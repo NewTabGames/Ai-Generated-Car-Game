@@ -1,5 +1,6 @@
 // Karts (rental / TaG 125 / KZ shifter): ride height, launches, top speed, steady-state cornering grip on a skid pad,
 // braking, hard turns (they must slide, never tip) and quick lane changes at speed (no spins with sane steering).
+// Clutch: where it pulls away and locks up (the TaG's must be fully in by 6,000 rpm - IAME's rules).
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694;
 const flat = (surf) => ({ C: { WATER_LEVEL: -1e4 }, ground(x, z, o) { o.h = 0; o.nx = 0; o.ny = 1; o.nz = 0; o.surface = surf; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } });
@@ -18,13 +19,18 @@ for (const key of ['rental', 'tag', 'kz']) {
   console.log(`== ${def.name} (${def.hp} hp, ${def.spec.mass} kg with driver)`);
   { const v = mk(key); for (let i = 0; i < 240; i++) v.step(1 / 120);
     console.log(`  static: CG ${v.py.toFixed(3)} m (spec ${v.spec.cgHeight}) · loads ${v.wheels.map((w) => Math.round(w.Fz)).join('/')} N · ${Math.round(v.rpm())} rpm idle`); }
-  { const v = mk(key); let t30 = null, t60 = null, nan = false;
+  { const v = mk(key); let t30 = null, t60 = null, nan = false, r1 = 0, lock = null, cutT = 0;
     for (let t = 0; t < 25; t += 1 / 240) {
       v.input.throttle = 1; v.step(1 / 240);
       if (!isFinite(v.px + v.vz)) { nan = true; break; }
       const s = v.forwardSpeed * MPH; if (t30 === null && s >= 30) t30 = t; if (t60 === null && s >= 60) t60 = t;
+      if (t < 1) r1 = v.rpm();
+      if (lock === null && v.locked && s > 1) lock = [s, v.rpm()];
+      if (v.fuelCut) cutT += 1 / 240;
     }
-    console.log(`  launch: 0-30 ${t30 ? t30.toFixed(2) : '--'} s · 0-60 ${t60 ? t60.toFixed(2) : '--'} s · top ${Math.round(v.forwardSpeed * MPH)} mph at ${Math.round(v.rpm())} rpm in ${v.gearLabel()}${nan ? ' NaN!' : ''}`); }
+    console.log(`  launch: 0-30 ${t30 ? t30.toFixed(2) : '--'} s · 0-60 ${t60 ? t60.toFixed(2) : '--'} s · top ${Math.round(v.forwardSpeed * MPH)} mph at ${Math.round(v.rpm())} rpm in ${v.gearLabel()}${nan ? ' NaN!' : ''}`);
+    // (a centrifugal clutch slips at a near-steady rpm until the kart catches up; the rental is governed, not cut)
+    console.log(`  clutch: pulls away at ${Math.round(r1)} rpm, locks up at ${lock ? Math.round(lock[0]) + ' mph / ' + Math.round(lock[1]) + ' rpm' : '--'} · rev limiter cut ${cutT.toFixed(1)} s of 25`); }
   // skid pad: hold a circle with steering, find the most lateral g it can keep
   { let best = 0;
     for (const mph of [15, 20, 25, 30, 35]) for (const st of [0.35, 0.55]) {

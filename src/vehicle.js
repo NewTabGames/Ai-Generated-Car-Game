@@ -1099,6 +1099,9 @@
         if (v > s.govSpeed) this.govT += h; else if (v < s.govSpeed - 1.5) this.govT = 0;
         if (this.govT > s.govGrace) thr *= clamp((s.govSpeed - v) / 1.2 + 0.3, 0, 1);
       }
+      // mechanical governor (rental karts): the flyweights close the throttle progressively as the revs near the governed
+      // speed, so it holds a steady top speed instead of banging off a rev limiter
+      if (s.governorRpm) thr = Math.min(thr, clamp((s.governorRpm - rpm) / s.governorBand, 0, 1));
       if (this.fuelCut || !this.running) thr = 0;
       // throttle-body / manifold lag
       const tau = thr > this.thrEff ? 0.065 : 0.045;
@@ -1135,11 +1138,12 @@
     }
 
     // ------------------------------------------------------------------ driveline
-    _coupling() {
+    _coupling(slip) {
       // returns 0 none, 1 fluid (torque converter), 2 friction (clutch / lockup) with this._cap
+      // (slip: engine speed minus the clutch's output side, rad/s)
       const s = this.spec;
       if (this.gear === 0 || this.park || this.revHoldActive || this.launchHold) return 0;
-      if (s.dragClutch) { this._cap = this._dcCap(); return this._cap > 1 ? 2 : 0; }
+      if (s.dragClutch) { this._cap = this._dcCap(slip || 0); return this._cap > 1 ? 2 : 0; }
       if (this.transType === 'auto') {
         if (this.lockupEng > 0.02 && !s.noLockup) { this._cap = s.lockupTorque * this.lockupEng; return 2; }
         return 1;
@@ -1153,10 +1157,14 @@
     // clutch slips by design for most of the run. Clamp = static pressure that the air timers step up over the run
     // (base, by seconds since the launch) + centrifugal counterweights (~ rpm^2). It only starts to grab above rpm0, so
     // the engine can idle in gear; traction control / clutch management backs the pressure off when the tyres spin
-    _dcCap() {
+    // muSlip (kart clutches): the linings grip harder the faster they slide (the rising friction curve clutch materials
+    // are made with, so they don't judder). Pulling away, the big slip holds the engine a little lower; as the kart
+    // catches up the grip eases and the revs climb into the lock-up - not one flat note all the way
+    _dcCap(slip) {
       const c = this.spec.dragClutch, we = this.eOmega;
       const e = clamp((we * RAD2RPM - c.rpm0) / (c.rpm1 - c.rpm0), 0, 1);
       let cap = e * e * (3 - 2 * e) * (curveAt(c.base, this.dcT) + c.kc * we * we);
+      if (c.muSlip) cap *= 1 + c.muSlip * Math.tanh(Math.abs(slip) / c.slipRef);
       if (this.gear < 0) cap = Math.min(cap, c.rev || 400);          // backing up on the reverser: just a nudge
       return cap * this.tcCut;
     }
@@ -1287,7 +1295,7 @@
       const lsdCap = s.lsdPreload + s.lsdRamp * Math.abs(this.lastTin);
       const dW = wl.omega - wr.omega;
       const Tb = -lsdCap * Math.tanh(dW / 2.5);
-      const mode = this._coupling();
+      const mode = this._coupling(this.eOmega - wc0 * G);
       if (mode !== 2) this.locked = false;
 
       if (mode === 0) {
@@ -1388,7 +1396,7 @@
       const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
       const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
-      const mode = this._coupling();
+      const mode = this._coupling(this.eOmega - wc0 * G);
       if (mode !== 2) this.locked = false;
       if (mode === 0) {
         this.eOmega += h * Te / Ie;
@@ -1865,24 +1873,26 @@
       mass: 235, Ipitch: 40, Iyaw: 52, Iroll: 16, cgHeight: 0.33, wheelbase: 1.07, frontWeight: 0.42,
       trackF: 1.12, trackR: 1.3, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.025, wheelInertiaR: 0.07,
       frontTire: 'kartRentF', rearTire: 'kartRentR', brakeTorqueF: 0, brakeTorqueR: 170,
-      idleRpm: 1500, limiterRpm: 4000, redlineRpm: 3800, engineInertia: 0.03, fricA: 1.2, fricB: 0.8, starterTorque: 8,
+      idleRpm: 1500, limiterRpm: 4200, redlineRpm: 3800, governorRpm: 3900, governorBand: 350, engineInertia: 0.03, fricA: 1.2, fricB: 0.8, starterTorque: 8,
       torqueCurve: [[0, 12], [1000, 16], [1500, 17.5], [2000, 18.8], [2500, 19.5], [3000, 19.3], [3500, 18.5], [3800, 17.8], [4000, 16], [4500, 10]],
       autoRatios: [1.0], autoRev: 1.0, autoFinal: 4.0, launchRpm: 2600,
-      dragClutch: { rpm0: 1900, rpm1: 2800, kc: 0.0005, rev: 20, base: [[0, 25]] },
+      dragClutch: { rpm0: 1800, rpm1: 2600, kc: 0.0005, rev: 20, base: [[0, 25]], muSlip: 0.3, slipRef: 90 },
       CdA: 0.55, bodyPts: kartPts(0.33, 0.42),
     } },
     // TaG 125 (IAME X30-type): a water-cooled 125 cc 2-stroke single, ~30 hp at ~14,000, 16,000 rpm limiter, touch-and-go
     // electric start, centrifugal clutch straight to the axle sprocket, rear brakes only, 158 kg with the driver. ~75 mph
-    tag: { name: 'TaG 125 Kart', short: 'TaG 125', car: 'X30', hp: 30, tq: 12.4, spec: {
+    tag: { name: 'TaG 125 Kart', short: 'TaG 125', car: 'X30', hp: 30, tq: 14.4, spec: {
       mass: 158, Ipitch: 28, Iyaw: 36, Iroll: 12, cgHeight: 0.3, wheelbase: 1.04, frontWeight: 0.42,
       trackF: 1.12, trackR: 1.38, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.02, wheelInertiaR: 0.05,
       frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 0, brakeTorqueR: 180,
       idleRpm: 2800, limiterRpm: 16000, redlineRpm: 15500, engineInertia: 0.006, fricA: 0.8, fricB: 0.25, starterTorque: 4,
-      torqueCurve: [[0, 2], [4000, 5], [6000, 7.5], [8000, 9.8], [10000, 11.6], [11500, 12.4], [13000, 12.0], [14000, 11.3], [15000, 10.2],
-        [15750, 9.3], [16500, 7.5], [17500, 4]],
-      autoRatios: [1.0], autoRev: 1.0, autoFinal: 7.0, launchRpm: 8000,
-      // (the centrifugal clutch bites around 8,000: it slips on the launch with the engine up in its powerband)
-      dragClutch: { rpm0: 6500, rpm1: 9500, kc: 0.000012, rev: 6, base: [[0, 6]] },
+      // (IAME: 30 hp, 19.5 Nm peak - the pipe comes on hard from ~9,000)
+      torqueCurve: [[0, 2], [4000, 5], [6000, 7.6], [8000, 10.4], [9500, 13.0], [10500, 14.3], [11500, 13.6], [12500, 12.5], [13500, 11.5],
+        [14500, 10.3], [15500, 8.9], [16500, 7.1], [17500, 4]],
+      autoRatios: [1.0], autoRev: 1.0, autoFinal: 7.0, launchRpm: 6000,
+      // (the centrifugal clutch must start to move the kart by 4,000 rpm and be fully in at 6,000 - IAME's rules - so it
+      // pulls away down around 5-6,000, off the pipe, and the revs climb with the speed from ~25 mph)
+      dragClutch: { rpm0: 3800, rpm1: 6000, kc: 0.000022, rev: 6, base: [[0, 2]], muSlip: 0.2, slipRef: 220 },
       CdA: 0.42, bodyPts: kartPts(0.3, 0.42),
     } },
     // KZ2 shifter: a 125 cc 2-stroke single with a 6-speed sequential box, ~48 hp at 13,500, brakes on all four wheels,
@@ -1896,7 +1906,7 @@
         [15000, 14], [16000, 9]],
       autoRatios: [2.0, 1.56, 1.29, 1.11, 1.0, 0.92], autoRev: 2.0, autoFinal: 5.3, shiftTimeWOT: 0.04, shiftTimePart: 0.08, shiftCutDepth: 0.45,
       launchRpm: 9000,
-      dragClutch: { rpm0: 6000, rpm1: 9000, kc: 0.00003, rev: 10, base: [[0, 14]] },
+      dragClutch: { rpm0: 6000, rpm1: 9000, kc: 0.00003, rev: 10, base: [[0, 14]], muSlip: 0.25, slipRef: 220 },
       CdA: 0.45, bodyPts: kartPts(0.3, 0.42),
     } },
   };
@@ -1948,7 +1958,10 @@
     if (b.dragClutch) {
       const c = b.dragClutch, st = t.stretch;
       s.dragClutch = Object.assign({}, c, { base: c.base.map(([x, y]) => [x, y * tr]), kc: c.kc * tr / (st * st), rpm0: c.rpm0 * st, rpm1: c.rpm1 * st });
+      if (c.slipRef) s.dragClutch.slipRef = c.slipRef * st;
     }
+    // (a governed rental kart: the rev-limit slider moves the governor with it; no limiter = no governor)
+    if (b.governorRpm) s.governorRpm = t.nolimit ? undefined : b.governorRpm + t.limiter - b.limiterRpm;
     s.dragScale = t.drag;
     s.lockupTorque = b.lockupTorque * Math.max(1, cap);
     s.clutchTorque = b.clutchTorque * Math.max(1, cap);

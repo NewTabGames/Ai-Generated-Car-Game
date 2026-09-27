@@ -21,7 +21,8 @@ class CarSynth {
       // nEng engines of cyl cylinders; fmul scales the exhaust formants (big engines, big pipes = lower); deep adds
       // longer pulses + sub-bass; loud drives the output stage harder; open: open cockpit (no cabin muffling);
       // whK: supercharger whine Hz per rpm, whPure 1 = a centrifugal blower's clean scream instead of a roots whine
-      nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 };
+      nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0,
+      pipe: 0 };   // (2-strokes) 0 off the pipe .. 1 in the expansion chamber's tuned band
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -129,10 +130,18 @@ class CarSynth {
     const race = c.race || 0, idleN = Math.max(0, 1 - c.rpm / (2300 + 1500 * race));
     if (k === this.weakIdx[e]) a *= 1 - 0.3 * idleN * (1 + 0.8 * race);
     else if (k === this.strongIdx[e]) a *= 1 + 0.25 * idleN * (1 + 0.8 * race);
-    a *= (1 + (this.cylAmp[e * 12 + k] - 1) * (1 - 0.75 * smoothN)) * (1 + (this.rnd() - 0.5) * (0.18 - 0.1 * smoothN + 0.25 * c.rough));
-    const bi = e * 2 + this.evB[i];
-    this.env[bi] += a;
-    this.slow[bi] += a * 0.55;
+    // (a 2-stroke single fires the same cylinder every turn: no cylinder-to-cylinder pattern)
+    a *= (1 + (this.cylAmp[e * 12 + (c.cyl === 2 ? 0 : k)] - 1) * (1 - 0.75 * smoothN)) * (1 + (this.rnd() - 0.5) * (0.18 - 0.1 * smoothN + 0.25 * c.rough));
+    if (c.cyl === 1 || c.cyl === 2) {
+      // a single has one exhaust: every pulse goes down the same pipe (through both resonator banks, for width).
+      // Handing alternate pulses to the two banks made a 2-stroke warble at half its firing rate, like a twin
+      const hA = a * 0.62;
+      this.env[0] += hA; this.env[1] += hA; this.slow[0] += hA * 0.55; this.slow[1] += hA * 0.55;
+    } else {
+      const bi = e * 2 + this.evB[i];
+      this.env[bi] += a;
+      this.slow[bi] += a * 0.55;
+    }
   }
   render(L, R, n) {
     const c = this.cur, t = this.tgt, sr = this.sr;
@@ -151,14 +160,19 @@ class CarSynth {
     const eDecay = Math.exp(-1 / (sr * (0.0019 - 0.0008 * rpmN) * (1 + 0.9 * deep))), sDecay = Math.exp(-1 / (sr * 0.007 * (1 + 0.6 * deep)));
     const bright = 0.25 + 0.95 * load * Math.min(1, rpm / 4800);
     const g = [(3.1 - 0.7 * rpmN) * (1 + 0.7 * deep), 2.1 * (1 + 0.35 * deep), 1.15 + 0.2 * race, 0.3 + 0.55 * bright + 0.4 * race * bright, 0.06 + 0.3 * bright + 0.28 * race * bright];
+    // (2-strokes) coming on the pipe: in the expansion chamber's tuned band the returning pressure wave rams the charge
+    // back in - the note hardens into a bright, ringing scream and gets louder; below it the engine burbles, soft and hollow
+    const pp = c.cyl === 2 ? Math.min(1, Math.max(0, c.pipe || 0)) : -1;
+    if (pp >= 0) { g[0] *= 1.3 - 0.5 * pp; g[1] *= 1.1 - 0.2 * pp; g[3] *= 0.65 + 0.95 * pp; g[4] *= 0.5 + 1.5 * pp; }
     const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
-    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN);   // open headers crackle
+    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0);   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
     const bodyAmp = (c.run > 0.5 ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
     const roarAmp = (c.run > 0.5 ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
     const aRoar = 1 - Math.exp(-2 * Math.PI * (160 + rpm * 0.1) / sr);
     let engGain = (c.run > 0.5 ? 0.5 + 0.5 * load : 0.3) * (0.62 + 0.38 * rpmN) * c.engVol * 0.55 * (1 + 0.3 * race) * (1 + loud * (0.1 + 0.9 * load)) / Math.sqrt(nE);
+    if (pp >= 0) engGain *= 0.82 + 0.4 * pp * (0.4 + 0.6 * load);
     const interior = c.open ? 0 : c.interior;
     // open cockpit: you sit right behind the engines, nothing in between
     if (c.open && c.interior > 0.5) engGain *= 1.2;
@@ -227,7 +241,9 @@ class CarSynth {
       if (nB === 2) { oL = (eL + 0.6 * eR) * engGain; oR = (eR + 0.6 * eL) * engGain; } else { oL = eL * engGain; oR = eR * engGain; }
       {
         const th = this.ca * Math.PI / 360;   // crank angle in radians (ca runs 0-720 deg per cycle)
-        const body = (Math.sin(bodyOrd * th) * 0.55 + Math.sin(2 * th + 0.7) * 0.3 * (1 + deep) + Math.sin(th + 1.9) * 0.16 * (1 + 2 * deep)) * bodyAmp;
+        // (the lope orders: once per cycle - two turns on a 4-stroke, one on a 2-stroke, which has no half order)
+        const tl = c.cyl === 2 ? 2 * th : th;
+        const body = (Math.sin(bodyOrd * th) * 0.55 + Math.sin(2 * tl + 0.7) * 0.3 * (1 + deep) + Math.sin(tl + 1.9) * 0.16 * (1 + 2 * deep)) * bodyAmp;
         this.bodyLP += 0.25 * (body - this.bodyLP);
         this.roarLP1 += aRoar * (w1 - this.roarLP1); this.roarLP2 += aRoar * (this.roarLP1 - this.roarLP2);
         const roar = this.roarLP2 * roarAmp * 4 * (0.65 + 0.35 * Math.sin(4 * th));

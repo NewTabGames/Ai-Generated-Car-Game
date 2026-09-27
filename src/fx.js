@@ -45,19 +45,22 @@
         // Soft particles: a flat billboard that slices through a tyre or the ground leaves a hard straight edge (it read
         // as the tyre sinking into the track), so each fragment fades out as it nears a tyre's surface or the pavement
         vertexShader: `attribute vec3 iPos; attribute vec4 iData; attribute float iGnd; varying vec2 vUv; varying float vA; varying float vShade;
-varying vec3 vWp; varying float vGnd;
+varying vec3 vWp; varying float vGnd; varying vec4 vNear;
+uniform vec3 uWc[4]; uniform vec2 uWr[4];
 #include <fog_pars_vertex>
 void main(){ vUv = uv; vA = iData.y; vShade = iData.w; vGnd = iGnd;
   float c = cos(iData.z), s = sin(iData.z);
   vec2 p = vec2(position.x * c - position.y * s, position.x * s + position.y * c) * iData.x;
   // world position of this corner of the billboard (camera right / up from the view matrix)
   vWp = iPos + vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]) * p.x + vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]) * p.y;
+  // which tyres this puff is close enough to touch (the per-pixel tyre test is the expensive part: most puffs skip it)
+  for (int k = 0; k < 4; k++) vNear[k] = uWr[k].x > 0.0 && distance(iPos, uWc[k]) < uWr[k].x + uWr[k].y + 0.35 + 0.72 * iData.x ? 1.0 : 0.0;
   vec4 mvPosition = viewMatrix * vec4(iPos, 1.0); mvPosition.xy += p;
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`,
         fragmentShader: `uniform sampler2D map; uniform vec3 uLight; uniform vec3 uAmb; varying vec2 vUv; varying float vA; varying float vShade;
-uniform vec3 uWc[4]; uniform vec3 uWa[4]; uniform vec2 uWr[4]; varying vec3 vWp; varying float vGnd;
+uniform vec3 uWc[4]; uniform vec3 uWa[4]; uniform vec2 uWr[4]; varying vec3 vWp; varying float vGnd; varying vec4 vNear;
 #include <fog_pars_fragment>
 // distance along the view ray from the camera to tyre k (a cylinder: tread + both sidewalls), 1e9 if the ray misses it
 float tyreHit(vec3 ro, vec3 rd, int k) {
@@ -74,12 +77,13 @@ float tyreHit(vec3 ro, vec3 rd, int k) {
   return th;
 }
 void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
+  if (a < 0.004) discard;
   // soft particles: fade a puff by how far it sits in front of whatever is behind it on this view ray - the pavement
   // or one of the car's tyres - so it never cuts a hard line through them
   vec3 rd = vWp - cameraPosition; float tf = length(rd); rd /= tf;
   if (rd.y < -1e-4) a *= smoothstep(0.0, 0.45, (vGnd - cameraPosition.y) / rd.y - tf);
   for (int k = 0; k < 4; k++) {
-    if (uWr[k].x <= 0.0) continue;
+    if (vNear[k] < 0.5) continue;
     float th = tyreHit(cameraPosition, rd, k);
     if (th < 1e8) a *= smoothstep(0.0, 0.3, th - tf);
   }
@@ -92,7 +96,21 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       });
       this.mesh = new THREE.Mesh(g, this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = 5;
       scene.add(this.mesh);
+      // the veil: a puff that has swallowed the camera is just an even haze over the whole view, but drawn as a
+      // billboard it fills every pixel on screen once per puff (a dense cloud around the camera = hundreds of
+      // full-screen layers, the lag in a monster truck's dirt roost). Those puffs are handed to one flat full-screen
+      // layer instead (a child of the puffs, so it hides with them in the cockpit)
+      this.veilU = { uCol: { value: new THREE.Color() }, uA: { value: 0 } };
+      this.veil = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: this.veilU, transparent: true, depthTest: false, depthWrite: false,
+        vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        fragmentShader: 'uniform vec3 uCol; uniform float uA; void main(){ gl_FragColor = vec4(uCol, uA); }' }));
+      this.veil.frustumCulled = false; this.veil.renderOrder = 6; this.veil.visible = false;
+      this.mesh.add(this.veil);
+      this.coverage = 0; this.budget = 1;
+      this.fill = 20;           // screens' worth of puff pixels drawn per frame at most (the game trims it on a slow GPU)
     }
+    // the camera the puffs are seen from (screen coverage, the veil)
+    setCamera(cam) { this.cam = cam; }
     emit(x, y, z, vx, vy, vz, size, grow, life, alpha, shade) {
       let i;
       if (this.n < this.max) i = this.n++;
@@ -128,23 +146,78 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         P[i * 3] += V[i * 3] * dt; P[i * 3 + 1] += V[i * 3 + 1] * dt; P[i * 3 + 2] += V[i * 3 + 2] * dt;
         this.rot[i] += this.rv[i] * dt;
       }
-      const ip = this.iPos.array, id = this.iData.array, ig = this.iGnd.array;
+      const ip = this.iPos.array, id = this.iData.array, ig = this.iGnd.array, cam = this.cam;
+      // Fill budget. Each puff costs the pixels it covers, and a cloud around the camera covers the whole screen
+      // hundreds of times over (a monster truck's dirt roost: 900+ screens a frame, a slideshow). So: find how big on
+      // screen (ph, half-height in half-screens) a puff may be for the drawn ones to fill at most FILL screens; bigger
+      // ones - the nearest, blurriest ones, which are an even haze by then anyway - fade into the veil instead
+      const e = cam ? cam.matrixWorldInverse.elements : null, th = cam ? Math.tan(cam.fov * Math.PI / 360) : 1, asp = cam ? cam.aspect : 1;
+      const phA = this.phA || (this.phA = new Float32Array(this.max)), arA = this.arA || (this.arA = new Float32Array(this.max));
+      const hist = this.hist || (this.hist = new Float32Array(Particles.NB));
+      hist.fill(0);
+      let covAll = 0;
       for (let i = 0; i < this.n; i++) {
-        const t = this.age[i] / this.life[i];
-        ip[i * 3] = P[i * 3]; ip[i * 3 + 1] = P[i * 3 + 1]; ip[i * 3 + 2] = P[i * 3 + 2]; ig[i] = this.gnd[i];
-        id[i * 4] = this.s0[i] + this.gr[i] * Math.pow(this.age[i], 0.65);
-        id[i * 4 + 1] = this.a0[i] * Math.min(1, this.age[i] * 6) * Math.pow(1 - t, 1.6);
+        const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+        ip[i * 3] = x; ip[i * 3 + 1] = y; ip[i * 3 + 2] = z; ig[i] = this.gnd[i];
+        const size = this.s0[i] + this.gr[i] * Math.pow(this.age[i], 0.65);
+        id[i * 4] = size; id[i * 4 + 1] = this.a0[i] * Math.min(1, this.age[i] * 6) * Math.pow(1 - this.age[i] / this.life[i], 1.6);
         id[i * 4 + 2] = this.rot[i]; id[i * 4 + 3] = this.shade[i];
+        phA[i] = -1;
+        const d = e ? -(e[2] * x + e[6] * y + e[10] * z + e[14]) : -1e9;
+        if (d <= -0.5 * size) continue;                     // behind the camera
+        const dd = Math.max(0.25, d), ph = 0.5 * size / (dd * th), pw = ph / asp;
+        const cx = (e[0] * x + e[4] * y + e[8] * z + e[12]) / (dd * th * asp), cy = (e[1] * x + e[5] * y + e[9] * z + e[13]) / (dd * th);
+        const area = Math.max(0, Math.min(1, cx + pw) - Math.max(-1, cx - pw)) * Math.max(0, Math.min(1, cy + ph) - Math.max(-1, cy - ph)) / 4;
+        phA[i] = ph; arA[i] = area; covAll += area;
+        hist[Particles.bin(ph)] += area;
+      }
+      // the size cut-off: smallest on-screen puffs first until the budget is spent (never past ~1.4: a puff that
+      // big covers the whole view), eased so puffs don't flicker across it
+      let cut = 1.4, sum = 0;
+      for (let b = 0; b < Particles.NB; b++) {
+        if (sum + hist[b] > this.fill) { cut = Math.min(cut, Particles.edge(b) * Math.pow(Particles.edge(b + 1) / Particles.edge(b), (this.fill - sum) / hist[b])); break; }
+        sum += hist[b];
+      }
+      this.cut = this.cut === undefined ? cut : this.cut + (cut - this.cut) * Math.min(1, dt * (cut < this.cut ? 8 : 2));
+      const c0 = this.cut;
+      let cov = 0, clear = 1, vw = 0, vs = 0;
+      for (let i = 0; i < this.n; i++) {
+        const ph = phA[i];
+        if (ph < 0) continue;
+        const f = Math.max(0, Math.min(1, (c0 - ph) / (0.3 * c0)));
+        if (f < 1) { const c = (1 - f) * id[i * 4 + 1] * 0.6 * arA[i]; clear *= 1 - c; vw += c; vs += c * this.shade[i]; }
+        id[i * 4 + 1] *= f; if (f <= 0) id[i * 4] = 0;       // (zero size: no pixels at all)
+        cov += arA[i] * f;
       }
       this.iPos.needsUpdate = true; this.iData.needsUpdate = true; this.iGnd.needsUpdate = true;
       this.geo.instanceCount = this.n;
+      this.coverage = cov; this.coverageAll = covAll;
+      // emission budget: a cloud already much bigger than the fill budget gets fewer (denser) new puffs
+      this.budget = Math.max(0.08, Math.min(1, (90 - covAll) / 60));
+      // (eased a little: the camera crossing a puff's edge shouldn't pop the whole view)
+      const va = this.veilA = (this.veilA || 0) + (Math.min(0.85, 1 - clear) - (this.veilA || 0)) * Math.min(1, dt * 12);
+      this.veil.visible = va > 0.003;
+      if (this.veil.visible) {
+        // the puffs' own colour (tyre smoke white-grey .. soil brown) under the same light, texture brightness ~0.8
+        if (vw > 0) this.veilSh = vs / vw;
+        const sh = this.veilSh || 0, u = this.uniforms, col = this.veilU.uCol.value;
+        const lit = this._lit || (this._lit = col.clone());
+        lit.copy(u.uLight.value).multiplyScalar(0.48).add(u.uAmb.value);
+        col.setRGB(0.9 - 0.38 * sh, 0.9 - 0.47 * sh, 0.92 - 0.6 * sh).multiply(lit);
+        this.veilU.uA.value = va;
+      }
       void groundFn;
     }
+    // on-screen size bins for the fill budget: log-spaced half-heights 0.01 .. 3 half-screens
+    static bin(ph) { return Math.max(0, Math.min(Particles.NB - 1, Math.floor(Math.log(ph / 0.01) / Math.log(300) * Particles.NB))); }
+    static edge(b) { return 0.01 * Math.pow(300, b / Particles.NB); }
     setLight(sunColor, sunI, amb) {
       this.uniforms.uLight.value.copy(sunColor).multiplyScalar(Math.min(1.2, sunI * 0.32));
       this.uniforms.uAmb.value.setScalar(amb);
     }
   }
+
+  Particles.NB = 48;
 
   class Skids {
     constructor(THREE, scene, max) {

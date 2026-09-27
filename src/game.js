@@ -157,6 +157,7 @@
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
   const smoke = new FX.Particles(THREE, scene, 2800);
+  smoke.setCamera(camera);
   const skids = new FX.Skids(THREE, scene, 9000);
   const SOIL = [null, [0.3, 0.27, 0.22], [0.2, 0.19, 0.09], [0.27, 0.19, 0.11]];   // rut colours: gravel, grass (torn turf), dirt
   const flames = new FX.Flames(THREE, car.root, car.exhaustTips);
@@ -228,7 +229,7 @@
     else if (DRAGSTER) setTimeout(() => hud.hint(CARDEF.short + ' dragster: shift up (E) for DRIVE. Burnout: hold B and floor it (it rolls — no front brakes). Stage, hold SPACE (clutch pedal) and floor it, let go on green. '
       + (DRAGMAP ? 'The chutes pop by themselves past the ' + (FINISH === 1000 ? '1,000 ft' : '¼ mile') + ' line (F pulls them).' : 'It lives on the Drag Strip map (Esc → Drive → Map).'), 11), 1600);
     else if (KART) setTimeout(() => hud.hint('Go-kart: shift up (E) for DRIVE and floor it. No suspension and a solid rear axle: brake in a straight line, turn in smoothly, let it roll through the corner.'
-      + (CARDEF.cls === 'kz' ? ' KZ shifter: 6 gears - E / Q or the paddles (M holds it in manual).' : CARDEF.cls === 'tag' ? ' The clutch grabs around 8,000 rpm - keep it screaming.' : ''), 10), 1600);
+      + (CARDEF.cls === 'kz' ? ' KZ shifter: 6 gears - E / Q or the paddles (M holds it in manual).' : CARDEF.cls === 'tag' ? ' The clutch is fully in by 6,000 rpm, so it pulls away off the pipe - it comes alive past ~9,000.' : ''), 10), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it. Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
@@ -290,7 +291,7 @@
       desc: 'A tube frame a few inches off the ground, an engine beside the seat driving the rear axle by chain, direct steering and slicks the size of dinner plates. No suspension and no differential - the frame flexes, the inside rear tyre lifts, and you feel every ripple. The rental kart is slow and forgiving behind its wraparound bumper; the TaG 125 is a proper race kart; the KZ shifter is a 48 hp, 6-speed rocket that brakes on all four wheels.',
       btn: 'GO-KART', tc: 3, optKey: 'kartClass', options: [
         ['rental', 'Rental kart', '390 cc 4-stroke · ~13 hp · centrifugal clutch · wraparound bumper · hard tyres · ~31 mph', 'Go Mango'],
-        ['tag', 'TaG 125', 'X30-type 125 cc 2-stroke · ~30 hp at 14,000 · centrifugal clutch · 158 kg · ~74 mph', 'B5 Blue'],
+        ['tag', 'TaG 125', 'X30-type 125 cc 2-stroke · ~30 hp at 13,000 · centrifugal clutch · 158 kg · ~74 mph', 'B5 Blue'],
         ['kz', 'KZ shifter', '125 cc 2-stroke · ~48 hp · 6-speed sequential · 4-wheel brakes · 0-60 in ~4 s · ~95 mph', 'TorRed'],
       ] },
     { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
@@ -481,7 +482,7 @@
       }
       if (KART) {
         add(row(CARDEF.name, CARDEF.cls === 'kz' ? '125 cc 2-stroke single, ~48 hp at 13,500, 14,500 limiter · 6-speed sequential (E / Q, paddles) · brakes on all four wheels · 175 kg with the driver · slicks'
-          : CARDEF.cls === 'tag' ? 'Water-cooled 125 cc 2-stroke single, ~30 hp at 14,000, 16,000 limiter · centrifugal clutch straight to the axle · rear brake only · 158 kg with the driver · slicks'
+          : CARDEF.cls === 'tag' ? 'Water-cooled 125 cc 2-stroke single, ~30 hp at 13,000, 19.5 Nm, 16,000 limiter · centrifugal clutch straight to the axle · rear brake only · 158 kg with the driver · slicks'
           : '390 cc 4-stroke single, ~13 hp, governed · centrifugal clutch · one rear disc · hard long-life tyres · 235 kg with the driver', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
           seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
@@ -826,7 +827,11 @@
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
       if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
-      G.emitAcc[i] += rate * dt * tune.smoke;
+      // (a cloud already filling the screen many times over gets its new puffs fewer but denser: same look, a
+      // fraction of the pixels to draw)
+      const bud = smoke.budget;
+      if (bud < 1) alpha = Math.min(0.85, 1 - Math.pow(1 - alpha, 1 / Math.max(0.35, bud)));
+      G.emitAcc[i] += rate * dt * tune.smoke * bud;
       if (G.emitAcc[i] >= 1) smoke.setGround(groundH(w.cpx, w.cpz));
       while (G.emitAcc[i] >= 1) {
         G.emitAcc[i] -= 1;
@@ -838,6 +843,9 @@
     }
     // nitro burns in the pipes: a Top Fuel engine under power lights all eight zoomies (alcohol burns nearly invisible)
     if (DRAGSTER) flames.burn(veh.running && !veh.fuelCut ? clamp(veh.thrEff * veh.tcCut * (veh.rpm() - 3000) / 4500, 0, 1) * (NITRO ? 1 : 0.35) : 0);
+    // (the smoke's fill budget follows the frame rate while the smoke is what's filling the screen: a slower GPU
+    // draws fewer of the nearest puffs one by one and more of them as the flat veil)
+    if (smoke.coverageAll > 0.6 * smoke.fill && G.fps) smoke.fill = clamp(smoke.fill * (G.fps < 50 ? 1 - dt * 0.8 : G.fps > 57 ? 1 + dt * 0.3 : 1), 4, 24);
     smoke.update(dt, 1.3, 0.5);
     smoke.setLight(world.sun.color, world.sun.intensity, world.preset === 'night' ? 0.08 : world.preset === 'sunset' ? 0.42 : 0.55);
     flames.update(dt);
@@ -970,8 +978,8 @@
   // roar with a lumpy, misfiring idle; methanol a little cleaner and higher-revving)
   // (karts: singles - a 4-stroke thumper for the rental, 2-strokes that ring to 14-16,000 through tiny expansion chambers)
   const ENG_SND = KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
-      : CARDEF.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15 }
-      : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15 })
+      : CARDEF.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15, pipe: [9000, 11500] }
+      : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15, pipe: [8500, 11000] })
     : MONSTER ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
     : DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
@@ -997,6 +1005,7 @@
       rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() ? 1 : 0,
       boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
+      pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
     });
   }
   function processEvents() {
@@ -1283,7 +1292,7 @@
 
   // ------------------------------------------------------------------ main loop
   let last = performance.now(), worldT = 0, fpsT = 0, frames = 0;
-  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE };
+  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke };
   function loop(now) {
     requestAnimationFrame(loop);
     frame(now);
