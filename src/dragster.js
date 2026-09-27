@@ -116,11 +116,13 @@
       const z0 = st[0][0], z1 = st[nS - 1][0];
       let q = 0;
       for (let i = 0; i < nS; i++) {
-        const [z, hw, yb, yt, n] = st[i], yc = (yb + yt) / 2, hh = (yt - yb) / 2, e = 2 / n;
+        // (clip: optional height the section is cut off below - wheel openings - without changing anything above it)
+        const [z, hw, yb, yt, n, clip] = st[i], yc = (yb + yt) / 2, hh = (yt - yb) / 2, e = 2 / n;
         for (let j = 0; j <= seg; j++) {
           const v = j / seg, ph = v * Math.PI * 2, s = Math.sin(ph), c = Math.cos(ph), ee = c > 0 ? e * 0.55 : e;   // squarer bottom
           pos[q * 3] = -hw * Math.sign(s) * Math.pow(Math.abs(s), ee);
-          pos[q * 3 + 1] = yc - hh * Math.sign(c) * Math.pow(Math.abs(c), ee);
+          const y = yc - hh * Math.sign(c) * Math.pow(Math.abs(c), ee);
+          pos[q * 3 + 1] = clip && y < clip ? clip : y;
           pos[q * 3 + 2] = z;
           uv[q * 2] = (z - z0) / (z1 - z0); uv[q * 2 + 1] = v; q++;
         }
@@ -266,30 +268,49 @@
 
     } else {
       // ---------------------------------------------------------------- Funny Car body
-      // One loft from the nose to the tail with the wheel openings cut into its underside (the section's bottom is
-      // raised round each axle), open underneath behind the rear axle; a separate greenhouse with see-through glass;
-      // a fascia on the nose and a tail panel. Same u/v mapping as the rail's body for the livery.
+      // One loft from the nose to the tail with the wheel openings cut into its underside (each section is clipped off
+      // below the opening, so the fenders and hood above keep their shape), open underneath behind the rear axle; a
+      // separate greenhouse with see-through glass; a fascia on the nose and a tail panel. Same u/v mapping as the
+      // rail's body for the livery.
       const zNf = zF - 1.25, zT = zR + 0.62, zW = zR - 1.45, zRW = zR + 0.05;
-      const tb = (T, z) => { if (z <= T[0][0]) return T[0][1]; for (let i = 1; i < T.length; i++) if (z <= T[i][0]) { const a = T[i - 1], b = T[i], t = (z - a[0]) / (b[0] - a[0]); const e = t * t * (3 - 2 * t); return a[1] + (b[1] - a[1]) * e; } return T[T.length - 1][1]; };
+      // profiles through their control points: monotone cubic (smooth, and it never overshoots between points - a
+      // smoothstep per segment went flat at every point and the hood rose in little ripples)
+      const spline = (T) => {
+        const n = T.length, x = T.map((p) => p[0]), y = T.map((p) => p[1]), h = [], d = [], m = [];
+        for (let i = 0; i < n - 1; i++) { h[i] = x[i + 1] - x[i]; d[i] = (y[i + 1] - y[i]) / h[i]; }
+        m[0] = d[0]; m[n - 1] = d[n - 2];
+        for (let i = 1; i < n - 1; i++) {
+          if (d[i - 1] * d[i] <= 0) m[i] = 0;
+          else { const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1]; m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]); }
+        }
+        return (z) => {
+          if (z <= x[0]) return y[0]; if (z >= x[n - 1]) return y[n - 1];
+          let i = 0; while (z > x[i + 1]) i++;
+          const t = (z - x[i]) / h[i], t2 = t * t, t3 = t2 * t;
+          return (2 * t3 - 3 * t2 + 1) * y[i] + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * y[i + 1] + (t3 - t2) * h[i] * m[i + 1];
+        };
+      };
       // (a bulge over the engine: the blower sits flush with it and only the hat comes through)
       const YTf = [[zNf, 0.34], [zNf + 0.1, 0.42], [zNf + 0.4, 0.55], [zF, 0.72], [zF + 0.35, 0.86], [zE - 0.45, 0.905], [zE, 0.945], [zW, 0.96], [zR - 0.6, 1.02], [zR, 1.12], [zT, 1.14]];
       const WTf = [[zNf, 0.62], [zNf + 0.15, 0.78], [zF - 0.5, 0.86], [zF, 0.9], [zR - 0.8, 0.92], [zR, 0.98], [zT, 0.95]];
       const NTf = [[zNf, 3.2], [zNf + 0.4, 4.2], [zT, 4.6]];
+      const pYT = spline(YTf), pW = spline(WTf), pN = spline(NTf);
       const ARF = 0.4, ARR = 0.6;                     // wheel-opening radii round the front / rear hubs
-      const ybAt = (z) => {
-        let yb = 0.11 + 0.09 * clamp((z - zF) / (zR - zF), 0, 1);
+      const ybAt = (z) => 0.11 + 0.09 * clamp((z - zF) / (zR - zF), 0, 1);
+      const clipAt = (z) => {                          // the wheel openings (and the open tail) as a cut-off height
+        let c = 0;
         const df = z - zF, dr = z - zR;
-        if (Math.abs(df) < ARF) yb = Math.max(yb, RF + Math.sqrt(ARF * ARF - df * df));
-        if (Math.abs(dr) < ARR) yb = Math.max(yb, RR + Math.sqrt(ARR * ARR - dr * dr));
-        if (z > zR) yb = Math.max(yb, 0.5);           // open under the tail: tyres, wheelie bars and chutes show
-        return yb;
+        if (Math.abs(df) < ARF) c = RF + Math.sqrt(ARF * ARF - df * df);
+        if (Math.abs(dr) < ARR) c = Math.max(c, RR + Math.sqrt(ARR * ARR - dr * dr));
+        if (z > zR) c = Math.max(c, 0.5);             // open under the tail: tyres, wheelie bars and chutes show
+        return c;
       };
       const zs = [];
-      for (let z = zNf; z < zT; z += 0.04) zs.push(z);
+      for (let z = zNf; z < zT; z += 0.03) zs.push(z);
       for (const [zc, r] of [[zF, ARF], [zR, ARR]]) zs.push(zc - r - 0.002, zc - r + 0.002, zc + r - 0.002, zc + r + 0.002);
       zs.push(zW, zRW, zT); zs.sort((a, b) => a - b);
       const Zs = zs.filter((z, i) => i === 0 || z - zs[i - 1] > 0.003);
-      const STf = Zs.map((z) => [z, tb(WTf, z), ybAt(z), tb(YTf, z), tb(NTf, z)]);
+      const STf = Zs.map((z) => [z, pW(z), ybAt(z), pYT(z), pN(z), clipAt(z)]);
       const fcGeo = loft(STf, SEG, (za, zb, v) => za >= zW - 1e-6 && zb <= zRW + 1e-6 && Math.abs(v - 0.5) < 0.1);
       const uOf = (z) => (z - zNf) / (zT - zNf);
       const fcLivery = canvasTex(2048, 512, (g, w, h) => {
@@ -336,15 +357,15 @@
       add(model, fcGeo, M.paint, 0, 0, 0);
       add(model, fcGeo, decal(fcLivery), 0, 0, 0, 0, 0, 0, false);
       // end panels from the first / last ring: the nose fascia (grille, headlight strips) and the tail (lights, name)
-      const ringShape = (hw, yb, yt, n, flipU) => {
-        const sh = new THREE.Shape(), yc = (yb + yt) / 2, hh = (yt - yb) / 2, e = 2 / n;
+      const ringShape = (hw, yb, yt, n, flipU, clip) => {
+        const sh = new THREE.Shape(), yc = (yb + yt) / 2, hh = (yt - yb) / 2, e = 2 / n, ylo = Math.max(yb, clip || 0);
         for (let j = 0; j < 48; j++) {
           const ph = j / 48 * Math.PI * 2, sn = Math.sin(ph), c = Math.cos(ph), ee = c > 0 ? e * 0.55 : e;
-          const x = -hw * Math.sign(sn) * Math.pow(Math.abs(sn), ee), y = yc - hh * Math.sign(c) * Math.pow(Math.abs(c), ee);
+          const x = -hw * Math.sign(sn) * Math.pow(Math.abs(sn), ee), y = Math.max(ylo, yc - hh * Math.sign(c) * Math.pow(Math.abs(c), ee));
           sh[j ? 'lineTo' : 'moveTo'](x, y);
         }
         const g = new THREE.ShapeGeometry(sh, 4), p = g.attributes.position, uv = new Float32Array(p.count * 2);
-        for (let q = 0; q < p.count; q++) { const u = (p.getX(q) + hw) / (2 * hw); uv[q * 2] = flipU ? 1 - u : u; uv[q * 2 + 1] = (p.getY(q) - yb) / (yt - yb); }
+        for (let q = 0; q < p.count; q++) { const u = (p.getX(q) + hw) / (2 * hw); uv[q * 2] = flipU ? 1 - u : u; uv[q * 2 + 1] = (p.getY(q) - ylo) / (yt - ylo); }
         g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return g;
       };
       const noseTex = canvasTex(512, 256, (g, w, h) => {
@@ -365,24 +386,20 @@
       const r0 = STf[0], rN = STf[STf.length - 1];
       const nG = ringShape(r0[1], r0[2], r0[3], r0[4], true); nG.rotateY(Math.PI);   // (faces forward: u flipped so it reads right)
       add(model, nG, M.paint, 0, 0, zNf - 0.001); add(model, nG, decal(noseTex), 0, 0, zNf - 0.003, 0, 0, 0, false);
-      const tG = ringShape(rN[1], rN[2], rN[3], rN[4]);
+      const tG = ringShape(rN[1], rN[2], rN[3], rN[4], false, rN[5]);
       add(model, tG, M.paint, 0, 0, zT + 0.001); add(model, tG, decal(tailTex), 0, 0, zT + 0.003, 0, 0, 0, false);
-      add(model, new THREE.BoxGeometry(1.5, 0.045, 0.016), M.tail, 0, rN[2] + (rN[3] - rN[2]) * 0.3, zT + 0.009, 0, 0, 0, false);
+      { const ylo = Math.max(rN[2], rN[5]); add(model, new THREE.BoxGeometry(1.5, 0.045, 0.016), M.tail, 0, ylo + (rN[3] - ylo) * 0.3, zT + 0.009, 0, 0, 0, false); }
       // firewall / dash at the base of the windshield: without it you looked straight into the engine bay from the seat
-      { const fw = ringShape(tb(WTf, zW) - 0.02, ybAt(zW) + 0.01, tb(YTf, zW) - 0.006, tb(NTf, zW)); add(model, fw, M.carbon, 0, 0, zW + 0.012, 0, 0, 0, false); }
+      { const fw = ringShape(pW(zW) - 0.02, ybAt(zW) + 0.01, pYT(zW) - 0.006, pN(zW)); add(model, fw, M.carbon, 0, 0, zW + 0.012, 0, 0, 0, false); }
       // splitter under the nose, a black collar round the hat where it comes through the hood
       add(model, new THREE.BoxGeometry(1.3, 0.012, 0.32), M.carbon, 0, 0.1, zNf + 0.14);
-      add(model, rbox(0.42, 0.05, 0.6, 0.02), M.black, 0, tb(YTf, zE) + 0.01, zE);
+      add(model, rbox(0.42, 0.05, 0.6, 0.02), M.black, 0, pYT(zE) + 0.01, zE);
       // greenhouse: low, laid-back windshield, short roof, glass cut out of the paint with an alpha map; the glass
       // underneath is a second skin you can see through - also from the driver's seat
       const GH = [[zW, 0.74, 0.94, 0.965], [zW + 0.2, 0.72, 0.95, 1.06], [zW + 0.42, 0.69, 0.96, 1.16], [zW + 0.66, 0.645, 0.98, 1.255],
         [zW + 0.86, 0.63, 0.99, 1.275], [zR - 0.48, 0.63, 1.0, 1.265], [zR - 0.28, 0.66, 1.03, 1.21], [zR - 0.1, 0.7, 1.07, 1.155], [zRW, 0.72, 1.09, 1.125]];
-      const ghSt = [];
-      for (let z = zW; z <= zRW + 1e-6; z += 0.04) {
-        let i = 1; while (i < GH.length - 1 && GH[i][0] < z) i++;
-        const a = GH[i - 1], b = GH[i], t = clamp((z - a[0]) / (b[0] - a[0]), 0, 1);
-        ghSt.push([z, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t, 2.6]);
-      }
+      const ghSt = [], gW = spline(GH.map((r) => [r[0], r[1]])), gB = spline(GH.map((r) => [r[0], r[2]])), gT = spline(GH.map((r) => [r[0], r[3]]));
+      for (let z = zW; z <= zRW + 1e-6; z += 0.03) ghSt.push([z, gW(z), gB(z), gT(z), 2.6]);
       const ghGeo = loft(ghSt, SEG, (za, zb, v) => v < 0.12 || v > 0.88);
       const winTex = canvasTex(512, 256, (g, w, h) => {
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
