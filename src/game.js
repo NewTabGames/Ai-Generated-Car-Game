@@ -276,6 +276,7 @@
     G.menu = v;
     $('menu').classList.toggle('hidden', !v);
     G.paused = v || !G.started;
+    if (v) input.stopRumble();              // (paused: no vibration left running under the menu)
     if (audio.ready) audio.master.gain.setTargetAtTime(v ? 0.25 : 1, audio.ctx.currentTime, 0.1);
     if (v) renderMenu();
   }
@@ -654,7 +655,7 @@
     ['rearMode', 'REAR STEER MODE', 'Monster truck: cycle AUTO / CRAB / MANUAL / FRONT'], ['rearLeft', 'REAR STEER LEFT (hold)', 'Monster truck, manual rear steer'], ['rearRight', 'REAR STEER RIGHT (hold)', ''],
   ];
   function startWizard() {
-    openMenu(false); G.paused = true;
+    openMenu(false); G.paused = true; input.stopRumble();
     $('wizard').classList.remove('hidden');
     input.wizard = true;
     WZ.step = 0; WZ.prof = { name: 'custom', buttons: {} }; WZ.base = input.snapshot(); WZ.hold = 0; WZ.found = null; WZ.waitRelease = false;

@@ -62,7 +62,12 @@
         if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Tab'].includes(e.code)) e.preventDefault();
       });
       window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-      window.addEventListener('blur', () => this.keys.clear());
+      window.addEventListener('blur', () => { this.keys.clear(); this.stopRumble(); });
+      // the vibration must be switched off before the page goes: a pulse still playing when the tab closes can lose its
+      // stop, and some wheel drivers then hold the last vibration indefinitely (the wheel buzzing after the game is gone)
+      window.addEventListener('pagehide', () => this.stopRumble());
+      window.addEventListener('beforeunload', () => this.stopRumble());
+      document.addEventListener('visibilitychange', () => { if (document.hidden) this.stopRumble(); });
       window.addEventListener('gamepadconnected', (e) => { this.onConnect && this.onConnect(e.gamepad); });
       window.addEventListener('gamepaddisconnected', (e) => { this.onDisconnect && this.onDisconnect(e.gamepad); });
     }
@@ -242,6 +247,18 @@
         if (va && va.playEffect) {
           try { va.playEffect(va.type || 'dual-rumble', { duration: ms || 80, strongMagnitude: clamp(strong, 0, 1), weakMagnitude: clamp(weak, 0, 1) }); } catch (e) { /* unsupported */ }
         }
+      }
+    }
+
+    /** Stop every pad's rumble motors right now (tab closing / hidden / unfocused, game paused). */
+    stopRumble() {
+      for (const p of this.pads()) {
+        const va = p.vibrationActuator;
+        if (!va) continue;
+        try {
+          if (va.reset) va.reset();
+          else if (va.playEffect) va.playEffect(va.type || 'dual-rumble', { duration: 1, strongMagnitude: 0, weakMagnitude: 0 });
+        } catch (e) { /* unsupported */ }
       }
     }
 

@@ -3781,7 +3781,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Tab'].includes(e.code)) e.preventDefault();
       });
       window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-      window.addEventListener('blur', () => this.keys.clear());
+      window.addEventListener('blur', () => { this.keys.clear(); this.stopRumble(); });
+      // the vibration must be switched off before the page goes: a pulse still playing when the tab closes can lose its
+      // stop, and some wheel drivers then hold the last vibration indefinitely (the wheel buzzing after the game is gone)
+      window.addEventListener('pagehide', () => this.stopRumble());
+      window.addEventListener('beforeunload', () => this.stopRumble());
+      document.addEventListener('visibilitychange', () => { if (document.hidden) this.stopRumble(); });
       window.addEventListener('gamepadconnected', (e) => { this.onConnect && this.onConnect(e.gamepad); });
       window.addEventListener('gamepaddisconnected', (e) => { this.onDisconnect && this.onDisconnect(e.gamepad); });
     }
@@ -3961,6 +3966,18 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         if (va && va.playEffect) {
           try { va.playEffect(va.type || 'dual-rumble', { duration: ms || 80, strongMagnitude: clamp(strong, 0, 1), weakMagnitude: clamp(weak, 0, 1) }); } catch (e) { /* unsupported */ }
         }
+      }
+    }
+
+    /** Stop every pad's rumble motors right now (tab closing / hidden / unfocused, game paused). */
+    stopRumble() {
+      for (const p of this.pads()) {
+        const va = p.vibrationActuator;
+        if (!va) continue;
+        try {
+          if (va.reset) va.reset();
+          else if (va.playEffect) va.playEffect(va.type || 'dual-rumble', { duration: 1, strongMagnitude: 0, weakMagnitude: 0 });
+        } catch (e) { /* unsupported */ }
       }
     }
 
@@ -9938,6 +9955,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     G.menu = v;
     $('menu').classList.toggle('hidden', !v);
     G.paused = v || !G.started;
+    if (v) input.stopRumble();              // (paused: no vibration left running under the menu)
     if (audio.ready) audio.master.gain.setTargetAtTime(v ? 0.25 : 1, audio.ctx.currentTime, 0.1);
     if (v) renderMenu();
   }
@@ -10316,7 +10334,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     ['rearMode', 'REAR STEER MODE', 'Monster truck: cycle AUTO / CRAB / MANUAL / FRONT'], ['rearLeft', 'REAR STEER LEFT (hold)', 'Monster truck, manual rear steer'], ['rearRight', 'REAR STEER RIGHT (hold)', ''],
   ];
   function startWizard() {
-    openMenu(false); G.paused = true;
+    openMenu(false); G.paused = true; input.stopRumble();
     $('wizard').classList.remove('hidden');
     input.wizard = true;
     WZ.step = 0; WZ.prof = { name: 'custom', buttons: {} }; WZ.base = input.snapshot(); WZ.hold = 0; WZ.found = null; WZ.waitRelease = false;
