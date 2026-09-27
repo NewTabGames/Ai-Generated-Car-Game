@@ -354,12 +354,16 @@
   // A stadium floor covered in packed, watered clay: HW x HL (half sizes) with rounded corners (radius CR), a concrete
   // wall and debris fence all round (colliders), the stands beyond. Every obstacle is an exact height function (like the
   // jump ramps), added to the flat ground so the tyres, suspension and body feel it, and meshed from the same function:
+  // The floor is 96 x 184 m (a big domed stadium's, wall to wall):
   //   east side  - a big tabletop: 13 m faces up to a 4 m deck 16 m long (jump it, or land on the far face)
   //   west side  - the car crush: a kicker, six junk cars side by side, a kicker back down. The cars flatten under load
-  //   north end  - the big gap jump: a 30 deg kicker to a 3.6 m lip, a gap, a landing mound with a long downslope
+  //   north end  - the big gap jump: a 30 deg kicker to a 3.6 m lip, a gap, a landing mound with a long downslope;
+  //                beside it a step-up (north-west: up a steep face onto a 2.8 m deck, off down a long ramp) and a
+  //                whoops lane (north-east, along the wall: four 1.2 m rollers)
   //   south end  - moguls: three 1.2 m whoops across the floor
   //   corners    - banked up to 2.4 m against the wall, for sliding round
-  const ARENA = { HW: 36, HL: 68, CR: 18, SPAWN_X: 0, SPAWN_Z: 32 };
+  const ARENA = { HW: 48, HL: 92, CR: 24, SPAWN_X: 0, SPAWN_Z: 44 };
+  const CRUSH_X = -26;                      // the car-crush lane (x of the junk cars)
   const sstep = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const dsstep = (a, b, x) => { const t = (x - a) / (b - a); return t <= 0 || t >= 1 ? 0 : 6 * t * (1 - t) / (b - a); };
   // signed distance to the wall line (negative inside the floor)
@@ -396,17 +400,25 @@
       w -= F;
       if (w < T) { o.d = 0; return HL; }
       w -= T; o.d = -HL * dsstep(0, B, w); return HL * (1 - sstep(0, B, w)); },
-    // moguls: three whoops
-    mogul(u, o) { const W = 7, H = 1.2, E = 3 * W;
+    // step-up: a steep face up onto a deck, then a long ramp back down (jump off the deck or roll it)
+    step(u, o) { const L = 8, H = 2.8, p = 1.6, T = 10, B = 14, E = L + T + B;
+      if (u <= 0 || u >= E) { o.d = 0; return 0; }
+      if (u < L) { const s = u / L; o.d = H * p * Math.pow(s, p - 1) / L; return H * Math.pow(s, p); }
+      if (u < L + T) { o.d = 0; return H; }
+      const w = u - L - T; o.d = -H * dsstep(0, B, w); return H * (1 - sstep(0, B, w)); },
+    // moguls: a row of whoops (three, or ob.n)
+    mogul(u, o, ob) { const W = 7, H = 1.2, E = (ob.n || 3) * W;
       if (u <= 0 || u >= E) { o.d = 0; return 0; }
       const a = Math.PI * u / W, s = Math.sin(a); o.d = H * 2 * s * Math.cos(a) * Math.PI / W; return H * s * s; },
   };
   // obstacles: centre-line start (x0, z0), direction (fx, fz), length, half width (flat part + falloff `bev`)
   const ARENA_OBS = [
-    { kind: 'table', x0: 17, z0: -21, fx: 0, fz: 1, len: 42, hw: 10.5, bev: 6 },
-    { kind: 'crush', x0: -17, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
-    { kind: 'gap', x0: 0, z0: -14, fx: 0, fz: -1, len: 36.5, hw: 7.5, bev: 3.5 },
-    { kind: 'mogul', x0: 0, z0: 40, fx: 0, fz: 1, len: 21, hw: 24, bev: 5 },
+    { kind: 'table', x0: 26, z0: -21, fx: 0, fz: 1, len: 42, hw: 10.5, bev: 6 },
+    { kind: 'crush', x0: CRUSH_X, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
+    { kind: 'gap', x0: 0, z0: -18, fx: 0, fz: -1, len: 36.5, hw: 7.5, bev: 3.5 },
+    { kind: 'mogul', x0: 0, z0: 58, fx: 0, fz: 1, len: 21, hw: 26, bev: 5 },
+    { kind: 'step', x0: -28, z0: -34, fx: 0, fz: -1, len: 32, hw: 8, bev: 3.5 },
+    { kind: 'mogul', n: 4, x0: 39, z0: -34, fx: 0, fz: -1, len: 28, hw: 6, bev: 2.5 },   // (clear of the tabletop's run-out)
   ];
   for (const ob of ARENA_OBS) {             // bounding boxes for quick rejection (and for the renderer's meshes)
     const ex = [ob.x0, ob.x0 + ob.fx * ob.len], ez = [ob.z0, ob.z0 + ob.fz * ob.len], rx = -ob.fz, rz = ob.fx;
@@ -430,7 +442,7 @@
     o.hb = hb * f; o.h0 = (hb + hc * gC) * f; return o;
   }
   for (let k = 0; k < 6; k++) {
-    const c = { x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
+    const c = { x: CRUSH_X, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
       dent: new Float32Array(CNA * CNB), h0: new Float32Array(CNA * CNB), hb: new Float32Array(CNA * CNB), ver: 0, level: 0, cab: 0, dd: 0, glassEv: 0, glassN: 0 };
     for (let ia = 0; ia < CNA; ia++) for (let ib = 0; ib < CNB; ib++) {
       carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
@@ -468,7 +480,7 @@
       if (x < ob.minX || x > ob.maxX || z < ob.minZ || z > ob.maxZ) continue;
       const dx = x - ob.x0, dz = z - ob.z0, u = dx * ob.fx + dz * ob.fz, v = dx * -ob.fz + dz * ob.fx, av = Math.abs(v);
       if (av >= ob.hw) continue;
-      const p = PR[ob.kind](u, _po);
+      const p = PR[ob.kind](u, _po, ob);
       if (p <= 0) continue;
       const side = 1 - sstep(ob.hw - ob.bev, ob.hw, av), ds = -dsstep(ob.hw - ob.bev, ob.hw, av) * (v < 0 ? -1 : 1);
       const h = p * side;
@@ -495,7 +507,7 @@
       }
     }
     // the junk cars
-    if (!noCars && Math.abs(x + 17) < CAR_L + 0.1 && Math.abs(z) < 6.5) {
+    if (!noCars && Math.abs(x - CRUSH_X) < CAR_L + 0.1 && Math.abs(z) < 6.5) {
       for (let i = 0; i < ARENA_CARS.length; i++) {
         const c = ARENA_CARS[i];
         if (Math.abs(z - c.z) >= CAR_W) continue;
@@ -512,7 +524,7 @@
    *  never springs back. Returns the car index if anything moved, else -1; the car's `dd` (depth crushed since the game
    *  last looked), `level` (how flat it is overall, 0-1) and `glassEv` (the cabin just caved in: glass) go with it. */
   function arenaCrush(x, z, fz, dt) {
-    if (Math.abs(x + 17) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
+    if (Math.abs(x - CRUSH_X) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
     const kBody = Math.max(0, Math.min(1, (fz - 6000) / 22000)), R = 0.95;
     let hit = -1;
     for (let i = 0; i < ARENA_CARS.length; i++) {

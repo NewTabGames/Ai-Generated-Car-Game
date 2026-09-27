@@ -170,7 +170,71 @@
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
       crr: [1.5, 1.2, 1.1, 1.1, 1.0, 1.5] },
+
+    // ---- off-road packages for the More Cars (see OFFROAD_PKG). finalK: the package's matching final drive (a bigger
+    // sprocket / ring gear) so a taller tyre doesn't just gear the vehicle up
+    // Tractor: Firestone R-2 30.5L-32 "cane & rice" deep-lug tyres, uncut - lugs twice as deep as a farm R-1 and never
+    // sharpened. They paddle through mud and dig into turf where the cut pullers skate; the hard-packed clay of a pull
+    // track suits the sharpened bars better, and on pavement the tall lugs squirm and thump. ~2 in taller, ~130 lb heavier
+    pullingR2: { name: 'Firestone R-2 30.5L-32 deep-lug', short: 'R-2 deep lugs', width: 0.78, radius: 0.915,
+      muX: 0.95, muY: 0.8, loose: 2.6, looseY: 1.6, kappaPeak: 0.25, alphaPeak: 0.12, relaxX: 0.65, relaxY: 0.6,
+      // (asphalt gravel grass dirt water/mud strip)
+      looseKx: [1, 1.05, 2.0, 0.92, 2.0, 1],
+      B: 1.3, C: 1.35, E: -0.2, heatCap: 20000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.4,
+      crr: [2.8, 1.3, 1.0, 1.1, 0.9, 2.8], massAdd: 60, inertiaAdd: 40, finalK: 0.915 / 0.87 },
+    // ... and lugged fronts (R-1 bar tread instead of the smooth ribs) so it steers in the soft stuff. Still less side
+    // grip than the rears, so it understeers rather than swapping ends
+    tractorFrontLug: { name: '11L-15 lugged fronts', short: 'Lug fronts', width: 0.28, radius: 0.385,
+      muX: 0.85, muY: 0.68, loose: 1.4, kappaPeak: 0.14, alphaPeak: 0.17, relaxX: 0.27, relaxY: 0.52,
+      B: 1.6, C: 1.38, E: -0.2, heatCap: 5000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.02,
+      crr: [1.6, 1.1, 1.0, 1.0, 1.0, 1.6], massAdd: 8, inertiaAdd: 0.6 },
+    // Dragsters, sand-drag package: Skat-Trak-type paddle tyres - a smooth carcass with ~1.5 in rubber paddles across the
+    // tread - and ribbed sand fronts. The paddles scoop the ground: enormous bite in sand, dirt and mud, next to none on
+    // pavement or a prepped strip (they skate on their tips), and little side grip anywhere. No heat to speak of.
+    // (they shovel the ground rather than grip it: the quickest sand pass is 2.16 s @ 156 mph in 300 ft, ~4 g)
+    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487,
+      muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 10, inertiaAdd: 0.5, finalK: 0.487 / 0.457 },
+    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468,
+      muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 9, inertiaAdd: 0.45, finalK: 0.468 / 0.438 },
+    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3,
+      muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.08 },
+    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33,
+      muX: 1.0, muY: 0.85, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.1 },
+    // Monster truck: the BKTs left full-depth (as moulded) instead of shaved and hand-cut for a stadium floor: ~1 in
+    // more lug and ~100 lb more rubber each. More bite in mud, turf and loose dirt, about the same on the arena's
+    // packed clay, less on pavement (the tall lugs squirm), and heavier to spin up
+    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858,
+      muX: 0.92, muY: 0.8, loose: 2.0, looseY: 1.45, looseKx: [1, 1.08, 1.25, 1.06, 1.35, 1], kappaPeak: 0.24, alphaPeak: 0.21, relaxX: 0.6, relaxY: 0.9,
+      B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05,
+      crr: [1.8, 1.25, 1.1, 1.1, 1.0, 1.8], massAdd: 45, inertiaAdd: 30, finalK: 0.858 / 0.838 },
+    // Karts: knobby tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match. About an
+    // inch more ground clearance and more than twice the bite on dirt and grass - and a lot less grip on pavement,
+    // where the knobs squirm and it slides like a rental on ice
+    kartKnobF: { name: 'Knobby 12x5.00-6', short: 'Knobbies', width: 0.127, radius: 0.152,
+      muX: 1.05, muY: 1.0, loose: 1.35, looseKx: [1, 1.05, 1.1, 1.15, 0.85, 1], kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.09, relaxY: 0.13,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 900, cold: 0.97, coldT: 10, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 1.5, inertiaAdd: 0.015 },
+    kartKnobR: { name: 'Knobby 13x6.50-6', short: 'Knobbies', width: 0.165, radius: 0.165,
+      muX: 1.02, muY: 0.98, loose: 1.35, looseKx: [1, 1.05, 1.1, 1.15, 0.85, 1], kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.14,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 1100, cold: 0.97, coldT: 10, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.03, finalK: 0.165 / 0.14 },
   };
+  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
+  function OFFROAD_PKG(car, cls) {
+    if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
+    if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
+    if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
+    if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
+    return { front: 'offroad', rear: 'offroad' };
+  }
   function MF(rho, t) {
     const bx = t.B * rho;
     return Math.sin(t.C * Math.atan(bx - t.E * (bx - Math.atan(bx))));
@@ -272,14 +336,15 @@
     // ------------------------------------------------------------------ transmission control
     ratioOf(g) {
       const s = this.spec;
+      const fk = this.finalK || 1;
       if (this.transType === 'auto') {
-        if (g < 0) return -s.autoRev * s.autoFinal;
+        if (g < 0) return -s.autoRev * s.autoFinal * fk;
         if (g === 0) return 0;
-        return s.autoRatios[g - 1] * s.autoFinal;
+        return s.autoRatios[g - 1] * s.autoFinal * fk;
       }
-      if (g < 0) return -s.manualRev * s.manualFinal;
+      if (g < 0) return -s.manualRev * s.manualFinal * fk;
       if (g === 0) return 0;
-      return s.manualRatios[g - 1] * s.manualFinal;
+      return s.manualRatios[g - 1] * s.manualFinal * fk;
     }
     get nGears() { return this.transType === 'auto' ? this.spec.autoRatios.length : this.spec.manualRatios.length; }
     get forwardSpeed() {
@@ -330,6 +395,7 @@
         extra += ty.massAdd || 0;
       }
       this.tireMass = extra;
+      this.finalK = TIRES[s.rearTire].finalK || 1;
       this.applySpec();
     }
 
@@ -478,12 +544,35 @@
     stopEngine() { this.running = false; this.cranking = false; }
 
     // ------------------------------------------------------------------ main step
+    // Air assist (the game turns it on for the monster truck): what an experienced driver's feet do over a jump. In the air
+    // the gas spins the wheels up and rocks the nose up, the brake stops them and drops it (wheelGyro) - pinned for the
+    // whole flight (a keyboard's W) it lands 50-70 deg nose up, and the rears touching down still spinning at twice
+    // road speed kick it on over backwards. So: fade whichever pedal would rotate it past a landable attitude (looking a
+    // few tenths of a second ahead), catch a nose that's way off, and feather the gas on touchdown until the rears
+    // match the ground. Short of that the pedals are all yours (off: do your own flips)
+    _airAssist(dt) {
+      const inp = this.input, { qx, qy, qz, qw } = this;
+      const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
+      const rx = 1 - 2 * (qy * qy + qz * qz), ry = 2 * (qx * qy + qz * qw), rz = 2 * (qx * qz - qy * qw);
+      const rate = (this.wx * rx + this.wy * ry + this.wz * rz) * 57.2958, ahead = pitch + 0.35 * rate;
+      if (this.airborne) {
+        this.aaGnd = 0;
+        if (inp.throttle > 0) inp.throttle *= clamp((20 - ahead) / 15, 0, 1);
+        if (inp.brake > 0) inp.brake *= clamp((ahead + 15) / 12, 0, 1);
+        if (ahead > 32) inp.brake = Math.max(inp.brake, clamp((ahead - 32) / 25, 0, 0.8));
+        if (ahead < -25) inp.throttle = Math.max(inp.throttle, clamp((-25 - ahead) / 20, 0, 1));
+      } else if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 0.8) {
+        const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
+        if (pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+      }
+    }
     step(dt) {
       this.acc += Math.min(dt, 0.1);
       const h = this.h;
       // gather obstacles once per frame
       const sp = Math.hypot(this.vx, this.vz);
       this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
+      if (this.input.airAssist) this._airAssist(Math.min(dt, 0.1));
       let n = 0;
       while (this.acc >= h && n < 110) { this.substep(h); this.acc -= h; n++; }
       if (n === 110) this.acc = 0;
@@ -1968,7 +2057,7 @@
     s.lsdPreload = b.lsdPreload * Math.max(1, Math.sqrt(tr));
     return s;
   }
-  const API = { Vehicle, SPEC, TIRES, CARS, MF, curveAt, RAD2RPM, RPM2RAD, LBFT, tuneSpec, windage };
+  const API = { Vehicle, SPEC, TIRES, CARS, MF, curveAt, RAD2RPM, RPM2RAD, LBFT, tuneSpec, windage, OFFROAD_PKG };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.HCVehicle = API;
 })(typeof self !== 'undefined' ? self : this);

@@ -431,6 +431,32 @@
       return mergeGeos(list);
     }
     const lugGeoR = lugs(1), lugGeoL = lugs(-1);
+    // off-road package: R-2 deep-lug rears - fewer, far taller bars at a steeper angle, uncut (the rolling radius grows
+    // from 0.87 to 0.915 m with them), and lugged fronts
+    function deepLugs(dir) {
+      const list = [];
+      for (let k = 0; k < 34; k++) {
+        const side = k & 1 ? 1 : -1, phi = k * Math.PI * 2 / 34;
+        const b = new THREE.BoxGeometry(0.42, 0.13, 0.075);
+        b.rotateY(-side * dir * 0.78); b.translate(side * 0.19, RR + 0.035, 0);
+        const sh = new THREE.BoxGeometry(0.1, 0.17, 0.075); sh.rotateZ(side * 0.7); sh.translate(side * 0.37, RR - 0.02, dir * 0.15);
+        b.rotateX(phi); sh.rotateX(phi); list.push(b, sh);
+      }
+      return mergeGeos(list);
+    }
+    const deepGeoR = deepLugs(1), deepGeoL = deepLugs(-1);
+    const RFL = 0.365;
+    const tyreFL = latheX([[0.2, -0.12], [0.24, -0.135], [0.31, -0.14], [RFL - 0.01, -0.13], [RFL, -0.1], [RFL, 0.1], [RFL - 0.01, 0.13], [0.31, 0.14], [0.24, 0.135], [0.2, 0.12]], 48);
+    function frontLugs(dir) {
+      const list = [];
+      for (let k = 0; k < 28; k++) {
+        const side = k & 1 ? 1 : -1, phi = k * Math.PI * 2 / 28;
+        const b = new THREE.BoxGeometry(0.15, 0.028, 0.035); b.rotateY(-side * dir * 0.6); b.translate(side * 0.065, RFL + 0.008, 0);
+        b.rotateX(phi); list.push(b);
+      }
+      return mergeGeos(list);
+    }
+    const flugR = frontLugs(1), flugL = frontLugs(-1);
     // polished 32 in rim: lip, deep cone dish, centre plate with nuts, planetary hub
     function rearRim(g) {
       const lip = new THREE.TorusGeometry(0.405, 0.024, 10, 56); lip.rotateY(Math.PI / 2); add(g, lip, M.polish, 0.33, 0, 0);
@@ -460,14 +486,18 @@
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
+      let stock, pkg;
       if (frontW) {
-        add(spin, tyreF, M.rubber, 0, 0, 0); frontRim(spin);
+        stock = [add(spin, tyreF, M.rubber, 0, 0, 0)]; frontRim(spin);
+        pkg = [add(spin, tyreFL, M.rubber, 0, 0, 0), add(spin, left ? flugL : flugR, M.rubber, 0, 0, 0)];
         // steering knuckle / spindle (turns with the wheel, doesn't spin)
         add(flip, new THREE.BoxGeometry(0.06, 0.2, 0.12), M.steel, -0.13, 0, 0);
       } else {
-        add(spin, tyreR, M.rubber, 0, 0, 0); add(spin, left ? lugGeoL : lugGeoR, M.rubber, 0, 0, 0); rearRim(spin);
+        add(spin, tyreR, M.rubber, 0, 0, 0); rearRim(spin);
+        stock = [add(spin, left ? lugGeoL : lugGeoR, M.rubber, 0, 0, 0)]; pkg = [add(spin, left ? deepGeoL : deepGeoR, M.rubber, 0, 0, 0)];
       }
-      wheels.push({ corner, flip, spin, left, front: frontW, side });
+      for (const m of pkg) m.visible = false;
+      wheels.push({ corner, flip, spin, left, front: frontW, side, stock, pkg });
     }
 
     // ---------------------------------------------------------------- headlights (LED bar on the weight rack)
@@ -515,7 +545,12 @@
     }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const on = (w.front ? front : rear) === (w.front ? 'tractorFrontLug' : 'pullingR2');
+        for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
+      }
+    }
     function setChute() {}
 
     for (const t of tips) t.add(V3(0, -cgH, zOff));

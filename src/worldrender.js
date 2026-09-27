@@ -1190,7 +1190,7 @@ void main(){
         g.fillStyle = '#888'; g.font = 'bold 34px Arial'; g.fillText(o.foot || '', w / 2, 520, w - 60);
         scrT.needsUpdate = true;
       }
-      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · WHOOPS' });
+      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
       arena = {
         update(dt) {
           for (const k of cars) if (k.ver !== k.c.ver) k.refresh();

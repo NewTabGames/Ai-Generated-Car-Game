@@ -641,17 +641,44 @@
     const slickGeo = latheX(slickP, 72), grownGeo = latheX(grownP, 72);
     slickGeo.morphAttributes.position = [grownGeo.attributes.position];
     slickGeo.morphAttributes.normal = [grownGeo.attributes.normal];
-    const tyreTex = canvasTex(2048, 256, (g, w, h) => {
+    const sideTex = (txt) => canvasTex(2048, 256, (g, w, h) => {
       g.fillStyle = '#141414'; g.fillRect(0, 0, w, h);
       // outer sidewall band: profile points 11..14 -> v 0.73..0.93 -> rows (1-v)*h; letters upright = pointing out
       const yA = (1 - 0.92) * h, yB = (1 - 0.74) * h;
       g.save(); g.translate(w, yA + yB); g.scale(-1, -1);
       g.font = 'bold 34px Arial'; g.fillStyle = '#e8e8e8'; g.textBaseline = 'middle'; g.textAlign = 'center';
-      const txt = TF ? 'DRAG SLICK  ·  36.0 x 17.5-16' : 'DRAG SLICK  ·  34.5 x 17.0-16';
       for (let q = 0; q < 2; q++) g.fillText(txt, w * (0.25 + 0.5 * q), (yA + yB) / 2);
       g.restore();
     });
-    M.slick = new THREE.MeshStandardMaterial({ map: tyreTex, roughness: 0.88, metalness: 0 });
+    M.slick = new THREE.MeshStandardMaterial({ map: sideTex(TF ? 'DRAG SLICK  ·  36.0 x 17.5-16' : 'DRAG SLICK  ·  34.5 x 17.0-16'), roughness: 0.88, metalness: 0 });
+    // off-road (sand-drag) package: the same soft carcass with rubber paddles moulded across the tread, and ribbed fronts
+    M.paddle = new THREE.MeshStandardMaterial({ map: sideTex(TF ? 'SAND PADDLE  ·  36 x 17.5-16' : 'SAND PADDLE  ·  34.5 x 17-16'), roughness: 0.9, metalness: 0 });
+    function mergeGeos(list) {
+      const parts = list.map((g) => (g.index ? g.toNonIndexed() : g));
+      let n = 0; for (const g of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { if (!g.attributes.normal) g.computeVertexNormals(); pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      out.computeBoundingSphere(); return out;
+    }
+    const paddleGeo = (() => {
+      const list = [], N = 12;
+      for (let k = 0; k < N; k++) {
+        // each paddle: a rubber blade across the tread, leaning back a touch, with a thick root
+        const b = new THREE.BoxGeometry(TWR - 0.05, 0.036, 0.02); b.translate(0, RR + 0.015, 0); b.rotateX(k * Math.PI * 2 / N);
+        const r = new THREE.BoxGeometry(TWR - 0.06, 0.012, 0.04); r.translate(0, RR - 0.001, 0); r.rotateX(k * Math.PI * 2 / N);
+        list.push(b, r);
+      }
+      return mergeGeos(list);
+    })();
+    function ribGeo(R, W, rr) {
+      const h = W / 2, pts = [[rr + 0.004, -0.03], [rr + 0.03, -h + 0.012], [R - 0.035, -h], [R - 0.012, -h + 0.006]];
+      for (let x = -h + 0.018, k = 0; x < h - 0.017; x += 0.013, k++) pts.push([k & 1 ? R - 0.011 : R, x]);
+      pts.push([R - 0.012, h - 0.006], [R - 0.035, h], [rr + 0.03, h - 0.012], [rr + 0.004, 0.03]);
+      return latheX(pts, 48);
+    }
+    const ribF = FC ? ribGeo(0.33, 0.17, 0.198) : ribGeo(0.3, 0.15, 0.214);
     const frontP = FC ? [[0.2, -0.05], [0.24, -0.057], [0.285, -0.056], [0.306, -0.045], [RF, -0.025], [RF, 0.025], [0.306, 0.045], [0.285, 0.056], [0.24, 0.057], [0.2, 0.05]]
       : [[0.218, -0.03], [0.245, -0.034], [0.268, -0.033], [0.281, -0.026], [RF, -0.012], [RF, 0.012], [0.281, 0.026], [0.268, 0.033], [0.245, 0.034], [0.218, 0.03]];
     const tyreFGeo = latheX(frontP, 48);
@@ -685,13 +712,16 @@
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
       let tyre = null;
+      let stock, pkg;
       if (frontW) {
-        add(spin, tyreFGeo, M.rubber, 0, 0, 0); frontRim(spin);
+        stock = [add(spin, tyreFGeo, M.rubber, 0, 0, 0)]; pkg = [add(spin, ribF, M.rubber, 0, 0, 0)]; frontRim(spin);
         add(flip, new THREE.BoxGeometry(0.05, 0.08, 0.06), M.polish, -0.06, 0, 0);          // spindle
       } else {
         tyre = add(spin, slickGeo, M.slick, 0, 0, 0); rearRim(spin);
+        stock = [tyre]; pkg = [add(spin, slickGeo, M.paddle, 0, 0, 0), add(spin, paddleGeo, M.rubber, 0, 0, 0)];
       }
-      wheels.push({ corner, flip, spin, left, front: frontW, side, tyre, growMax: GROW });
+      for (const m of pkg) m.visible = false;
+      wheels.push({ corner, flip, spin, left, front: frontW, side, tyre, growMax: GROW, stock, pkg });
     }
     // front axle through the nose, tie rod (inside the Funny Car's body)
     if (!FC) {
@@ -743,7 +773,12 @@
     }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const on = /^(paddle|sandRib)/.test(w.front ? front : rear);
+        for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
+      }
+    }
     // parachutes: out = deployed, infl 0..1 (from the physics), t = seconds since the pins were pulled. Two canopies
     // on long lines that fly apart and weave
     const _rim = new THREE.Vector3();

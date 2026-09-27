@@ -1,6 +1,7 @@
 // Off-road package: Pirelli P Zero vs BFGoodrich KO2 LT285/55R20 (+2 in lift) on each surface.
 // 0-60, 60-0, skidpad grip, ride height and a rough dirt track (wheels on the ground, bottoming out).
-const { Vehicle, CARS } = require('../src/vehicle.js');
+// Then the More Cars' own packages (tractor R-2s, sand-drag paddles, full-depth monster lugs, kart knobbies).
+const { Vehicle, CARS, TIRES: VEH_T } = require('../src/vehicle.js');
 const SURF = [[0, 'asphalt'], [1, 'gravel'], [2, 'grass'], [3, 'dirt']];
 const MPH = 2.23694;
 function world(surf, bump) {
@@ -91,3 +92,60 @@ console.log('\nDemon 170 on KO2s (E85): 0-60 asphalt ' + zeroSixty('offroad', 0,
   + ' s  | factory ET Street R: asphalt ' + zeroSixty(null, 0, 'demon').toFixed(2) + ' s, dirt ' + zeroSixty(null, 3, 'demon').toFixed(2) + ' s');
 console.log('Drag Pak on KO2s: 0-60 asphalt ' + zeroSixty('offroad', 0, 'dragpak').toFixed(2) + ' s, dirt ' + zeroSixty('offroad', 3, 'dragpak').toFixed(2)
   + ' s  | ET Drag slicks: asphalt ' + zeroSixty(null, 0, 'dragpak').toFixed(2) + ' s, dirt ' + zeroSixty(null, 3, 'dragpak').toFixed(2) + ' s');
+
+// ---- the More Cars' own off-road packages (OFFROAD_PKG): stock vs package on each surface
+// tractor: R-2 deep lugs + lugged fronts · dragsters: sand-drag paddles + rib fronts · monster: full-depth lugs · karts: knobbies
+{
+  const { OFFROAD_PKG } = require('../src/vehicle.js');
+  const TC = { puller: 2, dragster: 2, monster: 3, kart: 3 };
+  const upY = (v) => 1 - 2 * (v.qx * v.qx + v.qz * v.qz);
+  const pitch = (v) => Math.asin(Math.max(-1, Math.min(1, -2 * (v.qy * v.qz - v.qx * v.qw)))) * 180 / Math.PI;
+  const mkM = (car, cls, pkg, surf) => {
+    const def = car === 'monster' ? { spec: CARS.monster.spec } : CARS[car].make(cls);
+    const v = new Vehicle(world(surf), Object.assign({}, def.spec)), P = OFFROAD_PKG(car, cls);
+    v.setTires(pkg ? P.front : v.spec.frontTire, pkg ? P.rear : v.spec.rearTire);
+    v.reset(0, 0, 0, 0, -1); v.running = true; v.eOmega = v.spec.idleRpm / 9.549; v.park = false; v.gear = 1; v.tcMode = TC[car];
+    for (const w of v.wheels) w.temp = car === 'dragster' ? 85 : 55;
+    for (let i = 0; i < 120; i++) { v.input.brake = 1; v.step(1 / 120); }
+    v.input.brake = 0;
+    return v;
+  };
+  const launchM = (car, cls, pkg, surf) => {
+    const v = mkM(car, cls, pkg, surf), h = 1 / 240;
+    if (car === 'dragster' || car === 'puller') { v.input.handbrake = 1; v.input.throttle = 1; for (let i = 0; i < 360; i++) v.step(h); v.input.handbrake = 0; }
+    const z0 = v.pz, goal = car === 'kart' && cls === 'rental' ? 25 : car === 'dragster' ? 1e9 : 60;
+    let tg = null, t300 = null, maxP = 0, minUp = 1;
+    for (let t = 0; t < 25 && (tg === null || (car === 'dragster' && t300 === null)); t += h) {
+      v.input.throttle = 1; v.step(h);
+      const s = v.forwardSpeed * MPH, d = (z0 - v.pz) * 3.2808;
+      if (tg === null && s >= goal) tg = t; if (t300 === null && d >= 300) t300 = [t, s];
+      maxP = Math.max(maxP, pitch(v)); minUp = Math.min(minUp, upY(v));
+    }
+    return (car === 'dragster' ? (t300 ? `300 ft ${t300[0].toFixed(2)} s @ ${t300[1].toFixed(0)}` : '300 ft --') : `0-${goal} ${tg === null ? ' -- ' : tg.toFixed(2)} s`)
+      + (maxP > 15 ? ` (nose up ${maxP.toFixed(0)}°)` : '') + (minUp < 0.3 ? ' FLIPPED' : '');
+  };
+  const padM = (car, cls, pkg, surf) => {
+    let best = 0, spun = 0;
+    for (const mph of car === 'puller' ? [8, 14] : [12, 22]) for (const st of [0.35, 0.6]) {
+      const v = mkM(car, cls, pkg, surf);
+      for (let i = 0; i < 3600 && v.forwardSpeed * MPH < mph; i++) { v.input.throttle = 0.8; v.step(1 / 120); }
+      let gl = 0, n = 0, bad = false;
+      for (let t = 0; t < 6; t += 1 / 120) {
+        v.input.throttle = Math.max(0, Math.min(1, 0.3 + (mph / MPH - v.forwardSpeed) * 0.4)); v.input.steer = st; v.step(1 / 120);
+        if (t > 3) { gl += Math.abs(v.gLat); n++; }
+        const fx = -2 * (v.qx * v.qz + v.qy * v.qw), fz = -(1 - 2 * (v.qx * v.qx + v.qy * v.qy)), vv = Math.hypot(v.vx, v.vz);
+        if (upY(v) < 0.5 || (vv > 3 && Math.acos(Math.max(-1, Math.min(1, (v.vx * fx + v.vz * fz) / (vv * Math.hypot(fx, fz))))) > 0.7)) bad = true;
+      }
+      if (bad) spun++; else best = Math.max(best, gl / n);
+    }
+    return `${best.toFixed(2)} g${spun ? ' (' + spun + ' spun)' : ''}`;
+  };
+  console.log('\nMore Cars: stock vs their off-road package (0-60 / 300 ft from a stop · steady circle grip)');
+  for (const [car, cls] of [['puller', 'hemi4'], ['dragster', 'tf'], ['dragster', 'fc'], ['monster'], ['kart', 'rental'], ['kart', 'tag'], ['kart', 'kz']]) {
+    const P = OFFROAD_PKG(car, cls);
+    console.log(`${car}${cls ? ' ' + cls : ''} - package ${VEH_T[P.front].short} / ${VEH_T[P.rear].short}`);
+    for (const pkg of [false, true]) {
+      console.log(`  ${pkg ? 'package' : 'stock  '}  ` + [[0, 'asphalt'], [2, 'grass'], [3, 'dirt']].map(([s, n]) => `${n}: ${launchM(car, cls, pkg, s)}, ${padM(car, cls, pkg, s)}`).join(' | '));
+    }
+  }
+}

@@ -586,12 +586,16 @@
   // A stadium floor covered in packed, watered clay: HW x HL (half sizes) with rounded corners (radius CR), a concrete
   // wall and debris fence all round (colliders), the stands beyond. Every obstacle is an exact height function (like the
   // jump ramps), added to the flat ground so the tyres, suspension and body feel it, and meshed from the same function:
+  // The floor is 96 x 184 m (a big domed stadium's, wall to wall):
   //   east side  - a big tabletop: 13 m faces up to a 4 m deck 16 m long (jump it, or land on the far face)
   //   west side  - the car crush: a kicker, six junk cars side by side, a kicker back down. The cars flatten under load
-  //   north end  - the big gap jump: a 30 deg kicker to a 3.6 m lip, a gap, a landing mound with a long downslope
+  //   north end  - the big gap jump: a 30 deg kicker to a 3.6 m lip, a gap, a landing mound with a long downslope;
+  //                beside it a step-up (north-west: up a steep face onto a 2.8 m deck, off down a long ramp) and a
+  //                whoops lane (north-east, along the wall: four 1.2 m rollers)
   //   south end  - moguls: three 1.2 m whoops across the floor
   //   corners    - banked up to 2.4 m against the wall, for sliding round
-  const ARENA = { HW: 36, HL: 68, CR: 18, SPAWN_X: 0, SPAWN_Z: 32 };
+  const ARENA = { HW: 48, HL: 92, CR: 24, SPAWN_X: 0, SPAWN_Z: 44 };
+  const CRUSH_X = -26;                      // the car-crush lane (x of the junk cars)
   const sstep = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const dsstep = (a, b, x) => { const t = (x - a) / (b - a); return t <= 0 || t >= 1 ? 0 : 6 * t * (1 - t) / (b - a); };
   // signed distance to the wall line (negative inside the floor)
@@ -628,17 +632,25 @@
       w -= F;
       if (w < T) { o.d = 0; return HL; }
       w -= T; o.d = -HL * dsstep(0, B, w); return HL * (1 - sstep(0, B, w)); },
-    // moguls: three whoops
-    mogul(u, o) { const W = 7, H = 1.2, E = 3 * W;
+    // step-up: a steep face up onto a deck, then a long ramp back down (jump off the deck or roll it)
+    step(u, o) { const L = 8, H = 2.8, p = 1.6, T = 10, B = 14, E = L + T + B;
+      if (u <= 0 || u >= E) { o.d = 0; return 0; }
+      if (u < L) { const s = u / L; o.d = H * p * Math.pow(s, p - 1) / L; return H * Math.pow(s, p); }
+      if (u < L + T) { o.d = 0; return H; }
+      const w = u - L - T; o.d = -H * dsstep(0, B, w); return H * (1 - sstep(0, B, w)); },
+    // moguls: a row of whoops (three, or ob.n)
+    mogul(u, o, ob) { const W = 7, H = 1.2, E = (ob.n || 3) * W;
       if (u <= 0 || u >= E) { o.d = 0; return 0; }
       const a = Math.PI * u / W, s = Math.sin(a); o.d = H * 2 * s * Math.cos(a) * Math.PI / W; return H * s * s; },
   };
   // obstacles: centre-line start (x0, z0), direction (fx, fz), length, half width (flat part + falloff `bev`)
   const ARENA_OBS = [
-    { kind: 'table', x0: 17, z0: -21, fx: 0, fz: 1, len: 42, hw: 10.5, bev: 6 },
-    { kind: 'crush', x0: -17, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
-    { kind: 'gap', x0: 0, z0: -14, fx: 0, fz: -1, len: 36.5, hw: 7.5, bev: 3.5 },
-    { kind: 'mogul', x0: 0, z0: 40, fx: 0, fz: 1, len: 21, hw: 24, bev: 5 },
+    { kind: 'table', x0: 26, z0: -21, fx: 0, fz: 1, len: 42, hw: 10.5, bev: 6 },
+    { kind: 'crush', x0: CRUSH_X, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
+    { kind: 'gap', x0: 0, z0: -18, fx: 0, fz: -1, len: 36.5, hw: 7.5, bev: 3.5 },
+    { kind: 'mogul', x0: 0, z0: 58, fx: 0, fz: 1, len: 21, hw: 26, bev: 5 },
+    { kind: 'step', x0: -28, z0: -34, fx: 0, fz: -1, len: 32, hw: 8, bev: 3.5 },
+    { kind: 'mogul', n: 4, x0: 39, z0: -34, fx: 0, fz: -1, len: 28, hw: 6, bev: 2.5 },   // (clear of the tabletop's run-out)
   ];
   for (const ob of ARENA_OBS) {             // bounding boxes for quick rejection (and for the renderer's meshes)
     const ex = [ob.x0, ob.x0 + ob.fx * ob.len], ez = [ob.z0, ob.z0 + ob.fz * ob.len], rx = -ob.fz, rz = ob.fx;
@@ -662,7 +674,7 @@
     o.hb = hb * f; o.h0 = (hb + hc * gC) * f; return o;
   }
   for (let k = 0; k < 6; k++) {
-    const c = { x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
+    const c = { x: CRUSH_X, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
       dent: new Float32Array(CNA * CNB), h0: new Float32Array(CNA * CNB), hb: new Float32Array(CNA * CNB), ver: 0, level: 0, cab: 0, dd: 0, glassEv: 0, glassN: 0 };
     for (let ia = 0; ia < CNA; ia++) for (let ib = 0; ib < CNB; ib++) {
       carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
@@ -700,7 +712,7 @@
       if (x < ob.minX || x > ob.maxX || z < ob.minZ || z > ob.maxZ) continue;
       const dx = x - ob.x0, dz = z - ob.z0, u = dx * ob.fx + dz * ob.fz, v = dx * -ob.fz + dz * ob.fx, av = Math.abs(v);
       if (av >= ob.hw) continue;
-      const p = PR[ob.kind](u, _po);
+      const p = PR[ob.kind](u, _po, ob);
       if (p <= 0) continue;
       const side = 1 - sstep(ob.hw - ob.bev, ob.hw, av), ds = -dsstep(ob.hw - ob.bev, ob.hw, av) * (v < 0 ? -1 : 1);
       const h = p * side;
@@ -727,7 +739,7 @@
       }
     }
     // the junk cars
-    if (!noCars && Math.abs(x + 17) < CAR_L + 0.1 && Math.abs(z) < 6.5) {
+    if (!noCars && Math.abs(x - CRUSH_X) < CAR_L + 0.1 && Math.abs(z) < 6.5) {
       for (let i = 0; i < ARENA_CARS.length; i++) {
         const c = ARENA_CARS[i];
         if (Math.abs(z - c.z) >= CAR_W) continue;
@@ -744,7 +756,7 @@
    *  never springs back. Returns the car index if anything moved, else -1; the car's `dd` (depth crushed since the game
    *  last looked), `level` (how flat it is overall, 0-1) and `glassEv` (the cabin just caved in: glass) go with it. */
   function arenaCrush(x, z, fz, dt) {
-    if (Math.abs(x + 17) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
+    if (Math.abs(x - CRUSH_X) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
     const kBody = Math.max(0, Math.min(1, (fz - 6000) / 22000)), R = 0.95;
     let hit = -1;
     for (let i = 0; i < ARENA_CARS.length; i++) {
@@ -1406,7 +1418,71 @@
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
       crr: [1.5, 1.2, 1.1, 1.1, 1.0, 1.5] },
+
+    // ---- off-road packages for the More Cars (see OFFROAD_PKG). finalK: the package's matching final drive (a bigger
+    // sprocket / ring gear) so a taller tyre doesn't just gear the vehicle up
+    // Tractor: Firestone R-2 30.5L-32 "cane & rice" deep-lug tyres, uncut - lugs twice as deep as a farm R-1 and never
+    // sharpened. They paddle through mud and dig into turf where the cut pullers skate; the hard-packed clay of a pull
+    // track suits the sharpened bars better, and on pavement the tall lugs squirm and thump. ~2 in taller, ~130 lb heavier
+    pullingR2: { name: 'Firestone R-2 30.5L-32 deep-lug', short: 'R-2 deep lugs', width: 0.78, radius: 0.915,
+      muX: 0.95, muY: 0.8, loose: 2.6, looseY: 1.6, kappaPeak: 0.25, alphaPeak: 0.12, relaxX: 0.65, relaxY: 0.6,
+      // (asphalt gravel grass dirt water/mud strip)
+      looseKx: [1, 1.05, 2.0, 0.92, 2.0, 1],
+      B: 1.3, C: 1.35, E: -0.2, heatCap: 20000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.4,
+      crr: [2.8, 1.3, 1.0, 1.1, 0.9, 2.8], massAdd: 60, inertiaAdd: 40, finalK: 0.915 / 0.87 },
+    // ... and lugged fronts (R-1 bar tread instead of the smooth ribs) so it steers in the soft stuff. Still less side
+    // grip than the rears, so it understeers rather than swapping ends
+    tractorFrontLug: { name: '11L-15 lugged fronts', short: 'Lug fronts', width: 0.28, radius: 0.385,
+      muX: 0.85, muY: 0.68, loose: 1.4, kappaPeak: 0.14, alphaPeak: 0.17, relaxX: 0.27, relaxY: 0.52,
+      B: 1.6, C: 1.38, E: -0.2, heatCap: 5000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.02,
+      crr: [1.6, 1.1, 1.0, 1.0, 1.0, 1.6], massAdd: 8, inertiaAdd: 0.6 },
+    // Dragsters, sand-drag package: Skat-Trak-type paddle tyres - a smooth carcass with ~1.5 in rubber paddles across the
+    // tread - and ribbed sand fronts. The paddles scoop the ground: enormous bite in sand, dirt and mud, next to none on
+    // pavement or a prepped strip (they skate on their tips), and little side grip anywhere. No heat to speak of.
+    // (they shovel the ground rather than grip it: the quickest sand pass is 2.16 s @ 156 mph in 300 ft, ~4 g)
+    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487,
+      muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 10, inertiaAdd: 0.5, finalK: 0.487 / 0.457 },
+    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468,
+      muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 9, inertiaAdd: 0.45, finalK: 0.468 / 0.438 },
+    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3,
+      muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.08 },
+    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33,
+      muX: 1.0, muY: 0.85, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.1 },
+    // Monster truck: the BKTs left full-depth (as moulded) instead of shaved and hand-cut for a stadium floor: ~1 in
+    // more lug and ~100 lb more rubber each. More bite in mud, turf and loose dirt, about the same on the arena's
+    // packed clay, less on pavement (the tall lugs squirm), and heavier to spin up
+    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858,
+      muX: 0.92, muY: 0.8, loose: 2.0, looseY: 1.45, looseKx: [1, 1.08, 1.25, 1.06, 1.35, 1], kappaPeak: 0.24, alphaPeak: 0.21, relaxX: 0.6, relaxY: 0.9,
+      B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05,
+      crr: [1.8, 1.25, 1.1, 1.1, 1.0, 1.8], massAdd: 45, inertiaAdd: 30, finalK: 0.858 / 0.838 },
+    // Karts: knobby tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match. About an
+    // inch more ground clearance and more than twice the bite on dirt and grass - and a lot less grip on pavement,
+    // where the knobs squirm and it slides like a rental on ice
+    kartKnobF: { name: 'Knobby 12x5.00-6', short: 'Knobbies', width: 0.127, radius: 0.152,
+      muX: 1.05, muY: 1.0, loose: 1.35, looseKx: [1, 1.05, 1.1, 1.15, 0.85, 1], kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.09, relaxY: 0.13,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 900, cold: 0.97, coldT: 10, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 1.5, inertiaAdd: 0.015 },
+    kartKnobR: { name: 'Knobby 13x6.50-6', short: 'Knobbies', width: 0.165, radius: 0.165,
+      muX: 1.02, muY: 0.98, loose: 1.35, looseKx: [1, 1.05, 1.1, 1.15, 0.85, 1], kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.14,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 1100, cold: 0.97, coldT: 10, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.03, finalK: 0.165 / 0.14 },
   };
+  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
+  function OFFROAD_PKG(car, cls) {
+    if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
+    if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
+    if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
+    if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
+    return { front: 'offroad', rear: 'offroad' };
+  }
   function MF(rho, t) {
     const bx = t.B * rho;
     return Math.sin(t.C * Math.atan(bx - t.E * (bx - Math.atan(bx))));
@@ -1508,14 +1584,15 @@
     // ------------------------------------------------------------------ transmission control
     ratioOf(g) {
       const s = this.spec;
+      const fk = this.finalK || 1;
       if (this.transType === 'auto') {
-        if (g < 0) return -s.autoRev * s.autoFinal;
+        if (g < 0) return -s.autoRev * s.autoFinal * fk;
         if (g === 0) return 0;
-        return s.autoRatios[g - 1] * s.autoFinal;
+        return s.autoRatios[g - 1] * s.autoFinal * fk;
       }
-      if (g < 0) return -s.manualRev * s.manualFinal;
+      if (g < 0) return -s.manualRev * s.manualFinal * fk;
       if (g === 0) return 0;
-      return s.manualRatios[g - 1] * s.manualFinal;
+      return s.manualRatios[g - 1] * s.manualFinal * fk;
     }
     get nGears() { return this.transType === 'auto' ? this.spec.autoRatios.length : this.spec.manualRatios.length; }
     get forwardSpeed() {
@@ -1566,6 +1643,7 @@
         extra += ty.massAdd || 0;
       }
       this.tireMass = extra;
+      this.finalK = TIRES[s.rearTire].finalK || 1;
       this.applySpec();
     }
 
@@ -1714,12 +1792,35 @@
     stopEngine() { this.running = false; this.cranking = false; }
 
     // ------------------------------------------------------------------ main step
+    // Air assist (the game turns it on for the monster truck): what an experienced driver's feet do over a jump. In the air
+    // the gas spins the wheels up and rocks the nose up, the brake stops them and drops it (wheelGyro) - pinned for the
+    // whole flight (a keyboard's W) it lands 50-70 deg nose up, and the rears touching down still spinning at twice
+    // road speed kick it on over backwards. So: fade whichever pedal would rotate it past a landable attitude (looking a
+    // few tenths of a second ahead), catch a nose that's way off, and feather the gas on touchdown until the rears
+    // match the ground. Short of that the pedals are all yours (off: do your own flips)
+    _airAssist(dt) {
+      const inp = this.input, { qx, qy, qz, qw } = this;
+      const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
+      const rx = 1 - 2 * (qy * qy + qz * qz), ry = 2 * (qx * qy + qz * qw), rz = 2 * (qx * qz - qy * qw);
+      const rate = (this.wx * rx + this.wy * ry + this.wz * rz) * 57.2958, ahead = pitch + 0.35 * rate;
+      if (this.airborne) {
+        this.aaGnd = 0;
+        if (inp.throttle > 0) inp.throttle *= clamp((20 - ahead) / 15, 0, 1);
+        if (inp.brake > 0) inp.brake *= clamp((ahead + 15) / 12, 0, 1);
+        if (ahead > 32) inp.brake = Math.max(inp.brake, clamp((ahead - 32) / 25, 0, 0.8));
+        if (ahead < -25) inp.throttle = Math.max(inp.throttle, clamp((-25 - ahead) / 20, 0, 1));
+      } else if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 0.8) {
+        const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
+        if (pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+      }
+    }
     step(dt) {
       this.acc += Math.min(dt, 0.1);
       const h = this.h;
       // gather obstacles once per frame
       const sp = Math.hypot(this.vx, this.vz);
       this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
+      if (this.input.airAssist) this._airAssist(Math.min(dt, 0.1));
       let n = 0;
       while (this.acc >= h && n < 110) { this.substep(h); this.acc -= h; n++; }
       if (n === 110) this.acc = 0;
@@ -3204,7 +3305,7 @@
     s.lsdPreload = b.lsdPreload * Math.max(1, Math.sqrt(tr));
     return s;
   }
-  const API = { Vehicle, SPEC, TIRES, CARS, MF, curveAt, RAD2RPM, RPM2RAD, LBFT, tuneSpec, windage };
+  const API = { Vehicle, SPEC, TIRES, CARS, MF, curveAt, RAD2RPM, RPM2RAD, LBFT, tuneSpec, windage, OFFROAD_PKG };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.HCVehicle = API;
 })(typeof self !== 'undefined' ? self : this);
@@ -5879,6 +5980,32 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       return mergeGeos(list);
     }
     const lugGeoR = lugs(1), lugGeoL = lugs(-1);
+    // off-road package: R-2 deep-lug rears - fewer, far taller bars at a steeper angle, uncut (the rolling radius grows
+    // from 0.87 to 0.915 m with them), and lugged fronts
+    function deepLugs(dir) {
+      const list = [];
+      for (let k = 0; k < 34; k++) {
+        const side = k & 1 ? 1 : -1, phi = k * Math.PI * 2 / 34;
+        const b = new THREE.BoxGeometry(0.42, 0.13, 0.075);
+        b.rotateY(-side * dir * 0.78); b.translate(side * 0.19, RR + 0.035, 0);
+        const sh = new THREE.BoxGeometry(0.1, 0.17, 0.075); sh.rotateZ(side * 0.7); sh.translate(side * 0.37, RR - 0.02, dir * 0.15);
+        b.rotateX(phi); sh.rotateX(phi); list.push(b, sh);
+      }
+      return mergeGeos(list);
+    }
+    const deepGeoR = deepLugs(1), deepGeoL = deepLugs(-1);
+    const RFL = 0.365;
+    const tyreFL = latheX([[0.2, -0.12], [0.24, -0.135], [0.31, -0.14], [RFL - 0.01, -0.13], [RFL, -0.1], [RFL, 0.1], [RFL - 0.01, 0.13], [0.31, 0.14], [0.24, 0.135], [0.2, 0.12]], 48);
+    function frontLugs(dir) {
+      const list = [];
+      for (let k = 0; k < 28; k++) {
+        const side = k & 1 ? 1 : -1, phi = k * Math.PI * 2 / 28;
+        const b = new THREE.BoxGeometry(0.15, 0.028, 0.035); b.rotateY(-side * dir * 0.6); b.translate(side * 0.065, RFL + 0.008, 0);
+        b.rotateX(phi); list.push(b);
+      }
+      return mergeGeos(list);
+    }
+    const flugR = frontLugs(1), flugL = frontLugs(-1);
     // polished 32 in rim: lip, deep cone dish, centre plate with nuts, planetary hub
     function rearRim(g) {
       const lip = new THREE.TorusGeometry(0.405, 0.024, 10, 56); lip.rotateY(Math.PI / 2); add(g, lip, M.polish, 0.33, 0, 0);
@@ -5908,14 +6035,18 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
+      let stock, pkg;
       if (frontW) {
-        add(spin, tyreF, M.rubber, 0, 0, 0); frontRim(spin);
+        stock = [add(spin, tyreF, M.rubber, 0, 0, 0)]; frontRim(spin);
+        pkg = [add(spin, tyreFL, M.rubber, 0, 0, 0), add(spin, left ? flugL : flugR, M.rubber, 0, 0, 0)];
         // steering knuckle / spindle (turns with the wheel, doesn't spin)
         add(flip, new THREE.BoxGeometry(0.06, 0.2, 0.12), M.steel, -0.13, 0, 0);
       } else {
-        add(spin, tyreR, M.rubber, 0, 0, 0); add(spin, left ? lugGeoL : lugGeoR, M.rubber, 0, 0, 0); rearRim(spin);
+        add(spin, tyreR, M.rubber, 0, 0, 0); rearRim(spin);
+        stock = [add(spin, left ? lugGeoL : lugGeoR, M.rubber, 0, 0, 0)]; pkg = [add(spin, left ? deepGeoL : deepGeoR, M.rubber, 0, 0, 0)];
       }
-      wheels.push({ corner, flip, spin, left, front: frontW, side });
+      for (const m of pkg) m.visible = false;
+      wheels.push({ corner, flip, spin, left, front: frontW, side, stock, pkg });
     }
 
     // ---------------------------------------------------------------- headlights (LED bar on the weight rack)
@@ -5963,7 +6094,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const on = (w.front ? front : rear) === (w.front ? 'tractorFrontLug' : 'pullingR2');
+        for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
+      }
+    }
     function setChute() {}
 
     for (const t of tips) t.add(V3(0, -cgH, zOff));
@@ -6623,17 +6759,44 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const slickGeo = latheX(slickP, 72), grownGeo = latheX(grownP, 72);
     slickGeo.morphAttributes.position = [grownGeo.attributes.position];
     slickGeo.morphAttributes.normal = [grownGeo.attributes.normal];
-    const tyreTex = canvasTex(2048, 256, (g, w, h) => {
+    const sideTex = (txt) => canvasTex(2048, 256, (g, w, h) => {
       g.fillStyle = '#141414'; g.fillRect(0, 0, w, h);
       // outer sidewall band: profile points 11..14 -> v 0.73..0.93 -> rows (1-v)*h; letters upright = pointing out
       const yA = (1 - 0.92) * h, yB = (1 - 0.74) * h;
       g.save(); g.translate(w, yA + yB); g.scale(-1, -1);
       g.font = 'bold 34px Arial'; g.fillStyle = '#e8e8e8'; g.textBaseline = 'middle'; g.textAlign = 'center';
-      const txt = TF ? 'DRAG SLICK  ·  36.0 x 17.5-16' : 'DRAG SLICK  ·  34.5 x 17.0-16';
       for (let q = 0; q < 2; q++) g.fillText(txt, w * (0.25 + 0.5 * q), (yA + yB) / 2);
       g.restore();
     });
-    M.slick = new THREE.MeshStandardMaterial({ map: tyreTex, roughness: 0.88, metalness: 0 });
+    M.slick = new THREE.MeshStandardMaterial({ map: sideTex(TF ? 'DRAG SLICK  ·  36.0 x 17.5-16' : 'DRAG SLICK  ·  34.5 x 17.0-16'), roughness: 0.88, metalness: 0 });
+    // off-road (sand-drag) package: the same soft carcass with rubber paddles moulded across the tread, and ribbed fronts
+    M.paddle = new THREE.MeshStandardMaterial({ map: sideTex(TF ? 'SAND PADDLE  ·  36 x 17.5-16' : 'SAND PADDLE  ·  34.5 x 17-16'), roughness: 0.9, metalness: 0 });
+    function mergeGeos(list) {
+      const parts = list.map((g) => (g.index ? g.toNonIndexed() : g));
+      let n = 0; for (const g of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { if (!g.attributes.normal) g.computeVertexNormals(); pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      out.computeBoundingSphere(); return out;
+    }
+    const paddleGeo = (() => {
+      const list = [], N = 12;
+      for (let k = 0; k < N; k++) {
+        // each paddle: a rubber blade across the tread, leaning back a touch, with a thick root
+        const b = new THREE.BoxGeometry(TWR - 0.05, 0.036, 0.02); b.translate(0, RR + 0.015, 0); b.rotateX(k * Math.PI * 2 / N);
+        const r = new THREE.BoxGeometry(TWR - 0.06, 0.012, 0.04); r.translate(0, RR - 0.001, 0); r.rotateX(k * Math.PI * 2 / N);
+        list.push(b, r);
+      }
+      return mergeGeos(list);
+    })();
+    function ribGeo(R, W, rr) {
+      const h = W / 2, pts = [[rr + 0.004, -0.03], [rr + 0.03, -h + 0.012], [R - 0.035, -h], [R - 0.012, -h + 0.006]];
+      for (let x = -h + 0.018, k = 0; x < h - 0.017; x += 0.013, k++) pts.push([k & 1 ? R - 0.011 : R, x]);
+      pts.push([R - 0.012, h - 0.006], [R - 0.035, h], [rr + 0.03, h - 0.012], [rr + 0.004, 0.03]);
+      return latheX(pts, 48);
+    }
+    const ribF = FC ? ribGeo(0.33, 0.17, 0.198) : ribGeo(0.3, 0.15, 0.214);
     const frontP = FC ? [[0.2, -0.05], [0.24, -0.057], [0.285, -0.056], [0.306, -0.045], [RF, -0.025], [RF, 0.025], [0.306, 0.045], [0.285, 0.056], [0.24, 0.057], [0.2, 0.05]]
       : [[0.218, -0.03], [0.245, -0.034], [0.268, -0.033], [0.281, -0.026], [RF, -0.012], [RF, 0.012], [0.281, 0.026], [0.268, 0.033], [0.245, 0.034], [0.218, 0.03]];
     const tyreFGeo = latheX(frontP, 48);
@@ -6667,13 +6830,16 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
       let tyre = null;
+      let stock, pkg;
       if (frontW) {
-        add(spin, tyreFGeo, M.rubber, 0, 0, 0); frontRim(spin);
+        stock = [add(spin, tyreFGeo, M.rubber, 0, 0, 0)]; pkg = [add(spin, ribF, M.rubber, 0, 0, 0)]; frontRim(spin);
         add(flip, new THREE.BoxGeometry(0.05, 0.08, 0.06), M.polish, -0.06, 0, 0);          // spindle
       } else {
         tyre = add(spin, slickGeo, M.slick, 0, 0, 0); rearRim(spin);
+        stock = [tyre]; pkg = [add(spin, slickGeo, M.paddle, 0, 0, 0), add(spin, paddleGeo, M.rubber, 0, 0, 0)];
       }
-      wheels.push({ corner, flip, spin, left, front: frontW, side, tyre, growMax: GROW });
+      for (const m of pkg) m.visible = false;
+      wheels.push({ corner, flip, spin, left, front: frontW, side, tyre, growMax: GROW, stock, pkg });
     }
     // front axle through the nose, tie rod (inside the Funny Car's body)
     if (!FC) {
@@ -6725,7 +6891,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const on = /^(paddle|sandRib)/.test(w.front ? front : rear);
+        for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
+      }
+    }
     // parachutes: out = deployed, infl 0..1 (from the physics), t = seconds since the pins were pulled. Two canopies
     // on long lines that fly apart and weave
     const _rim = new THREE.Vector3();
@@ -7188,20 +7359,21 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const tyreGeo = latheX([[RRIM + 0.01, -0.5], [0.4, -0.54], [0.55, -0.545], [0.68, -0.535], [0.77, -0.505], [0.815, -0.46], [RT - 0.02, -0.39],
       [RT - 0.02, 0.39], [0.815, 0.46], [0.77, 0.505], [0.68, 0.535], [0.55, 0.545], [0.4, 0.54], [RRIM + 0.01, 0.5]], 64);
     // hand-cut paddle tread: chevron lugs across the crown and wrapping over the shoulders (mirrored for the left)
-    function lugs(dir) {
-      const list = [], N = 34;
+    // (deep: the off-road package's full-depth lugs - ~1 in taller, and the physics' rolling radius 2 cm bigger with them)
+    function lugs(dir, deep) {
+      const list = [], N = 34, lh = deep ? 0.075 : 0.055, ly = deep ? RT + 0.0225 : RT + 0.012;
       for (let k = 0; k < N; k++) {
         const phi = k * Math.PI * 2 / N;
         for (const side of [-1, 1]) {
-          const b = new THREE.BoxGeometry(0.46, 0.055, 0.1);
-          b.rotateY(-side * dir * 0.38); b.translate(side * 0.25, RT + 0.012, side * dir * 0.04);
-          const sh = new THREE.BoxGeometry(0.12, 0.14, 0.1); sh.rotateZ(side * 0.75); sh.translate(side * 0.5, RT - 0.07, side * dir * 0.1);
+          const b = new THREE.BoxGeometry(0.46, lh, deep ? 0.12 : 0.1);
+          b.rotateY(-side * dir * 0.38); b.translate(side * 0.25, ly, side * dir * 0.04);
+          const sh = new THREE.BoxGeometry(deep ? 0.14 : 0.12, deep ? 0.17 : 0.14, deep ? 0.12 : 0.1); sh.rotateZ(side * 0.75); sh.translate(side * (deep ? 0.51 : 0.5), RT - (deep ? 0.06 : 0.07), side * dir * 0.1);
           b.rotateX(phi + (side > 0 ? Math.PI / N : 0)); sh.rotateX(phi + (side > 0 ? Math.PI / N : 0)); list.push(b, sh);
         }
       }
       return mergeGeos(list);
     }
-    const lugR = lugs(1), lugL = lugs(-1);
+    const lugR = lugs(1), lugL = lugs(-1), lugRD = lugs(1, true), lugLD = lugs(-1, true);
     // sidewall lettering
     const swTex = canvasTex(1024, 1024, (g, w) => {
       g.clearRect(0, 0, w, w); g.fillStyle = '#e8e8e8'; g.font = 'bold 60px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -7232,12 +7404,14 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       // (squash: the tyre flattens and bulges when a hard landing drives it past the end of the suspension's travel)
       const squash = new THREE.Group(); flip.add(squash);
       const spin = new THREE.Group(); squash.add(spin);
-      add(spin, tyreGeo, M.rubber, 0, 0, 0); add(spin, left ? lugL : lugR, M.rubber, 0, 0, 0); rim(spin);
+      add(spin, tyreGeo, M.rubber, 0, 0, 0); rim(spin);
+      const lugS = add(spin, left ? lugL : lugR, M.rubber, 0, 0, 0), lugD = add(spin, left ? lugLD : lugRD, M.rubber, 0, 0, 0);
+      lugD.visible = false;
       // planetary hub housing (steers with the wheel, doesn't spin)
       add(flip, cylX(0.2, 0.24, 0.3, 32), M.cast, 0.3, 0, 0);
       add(flip, cylX(0.14, 0.17, 0.1, 28), M.polish, 0.48, 0, 0);
       for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; add(flip, cylX(0.014, 0.014, 0.04, 6), M.chrome, 0.54, Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0, 0, 0, false); }
-      wheels.push({ corner, flip, spin, squash, left, front: frontW, side, rt: RT });
+      wheels.push({ corner, flip, spin, squash, left, front: frontW, side, rt: RT, lugS, lugD });
     }
 
     // ---------------------------------------------------------------- axles, 4-links and shocks (moved every frame)
@@ -7360,7 +7534,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       if (wsMesh) wsMesh.visible = !cockpit;
     }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const deep = (w.front ? front : rear) === 'monsterMud';
+        w.lugS.visible = !deep; w.lugD.visible = deep; w.rt = RT + (deep ? 0.02 : 0);
+      }
+    }
     function setChute() {}
 
     rootG.traverse((o) => { if (o.isMesh && o.material && o.material.transparent) o.castShadow = false; });
@@ -7606,6 +7785,33 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // ---------------------------------------------------------------- wheels
     const tyreR = latheX([[0.068, -0.09], [0.085, -0.094], [0.11, -0.092], [0.13, -0.08], [RR, -0.06], [RR, 0.06], [0.13, 0.08], [0.11, 0.092], [0.085, 0.094], [0.068, 0.09]], 36);
     const tyreF = latheX([[0.066, -0.057], [0.085, -0.06], [0.108, -0.056], [RF - 0.006, -0.042], [RF, -0.03], [RF, 0.03], [RF - 0.006, 0.042], [0.108, 0.056], [0.085, 0.06], [0.066, 0.057]], 36);
+    // off-road package: knobby tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) - a rounded carcass under staggered
+    // rows of square knobs
+    function mergeGeos(list) {
+      const parts = list.map((g) => (g.index ? g.toNonIndexed() : g));
+      let n = 0; for (const g of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { if (!g.attributes.normal) g.computeVertexNormals(); pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      out.computeBoundingSphere(); return out;
+    }
+    function knobby(R, W) {
+      const c = R - 0.013, h = W / 2;
+      const carcass = latheX([[0.068, -h + 0.014], [0.09, -h], [0.12, -h + 0.001], [c - 0.022, -h + 0.006], [c - 0.006, -h + 0.02], [c, -h + 0.04],
+        [c, h - 0.04], [c - 0.006, h - 0.02], [c - 0.022, h - 0.006], [0.12, h - 0.001], [0.09, h], [0.068, h - 0.014]], 40);
+      const list = [], N = Math.round(2 * Math.PI * c / 0.036);
+      for (let k = 0; k < N; k++) {
+        const phi = k * 2 * Math.PI / N, odd = k & 1;
+        for (const f of odd ? [-0.36, 0.36] : [-0.74, 0, 0.74]) {
+          const b = new THREE.BoxGeometry(W * 0.2, 0.016, 0.022); b.translate(f * h, c + 0.005, 0); b.rotateX(phi); list.push(b);
+        }
+        // shoulder knobs, stepping down the sidewall
+        if (odd) for (const sd of [-1, 1]) { const b = new THREE.BoxGeometry(0.016, 0.02, 0.02); b.translate(sd * (h - 0.004), c - 0.018, 0); b.rotateX(phi); list.push(b); }
+      }
+      return [carcass, mergeGeos(list)];
+    }
+    const knobF = knobby(0.152, 0.127), knobR = knobby(0.165, 0.165);
     function rim(g, w) {
       const barrel = new THREE.CylinderGeometry(0.066, 0.066, w * 0.95, 28, 1, true); barrel.rotateZ(Math.PI / 2); add(g, barrel, M.mag, 0, 0, 0);
       const face = new THREE.CylinderGeometry(0.066, 0.066, 0.008, 28); face.rotateZ(Math.PI / 2); add(g, face, M.mag, w * 0.3, 0, 0);
@@ -7620,14 +7826,17 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
+      // (the slick, and the package's knobby: setTires shows one)
+      const stock = add(spin, frontW ? tyreF : tyreR, M.rubber, 0, 0, 0);
+      const knob = (frontW ? knobF : knobR).map((g) => { const m = add(spin, g, M.rubber, 0, 0, 0); m.visible = false; return m; });
       if (frontW) {
-        add(spin, tyreF, M.rubber, 0, 0, 0); rim(spin, WF);
+        rim(spin, WF);
         // spindle and kingpin (steers, doesn't spin), a brake disc on the KZ
         add(flip, cylX(0.012, 0.012, 0.12, 8), M.chrome, -0.07, 0, 0);
         add(flip, new THREE.CylinderGeometry(0.014, 0.014, 0.11, 8), M.frame, -0.13, 0.01, 0);
         if (KZ) { add(flip, cylX(0.075, 0.075, 0.005, 24), M.cast, -0.06, 0, 0); add(flip, rbox(0.03, 0.05, 0.06, 0.008), M.red, -0.06, 0.06, 0); }
-      } else { add(spin, tyreR, M.rubber, 0, 0, 0); rim(spin, WR); }
-      wheels.push({ corner, flip, spin, left, front: frontW, side });
+      } else rim(spin, WR);
+      wheels.push({ corner, flip, spin, left, front: frontW, side, stock, knob });
     }
     // tie rods from the column to the spindles (static - a little artistic licence)
     for (const sx of [-1, 1]) tubeAB(model, V3(0, 0.1, -0.74), V3(sx * (trackF / 2 - 0.16), 0.11, zF + 0.05), 0.007, M.chrome, 6);
@@ -7657,7 +7866,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     function setLights(o) { M.tail.emissiveIntensity = o.brake ? 4 : (o.night ? 1 : 0.3); }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const kn = /^kartKnob/.test(w.front ? front : rear);
+        w.stock.visible = !kn; for (const m of w.knob) m.visible = kn;
+      }
+    }
     function setChute() {}
 
     rootG.traverse((o) => { if (o.isMesh && o.material && o.material.transparent) o.castShadow = false; });
@@ -8865,7 +9079,7 @@ void main(){
         g.fillStyle = '#888'; g.font = 'bold 34px Arial'; g.fillText(o.foot || '', w / 2, 520, w - 60);
         scrT.needsUpdate = true;
       }
-      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · WHOOPS' });
+      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
       arena = {
         update(dt) {
           for (const k of cars) if (k.ver !== k.c.ver) k.refresh();
@@ -9469,7 +9683,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
-    map: 'country', rsMode: 'auto', vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
+    map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
   };
   let S;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('hc_settings')) || {}); } catch (e) { S = Object.assign({}, DEFAULTS); }
@@ -9514,9 +9728,21 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
-  const OFFROAD = () => !PULLER && !DRAGSTER && !MONSTER && !KART && !!(S.offroad && S.offroad[S.car]);   // KO2 all-terrains + lift, saved per car
-  const tireF = () => (OFFROAD() ? 'offroad' : FIXED ? carSpec.frontTire : 'street');
-  const tireR = () => (OFFROAD() ? 'offroad' : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
+  // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
+  const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
+  const PKG = VEH.OFFROAD_PKG(S.car, CARDEF.cls);
+  const PKG_UI = PULLER ? ['R-2 deep lugs', 'R-2 deep lugs + lug fronts', 'Firestone R-2 30.5L-32 "cane & rice" rears left uncut (lugs twice as deep as a farm tyre, never sharpened) and lugged 11L-15 fronts. '
+      + 'They paddle through mud and dig into turf, and it steers in the soft stuff · the sharpened pullers bite harder on hard-packed clay, and on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
+    : DRAGSTER ? ['Sand-drag paddles', 'Paddles + rib fronts', 'The sand-drag setup: paddle tyres (a smooth carcass with ~1.5 in rubber paddles across the tread) and ribbed sand fronts. The paddles shovel the ground - huge bite on dirt and gravel '
+      + '(the quickest sand dragster does 300 ft in 2.16 s @ 156 mph) - but next to none on pavement or a prepped strip, and little side grip anywhere. Try the Dirt Drag map']
+    : MONSTER ? ['Full-depth lugs', 'Full-depth lugs', 'The BKTs left full-depth, as moulded, instead of shaved and hand-cut for a stadium floor: ~1 in more lug and ~100 lb more rubber each. '
+      + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
+    : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
+      + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
+      + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, tread hum, and taller effective gearing'];
+  const tireF = () => (OFFROAD() ? PKG.front : FIXED ? carSpec.frontTire : 'street');
+  const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena';
@@ -9679,9 +9905,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     else if (KART) setTimeout(() => hud.hint('Go-kart: shift up (E) for DRIVE and floor it. No suspension and a solid rear axle: brake in a straight line, turn in smoothly, let it roll through the corner.'
       + (CARDEF.cls === 'kz' ? ' KZ shifter: 6 gears - E / Q or the paddles (M holds it in manual).' : CARDEF.cls === 'tag' ? ' The clutch is fully in by 6,000 rpm, so it pulls away off the pipe - it comes alive past ~9,000.' : ''), 10), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
-      + 'In the air, GAS lifts the nose and BRAKE drops it. Rolled it? Steer left or right to flip it back over.'
+      + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
-    else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump ahead, the car crush on the left, the tabletop on the right, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 10), 1600);
+    else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump straight ahead with a step-up (left) and a whoops lane (right) either side of it, the car crush and the tabletop halfway down the sides, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
     else setTimeout(() => hud.hint(veh.transType === 'auto' ? 'In PARK — throttle revs the engine. Shift up (E / right paddle) for DRIVE.' : 'In NEUTRAL — throttle revs the engine. Shift up (E / right paddle) for 1st gear.', 6), 1600);
@@ -9943,6 +10169,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
           seg([['auto', 'Auto'], ['crab', 'Crab'], ['manual', 'Manual'], ['front', 'Front only']], S.rsMode, (v) => { S.rsMode = v; G.rearMan = 0; })));
         add(row('In the air', 'The tyres weigh 645 lb each: spin them up with the GAS and the truck rocks back (nose up); stab the BRAKE and it pitches nose down. Lift off the gas to fly level. Land on the down slopes.', el('<span></span>')));
+        add(row('Air assist', 'On: like a seasoned driver’s feet - it eases off the gas (or brake) before the truck rotates past a landable attitude, catches a nose that’s way off, and feathers the gas as you touch down while the rear tyres are still spinning hard (they’d kick it over backwards). Holding the gas over a jump no longer flips it. Off: all yours - backflips, front flips and crashes',
+          seg([[true, 'On'], [false, 'Off (do your own flips)']], S.airAssist !== false, (v) => { S.airAssist = v; })));
       }
       if (ARENAMAP) {
         const clr = el('<button class="btn small ghost">New run (score to 0)</button>');
@@ -9956,9 +10184,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { S.trans = v; applyVehicleSettings(); })));
       if (!FIXED) add(row('Manual clutch', input.hasClutchPedal ? 'Use your clutch pedal (can stall!) or let the car work the clutch for you' : 'Map a clutch pedal in Controls → Wheel setup to use it', seg([[false, 'Auto-clutch'], [true, 'Clutch pedal']], S.clutchPedal, (v) => { S.clutchPedal = v; })));
-      if (!PULLER && !DRAGSTER && !MONSTER) add(row('Off-road package', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
-        + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, '
-        + 'tread hum, and taller effective gearing', seg([[false, 'Off'], [true, 'KO2 all-terrains + 2" lift']], OFFROAD(), (v) => {
+      add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
       if (!FIXED && !OFFROAD()) add(row('Rear tyres', 'Drag radials: huge launch grip once warm (do a burnout!), soft sidewall, less cornering grip, slick when cold', seg([['street', 'Pirelli P Zero 275/40ZR20'], ['drag', 'Nitto NT555R II 315/35R20 drag radials']], S.rearTire, (v) => { S.rearTire = v; applyVehicleSettings(); })));
@@ -10216,6 +10442,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     // GTA-style flip: steering rolls a car that's on its roof or side back onto its wheels
     veh.input.flipAssist = true;
+    // (monster truck) air assist: eases off whichever pedal would over-rotate it in the air, feathers the gas on landing
+    veh.input.airAssist = MONSTER && S.airAssist !== false;
     veh.input.revHold = !!A.rev;
     veh.input.nos = !!A.nos;
     veh.input.lineLock = !!A.lineLock;
@@ -10450,7 +10678,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       cut: veh.fuelCut ? 1 : 0, boost: veh.boost, run: veh.running ? 1 : 0, crank: veh.cranking ? 1 : 0,
       squeal, sqPitch: pitch, spin, speed, surf: rw.contact ? rw.surface : 0, interior: cam.mode === 2 ? 1 : 0,
       horn: G.horn ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol, rough: ENG_SND.rough || 0, whine: (BIG ? ENG_SND.whine : DRAGPAK ? 1.7 : DEMON ? 1.45 : 1) * tune.whine,
-      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() ? 1 : 0,
+      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() && !BIG ? 1 : 0,
       boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
@@ -10508,7 +10736,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
       { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
       { html: KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? PKG_UI[0] : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
@@ -10678,7 +10906,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
     if (world.arena) world.arena.update(dt);
     // fresh cars once they're all flat and the truck is well clear of the pile
-    if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px + 17, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
+    if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px - W.ARENA_CARS[0].x, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
     // body axes
     const { qx, qy, qz, qw } = veh;
     const ax = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qz * qw), 2 * (qx * qz - qy * qw)];            // right

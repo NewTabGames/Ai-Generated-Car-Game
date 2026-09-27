@@ -227,6 +227,33 @@
     // ---------------------------------------------------------------- wheels
     const tyreR = latheX([[0.068, -0.09], [0.085, -0.094], [0.11, -0.092], [0.13, -0.08], [RR, -0.06], [RR, 0.06], [0.13, 0.08], [0.11, 0.092], [0.085, 0.094], [0.068, 0.09]], 36);
     const tyreF = latheX([[0.066, -0.057], [0.085, -0.06], [0.108, -0.056], [RF - 0.006, -0.042], [RF, -0.03], [RF, 0.03], [RF - 0.006, 0.042], [0.108, 0.056], [0.085, 0.06], [0.066, 0.057]], 36);
+    // off-road package: knobby tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) - a rounded carcass under staggered
+    // rows of square knobs
+    function mergeGeos(list) {
+      const parts = list.map((g) => (g.index ? g.toNonIndexed() : g));
+      let n = 0; for (const g of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { if (!g.attributes.normal) g.computeVertexNormals(); pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      out.computeBoundingSphere(); return out;
+    }
+    function knobby(R, W) {
+      const c = R - 0.013, h = W / 2;
+      const carcass = latheX([[0.068, -h + 0.014], [0.09, -h], [0.12, -h + 0.001], [c - 0.022, -h + 0.006], [c - 0.006, -h + 0.02], [c, -h + 0.04],
+        [c, h - 0.04], [c - 0.006, h - 0.02], [c - 0.022, h - 0.006], [0.12, h - 0.001], [0.09, h], [0.068, h - 0.014]], 40);
+      const list = [], N = Math.round(2 * Math.PI * c / 0.036);
+      for (let k = 0; k < N; k++) {
+        const phi = k * 2 * Math.PI / N, odd = k & 1;
+        for (const f of odd ? [-0.36, 0.36] : [-0.74, 0, 0.74]) {
+          const b = new THREE.BoxGeometry(W * 0.2, 0.016, 0.022); b.translate(f * h, c + 0.005, 0); b.rotateX(phi); list.push(b);
+        }
+        // shoulder knobs, stepping down the sidewall
+        if (odd) for (const sd of [-1, 1]) { const b = new THREE.BoxGeometry(0.016, 0.02, 0.02); b.translate(sd * (h - 0.004), c - 0.018, 0); b.rotateX(phi); list.push(b); }
+      }
+      return [carcass, mergeGeos(list)];
+    }
+    const knobF = knobby(0.152, 0.127), knobR = knobby(0.165, 0.165);
     function rim(g, w) {
       const barrel = new THREE.CylinderGeometry(0.066, 0.066, w * 0.95, 28, 1, true); barrel.rotateZ(Math.PI / 2); add(g, barrel, M.mag, 0, 0, 0);
       const face = new THREE.CylinderGeometry(0.066, 0.066, 0.008, 28); face.rotateZ(Math.PI / 2); add(g, face, M.mag, w * 0.3, 0, 0);
@@ -241,14 +268,17 @@
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
+      // (the slick, and the package's knobby: setTires shows one)
+      const stock = add(spin, frontW ? tyreF : tyreR, M.rubber, 0, 0, 0);
+      const knob = (frontW ? knobF : knobR).map((g) => { const m = add(spin, g, M.rubber, 0, 0, 0); m.visible = false; return m; });
       if (frontW) {
-        add(spin, tyreF, M.rubber, 0, 0, 0); rim(spin, WF);
+        rim(spin, WF);
         // spindle and kingpin (steers, doesn't spin), a brake disc on the KZ
         add(flip, cylX(0.012, 0.012, 0.12, 8), M.chrome, -0.07, 0, 0);
         add(flip, new THREE.CylinderGeometry(0.014, 0.014, 0.11, 8), M.frame, -0.13, 0.01, 0);
         if (KZ) { add(flip, cylX(0.075, 0.075, 0.005, 24), M.cast, -0.06, 0, 0); add(flip, rbox(0.03, 0.05, 0.06, 0.008), M.red, -0.06, 0.06, 0); }
-      } else { add(spin, tyreR, M.rubber, 0, 0, 0); rim(spin, WR); }
-      wheels.push({ corner, flip, spin, left, front: frontW, side });
+      } else rim(spin, WR);
+      wheels.push({ corner, flip, spin, left, front: frontW, side, stock, knob });
     }
     // tie rods from the column to the spindles (static - a little artistic licence)
     for (const sx of [-1, 1]) tubeAB(model, V3(0, 0.1, -0.74), V3(sx * (trackF / 2 - 0.16), 0.11, zF + 0.05), 0.007, M.chrome, 6);
@@ -278,7 +308,12 @@
     function setLights(o) { M.tail.emissiveIntensity = o.brake ? 4 : (o.night ? 1 : 0.3); }
     function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const kn = /^kartKnob/.test(w.front ? front : rear);
+        w.stock.visible = !kn; for (const m of w.knob) m.visible = kn;
+      }
+    }
     function setChute() {}
 
     rootG.traverse((o) => { if (o.isMesh && o.material && o.material.transparent) o.castShadow = false; });

@@ -422,20 +422,21 @@
     const tyreGeo = latheX([[RRIM + 0.01, -0.5], [0.4, -0.54], [0.55, -0.545], [0.68, -0.535], [0.77, -0.505], [0.815, -0.46], [RT - 0.02, -0.39],
       [RT - 0.02, 0.39], [0.815, 0.46], [0.77, 0.505], [0.68, 0.535], [0.55, 0.545], [0.4, 0.54], [RRIM + 0.01, 0.5]], 64);
     // hand-cut paddle tread: chevron lugs across the crown and wrapping over the shoulders (mirrored for the left)
-    function lugs(dir) {
-      const list = [], N = 34;
+    // (deep: the off-road package's full-depth lugs - ~1 in taller, and the physics' rolling radius 2 cm bigger with them)
+    function lugs(dir, deep) {
+      const list = [], N = 34, lh = deep ? 0.075 : 0.055, ly = deep ? RT + 0.0225 : RT + 0.012;
       for (let k = 0; k < N; k++) {
         const phi = k * Math.PI * 2 / N;
         for (const side of [-1, 1]) {
-          const b = new THREE.BoxGeometry(0.46, 0.055, 0.1);
-          b.rotateY(-side * dir * 0.38); b.translate(side * 0.25, RT + 0.012, side * dir * 0.04);
-          const sh = new THREE.BoxGeometry(0.12, 0.14, 0.1); sh.rotateZ(side * 0.75); sh.translate(side * 0.5, RT - 0.07, side * dir * 0.1);
+          const b = new THREE.BoxGeometry(0.46, lh, deep ? 0.12 : 0.1);
+          b.rotateY(-side * dir * 0.38); b.translate(side * 0.25, ly, side * dir * 0.04);
+          const sh = new THREE.BoxGeometry(deep ? 0.14 : 0.12, deep ? 0.17 : 0.14, deep ? 0.12 : 0.1); sh.rotateZ(side * 0.75); sh.translate(side * (deep ? 0.51 : 0.5), RT - (deep ? 0.06 : 0.07), side * dir * 0.1);
           b.rotateX(phi + (side > 0 ? Math.PI / N : 0)); sh.rotateX(phi + (side > 0 ? Math.PI / N : 0)); list.push(b, sh);
         }
       }
       return mergeGeos(list);
     }
-    const lugR = lugs(1), lugL = lugs(-1);
+    const lugR = lugs(1), lugL = lugs(-1), lugRD = lugs(1, true), lugLD = lugs(-1, true);
     // sidewall lettering
     const swTex = canvasTex(1024, 1024, (g, w) => {
       g.clearRect(0, 0, w, w); g.fillStyle = '#e8e8e8'; g.font = 'bold 60px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -466,12 +467,14 @@
       // (squash: the tyre flattens and bulges when a hard landing drives it past the end of the suspension's travel)
       const squash = new THREE.Group(); flip.add(squash);
       const spin = new THREE.Group(); squash.add(spin);
-      add(spin, tyreGeo, M.rubber, 0, 0, 0); add(spin, left ? lugL : lugR, M.rubber, 0, 0, 0); rim(spin);
+      add(spin, tyreGeo, M.rubber, 0, 0, 0); rim(spin);
+      const lugS = add(spin, left ? lugL : lugR, M.rubber, 0, 0, 0), lugD = add(spin, left ? lugLD : lugRD, M.rubber, 0, 0, 0);
+      lugD.visible = false;
       // planetary hub housing (steers with the wheel, doesn't spin)
       add(flip, cylX(0.2, 0.24, 0.3, 32), M.cast, 0.3, 0, 0);
       add(flip, cylX(0.14, 0.17, 0.1, 28), M.polish, 0.48, 0, 0);
       for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; add(flip, cylX(0.014, 0.014, 0.04, 6), M.chrome, 0.54, Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0, 0, 0, false); }
-      wheels.push({ corner, flip, spin, squash, left, front: frontW, side, rt: RT });
+      wheels.push({ corner, flip, spin, squash, left, front: frontW, side, rt: RT, lugS, lugD });
     }
 
     // ---------------------------------------------------------------- axles, 4-links and shocks (moved every frame)
@@ -594,7 +597,12 @@
       if (wsMesh) wsMesh.visible = !cockpit;
     }
     function setTransmission() {}
-    function setTires() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const deep = (w.front ? front : rear) === 'monsterMud';
+        w.lugS.visible = !deep; w.lugD.visible = deep; w.rt = RT + (deep ? 0.02 : 0);
+      }
+    }
     function setChute() {}
 
     rootG.traverse((o) => { if (o.isMesh && o.material && o.material.transparent) o.castShadow = false; });
