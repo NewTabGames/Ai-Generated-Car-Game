@@ -2,11 +2,14 @@
 
 An advanced, browser-based 3D car driving and motorsport simulation built with **Three.js** and **Web Audio API**.
 
-Features procedural world generation, realistic vehicle dynamics (tire friction, weight transfer, suspension geometry, aerodynamics), procedural multi-cylinder engine sound synthesis, and multiple game modes ranging from country cruising to professional drag racing and tractor pulling.
+[![Play Online](https://img.shields.io/badge/Play_Online-GitHub_Pages-brightgreen?style=for-the-badge&logo=github)](https://newtabgames.github.io/Ai-Generated-Car-Game/)
 
 ---
 
 ## 🎮 Play & Run
+
+### 🌐 Play Live in Browser
+**[Launch Game on GitHub Pages](https://newtabgames.github.io/Ai-Generated-Car-Game/)**
 
 ### Option 1: Run Locally via Web Server
 To run the modular development build:
