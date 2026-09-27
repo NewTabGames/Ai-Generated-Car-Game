@@ -1797,7 +1797,7 @@
     // 4-link on nitrogen shocks: soft, long travel (18 in bump / 12 in droop from ride height), the gas springs and
     // bypass tubes stiffen the last part of the stroke hard
     springF: 52000, springR: 66000, dampBumpF: 15000, dampRebF: 21000, dampBumpR: 17000, dampRebR: 24000, dampKnee: 0.5,
-    arbF: 32000, arbR: 28000, travelUp: 0.45, travelDown: 0.3, suspS0: 0.6, bumpStopK: 3000000, fzMax: 600000,
+    arbF: 12000, arbR: 10000, travelUp: 0.45, travelDown: 0.3, suspS0: 0.6, bumpStopK: 3000000, fzMax: 600000,
     suspProg: { x0: 0.55, k: 6, damp: 2.5 },
     brakeTorqueF: 9000, brakeTorqueR: 9000, handbrakeTorque: 9000, noABS: true, noESC: true,
     maxSteer: 0.58, steerRate: 1.6, steerRatio: 12, ackermann: 0.5, rearToe: 0, rearSteerMax: 0.55,

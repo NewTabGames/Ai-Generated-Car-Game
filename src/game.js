@@ -834,6 +834,16 @@
       vw.corner.rotation.y = -w.steer;
       const sp_ = w.spin % (Math.PI * 2);
       vw.spin.rotation.x = vw.left ? sp_ : -sp_;
+      // (monster truck) a landing that drives the wheel past the end of the suspension's travel flattens the tyre
+      // and a 16 psi tyre deflects with its load all the time (~2 in at rest, several on a landing): the hub is drawn that
+      // much lower and the tyre flattened by it, so the contact patch stays exactly where the physics has it
+      if (vw.squash) {
+        const pen = w.contact ? clamp(w.s - w.sRaw, 0, 0.3) : 0, d = w.contact ? clamp(w.Fz / 260000, 0, 0.16) : 0, rt = vw.rt || w.radius;
+        const ease = (a, b) => a + (b - a) * Math.min(1, dt * (b > a ? 60 : 10));
+        vw.dd = ease(vw.dd || 0, d); vw.sq = ease(vw.sq || 0, pen + d);
+        vw.corner.position.y -= vw.dd;
+        vw.squash.scale.set(1 + vw.sq * 0.45, 1 - vw.sq / (2 * rt), 1 + vw.sq * 0.3); vw.squash.position.y = vw.sq / 2;
+      }
       // slicks thrown taller (and narrower) at speed
       if (vw.tyre && vw.growMax && w.tire.grow) vw.tyre.morphTargetInfluences[0] = clamp((w.radius / w.tire.radius - 1) / vw.growMax, 0, 1);
       // tell the smoke where this tyre is, so puffs fade into it instead of slicing through it

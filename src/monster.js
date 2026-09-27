@@ -69,6 +69,24 @@
       return m;
     }
 
+    // smooth shading for the extruded body: average the normals of faces meeting at a point when they're within maxDeg
+    // of each other - the rounded edges (bevels) come out smooth, the real creases stay sharp
+    function smoothNormals(g, maxDeg) {
+      const p = g.attributes.position, n = g.attributes.normal, cnt = p.count, cosMax = Math.cos(maxDeg * Math.PI / 180);
+      const fn = new Float32Array(cnt * 3), groups = new Map();
+      for (let i = 0; i < cnt; i++) {
+        fn[i * 3] = n.getX(i); fn[i * 3 + 1] = n.getY(i); fn[i * 3 + 2] = n.getZ(i);
+        const k = Math.round(p.getX(i) * 1000) + ',' + Math.round(p.getY(i) * 1000) + ',' + Math.round(p.getZ(i) * 1000);
+        let l = groups.get(k); if (!l) groups.set(k, l = []); l.push(i);
+      }
+      for (const l of groups.values()) for (const i of l) {
+        let x = 0, y = 0, z = 0;
+        for (const j of l) { const d = fn[i * 3] * fn[j * 3] + fn[i * 3 + 1] * fn[j * 3 + 1] + fn[i * 3 + 2] * fn[j * 3 + 2]; if (d >= cosMax) { x += fn[j * 3]; y += fn[j * 3 + 1]; z += fn[j * 3 + 2]; } }
+        const il = 1 / (Math.hypot(x, y, z) || 1); n.setXYZ(i, x * il, y * il, z * il);
+      }
+      n.needsUpdate = true;
+    }
+
     // ---------------------------------------------------------------- materials
     const M = {};
     M.paint = new THREE.MeshPhysicalMaterial({ color: PAINTS[opts.paint] || 0xf2570f, metalness: 0.1, roughness: 0.4, clearcoat: 0.7, clearcoatRoughness: 0.12 });
@@ -82,7 +100,7 @@
     M.alu = new THREE.MeshStandardMaterial({ color: 0xaeb2b8, roughness: 0.4, metalness: 0.85 });
     M.blue = new THREE.MeshStandardMaterial({ color: 0x1b58d6, roughness: 0.3, metalness: 0.75 });
     M.red = new THREE.MeshStandardMaterial({ color: 0xc81a1a, roughness: 0.3, metalness: 0.75 });
-    M.rubber = new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.92, metalness: 0 });
+    M.rubber = new THREE.MeshStandardMaterial({ color: 0x1d1915, roughness: 0.94, metalness: 0 });   // (dusty)
     M.suit = new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.8 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, roughness: 0.25, clearcoat: 1 });
     M.visor = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.05, metalness: 0.8 });
@@ -129,6 +147,18 @@
         for (let k = 0; k <= 14; k++) { const x = k * W / 14, y = H * (0.62 + 0.18 * Math.sin(k * 1.9) * (k % 2 ? 1 : -0.6)); g.lineTo(x, y); }
         g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill(); g.stroke();
         claw(g, W * 0.12, H * 0.45, 0.9, false);
+        // arena dirt: flung up by the tyres - thickest low down and round the wheel arches, streaks and spots higher up
+        let sd = 1234 + side * 77; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+        for (let k = 0; k < 900; k++) {
+          const nearArch = rnd() < 0.55, arch = rnd() < 0.5 ? 0.197 : 0.829;
+          const x = (nearArch ? arch + (rnd() - 0.5) * 0.3 : rnd()) * W;
+          const yy = H * (1 - Math.pow(rnd(), nearArch ? 1.6 : 2.6) * (nearArch ? 0.75 : 0.5));
+          const r = 3 + rnd() * rnd() * 22;
+          g.fillStyle = `rgba(${60 + rnd() * 25 | 0},${38 + rnd() * 15 | 0},${22 + rnd() * 10 | 0},${0.25 + rnd() * 0.5})`;
+          g.beginPath(); g.ellipse(x, yy, r * (1 + rnd()), r, rnd() * 3, 0, 7); g.fill();
+        }
+        const mud = g.createLinearGradient(0, H * 0.72, 0, H); mud.addColorStop(0, 'rgba(66,42,24,0)'); mud.addColorStop(1, 'rgba(66,42,24,0.75)');
+        g.fillStyle = mud; g.fillRect(0, H * 0.72, W, H * 0.28);
         g.restore();
         // the name, reading left to right on both sides
         g.save(); g.translate(0, side * H);
@@ -219,6 +249,7 @@
       else { const p = g.attributes.position, u = g.attributes.uv; for (let k = 0; k < p.count; k += 3) for (const a of [p, u]) { const sz = a.itemSize; for (let c = 0; c < sz; c++) { const t = a.array[(k + 1) * sz + c]; a.array[(k + 1) * sz + c] = a.array[(k + 2) * sz + c]; a.array[(k + 2) * sz + c] = t; } } }
       g.computeVertexNormals();
       sideUVs(g, BZ0, BZ1, BY0, BY1);
+      smoothNormals(g, 32);
       const m = new THREE.Mesh(g, [M.livery, M.paint]); m.castShadow = true; m.receiveShadow = true; bodyG.add(m);
       // the inside of the shell (seen from under the truck / from the bed)
       const inner = new THREE.Mesh(g, M.inner); inner.scale.set(0.985, 1, 0.99); bodyG.add(inner);
@@ -235,6 +266,7 @@
       else for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
       g.computeVertexNormals();
       sideUVs(g, CZ0, CZ1, CY0, CY1);
+      smoothNormals(g, 32);
       const cab = new THREE.Mesh(g, [M.cabSide, M.paint]); cab.castShadow = true; cab.receiveShadow = true; bodyG.add(cab);
       // windshield and back glass (a hair proud of the cab)
       const ws = new THREE.PlaneGeometry(2 * CHW - 0.34, 0.86);
@@ -263,6 +295,29 @@
       const h = add(bodyG, new THREE.CylinderGeometry(0.15, 0.15, 0.05, 24), M.head, sx * 1.36, 1.99, -2.82 - BV - 0.01, Math.PI / 2, 0, 0, false); heads.push(h);
       add(bodyG, new THREE.TorusGeometry(0.155, 0.02, 8, 24), M.chrome, sx * 1.36, 1.99, -2.82 - BV - 0.03, 0, 0, 0, false);
       add(bodyG, rbox(0.34, 0.16, 0.03, 0.02), M.tail, sx * 1.4, 1.95, 2.66 + BV + 0.01, 0, 0, 0, false);
+    }
+    // fender flares: a thick black lip round each wheel arch, standing out from the body sides
+    M.flare = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.62, metalness: 0.1 });
+    for (const za of [zF, zR]) for (const sx of [-1, 1]) {
+      const pts = [], R = 1.27 - BV + 0.02;
+      for (let k = 0; k <= 24; k++) {
+        const ph = 0.5 + (Math.PI - 1.0) * k / 24, z = za - R * Math.cos(ph), y = 0.95 + R * Math.sin(ph);
+        if (z < BZ0 - 0.05 || z > BZ1 + 0.05) continue;
+        pts.push(V3(sx * (HW + 0.02), y, z));
+      }
+      const f = add(bodyG, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.085, 10, false), M.flare, 0, 0, 0);
+      f.scale.set(1, 1, 1);
+    }
+    // molded bumpers, front and back
+    add(bodyG, rbox(2 * HW + 0.1, 0.26, 0.3, 0.08), M.flare, 0, 1.72, -2.92 - BV + 0.08);
+    add(bodyG, rbox(2 * HW + 0.1, 0.24, 0.26, 0.08), M.flare, 0, 1.78, 2.72 + BV - 0.06);
+    // roof light bar and mirrors
+    add(bodyG, rbox(2.1, 0.13, 0.22, 0.04), M.flare, 0, 3.62, 0.02);
+    for (let k = 0; k < 6; k++) add(bodyG, rbox(0.24, 0.09, 0.03, 0.02), M.head, -0.8 + k * 0.32, 3.62, -0.1, 0, 0, 0, false);
+    for (const sx of [-1, 1]) {
+      tubeAB(bodyG, V3(sx * 1.5, 2.72, -0.32), V3(sx * 1.78, 2.86, -0.4), 0.018, M.flare);
+      add(bodyG, rbox(0.1, 0.24, 0.3, 0.03), M.flare, sx * 1.84, 2.9, -0.42, 0, sx * 0.12, 0);
+      add(bodyG, new THREE.PlaneGeometry(0.22, 0.18), M.chrome, sx * 1.84, 2.9, -0.265, 0, 0, 0, false);
     }
 
     // ---------------------------------------------------------------- chassis (chromoly tube frame)
@@ -304,8 +359,13 @@
     add(eng, rbox(0.4, 0.32, 0.74, 0.06), M.polish, 0, ey + 0.66, ez);                // 14-71 roots case
     add(eng, rbox(0.42, 0.06, 0.78, 0.02), M.black, 0, ey + 0.84, ez);
     // butterfly injector hat standing up through the bed
-    add(eng, rbox(0.34, 0.5, 0.52, 0.04), M.polish, 0, ey + 1.12, ez - 0.03);
-    add(eng, new THREE.BoxGeometry(0.28, 0.3, 0.04), M.black, 0, ey + 1.2, ez - 0.3, 0, 0, 0, false);
+    // (a forward-facing scoop: tapered aluminium walls, a dark mouth, the butterfly plate and its linkage on top)
+    { const sc = new THREE.CylinderGeometry(0.2, 0.26, 0.52, 4, 1, false); sc.rotateY(Math.PI / 4); sc.scale(1, 1, 1.25);
+      add(eng, sc, M.alu, 0, ey + 1.12, ez - 0.02); }
+    add(eng, rbox(0.3, 0.26, 0.05, 0.02), M.gloss, 0, ey + 1.16, ez - 0.36, 0.25, 0, 0, false);            // the mouth
+    add(eng, rbox(0.3, 0.035, 0.38, 0.01), M.gloss, 0, ey + 1.39, ez - 0.02);                               // butterfly plate
+    for (const sx of [-0.07, 0.07]) add(eng, cylX(0.028, 0.028, 0.012, 14), M.red, sx, ey + 1.415, ez - 0.02, 0, 0, Math.PI / 2);
+    add(eng, rbox(0.34, 0.06, 0.08, 0.02), M.red, 0, ey + 0.93, ez - 0.02);                               // hat base ring
     add(eng, cylX(0.1, 0.1, 0.04, 24), M.polish, 0, ey + 0.66, ez - 0.4, 0, Math.PI / 2, 0);
     // belt drive at the front of the blower
     add(eng, rbox(0.12, 0.62, 0.08, 0.03), M.black, 0, ey + 0.33, ez - 0.46);
@@ -403,13 +463,15 @@
       corner.position.set(side * HX, RT - cgH, (frontW ? zF : zR) + zOff);
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
-      const spin = new THREE.Group(); flip.add(spin);
+      // (squash: the tyre flattens and bulges when a hard landing drives it past the end of the suspension's travel)
+      const squash = new THREE.Group(); flip.add(squash);
+      const spin = new THREE.Group(); squash.add(spin);
       add(spin, tyreGeo, M.rubber, 0, 0, 0); add(spin, left ? lugL : lugR, M.rubber, 0, 0, 0); rim(spin);
       // planetary hub housing (steers with the wheel, doesn't spin)
       add(flip, cylX(0.2, 0.24, 0.3, 32), M.cast, 0.3, 0, 0);
       add(flip, cylX(0.14, 0.17, 0.1, 28), M.polish, 0.48, 0, 0);
       for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; add(flip, cylX(0.014, 0.014, 0.04, 6), M.chrome, 0.54, Math.cos(a) * 0.12, Math.sin(a) * 0.12, 0, 0, 0, false); }
-      wheels.push({ corner, flip, spin, left, front: frontW, side });
+      wheels.push({ corner, flip, spin, squash, left, front: frontW, side, rt: RT });
     }
 
     // ---------------------------------------------------------------- axles, 4-links and shocks (moved every frame)
