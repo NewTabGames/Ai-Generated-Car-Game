@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hellcat Model Viewer</title>
+<style>
+  :root { --red: #d4161c; --bg: rgba(10, 11, 13, 0.85); --line: rgba(255,255,255,0.14); --txt: #eceef1; --dim: #9aa0a8; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: var(--txt); font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #ui { position: fixed; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
+  .grp { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px; pointer-events: auto; }
+  button { background: transparent; border: 0; color: var(--txt); padding: 6px 10px; border-radius: 4px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+  button.on { background: var(--red); }
+  .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .sw.on { border-color: #fff; }
+  .lab { position: fixed; bottom: 16px; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; background: var(--bg); border: 1px solid var(--line); padding: 5px 12px; border-radius: 4px; }
+  #labL { left: 25%; transform: translateX(-50%); } #labR { left: 75%; transform: translateX(-50%); } #labC { left: 50%; transform: translateX(-50%); }
+  #hint { position: fixed; right: 14px; bottom: 16px; font-size: 12px; color: var(--dim); }
+  #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; color: #f66; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="grp" id="modes"><button data-m="split" class="on">Before | After</button><button data-m="before">Before</button><button data-m="after">After</button></div>
+  <div class="grp" id="views"><button data-v="front34" class="on">Front ¾</button><button data-v="front">Front</button><button data-v="side">Side</button><button data-v="rear34">Rear ¾</button><button data-v="rear">Rear</button><button data-v="top">Top</button><button data-v="spin">Spin</button></div>
+  <div class="grp" id="paints"></div>
+</div>
+<div class="lab" id="labL">Before</div><div class="lab" id="labR">After</div><div class="lab" id="labC" style="display:none"></div>
+<div id="hint">drag to orbit · scroll to zoom</div>
+<div id="err">Could not load three.js from cdn.jsdelivr.net — an internet connection is required.</div>
+<script src="carmodel_before.js"></script>
+<script src="../src/carmodel.js"></script>
+<script>
+(async function () {
+  let THREE;
+  try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js'); }
+  catch (e) { document.getElementById('err').style.display = 'flex'; return; }
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fb4c8);
+  scene.fog = new THREE.Fog(0x9fb4c8, 25, 60);
+  // studio-ish environment for reflections: gradient sky dome + soft ground
+  {
+    const pm = new THREE.PMREMGenerator(renderer);
+    const env = new THREE.Scene();
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: 'varying vec3 d; void main(){ d = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'varying vec3 d; void main(){ float h = normalize(d).y; vec3 c = mix(vec3(0.72,0.8,0.9), vec3(0.25,0.42,0.7), pow(max(h,0.0),0.5)); c = mix(c, vec3(0.22,0.21,0.2), smoothstep(0.0,-0.1,h)); c += vec3(1.0,0.95,0.85) * pow(max(dot(normalize(d), normalize(vec3(0.5,0.6,0.3))),0.0), 200.0) * 20.0; gl_FragColor = vec4(c,1.0); }',
+    }));
+    env.add(sky);
+    scene.environment = pm.fromScene(env, 0.02).texture;
+  }
+  const sun = new THREE.DirectionalLight(0xfff4e6, 2.6);
+  sun.position.set(6, 9, 4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 });
+  sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.02;
+  scene.add(sun, new THREE.HemisphereLight(0xbfd4ff, 0x4a4540, 0.5));
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ color: 0x3a3b3e, roughness: 0.92 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+  const cgH = 0.53, wheelY = 0.357 - 0.53;
+  const opts = { paint: 'TorRed', cgHeight: cgH, zOff: 0.2062 };
+  function mk(lib) {
+    const car = lib.build(THREE, opts);
+    car.root.position.y = cgH;
+    for (const w of car.wheels) w.corner.position.y = wheelY;
+    car.setInteriorVisible(true, false);
+    car.setLights({ brake: false, reverse: false, headlights: false, night: false });
+    car.drawCluster({ rpm: 800, speedMph: 0, gear: 'P', boost: 0, mode: 'STREET', tc: false, abs: false, lineLock: false, running: true, shift: false });
+    car.root.traverse((o) => { if (o.isMesh && !(o.material && o.material.transparent)) o.castShadow = true; });
+    scene.add(car.root);
+    return car;
+  }
+  const before = mk(window.HCCarModelBefore), after = mk(window.HCCarModel);
+
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 200);
+  const orbit = { yaw: 0.75, pitch: 0.12, dist: 8.2, target: new THREE.Vector3(0, 0.62, 0.15), spin: false };
+  const VIEWS = { front34: [0.75, 0.12, 8.2], front: [0, 0.06, 8.6], side: [Math.PI / 2, 0.03, 9.2], rear34: [2.45, 0.14, 8.2], rear: [Math.PI, 0.08, 8.6], top: [0.6, 1.2, 9.5] };
+  function setView(v) {
+    if (v === 'spin') { orbit.spin = !orbit.spin; return; }
+    orbit.spin = false; [orbit.yaw, orbit.pitch, orbit.dist] = VIEWS[v];
+  }
+  let mode = 'split';
+  function setMode(m) {
+    mode = m;
+    document.getElementById('labL').style.display = m === 'split' ? '' : 'none';
+    document.getElementById('labR').style.display = m === 'split' ? '' : 'none';
+    const c = document.getElementById('labC'); c.style.display = m === 'split' ? 'none' : ''; c.textContent = m === 'before' ? 'Before' : 'After';
+  }
+  const bind = (id, attr, fn) => document.querySelectorAll('#' + id + ' button').forEach((b) => b.addEventListener('click', () => {
+    if (!(id === 'views' && b.dataset.v === 'spin')) document.querySelectorAll('#' + id + ' button').forEach((x) => x.classList.toggle('on', x === b));
+    else b.classList.toggle('on');
+    fn(b.dataset[attr]);
+  }));
+  bind('modes', 'm', setMode); bind('views', 'v', setView);
+  const pg = document.getElementById('paints');
+  for (const [name, hex] of Object.entries(window.HCCarModel.PAINTS)) {
+    const b = document.createElement('button'); b.className = 'sw' + (name === 'TorRed' ? ' on' : ''); b.title = name;
+    b.style.background = '#' + hex.toString(16).padStart(6, '0');
+    b.addEventListener('click', () => { before.setPaint(name); after.setPaint(name); pg.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b)); });
+    pg.appendChild(b);
+  }
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; orbit.spin = false; });
+  addEventListener('pointerup', () => { drag = null; });
+  addEventListener('pointermove', (e) => { if (!drag) return; orbit.yaw -= (e.clientX - drag[0]) * 0.006; orbit.pitch = Math.max(-0.05, Math.min(1.4, orbit.pitch + (e.clientY - drag[1]) * 0.004)); drag = [e.clientX, e.clientY]; });
+  canvas.addEventListener('wheel', (e) => { orbit.dist = Math.max(2.5, Math.min(20, orbit.dist * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: true });
+
+  function place() {
+    const t = orbit.target, cp = Math.cos(orbit.pitch);
+    const d = orbit.dist * (mode === 'split' ? 1.6 : 1);   // half-width viewports need to sit further back
+    // yaw 0 = looking at the nose (car faces -Z)
+    camera.position.set(t.x - Math.sin(orbit.yaw) * d * cp, t.y + Math.sin(orbit.pitch) * d, t.z - Math.cos(orbit.yaw) * d * cp);
+    camera.lookAt(t);
+  }
+  function draw() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    renderer.setScissorTest(false);
+    if (mode === 'split') {
+      renderer.setScissorTest(true);
+      camera.aspect = (w / 2) / h; camera.updateProjectionMatrix(); place();
+      for (const [car, x] of [[before, 0], [after, w / 2]]) {
+        before.root.visible = car === before; after.root.visible = car === after;
+        renderer.setViewport(x, 0, w / 2, h); renderer.setScissor(x, 0, w / 2, h);
+        renderer.render(scene, camera);
+      }
+      renderer.setScissorTest(false);
+    } else {
+      before.root.visible = mode === 'before'; after.root.visible = mode === 'after';
+      camera.aspect = w / h; camera.updateProjectionMatrix(); place();
+      renderer.setViewport(0, 0, w, h);
+      renderer.render(scene, camera);
+    }
+  }
+  function loop() { requestAnimationFrame(loop); if (orbit.spin) orbit.yaw += 0.006; draw(); }
+  window.__viewer = { setView, setMode, draw, orbit, before, after };
+  loop();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "ai-generated-car-game",
+  "version": "1.0.0",
+  "description": "AI-generated 3D browser-based car driving and motorsport simulation with Three.js",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "node build.js",
+    "build:viewer": "node build-viewer.js",
+    "build:all": "node build.js && node build-viewer.js",
+    "test": "node test/sim-test.js",
+    "test:dragster": "node test/dragster-test.js",
+    "test:puller": "node test/puller-test.js",
+    "test:audio": "node test/audio-test.js"
+  },
+  "keywords": [
+    "threejs",
+    "webgl",
+    "car-game",
+    "vehicle-physics",
+    "audio-synthesis",
+    "procedural-generation"
+  ],
+  "author": "NewTabGames",
+  "license": "MIT"
+}
