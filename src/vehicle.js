@@ -143,6 +143,14 @@
       muX: 1.0, muY: 0.95, loose: 0.75, kappaPeak: 0.1, alphaPeak: 0.09, relaxX: 0.14, relaxY: 0.3,
       B: 1.6, C: 1.38, E: -0.3, heatCap: 900, cold: 0.95, coldT: 20, warmT: 45, hotT: 110, overheat: 0.004, prep: 1.0,
       crr: [0.6, 1, 1, 1, 1, 0.6] },
+    // Monster truck: BKT 66x43.00-25 flotation tyres (66 in tall, 43 in wide, ~645 lb each) at ~16 psi, the tread
+    // hand-cut by the crew into deep paddles. They dig into the arena's clay and hook harder than any street tyre
+    // (enough to stand the truck on its rear wheels), slide a long way sideways before they let go, and are only so-so
+    // on pavement. No temperature to speak of.
+    monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838,
+      muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
+      B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
+      crr: [1.5, 1.2, 1.1, 1.1, 1.0, 1.5] },
   };
   function MF(rho, t) {
     const bx = t.B * rho;
@@ -215,7 +223,7 @@
       this.px = x; this.py = y + s.cgHeight - (s.cgDrop || 0) + 0.02; this.pz = z;
       this.vx = this.vy = this.vz = 0; this.wx = this.wy = this.wz = 0;
       for (const w of this.wheels) { w.omega = 0; w.kappa = 0; w.tanA = 0; w.abs = 1; w.s = w.s0; }
-      this.steerAngle = 0;
+      this.steerAngle = 0; this.rearSteerAngle = 0; this.bodyContact = 0; this.flipping = false;
       this.eOmega = this.eOmega || 0;
       if (this.running === undefined) { this.running = false; this.eOmega = 0; }
       this.cranking = false; this.crankT = 0;
@@ -505,6 +513,12 @@
         if (d > 0) { dR = aIn * sg; dL = aOut * sg; } else { dL = aIn * sg; dR = aOut * sg; }
       }
       W[0].steer = dL; W[1].steer = dR; W[2].steer = s.rearToe; W[3].steer = -s.rearToe;   // static rear toe-in
+      // four-wheel steering (monster truck): the rear axle has its own hydraulic ram on its own switch (+ = pointing right)
+      if (s.rearSteerMax) {
+        const rt = clamp(inp.rearSteer || 0, -1, 1) * s.rearSteerMax, ra = this.rearSteerAngle || 0;
+        this.rearSteerAngle = ra + clamp(rt - ra, -mr, mr);
+        W[2].steer += this.rearSteerAngle; W[3].steer += this.rearSteerAngle;
+      }
 
       // ---------------- tyre growth: a big low-pressure slick is flung outwards as it spins up (taller, narrower),
       // which gears the car up at the top end
@@ -526,24 +540,28 @@
         const hz = pz + m20 * w.mx + m21 * w.my + m22 * w.mz;
         w.hx = hx; w.hy = hy; w.hz = hz;
         const r = w.radius;
-        world.ground(hx, hz, g);
-        let nx = g.nx, ny = g.ny, nz = g.nz;
-        let ndd = -(nx * dirX + ny * dirY + nz * dirZ);
-        let sl = 1e9;
-        if (ndd > 0.2) {
-          let hpN = (hy - g.h) * ny;
-          sl = (hpN - r) / ndd;
-          if (sl < w.sMax + 0.35) {
-            const cx = hx + dirX * sl - nx * r, cz = hz + dirZ * sl - nz * r;
-            world.ground(cx, cz, g);
-            nx = g.nx; ny = g.ny; nz = g.nz;
-            ndd = -(nx * dirX + ny * dirY + nz * dirZ);
-            hpN = nx * (hx - cx) + ny * (hy - g.h) + nz * (hz - cz);
-            sl = ndd > 0.2 ? (hpN - r) / ndd : 1e9;
+        if (s.tyreEnvelope) this._envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
+        else {
+          world.ground(hx, hz, g);
+          let nx = g.nx, ny = g.ny, nz = g.nz;
+          let ndd = -(nx * dirX + ny * dirY + nz * dirZ);
+          let sl = 1e9;
+          if (ndd > 0.2) {
+            let hpN = (hy - g.h) * ny;
+            sl = (hpN - r) / ndd;
+            if (sl < w.sMax + 0.35) {
+              const cx = hx + dirX * sl - nx * r, cz = hz + dirZ * sl - nz * r;
+              world.ground(cx, cz, g);
+              nx = g.nx; ny = g.ny; nz = g.nz;
+              ndd = -(nx * dirX + ny * dirY + nz * dirZ);
+              hpN = nx * (hx - cx) + ny * (hy - g.h) + nz * (hz - cz);
+              sl = ndd > 0.2 ? (hpN - r) / ndd : 1e9;
+            }
           }
+          w.sRaw = sl;
+          w.nx = nx; w.ny = ny; w.nz = nz; w.surface = g.surface; w.ndd = ndd;
         }
-        w.sRaw = sl;
-        w.nx = nx; w.ny = ny; w.nz = nz; w.surface = g.surface; w.ndd = ndd;
+        const sl = w.sRaw, nx = w.nx, ny = w.ny, nz = w.nz, ndd = w.ndd;
         if (sl < w.sMax) {
           w.contact = true; anyContact = true;
           w.s = sl < w.sMin ? w.sMin : sl;
@@ -551,6 +569,7 @@
           const rx = hx - px, ry = hy - py, rz = hz - pz;
           const hvx = vx + (wy * rz - wz * ry), hvy = vy + (wz * rx - wx * rz), hvz = vz + (wx * ry - wy * rx);
           w.comp = -(nx * hvx + ny * hvy + nz * hvz) / ndd;
+          if (s.tyreEnvelope) w.comp = clamp(w.comp, -8, 8);    // (the carcass gives before the shocks see a spike)
         } else {
           w.contact = false; w.s = w.sMax; w.comp = 0;
         }
@@ -569,7 +588,14 @@
         const ac = Math.abs(c);
         const kn = s.dampKnee || 0.13;      // (blow-off: above the knee the damper only adds 45 %)
         let Fd = ac < kn ? cc * c : Math.sign(c) * cc * (kn + (ac - kn) * 0.45);
-        let F = w.k * (w.sFree - w.sRaw) + Fd + arb[i];
+        // (suspProg - nitrogen shocks: the gas spring rises steeply deep in the stroke and the bypass tubes close off, so
+        // the damping climbs too - the last few inches soak up a landing that would otherwise slam the bump stops)
+        let progF = 0;
+        if (s.suspProg) {
+          const P = s.suspProg, e = ((w.s0 - w.sRaw) / s.travelUp - P.x0) / (1 - P.x0);
+          if (e > 0) { Fd *= 1 + P.damp * Math.min(1, e); progF = w.k * s.travelUp * P.k * Math.min(e, 1.6) * Math.min(e, 1.6); }
+        }
+        let F = w.k * (w.sFree - w.sRaw) + Fd + arb[i] + progF;
         if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + 2500 * Math.max(0, c);
         // anti-squat: the rear links' angle turns part of the tyre's drive force into lift on the body at the axle
         // (and the same push down on the tyre). 100 % = no squat at all. Drag cars run more: the body is thrown up on
@@ -578,8 +604,15 @@
         if (F < 0) F = 0; if (F > (s.fzMax || 70000)) F = s.fzMax || 70000;
         w.Fz = F;
         // apply along body up at the wheel centre
-        const cx = w.hx + dirX * w.s, cy = w.hy + dirY * w.s, cz = w.hz + dirZ * w.s;
-        const fx = upX * F, fy = upY * F, fz = upZ * F;
+        let cx = w.hx + dirX * w.s, cy = w.hy + dirY * w.s, cz = w.hz + dirZ * w.s;
+        let fx = upX * F, fy = upY * F, fz = upZ * F;
+        if (s.tyreEnvelope) {
+          // the whole contact force at the contact point: the spring sets its part along the strut, the links carry the
+          // rest - so a tyre rolling into a step (a car's side, a ramp's toe) is pushed back by it, not just lifted
+          const N = F / Math.max(0.35, w.ndd);
+          w.Fz = N; fx = w.nx * N; fy = w.ny * N; fz = w.nz * N;
+          cx -= w.nx * w.radius; cy -= w.ny * w.radius; cz -= w.nz * w.radius;
+        }
         Fx += fx; Fy += fy; Fz += fz;
         const rx = cx - px, ry = cy - py, rz = cz - pz;
         Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
@@ -711,13 +744,26 @@
       this._brakes(h, speed);
 
       // ---------------- wheels & driveline
-      for (let i = 0; i < 2; i++) {
-        const w = W[i];
-        w.omega += h * (-w.fx * w.radius + (w.rrT || 0)) / w.inertia;
-        w.omega = brakeClamp(w.omega, w.brakeT, w.inertia, h);
+      let L0 = 0;
+      if (s.wheelGyro) for (let i = 0; i < 4; i++) L0 += W[i].inertia * W[i].omega;
+      if (s.awd) this._driveline4(h);
+      else {
+        for (let i = 0; i < 2; i++) {
+          const w = W[i];
+          w.omega += h * (-w.fx * w.radius + (w.rrT || 0)) / w.inertia;
+          w.omega = brakeClamp(w.omega, w.brakeT, w.inertia, h);
+        }
+        const wl = W[2], wr = W[3];
+        this._driveline(h, -wl.fx * wl.radius + (wl.contact ? wl.rrT : 0), -wr.fx * wr.radius + (wr.contact ? wr.rrT : 0), wl.brakeT, wr.brakeT);
       }
-      const wl = W[2], wr = W[3];
-      this._driveline(h, -wl.fx * wl.radius + (wl.contact ? wl.rrT : 0), -wr.fx * wr.radius + (wr.contact ? wr.rrT : 0), wl.brakeT, wr.brakeT);
+      if (s.wheelGyro) {
+        // (wheelGyro) the wheels' spin is angular momentum the body has to trade: spinning them up rocks the body the
+        // other way (nose up), braking them pitches it nose down. With four 290 kg tyres that's how a monster truck
+        // driver steers a jump in the air - gas to lift the nose, a stab of brake to drop it
+        let L1 = 0; for (let i = 0; i < 4; i++) L1 += W[i].inertia * W[i].omega;
+        const Tg = (L1 - L0) / h;
+        Tx += m00 * Tg; Ty += m10 * Tg; Tz += m20 * Tg;
+      }
       for (let i = 0; i < 4; i++) W[i].spin += W[i].omega * h;
 
       // ---------------- aero
@@ -746,6 +792,31 @@
         Fx += fx; Fy += fy; Fz += fz;
         Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
       });
+
+      // ---------------- flip back over, GTA style (the game switches it on): on its roof or its side and nearly
+      // stopped, steering left / right rolls the car about its own length back onto its wheels
+      // A controlled roll: it turns the way back up (the player picks the way when it's flat on its roof) at a rate that
+      // eases off as it comes upright, so it drops back onto its wheels instead of rolling on over the other side.
+      {
+        const st = clamp(inp.steer || 0, -1, 1), a = Math.abs(st);
+        const start = inp.flipAssist && a > 0.15 && m11 < 0.5 && speed < 4 && (this.bodyContact > 0 || anyContact);
+        if (!this.flipping && start) { this.flipping = true; this.flipDir = Math.abs(m10) > 0.3 ? Math.sign(m10) : Math.sign(st); }
+        if (this.flipping && (!inp.flipAssist || a < 0.1 || m11 > 0.95 || speed > 12)) this.flipping = false;
+        if (this.flipping) {
+          if (Math.abs(m10) > 0.3) this.flipDir = Math.sign(m10);      // (right side up -> roll right, and vice versa)
+          const ax = -m02, ay = -m12, az = -m22;                // roll axis: the car's own forward
+          const wRoll = this.wx * ax + this.wy * ay + this.wz * az;
+          const ang = Math.acos(clamp(m11, -1, 1));               // how far from upright
+          const wT = this.flipDir * Math.min(1.7, 0.35 + 1.1 * ang);
+          const lever = Math.max(s.bodyHalfW, (s.trackF + s.trackR) / 4, s.bodyTop || 0);
+          const Tmax = 1.8 * mass * GRAV * (s.gravScale || 1) * lever;
+          const T = clamp((wT - wRoll) / 1.7, -1, 1) * Tmax * Math.min(1, (a - 0.1) / 0.35);
+          Tx += ax * T; Ty += ay * T; Tz += az * T;
+          // (and hold its heading and pitch still while it goes over)
+          const wy = this.wy - wRoll * ay, wP = (this.wx * m00 + this.wy * m10 + this.wz * m20);
+          Ty -= wy * s.Iyaw * 3; Tx -= m00 * wP * s.Ipitch * 3; Ty -= m10 * wP * s.Ipitch * 3; Tz -= m20 * wP * s.Ipitch * 3;
+        }
+      }
 
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
@@ -782,6 +853,57 @@
       const ql = 1 / Math.sqrt(nqx * nqx + nqy * nqy + nqz * nqz + nqw * nqw);
       this.qx = nqx * ql; this.qy = nqy * ql; this.qz = nqz * ql; this.qw = nqw * ql;
       this.odometer += speed * h;
+    }
+
+    // ------------------------------------------------------------------ big-tyre contact (tyreEnvelope)
+    // Instead of one ray down from the hub, the lower half of the tyre is tested against the ground: points round the
+    // tread in the wheel plane plus both shoulders. A 66 in tyre then rolls up onto a step, a car's side or a sharp ramp
+    // toe as it meets it, instead of the hub snapping up when it passes over the edge. Gives the suspension length, the
+    // contact normal (from the contact point towards the hub) and the surface, like the ray does.
+    _envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g) {
+      const world = this.world, r = w.radius, ky = -dirY;
+      if (ky < 0.2) { w.sRaw = 1e9; w.nx = 0; w.ny = 1; w.nz = 0; w.ndd = 1; return; }     // wheels up: no contact
+      const E = Vehicle.ENV, S = this._envS || (this._envS = new Float64Array(E.n));
+      const sn = Math.sin(w.steer), cs = Math.cos(w.steer);
+      const fX = m00 * sn - m02 * cs, fY = m10 * sn - m12 * cs, fZ = m20 * sn - m22 * cs;   // wheel heading
+      const aX = m00 * cs + m02 * sn, aY = m10 * cs + m12 * sn, aZ = m20 * cs + m22 * sn;   // axle
+      const sE = w.sRaw < w.sMin ? w.sMin : w.sRaw > w.sMax ? w.sMax : w.sRaw;
+      const cx0 = hx + dirX * sE, cz0 = hz + dirZ * sE;
+      let best = 1e9, bj = -1, bth = 0, bs = 0, gx = 0, gy = 1, gz = 0;
+      // (each point's clearance is measured along the ground's own normal there and turned into strut travel, like the
+      // single ray does - measured straight up, a steep face read several times too much compression and flung the truck)
+      const cy0 = hy + dirY * sE;
+      for (let j = 0; j < E.n; j++) {                     // round the tread
+        const k1 = E.sin[j] * r, k2 = E.cos[j] * r;
+        const ox = k1 * fX + k2 * dirX, oy = k1 * fY + k2 * dirY, oz = k1 * fZ + k2 * dirZ;
+        world.ground(cx0 + ox, cz0 + oz, g);
+        const nd = -(dirX * g.nx + dirY * g.ny + dirZ * g.nz);
+        const sl = S[j] = sE + (cy0 + oy - g.h) * g.ny / (nd > 0.2 ? nd : 0.2);
+        if (sl < best) { best = sl; bj = j; bth = E.th[j]; bs = g.surface; gx = g.nx; gy = g.ny; gz = g.nz; }
+      }
+      const lw = (w.tire.width || 0.3) * 0.42, rs = r - 0.06;
+      for (let side = -1; side <= 1; side += 2) for (let j = E.mid - 1; j <= E.mid + 1; j++) {    // both shoulders
+        const k1 = E.sin[j] * rs, k2 = E.cos[j] * rs, l = side * lw;
+        const ox = k1 * fX + k2 * dirX + l * aX, oy = k1 * fY + k2 * dirY + l * aY, oz = k1 * fZ + k2 * dirZ + l * aZ;
+        world.ground(cx0 + ox, cz0 + oz, g);
+        const nd = -(dirX * g.nx + dirY * g.ny + dirZ * g.nz);
+        const sl = sE + (cy0 + oy - g.h) * g.ny / (nd > 0.2 ? nd : 0.2);
+        if (sl < best - 0.004) { best = sl; bj = -1; bth = E.th[j]; bs = g.surface; gx = g.nx; gy = g.ny; gz = g.nz; }
+      }
+      // round the tread: a parabola through the lowest sample and its neighbours finds the true contact angle, so the
+      // normal turns smoothly as the tyre rolls over a crest or into a dip
+      if (bj > 0 && bj < E.n - 1) {
+        const a = S[bj - 1], b = S[bj], c = S[bj + 1], den = a - 2 * b + c;
+        if (den > 1e-9) { const o = clamp(0.5 * (a - c) / den, -0.5, 0.5); bth += o * E.dth; best = Math.min(b, b - 0.25 * (a - c) * o); }
+      }
+      const ps = Math.sin(bth), pc = Math.cos(bth);
+      let nx = -(ps * fX + pc * dirX), ny = -(ps * fY + pc * dirY), nz = -(ps * fZ + pc * dirZ);
+      const la = gx * aX + gy * aY + gz * aZ;            // + the ground's slope across the tyre
+      nx += la * aX; ny += la * aY; nz += la * aZ;
+      const nl = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      w.nx = nx * nl; w.ny = ny * nl; w.nz = nz * nl;
+      w.sRaw = best; w.surface = bs;
+      w.ndd = Math.max(0.35, -(w.nx * dirX + w.ny * dirY + w.nz * dirZ));
     }
 
     // ------------------------------------------------------------------ driver aids: TC, ESC, line lock
@@ -1224,16 +1346,104 @@
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
+    // four-wheel drive (monster truck): a locked transfer case splits the gearbox output front / rear, lockers in both
+    // axles. The engine / converter / clutch drives the carrier (the wheels' inertia-weighted mean speed); stiff,
+    // torque-limited couplings - the lockers and the transfer case - pull the four wheels back together. Brakes on all four.
+    _driveline4(h) {
+      const s = this.spec, W = this.wheels, Ie = s.engineInertia, eff = s.driveEff;
+      const T = this._T4 || (this._T4 = [0, 0, 0, 0]), Ti = this._Ti4 || (this._Ti4 = [0, 0, 0, 0]);
+      let Isum = 0, wc0 = 0, Tsum = 0;
+      for (let i = 0; i < 4; i++) {
+        const w = W[i];
+        T[i] = -w.fx * w.radius + (w.contact ? w.rrT : 0);
+        Isum += w.inertia; wc0 += w.inertia * w.omega; Tsum += T[i];
+      }
+      wc0 /= Isum;
+      this._transLogic(h, wc0);
+      const G = this._gEff();
+      const gliding = this.transType === 'auto' && this.shiftTimer > 0 && this.shiftFromG && this.gear >= 1;
+      const Gdot = gliding && this._gPrev ? (G - this._gPrev) / h : 0;
+      this._gPrev = G;
+      const Te = this.Te, lt = s.lsdRamp * Math.abs(this.lastTin);
+      const lkR = s.lsdPreload + lt, lkF = (s.lsdPreloadF || s.lsdPreload) + lt, lkC = (s.centerPreload || 2 * s.lsdPreload) + 2 * lt;
+      const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
+      const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
+      Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
+      const mode = this._coupling();
+      if (mode !== 2) this.locked = false;
+      if (mode === 0) {
+        this.eOmega += h * Te / Ie;
+        for (let i = 0; i < 4; i++) W[i].omega += h * (T[i] + Ti[i]) / W[i].inertia;
+        this.lastTin = 0;
+      } else if (mode === 1) {
+        const we = this.eOmega, wt = wc0 * G;
+        let Tp = s.tcCouple ? s.tcK * we * we * Math.min(1, (1 - wt / Math.max(we, 1)) / (1 - s.tcCouple)) : s.tcK * we * (we - wt);
+        if (s.tcCouple && we < 1) Tp = s.tcK * we * (we - wt);
+        if (Tp < 0) Tp *= 0.65;
+        let TRr = 1;
+        if (Tp > 0 && we > 1) { const SR = wt / we; TRr = SR < 0.85 ? s.tcStall - (s.tcStall - 1) * Math.max(0, SR) / 0.85 : 1; }
+        this.eOmega += h * (Te - Tp) / Ie;
+        const Tin = Tp * TRr * G * eff;
+        for (let i = 0; i < 4; i++) W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia;
+        this.lastTin = Tin;
+      } else {
+        const cap = this._cap, Itot = Isum + Ie * G * G;
+        if (this.locked) {
+          const wcDot = (G * eff * (Te - Ie * wc0 * Gdot) + Tsum) / Itot;
+          const Treq = Te - Ie * G * wcDot - Ie * wc0 * Gdot;
+          if (Math.abs(Treq) > cap) this.locked = false;
+          else {
+            for (let i = 0; i < 4; i++) W[i].omega += h * wcDot + h * (T[i] + Ti[i] - W[i].inertia * Tsum / Isum) / W[i].inertia;
+            this.eOmega = (wc0 + h * wcDot) * G;
+            this.lastTin = G * eff * Treq;
+          }
+        }
+        if (!this.locked) {
+          const dE = this.eOmega - wc0 * G, sg = dE > 0 ? 1 : dE < 0 ? -1 : 0;
+          const Tcl = cap * sg;
+          this.eOmega += h * (Te - Tcl) / Ie;
+          const Tin = Tcl * G * eff;
+          let wc1 = 0;
+          for (let i = 0; i < 4; i++) { W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia; wc1 += W[i].inertia * W[i].omega; }
+          wc1 /= Isum;
+          const dE1 = this.eOmega - wc1 * G;
+          if (cap > 0 && (dE1 === 0 || (dE1 > 0 ? 1 : -1) !== sg)) {
+            const wcL = (Isum * wc1 + Ie * G * this.eOmega) / Itot, sh = wcL - wc1;
+            for (let i = 0; i < 4; i++) W[i].omega += sh;
+            this.eOmega = wcL * G;
+            this.locked = true;
+          }
+          this.lastTin = Tin;
+        }
+      }
+      // brakes on all four corners (+ the parking pawl, through the lockers)
+      const pk = this.park ? 20000 : 0;
+      if (this.locked && G !== 0) {
+        let wc = 0, Tb = 0;
+        for (let i = 0; i < 4; i++) { wc += W[i].inertia * W[i].omega; Tb += W[i].brakeT + pk; }
+        wc /= Isum;
+        const wcB = brakeClamp(wc, Tb, Isum + Ie * G * G, h);
+        for (let i = 0; i < 4; i++) W[i].omega += wcB - wc;
+        this.eOmega = wcB * G;
+      } else for (let i = 0; i < 4; i++) W[i].omega = brakeClamp(W[i].omega, W[i].brakeT + pk, W[i].inertia, h);
+      if (this.eOmega < 0) this.eOmega = 0;
+      if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
+    }
+
     // ------------------------------------------------------------------ body vs ground (penalty)
     _bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, apply) {
       const s = this.spec, g = this._g;
       // (per car, and shifted up when a tune drops the CG inside the body)
       const P = this._bodyPts || (this._bodyPts = (() => {
         const hw = s.bodyHalfW, f = s.bodyFront, r = s.bodyRear, d = s.cgDrop || 0, b = s.bodyBottom + d, t = s.bodyTop + d;
+        // (bodyPts: a vehicle shaped nothing like a car lists its own - the monster truck's tyres, body shell and roof)
+        if (s.bodyPts) return s.bodyPts.map((p) => [p[0], p[1] + d, p[2]]);
         return [[-hw, b, f], [hw, b, f], [-hw, b, r], [hw, b, r], [0, b, 0.2],
           [-0.72, t, -0.3], [0.72, t, -0.3], [-0.72, t, 0.9], [0.72, t, 0.9],
           [-hw, 0.35 + d, f + 0.2], [hw, 0.35 + d, f + 0.2], [-hw, 0.35 + d, r - 0.2], [hw, 0.35 + d, r - 0.2], [-hw, 0.2 + d, 0.3], [hw, 0.2 + d, 0.3]];
       })());
+      const bK = s.bodyK || 240000, bC = s.bodyC || 16000;
+      let nC = 0;
       for (let i = 0; i < P.length; i++) {
         const lx = P[i][0], ly = P[i][1], lz = P[i][2];
         const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
@@ -1241,9 +1451,10 @@
         this.world.ground(wx_, wz_, g);
         const pen = (g.h - wy_) * g.ny;
         if (pen <= 0) continue;
+        nC++;
         const cvx = this.vx + (this.wy * rz - this.wz * ry), cvy = this.vy + (this.wz * rx - this.wx * rz), cvz = this.vz + (this.wx * ry - this.wy * rx);
         const vn = cvx * g.nx + cvy * g.ny + cvz * g.nz;
-        let Fn = 240000 * Math.min(pen, 0.4) - 16000 * vn;
+        let Fn = bK * Math.min(pen, 0.4) - bC * vn;
         if (Fn < 0) Fn = 0;
         // friction
         let tx = cvx - g.nx * vn, ty = cvy - g.ny * vn, tz = cvz - g.nz * vn;
@@ -1256,6 +1467,7 @@
         if (Fn > 30000 && vn < -3) this.events.impact = Math.max(this.events.impact, -vn * 0.5);
         apply(fxx, fyy, fzz, rx, ry, rz);
       }
+      this.bodyContact = nC;
     }
 
     // ------------------------------------------------------------------ static obstacles (trees, poles, rocks, buildings)
@@ -1306,8 +1518,11 @@
       const s = this.spec;
       // car footprint in XZ (yaw only)
       let rX = m00, rZ = m20; let l = Math.hypot(rX, rZ) || 1; rX /= l; rZ /= l;
+      const lr = l;
       let bX = m02, bZ = m22; l = Math.hypot(bX, bZ) || 1; bX /= l; bZ /= l;
-      const zc = 0.5 * (s.bodyFront + s.bodyRear), hl = 0.5 * (s.bodyRear - s.bodyFront), hw = s.bodyHalfW;
+      // (the footprint is the body's shadow on the ground: a car stood up on its tail or rolled on its side covers less
+      // ground - taken as the full box, a truck pitched up against a wall read metres of overlap and was flung away)
+      const zc = 0.5 * (s.bodyFront + s.bodyRear) * l, hl = Math.max(0.5 * (s.bodyRear - s.bodyFront) * l, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - l * l))), hw = Math.max(s.bodyHalfW * lr, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - lr * lr)));
       const cx = this.px + bX * zc, cz = this.pz + bZ * zc;
       // skip when flying high over things
       for (const c of this._circles) {
@@ -1361,6 +1576,13 @@
       }
     }
   }
+
+  // tyre-envelope sample angles round the tread (-80 .. +80 deg from straight down along the strut, + = ahead)
+  Vehicle.ENV = (() => {
+    const n = 9, dth = 20 * Math.PI / 180, th = [], sin = [], cos = [];
+    for (let j = 0; j < n; j++) { const t = (j - 4) * dth; th.push(t); sin.push(Math.sin(t)); cos.push(Math.cos(t)); }
+    return { n, mid: 4, dth, th, sin, cos };
+  })();
 
   // Selectable cars. Spec entries override SPEC (the Hellcat).
   const CARS = {
@@ -1549,6 +1771,51 @@
     return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq, finishFt: c.finishFt,
       spec: Object.assign({}, CARS.dragster.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
   };
+  // Monster truck, built to the stadium freestyle spec: 12,000 lb minimum, 12 ft tall and 12.5 ft wide, a chromoly tube
+  // chassis under a fiberglass body, the driver strapped in the middle of it. A supercharged 540 ci methanol big-block
+  // (~1,500 hp) sits behind the driver, into a 2-speed race automatic, a locked transfer case and planetary axles with
+  // lockers - all four wheels always driven. 4-link suspension on nitrogen coil-overs and bypass shocks, ~30 in of
+  // travel. Four-wheel steering: the fronts on the wheel, the rears on a thumb switch. 66 in BKT tyres, ~70 mph flat out.
+  // No traction control, no ABS. Physics extras: all-wheel drive (_driveline4), tyre envelope contacts, progressive
+  // shocks, wheel-spin gyro (throttle / brake steer it in the air), its own body contact points.
+  // (body contact points: the tyres' sidewalls and tops, the body shell's edges, the cab roof, the chassis rails and the
+  // blower - given as heights above the ground and lengths from the wheelbase centre, converted to the CG frame)
+  const cgM = 1.26, fwM = 0.44, wbM = 3.45, zcM = wbM * (fwM - 0.5);   // CG height, front weight, wheelbase, CG z offset
+  const P = (x, y, z) => [x, y - cgM, z + zcM];
+  const mBody = [];
+  for (const z0 of [-wbM / 2, wbM / 2]) for (const sx of [-1, 1]) mBody.push(P(sx * 1.88, 1.54, z0), P(sx * 1.88, 0.84, z0 - 0.72), P(sx * 1.88, 0.84, z0 + 0.72), P(sx * 1.36, 1.68, z0));
+  for (const sx of [-1, 1]) {
+    mBody.push(P(sx * 1.78, 1.6, -2.75), P(sx * 1.78, 1.6, 2.6), P(sx * 1.7, 2.48, -2.65), P(sx * 1.7, 2.48, 2.5),
+      P(sx * 1.0, 3.5, -0.4), P(sx * 1.0, 3.5, 0.95), P(sx * 0.5, 0.9, -1.2), P(sx * 0.5, 0.9, 1.3));
+  }
+  mBody.push(P(0, 0.9, 0), P(0, 3.2, 1.75));
+  CARS.monster = { name: 'Monster Truck', short: 'Monster Truck', more: true, hp: 1500, tq: 1300, car: 'WRECKONING', spec: {
+    name: 'Monster Truck "WRECKONING"',
+    mass: 5450, Ipitch: 10700, Iyaw: 10500, Iroll: 5900, cgHeight: cgM, wheelbase: wbM, frontWeight: fwM,
+    trackF: 2.71, trackR: 2.71, wheelRadius: 0.838, wheelInertiaF: 160, wheelInertiaR: 160,
+    frontTire: 'monster', rearTire: 'monster', Fz0: 13400, loadSens: 0.07,
+    // 4-link on nitrogen shocks: soft, long travel (18 in bump / 12 in droop from ride height), the gas springs and
+    // bypass tubes stiffen the last part of the stroke hard
+    springF: 52000, springR: 66000, dampBumpF: 15000, dampRebF: 21000, dampBumpR: 17000, dampRebR: 24000, dampKnee: 0.5,
+    arbF: 32000, arbR: 28000, travelUp: 0.45, travelDown: 0.3, suspS0: 0.6, bumpStopK: 3000000, fzMax: 600000,
+    suspProg: { x0: 0.55, k: 6, damp: 2.5 },
+    brakeTorqueF: 9000, brakeTorqueR: 9000, handbrakeTorque: 9000, noABS: true, noESC: true,
+    maxSteer: 0.58, steerRate: 1.6, steerRatio: 12, ackermann: 0.5, rearToe: 0, rearSteerMax: 0.55,
+    // supercharged 540 ci methanol big-block: ~1,500 hp @ 7,000, 1,300 lb-ft @ 5,000, roots blower at ~28 psi
+    idleRpm: 1100, limiterRpm: 7400, redlineRpm: 7200, shiftRpm: 7000, engineInertia: 0.55, fricA: 60, fricB: 45, starterTorque: 450,
+    torqueCurve: [[0, 480], [1000, 700], [2000, 900], [3000, 1080], [4000, 1230], [5000, 1300], [5500, 1292], [6000, 1258],
+      [6500, 1210], [7000, 1130], [7500, 1010], [8000, 860], [9000, 500]],
+    boostMax: 28,
+    // 2-speed race automatic (1.76 / 1.00) behind a ~4,000 rpm race converter; transfer case + planetaries ~19.5:1
+    autoRatios: [1.76, 1.0], autoRev: 1.76, autoFinal: 19.5, shiftTimeWOT: 0.15, shiftTimePart: 0.25, shiftCutDepth: 0.2,
+    noLockup: true, tcK: 0.0095, tcCouple: 0.88, tcStall: 2.0, driveEff: 0.82,
+    awd: true, lsdPreload: 9000, lsdPreloadF: 9000, centerPreload: 16000, lsdRamp: 0.15,
+    launchRpm: 3500, transbrake: true, noCoastBlip: true, blipMax: 0.2, tcRefBody: true,
+    CdA: 7.0,
+    bodyHalfW: 1.9, bodyFront: -2.75 + zcM, bodyRear: 2.6 + zcM, bodyBottom: 0.9 - cgM, bodyTop: 3.5 - cgM, bodyPts: mBody,
+    bodyK: 900000, bodyC: 60000, bodyMu: 0.6,
+    tyreEnvelope: true, wheelGyro: true,
+  } };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock

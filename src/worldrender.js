@@ -29,7 +29,7 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
@@ -82,7 +82,37 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 2.5) {
+    if (uMap > 3.5) {
+      // ---- monster truck arena: packed, watered clay (the jumps are meshed from the same ground and painted by this
+      // too), wetter patches, tyre tracks wandering all over it and donut rings in the middle; concrete outside the wall
+      float px = max(length(fwidth(P)), 1e-4);
+      vec2 aq = abs(P) - vec2(${(W.ARENA.HW - W.ARENA.CR).toFixed(2)}, ${(W.ARENA.HL - W.ARENA.CR).toFixed(2)});
+      float asd = length(max(aq, 0.0)) + min(max(aq.x, aq.y), 0.0) - ${W.ARENA.CR.toFixed(2)};          // < 0 on the floor
+      float n1 = vnoise(P * 0.18), n2 = vnoise(P * 1.3), n3 = vnoise(P * 7.0);
+      vec3 c = mix(vec3(0.17, 0.095, 0.052), vec3(0.26, 0.155, 0.088), n1) * (0.82 + 0.16 * n2 + 0.08 * n3);
+      c *= 1.0 - 0.22 * smoothstep(0.45, 0.8, fbm3(P * 0.035 + 3.0));
+      float trk = 0.0;
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k);
+        float v = vnoise(P * (0.02 + 0.007 * fk) + vec2(fk * 3.1, fk * 7.7)) - 0.5;
+        float gv = max(length(vec2(dFdx(v), dFdy(v))) / px, 1e-4);
+        float dd = abs(v) / gv;                                  // metres from the track's centre line
+        trk += (exp(-pow((dd - 1.35) / 0.42, 2.0)) * (0.55 + 0.45 * vnoise(P * 0.9 + fk))) * (0.5 + 0.5 * step(0.35, vnoise(P * 0.01 + fk * 5.0)));
+      }
+      for (int k = 0; k < 4; k++) {
+        float fk = float(k);
+        vec2 cc = vec2(-6.0 + 5.0 * sin(fk * 2.1), -8.0 + 22.0 * fract(fk * 0.37) - 3.0 * fk + 10.0);
+        float rr = length(P - cc), r0 = 3.4 + 1.3 * fract(fk * 0.61);
+        trk += exp(-pow((rr - r0 + 1.35) / 0.4, 2.0)) + exp(-pow((rr - r0 - 1.35) / 0.45, 2.0));
+      }
+      c *= 1.0 - 0.38 * clamp(trk, 0.0, 1.0);
+      // jump faces: packed hard and darker, lighter loose dirt on the tops
+      float asl = 1.0 - vWN.y;
+      c *= 1.0 - 0.3 * smoothstep(0.06, 0.4, asl);
+      vec3 conc = vec3(0.4, 0.39, 0.37) * (0.9 + 0.1 * n2 + 0.05 * n3);
+      col = mix(c, conc, smoothstep(-0.05, 0.05, asd));
+      rough = mix(0.96, 0.9, smoothstep(-0.05, 0.05, asd));
+    } else if (uMap > 2.5) {
       // ---- All Road: pavement to the horizon. 4-lane avenues every 240 m; every block between them is its own lot:
       // a parking lot, a skid pad, a concrete apron, a rubbered-in drift pad or open asphalt
       float px = max(length(fwidth(P)), 1e-4);                // metres per pixel (derivatives kept out of the branches below)
@@ -742,7 +772,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac';
+    water.visible = W.map !== 'tarmac' && W.map !== 'arena';
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -809,6 +839,12 @@ void main(){
       // All Road street lights come on at dusk
       terrUniforms.uLamp.value = p.night ? 1 : name === 'sunset' ? 0.3 : 0;
       lampLensMat.emissiveIntensity = p.night ? 6 : name === 'sunset' ? 2 : 0;
+      // the stadium at night: the floodlights take over from the moon (cool white, from high up, with shadows)
+      if (arena) {
+        arena.floodM.emissiveIntensity = p.night ? 9 : name === 'sunset' ? 3 : 1.2;
+        if (p.night) { sun.color.setRGB(0.93, 0.96, 1.0); sun.intensity = 2.4; hemi.color.setHex(0x8fa0c0); hemi.groundColor.setHex(0x3a3028); hemi.intensity = 0.45; }
+        else if (name === 'sunset') { sun.intensity += 0.4; hemi.intensity += 0.1; }
+      }
       if (renderer) {
         renderer.toneMappingExposure = p.exposure;
         const pm = new THREE.PMREMGenerator(renderer);
@@ -909,7 +945,215 @@ void main(){
       };
     }
 
-    return { group, terrainMat, update, drag, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks };
+    // ---------------------------------------------------------------- monster truck arena (built once)
+    let arena = null;
+    if (W.map === 'arena') {
+      const A = W.ARENA, ag = new THREE.Group(); scene.add(ag);
+      const sst = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
+      // the dirt jumps: meshed from worldgen's own height function (what the tyres feel) and painted by the terrain
+      // shader, so they're the same clay as the floor they rise out of
+      const dirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+      dirtMat.onBeforeCompile = terrainMat.onBeforeCompile;
+      const hgt = (x, z) => W.arenaHeight(x, z, true);
+      function patch(x0, x1, z0, z1, step) {
+        const nx = Math.max(2, Math.ceil((x1 - x0) / step)), nz = Math.max(2, Math.ceil((z1 - z0) / step)), N = (nx + 1) * (nz + 1), e = 0.05;
+        const pos = new Float32Array(N * 3), nor = new Float32Array(N * 3), idx = [];
+        for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+          const k = j * (nx + 1) + i, x = x0 + (x1 - x0) * i / nx, z = z0 + (z1 - z0) * j / nz;
+          const h = hgt(x, z), dx = (hgt(x + e, z) - hgt(x - e, z)) / (2 * e), dz = (hgt(x, z + e) - hgt(x, z - e)) / (2 * e), il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
+          pos[k * 3] = x; pos[k * 3 + 1] = h + 0.004; pos[k * 3 + 2] = z;
+          nor[k * 3] = -dx * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = -dz * il;
+        }
+        for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+        g.setAttribute('aData', new THREE.BufferAttribute(new Float32Array(N * 2), 2)); g.setIndex(idx);
+        g.computeBoundingSphere();
+        const m = new THREE.Mesh(g, dirtMat); m.receiveShadow = true; m.castShadow = true; ag.add(m);
+      }
+      for (const ob of W.ARENA_OBS) patch(ob.minX - 0.5, ob.maxX + 0.5, ob.minZ - 0.5, ob.maxZ + 0.5, 0.3);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const xa = sx * (A.HW - A.CR - 0.5), xb = sx * (A.HW + 1), za = sz * (A.HL - A.CR - 0.5), zb = sz * (A.HL + 1);
+        patch(Math.min(xa, xb), Math.max(xa, xb), Math.min(za, zb), Math.max(za, zb), 0.4);
+      }
+
+      // junk cars on the crush lane: a heightfield body (the same shape the tyres ride on) with two crushed states as
+      // morph targets - the physics flattens each half of each car and the mesh follows
+      const cars = [];
+      const CL = W.CAR_L, CW = W.CAR_W, wheelMat = new THREE.MeshStandardMaterial({ color: 0x131313, roughness: 0.9 });
+      for (const c of W.ARENA_CARS) {
+        const as = [-CL], bs = [];
+        for (let i = 0; i <= 46; i++) as.push(-CL + 2 * CL * i / 46);
+        as.push(CL);
+        for (let j = 0; j <= 18; j++) bs.push(-CW + 2 * CW * j / 18);
+        const na = as.length, nb = bs.length, N = na * nb;
+        const state = (cA, cB) => {
+          const sA = c.cA, sB = c.cB; c.cA = cA; c.cB = cB;
+          const p = new Float32Array(N * 3);
+          for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
+            const k = i * nb + j, x = c.x + as[i] * c.flip, z = c.z + bs[j];
+            p[k * 3] = x - c.x; p[k * 3 + 2] = z - c.z;
+            p[k * 3 + 1] = i === 0 || i === na - 1 ? 0 : W.arenaCarHeight(c, x, z);
+          }
+          c.cA = sA; c.cB = sB; return p;
+        };
+        const p0 = state(0, 0), pA = state(1, 0), pB = state(0, 1);
+        // paint: a faded, sun-bleached colour per car, dark glass on the cabin, black bumpers, rust
+        const JUNK = ['#6e1a17', '#1f3a5e', '#cfcabd', '#35573a', '#a8956c', '#262628', '#80868c', '#9c4a22', '#4a2b4f', '#b0a14e'];
+        const col = new Float32Array(N * 3), cc = new THREE.Color(JUNK[Math.floor(c.hue * JUNK.length) % JUNK.length]).multiplyScalar(0.85 + 0.25 * c.shape);
+        const cab0 = -0.75 + 0.15 * c.shape, cab1 = 1.35;
+        for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
+          const k = i * nb + j, a = as[i], b = Math.abs(bs[j]), aa = Math.abs(a), y = p0[k * 3 + 1];
+          const hb = (0.5 + 0.42 * (1 - sst(1.85, CL, aa))) * (1 - sst(0.76, CW, b));
+          let r = cc.r, g = cc.g, bl = cc.b;
+          const cabin = y > hb + 0.08 && a > cab0 && a < cab1;
+          const roof = a > cab0 + 0.6 && a < cab1 - 0.55 && b < 0.5;
+          if (cabin && !roof) { r = 0.05; g = 0.06; bl = 0.07; }
+          if (aa > 2.12) { r = 0.08; g = 0.08; bl = 0.08; }
+          const rust = W.hash01(Math.floor((a + 3) * 2.5), Math.floor((bs[j] + 2) * 2.5), 77 + cars.length) > 0.86 ? 0.55 : 1;
+          if (rust < 1 && !(cabin && !roof)) { r = r * 0.35 + 0.1; g = g * 0.35 + 0.045; bl = bl * 0.3 + 0.015; }   // rust
+          col[k * 3] = r; col[k * 3 + 1] = g; col[k * 3 + 2] = bl;
+        }
+        const idx = [];
+        for (let i = 0; i < na - 1; i++) for (let j = 0; j < nb - 1; j++) { const a = i * nb + j, b = a + 1, c2 = a + nb, d = c2 + 1; idx.push(a, b, c2, b, d, c2); }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(p0, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
+        g.computeVertexNormals();
+        const nrm = (p) => { const t = new THREE.BufferGeometry(); t.setAttribute('position', new THREE.BufferAttribute(p, 3)); t.setIndex(idx); t.computeVertexNormals(); return t.attributes.normal; };
+        // (the winding faces up for flip = 1; mirrored cars get their triangles turned round)
+        if (c.flip < 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; } g.setIndex(idx); g.computeVertexNormals(); }
+        g.morphAttributes.position = [new THREE.BufferAttribute(pA, 3), new THREE.BufferAttribute(pB, 3)];
+        g.morphAttributes.normal = [nrm(pA), nrm(pB)];
+        const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide }));
+        m.position.set(c.x, 0.002, c.z); m.castShadow = true; m.receiveShadow = true; m.morphTargetInfluences = [0, 0];
+        ag.add(m);
+        const wh = [];
+        for (const wa of [-1.45, 1.45]) for (const wb of [-0.74, 0.74]) {
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.2, 18), wheelMat); w.rotation.x = Math.PI / 2;
+          w.position.set(c.x + wa * c.flip, 0.31, c.z + wb); w.castShadow = true; ag.add(w); wh.push({ w, half: wa < 0 ? 'cA' : 'cB' });
+        }
+        cars.push({ c, m, wh });
+      }
+
+      // ---- the stadium: concrete wall with banners, debris fence, the seating bowl, roof ring with floodlights, two
+      // video boards over the ends
+      const perim = [];
+      {
+        const sx = A.HW - A.CR, sz = A.HL - A.CR, pts = [];
+        const run = (ax, az, bx, bz) => { const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 2); for (let k = 0; k < n; k++) pts.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]); };
+        const arc = (cx, cz, a0) => { for (let k = 0; k < 16; k++) { const a = a0 + k * Math.PI / 32; pts.push([cx + Math.cos(a) * A.CR, cz + Math.sin(a) * A.CR]); } };
+        run(A.HW, -sz, A.HW, sz); arc(sx, sz, 0); run(sx, A.HL, -sx, A.HL); arc(-sx, sz, Math.PI / 2);
+        run(-A.HW, sz, -A.HW, -sz); arc(-sx, -sz, Math.PI); run(-sx, -A.HL, sx, -A.HL); arc(sx, -sz, 1.5 * Math.PI);
+        pts.push(pts[0]);
+        let sAcc = 0;
+        for (let i = 0; i < pts.length; i++) {
+          const [x, z] = pts[i], [xn, zn] = pts[(i + 1) % (pts.length - 1)], [xp, zp] = pts[(i - 1 + pts.length - 1) % (pts.length - 1)];
+          let tx = xn - xp, tz = zn - zp; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+          let nx = tz, nz = -tx; if (nx * x + nz * z < 0) { nx = -nx; nz = -nz; }
+          if (i) sAcc += Math.hypot(x - pts[i - 1][0], z - pts[i - 1][1]);
+          perim.push({ x, z, nx, nz, s: sAcc, g: hgt(x - nx * 0.05, z - nz * 0.05) });
+        }
+      }
+      // strip mesh along the perimeter from a list of (offset out from the wall line, height) rows
+      function ring(rows, mat, uScale, vOf) {
+        const n = perim.length, R = rows.length, pos = new Float32Array(n * R * 3), uv = new Float32Array(n * R * 2), idx = [];
+        for (let i = 0; i < n; i++) for (let r = 0; r < R; r++) {
+          const p = perim[i], [d, h] = rows[r], k = i * R + r;
+          pos[k * 3] = p.x + p.nx * d; pos[k * 3 + 1] = typeof h === 'function' ? h(p) : h; pos[k * 3 + 2] = p.z + p.nz * d;
+          uv[k * 2] = p.s / uScale; uv[k * 2 + 1] = vOf ? vOf(r, rows[r]) : r / (R - 1);
+        }
+        for (let i = 0; i < n - 1; i++) for (let r = 0; r < R - 1; r++) { const a = i * R + r, b = a + 1, c = a + R, d = c + 1; idx.push(a, c, b, b, c, d); }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+        const m = new THREE.Mesh(g, mat); m.receiveShadow = true; ag.add(m); return m;
+      }
+      const bannerTex = (() => {
+        const c = document.createElement('canvas'); c.width = 2048; c.height = 128; const g = c.getContext('2d');
+        const panels = [['#0b0b0c', '#a6ff1c', 'HELLCAT DRIVE'], ['#b3121a', '#ffffff', 'MONSTER TRUCK FREESTYLE'], ['#f2c200', '#0b0b0c', 'KEEP IT PINNED'],
+          ['#1e6fc4', '#ffffff', 'WRECKONING'], ['#0b0b0c', '#f2570f', '540 BLOWN · METHANOL'], ['#e6e6e3', '#b3121a', 'BIG AIR · CAR CRUSH']];
+        const pw = c.width / panels.length;
+        panels.forEach(([bg, fg, t], i) => { g.fillStyle = bg; g.fillRect(i * pw, 0, pw, 128); g.fillStyle = fg; g.font = 'italic 900 56px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, i * pw + pw / 2, 66, pw - 30); });
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 8; return t;
+      })();
+      const concreteM = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.92 });
+      const darkM = new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.7, metalness: 0.3 });
+      // wall: banner face on the inside (1.3 m tall above the dirt - banked corners included), concrete cap, outside face
+      ring([[0, (p) => p.g - 0.2], [0, (p) => p.g + 1.3]], new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.6 }), 36, (r) => r ? 0.96 : 0.04);
+      ring([[0, (p) => p.g + 1.3], [0.55, (p) => p.g + 1.3]], concreteM, 10);
+      ring([[0.55, (p) => p.g + 1.3], [0.55, -0.2]], concreteM, 10);
+      // debris fence: posts and a see-through net up to 5 m over the wall
+      const netTex = (() => {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d');
+        g.strokeStyle = 'rgba(40,42,46,0.9)'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
+        const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+      })();
+      const net = ring([[0.3, (p) => p.g + 1.3], [0.3, (p) => p.g + 6.3]], new THREE.MeshStandardMaterial({ map: netTex, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.8 }), 0.25, (r) => r * 20);
+      net.castShadow = false;
+      const postG = new THREE.CylinderGeometry(0.05, 0.05, 5.2, 6), postM = new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.5, metalness: 0.6 });
+      for (let i = 0; i < perim.length - 1; i += 3) { const p = perim[i], m = new THREE.Mesh(postG, postM); m.position.set(p.x + p.nx * 0.3, p.g + 3.8, p.z + p.nz * 0.3); ag.add(m); }
+      ring([[0.3, (p) => p.g + 6.3], [0.34, (p) => p.g + 6.3]], postM, 10);
+      // the seating bowl: a crowd on steep tiers from 4 m back and 4 m up to 52 m back and 34 m up, a back wall, the roof ring
+      const crowdTex = (() => {
+        const c = document.createElement('canvas'); c.width = 512; c.height = 512; const g = c.getContext('2d');
+        g.fillStyle = '#26282d'; g.fillRect(0, 0, 512, 512);
+        for (let row = 0; row < 16; row++) {
+          const y = row * 32; g.fillStyle = '#3c3e44'; g.fillRect(0, y + 25, 512, 7);
+          for (let x = 0; x < 512; x += 9) {
+            if ((x % 170) < 14 || Math.random() < 0.18) continue;              // aisles, empty seats
+            const hue = Math.random() < 0.3 ? 20 + Math.random() * 30 : Math.random() * 360, lt = 22 + Math.random() * 38;
+            g.fillStyle = `hsl(${hue | 0}, ${(18 + Math.random() * 40) | 0}%, ${lt | 0}%)`; g.fillRect(x + Math.random() * 2, y + 9 + Math.random() * 3, 6, 14);
+            g.fillStyle = `hsl(28, 35%, ${(40 + Math.random() * 25) | 0}%)`; g.fillRect(x + 1.5, y + 3 + Math.random() * 3, 4, 5);
+          }
+        }
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
+      })();
+      ring([[2.2, -0.2], [2.2, 4.2]], darkM, 10);                                          // front of the stands
+      ring([[2.2, 4.2], [4.2, 4.2]], concreteM, 10);                                        // front walkway
+      ring([[4.2, 4.2], [52, 34]], new THREE.MeshStandardMaterial({ map: crowdTex, roughness: 0.95 }), 24, (r) => r * 4);
+      ring([[52, 34], [52, 40]], darkM, 10);
+      const roof = ring([[40, 41.5], [60, 41.5]], darkM, 10); roof.material = new THREE.MeshStandardMaterial({ color: 0x2a2b2f, roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
+      ring([[40, 40.3], [40, 41.6]], darkM, 10);
+      // floodlight banks under the roof's edge
+      const floodM = new THREE.MeshStandardMaterial({ color: 0xdddddd, emissive: 0xf4f8ff, emissiveIntensity: 1.5, roughness: 0.3 });
+      const floodG = new THREE.BoxGeometry(6, 1.2, 0.4);
+      for (let i = 0; i < perim.length - 1; i += 9) {
+        const p = perim[i], m = new THREE.Mesh(floodG, floodM);
+        m.position.set(p.x + p.nx * 40.5, 40.4, p.z + p.nz * 40.5); m.lookAt(p.x - p.nx * 30, 0, p.z - p.nz * 30); ag.add(m);
+      }
+      // video boards hanging over each end
+      const scrC = document.createElement('canvas'); scrC.width = 1024; scrC.height = 576;
+      const scrT = new THREE.CanvasTexture(scrC); scrT.colorSpace = THREE.SRGBColorSpace;
+      const scrM = new THREE.MeshBasicMaterial({ map: scrT, toneMapped: false });
+      for (const sz of [-1, 1]) {
+        const b = new THREE.Group(); b.position.set(0, 27, sz * (A.HL + 26)); b.rotation.y = sz > 0 ? Math.PI : 0; ag.add(b);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(22, 13, 1.4), darkM); b.add(box);
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(20.5, 11.5), scrM); face.position.z = 0.72; b.add(face);
+        for (const sx of [-1, 1]) { const cab = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 14, 5), darkM); cab.position.set(sx * 9, 13.5, -0.4); b.add(cab); }   // hung on cables
+      }
+      function drawScreen(o) {
+        const g = scrC.getContext('2d'), w = scrC.width, h = scrC.height;
+        g.fillStyle = '#050608'; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#0d1a05'; for (let y = 0; y < h; y += 6) g.fillRect(0, y, w, 2);
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillStyle = '#a6ff1c'; g.font = 'italic 900 70px Impact, "Arial Black", Arial'; g.fillText(o.title || 'MONSTER TRUCK FREESTYLE', w / 2, 80, w - 60);
+        g.fillStyle = o.color || '#ffffff'; g.font = 'italic 900 150px Impact, "Arial Black", Arial'; g.fillText(o.big || '', w / 2, 270, w - 60);
+        g.fillStyle = '#f2c200'; g.font = 'bold 56px Arial'; g.fillText(o.sub || '', w / 2, 430, w - 60);
+        g.fillStyle = '#888'; g.font = 'bold 34px Arial'; g.fillText(o.foot || '', w / 2, 520, w - 60);
+        scrT.needsUpdate = true;
+      }
+      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · WHOOPS' });
+      arena = {
+        update() {
+          for (const k of cars) {
+            k.m.morphTargetInfluences[0] = k.c.cA; k.m.morphTargetInfluences[1] = k.c.cB;
+            for (const { w, half } of k.wh) { const sq = 1 - 0.5 * k.c[half]; w.scale.z = sq; w.position.y = 0.31 * sq; }   // (the tyres squash flat too)
+          }
+        },
+        setScreen: drawScreen, floodM,
+      };
+    }
+
+    return { group, terrainMat, update, drag, arena, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks };
   }
 
   root.HCWorldRender = { create };

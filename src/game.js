@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -21,7 +21,7 @@
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
-    map: 'country', vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
+    map: 'country', rsMode: 'auto', vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
   };
   let S;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('hc_settings')) || {}); } catch (e) { S = Object.assign({}, DEFAULTS); }
@@ -48,27 +48,30 @@
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
-  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster';
-  const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass)
+  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster';
+  const BIG = PULLER || DRAGSTER || MONSTER;             // race engines: their own sound set-up, rumble and shake
+  const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
   const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
-  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER;   // factory-fixed driveline and tyres
+  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER;   // factory-fixed driveline and tyres
   // chase camera: distance / height scale (the tractor is 7 m long and 2.4 m tall; a dragster is 9 m long with its
   // wing 2.2 m up, so the camera sits further back and higher to see over it)
-  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : 1;
+  // (the monster truck is 12 ft tall and 12.5 ft wide: further back and well up)
+  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
-  const OFFROAD = () => !PULLER && !DRAGSTER && !!(S.offroad && S.offroad[S.car]);   // KO2 all-terrains + lift, saved per car
+  const OFFROAD = () => !PULLER && !DRAGSTER && !MONSTER && !!(S.offroad && S.offroad[S.car]);   // KO2 all-terrains + lift, saved per car
   const tireF = () => (OFFROAD() ? 'offroad' : FIXED ? carSpec.frontTire : 'street');
   const tireR = () => (OFFROAD() ? 'offroad' : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
-  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag';
+  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena';
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
+    : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : S.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -146,7 +149,8 @@
     moon: () => Object.assign(tuneDefaults(), { gravity: 0.17, smoke: 2 }),
   };
   const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
-  const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls })) : CAR.build(THREE, carOpts);
+  const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
+    : MONSTER ? MON.build(THREE, carOpts) : CAR.build(THREE, carOpts);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -160,9 +164,10 @@
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
   // ------------------------------------------------------------------ state
-  const G = { started: false, paused: true, menu: false, lightsOn: false, horn: false, arcadeT: 0, time: 0, lastEv: { shift: 0, backfire: 0, grind: 0 }, emitAcc: [0, 0, 0, 0], rumbleT: 0, loadDone: false, shake: 0 };
+  const G = { started: false, paused: true, menu: false, lightsOn: false, horn: false, arcadeT: 0, time: 0, rearMan: 0, flipHintT: 0, lastEv: { shift: 0, backfire: 0, grind: 0 }, emitAcc: [0, 0, 0, 0], rumbleT: 0, loadDone: false, shake: 0 };
   const cam = { mode: S.camMode | 0, fwd: new THREE.Vector3(0, 0, -1), off: new THREE.Vector3(), yS: 0, orbitYaw: 0, orbitPitch: 0, orbitT: 0, dragging: false, headYaw: 0, head: new THREE.Vector3(), zoom: 1, init: false };
   const TC_NAMES = ['STREET', 'SPORT', 'TRACK', 'OFF'];
+  const RS_NAMES = { auto: 'AUTO (counter-steer)', crab: 'CRAB', manual: 'MANUAL (, and .)', front: 'FRONT ONLY' };
   const VIEW_NAMES = ['CHASE CAM', 'FAR CHASE CAM', 'COCKPIT'];
 
   // ------------------------------------------------------------------ helpers
@@ -187,7 +192,7 @@
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
-    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : 'Car reset');
+    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : 'Car reset');
     if (DRAGMAP) dragReset();
   }
   function applyVehicleSettings() {
@@ -220,6 +225,10 @@
     if (PULLER) setTimeout(() => hud.hint('Pulling tractor: shift up (E) for DRIVE, hold SPACE and floor it, let go of SPACE to dump the clutch. On dirt it stands up on its weight bar — lift to steer! Ease into the throttle in turns.', 9), 1600);
     else if (DRAGSTER) setTimeout(() => hud.hint(CARDEF.short + ' dragster: shift up (E) for DRIVE. Burnout: hold B and floor it (it rolls — no front brakes). Stage, hold SPACE (clutch pedal) and floor it, let go on green. '
       + (DRAGMAP ? 'The chutes pop by themselves past the ' + (FINISH === 1000 ? '1,000 ft' : '¼ mile') + ' line (F pulls them).' : 'It lives on the Drag Strip map (Esc → Drive → Map).'), 11), 1600);
+    else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
+      + 'In the air, GAS lifts the nose and BRAKE drops it. Rolled it? Steer left or right to flip it back over.'
+      + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
+    else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump ahead, the car crush on the left, the tabletop on the right, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 10), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
     else setTimeout(() => hud.hint(veh.transType === 'auto' ? 'In PARK — throttle revs the engine. Shift up (E / right paddle) for DRIVE.' : 'In NEUTRAL — throttle revs the engine. Shift up (E / right paddle) for 1st gear.', 6), 1600);
@@ -272,6 +281,10 @@
         ['fc', 'Funny Car', 'The same 11,000 hp nitro HEMI under a carbon flip-top body · 125 in wheelbase · wheelie bars · 1,000 ft in ~3.88 s @ 330 mph', 'TorRed'],
         ['tad', 'Top Alcohol', '3,900 hp blown methanol HEMI · 2-speed · ¼ mile in ~5.2 s @ 275 mph', 'Frostbite'],
       ] },
+    { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
+      sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
+      desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
+      btn: 'MONSTER TRUCK', tc: 3 },
   ];
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
@@ -285,6 +298,12 @@
     if (id !== S.car) {
       if (m && m.tc !== undefined) { if (!wasMore) S.tcModePrev = S.tcMode; S.tcMode = m.tc; }
       else if (!m && wasMore && S.tcModePrev !== undefined) S.tcMode = S.tcModePrev;
+    }
+    // (a car with a home map takes you there; the map you came from comes back when you leave it)
+    if (id !== S.car) {
+      const from = MORE_CARS.find((x) => x.id === S.car);
+      if (m && m.map && S.map !== m.map) { S.mapPrev = S.map; S.map = m.map; }
+      else if (from && from.map && S.map === from.map && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
     if (m && opt) S[m.optKey] = opt;
@@ -448,6 +467,17 @@
         add(row('Making a pass', 'Burnout: hold B and floor it — no front brakes, so it rolls forward spinning its wet slicks (that\'s the heat they need). Back up (X / reverse, it creeps). Stage, hold SPACE (clutch pedal in) and floor it, let go of SPACE on green. The clutch slips by design — the engine sits near 7,000 rpm and climbs as the clutch locks up. Lift at the finish; the chutes pop by themselves (F pulls them).', el('<span></span>')));
         add(row('Staying straight', 'Traction control on Track (the default) plays crew chief: it backs off the clutch and timing when the slicks start to spin. Off is the real thing — on plain asphalt it goes up in smoke and swaps ends.', el('<span></span>')));
       }
+      if (MONSTER) {
+        add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
+        add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
+          seg([['auto', 'Auto'], ['crab', 'Crab'], ['manual', 'Manual'], ['front', 'Front only']], S.rsMode, (v) => { S.rsMode = v; G.rearMan = 0; })));
+        add(row('In the air', 'The tyres weigh 645 lb each: spin them up with the GAS and the truck rocks back (nose up); stab the BRAKE and it pitches nose down. Lift off the gas to fly level. Land on the down slopes.', el('<span></span>')));
+      }
+      if (ARENAMAP) {
+        const clr = el('<button class="btn small ghost">New run (score to 0)</button>');
+        clr.addEventListener('click', () => { FS.score = 0; FS.best = 0; FS.last = ''; arenaScreen(true); hud.toast('Freestyle score reset'); });
+        add(row('Freestyle', 'Big air, flips, wheelies, nose wheelies, donuts and crushed cars all score on the big screens · the junk cars are replaced once they\'re all flat', clr));
+      }
       if (DRAGPAK) {
         add(row('Mopar Drag Pak (race car)', 'Supercharged 354 HEMI · race 3-speed auto, non-lockup converter · spool · wheelie bars · no ABS / ESC. Hold SPACE on the line (TransBrake), floor it, release SPACE to launch.', el('<span></span>')));
         if (!OFFROAD()) add(row('Rear tyres', 'Slicks: fatter footprint, more grip (~7.5 s) · Radials: the 9-inch tyre NHRA Factory Stock requires (~7.7 s) · both need heat', seg([['etdrag', 'MT ET Drag 29.5x10.5 slicks'], ['etdragpro', 'MT ET Drag Pro 30x9 radials']], S.dpRear || 'etdrag', (v) => { S.dpRear = v; applyVehicleSettings(); })));
@@ -455,13 +485,13 @@
       }
       if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { S.trans = v; applyVehicleSettings(); })));
       if (!FIXED) add(row('Manual clutch', input.hasClutchPedal ? 'Use your clutch pedal (can stall!) or let the car work the clutch for you' : 'Map a clutch pedal in Controls → Wheel setup to use it', seg([[false, 'Auto-clutch'], [true, 'Clutch pedal']], S.clutchPedal, (v) => { S.clutchPedal = v; })));
-      if (!PULLER && !DRAGSTER) add(row('Off-road package', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
+      if (!PULLER && !DRAGSTER && !MONSTER) add(row('Off-road package', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
         + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, '
         + 'tread hum, and taller effective gearing', seg([[false, 'Off'], [true, 'KO2 all-terrains + 2" lift']], OFFROAD(), (v) => {
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
       if (!FIXED && !OFFROAD()) add(row('Rear tyres', 'Drag radials: huge launch grip once warm (do a burnout!), soft sidewall, less cornering grip, slick when cold', seg([['street', 'Pirelli P Zero 275/40ZR20'], ['drag', 'Nitto NT555R II 315/35R20 drag radials']], S.rearTire, (v) => { S.rearTire = v; applyVehicleSettings(); })));
-      add(row(DRAGPAK || PULLER || DRAGSTER ? 'Traction control' + (DRAGPAK ? ' (Holley EFI)' : DRAGSTER ? ' (clutch management)' : '') : 'Drive mode (ESC / traction)', DRAGPAK ? 'Timing-based wheel-speed traction management — Street: most intervention · Track: least · Off: all on you (no ESC on a race car)' : 'Street: full nannies · Sport: some slip · Track: TC only, ESC off · Off: everything off', seg(TC_NAMES.map((n, i) => [i, n]), S.tcMode, (v) => { S.tcMode = v; applyVehicleSettings(); })));
+      add(row(DRAGPAK || PULLER || DRAGSTER || MONSTER ? 'Traction control' + (DRAGPAK ? ' (Holley EFI)' : DRAGSTER ? ' (clutch management)' : '') : 'Drive mode (ESC / traction)', DRAGPAK ? 'Timing-based wheel-speed traction management — Street: most intervention · Track: least · Off: all on you (no ESC on a race car)' : 'Street: full nannies · Sport: some slip · Track: TC only, ESC off · Off: everything off', seg(TC_NAMES.map((n, i) => [i, n]), S.tcMode, (v) => { S.tcMode = v; applyVehicleSettings(); })));
       if (!sp.noABS) add(row('ABS', '', seg([[true, 'On'], [false, 'Off']], S.abs, (v) => { S.abs = v; applyVehicleSettings(); })));
       const sw = el('<div class="swatches"></div>');
       for (const [name, hex] of Object.entries(CAR.PAINTS)) {
@@ -470,8 +500,8 @@
         sw.appendChild(b);
       }
       add(row('Paint', S.paint, sw));
-      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars (restarts)',
+        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -505,6 +535,7 @@
     } else {
       add(el(`<div class="help">
 <h3>Burnout (line lock)</h3><p>Stop. Hold <kbd>B</kbd> (or your mapped Line Lock button) — the front brakes lock and the rears are free. Floor the throttle. Traction control is disabled while line lock is held. Release B to launch. Warm drag radials grip far better.</p>
+<h3>Rolled over?</h3><p>On its roof or its side and nearly stopped: steer left or right (keys or wheel) and it rolls back over onto its wheels, GTA style. <kbd>Backspace</kbd> also puts it back on its wheels.</p>
 <h3>Rev it</h3><p>In <b>P</b>ark or <b>N</b>eutral the throttle revs the engine freely. While driving, hold <kbd>R</kbd> (or your Rev button) to put the car in neutral and rev with the pedal — let go to drop it back in gear (neutral drop = instant wheelspin).</p>
 <h3>Drag launch</h3><p>Track or Sport mode, warm tyres, hold the brake, bring the throttle up, release the brake and floor it. The 0–60 / ¼-mile timers start automatically from a stop. Real Hellcat: 3.6 s / 11.8 s @ 125 mph on P Zeros.</p>
 <h3>Shifting</h3><p>Automatic: <kbd>E</kbd>/<kbd>Q</kbd> or paddles for manual override (M-mode, press <kbd>M</kbd> to return to D). Keyboard: hold <kbd>S</kbd> at a stop to reverse. Manual: auto-clutch by default; map a clutch pedal to do it yourself.</p>
@@ -516,7 +547,7 @@
 <tr><td>Change view (chase / far / cockpit)</td><td><kbd>C</kbd></td></tr><tr><td>Look back</td><td><kbd>V</kbd></td></tr>
 <tr><td>Drive mode Street/Sport/Track/Off</td><td><kbd>T</kbd></td></tr><tr><td>Reverse / Park</td><td><kbd>X</kbd> / <kbd>P</kbd></td></tr>
 <tr><td>Auto ↔ manual shifting (D/M)</td><td><kbd>M</kbd></td></tr><tr><td>Engine start/stop</td><td><kbd>I</kbd></td></tr>
-<tr><td>Horn / headlights</td><td><kbd>H</kbd> / <kbd>L</kbd></td></tr><tr><td>Parachute (Drag Pak, dragsters)</td><td><kbd>F</kbd></td></tr><tr><td>Nitrous (set a shot in Esc → Fun)</td><td><kbd>N</kbd></td></tr><tr><td>Reset to road</td><td><kbd>Backspace</kbd></td></tr>
+<tr><td>Horn / headlights</td><td><kbd>H</kbd> / <kbd>L</kbd></td></tr><tr><td>Monster truck rear steer: mode / manual</td><td><kbd>G</kbd> / <kbd>,</kbd> <kbd>.</kbd></td></tr><tr><td>Parachute (Drag Pak, dragsters)</td><td><kbd>F</kbd></td></tr><tr><td>Nitrous (set a shot in Esc → Fun)</td><td><kbd>N</kbd></td></tr><tr><td>Reset to road</td><td><kbd>Backspace</kbd></td></tr>
 <tr><td>Menu</td><td><kbd>Esc</kbd></td></tr><tr><td>Orbit camera / zoom</td><td>drag mouse / wheel</td></tr></table>
 <h3>PXN V3 Pro</h3><p>Set the wheel to PC mode. In X-input mode it works out of the box (wheel = steering, RT/LT = pedals, RB/LB = paddles). In D-input mode, or to use the clutch pedal / shifter / MODE button, open <b>Controls → Run wheel setup</b> and follow the prompts. The V3 Pro turns 180°, so steering is speed-sensitive by default — adjust it in Controls. Rumble uses the wheel's vibration motors when the browser supports it.</p>
 </div>`));
@@ -585,6 +616,7 @@
     ['tcMode', 'DRIVE MODE', 'Cycle Street / Sport / Track / Off'],
     ['lookBack', 'LOOK BACK', ''], ['horn', 'HORN', ''], ['reverse', 'REVERSE', 'Toggle R ↔ D'],
     ['engine', 'ENGINE START/STOP', ''], ['lights', 'HEADLIGHTS', ''], ['autoManual', 'AUTO ↔ MANUAL SHIFTING', ''],
+    ['rearMode', 'REAR STEER MODE', 'Monster truck: cycle AUTO / CRAB / MANUAL / FRONT'], ['rearLeft', 'REAR STEER LEFT (hold)', 'Monster truck, manual rear steer'], ['rearRight', 'REAR STEER RIGHT (hold)', ''],
   ];
   function startWizard() {
     openMenu(false); G.paused = true;
@@ -701,6 +733,18 @@
       : Math.abs(veh.forwardSpeed) < 3 ? 'LINE LOCK — front brakes held. Floor it!' : 'Line lock only arms below ~7 mph', 2.5);
     if (P.rev) hud.hint('NEUTRAL — rev it! Release to drop it in gear.', 2);
     if (P.handbrake && Math.abs(veh.forwardSpeed) < 2.5 && veh.gear !== 0 && !veh.park) hud.hint(DRAGSTER ? 'CLUTCH IN — floor it, let go of SPACE to launch' : 'LAUNCH CONTROL — rev it, then let go of the handbrake to launch', 3);
+    if (MONSTER) {
+      if (P.rearMode) { const M4 = ['auto', 'crab', 'manual', 'front']; S.rsMode = M4[(M4.indexOf(S.rsMode) + 1) % 4]; G.rearMan = 0; saveS(); hud.toast('Rear steering: ' + RS_NAMES[S.rsMode], 1.4); }
+      const v = Math.abs(veh.forwardSpeed), stv = input.state.steer, man = (A.rearRight ? 1 : 0) - (A.rearLeft ? 1 : 0);
+      let rs = 0;
+      if (S.rsMode === 'auto') rs = -stv * clamp(1 - (v - 5) / 10, 0, 1);          // counter-steer, gone by ~34 mph
+      else if (S.rsMode === 'crab') rs = stv * clamp(1 - (v - 8) / 14, 0.25, 1);
+      else if (S.rsMode === 'manual') { G.rearMan = clamp(G.rearMan + man * dt * 1.1, -1, 1); rs = G.rearMan; }
+      if (S.rsMode !== 'manual' && man) rs = clamp(rs + man, -1, 1);                // (the switch works in any mode)
+      veh.input.rearSteer = rs;
+    }
+    // GTA-style flip: steering rolls a car that's on its roof or side back onto its wheels
+    veh.input.flipAssist = true;
     veh.input.revHold = !!A.rev;
     veh.input.nos = !!A.nos;
     veh.input.lineLock = !!A.lineLock;
@@ -759,6 +803,7 @@
         const rut = past * clamp((slip - 2) / 5, 0, 1) * clamp(w.Fz / 3500, 0.2, 1) * 0.6;
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
+      if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
       G.emitAcc[i] += rate * dt * tune.smoke;
       if (G.emitAcc[i] >= 1) smoke.setGround(groundH(w.cpx, w.cpz));
       while (G.emitAcc[i] >= 1) {
@@ -795,6 +840,7 @@
       vw.corner.getWorldPosition(_v); _v2.set(1, 0, 0).applyQuaternion(vw.corner.getWorldQuaternion(_q));
       smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
+    if (car.afterWheels) car.afterWheels();
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
     car.setChute(veh.chuteOut, veh.chuteInfl || 0, veh.chuteT || 0);
@@ -818,6 +864,7 @@
       shiftNow: veh.rpm() > (sp.shiftRpm || sp.redlineRpm) - 350 && veh.gear > 0, launch: veh.launchHold, chute: veh.chuteOut, brakeP: veh.input.brake * 1100 + (veh.launchHold ? 900 : 0),
       oil: veh.running ? Math.min(95, 22 + veh.rpm() * 0.0085) : 0, water: 176 + 14 * clamp(veh.thrEff, 0, 1), afr: veh.running ? (veh.thrEff > 0.6 ? 11.4 : 13.6) + Math.sin(G.time * 3) * 0.1 : 0,
       volts: veh.running ? 13.9 : 12.4, lastEt: DRAGMAP && DR.sp && DR.sp['s' + FINISH] ? DR.sp['s' + FINISH].toFixed(3) + ' @ ' + DR.sp['m' + FINISH].toFixed(1) : null,
+      rearSteer: sp.rearSteerMax ? (veh.rearSteerAngle || 0) / sp.rearSteerMax : 0, rsMode: MONSTER ? S.rsMode.toUpperCase() : '',
       gLat: veh.gLat, gLong: veh.gLong, clock: d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'),
       t60: perf.last.t60 !== undefined ? perf.last.t60.toFixed(2) + ' s' : null, t100: perf.last.t100 !== undefined ? perf.last.t100.toFixed(2) + ' s' : null,
       tq: perf.last.tq !== undefined ? perf.last.tq.toFixed(2) + ' s' : null, brk: perf.last.b60 !== undefined ? perf.last.b60.toFixed(0) + ' ft' : null,
@@ -876,7 +923,7 @@
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if ((PULLER || DRAGSTER) && veh.running) { const sh = (DRAGSTER ? 0.003 : 0.004) + (NITRO ? 0.016 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -889,7 +936,8 @@
   // open cockpit (the V12s' gear-driven centrifugal blowers scream instead of whining)
   // (dragsters: one open-header blown HEMI a few feet behind your head - nitro is a ragged, crackling, earth-shaking
   // roar with a lumpy, misfiring idle; methanol a little cleaner and higher-revving)
-  const ENG_SND = DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
+  const ENG_SND = MONSTER ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
+    : DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
     : !PULLER ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
     : CARDEF.engine === 'v12' ? { nEng: 2, cyl: 12, fmul: 0.5, deep: 1, loud: 1, open: 1, whK: 2.0, whPure: 1, whine: 1.2, rpmRef: 3700, race: 0.5 }
@@ -909,9 +957,9 @@
       rpm: veh.rpm(), load: veh.running ? clamp(veh.thrEff * veh.tcCut * veh.escCut * (veh.shiftCut || 1), 0, 1) : 0, thr: veh.input.throttle,
       cut: veh.fuelCut ? 1 : 0, boost: veh.boost, run: veh.running ? 1 : 0, crank: veh.cranking ? 1 : 0,
       squeal, sqPitch: pitch, spin, speed, surf: rw.contact ? rw.surface : 0, interior: cam.mode === 2 ? 1 : 0,
-      horn: G.horn ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol, rough: ENG_SND.rough || 0, whine: (PULLER || DRAGSTER ? ENG_SND.whine : DRAGPAK ? 1.7 : DEMON ? 1.45 : 1) * tune.whine,
-      rpmRef: (PULLER || DRAGSTER ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() ? 1 : 0,
-      boostRef: Math.max(PULLER || DRAGSTER ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: PULLER || DRAGSTER ? ENG_SND.race : DRAGPAK ? 1 : 0,
+      horn: G.horn ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol, rough: ENG_SND.rough || 0, whine: (BIG ? ENG_SND.whine : DRAGPAK ? 1.7 : DEMON ? 1.45 : 1) * tune.whine,
+      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() ? 1 : 0,
+      boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
     });
   }
@@ -937,7 +985,7 @@
     }
     if (veh.fuelCut) strong = Math.max(strong, 0.45);
     weak += clamp(veh.rpm() / 6200, 0, 1) * 0.08 * (veh.running ? 1 : 0);
-    if ((PULLER || DRAGSTER) && veh.running) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
+    if (BIG && veh.running) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
     if (strong > 0.02 || weak > 0.05) input.rumble(strong, weak, 120);
   }
   function hudUpdate(dt) {
@@ -965,11 +1013,14 @@
     hud.setInputs(veh.input.throttle, veh.input.brake, input.state.clutch, input.source === 'wheel' ? input.raw.steer : input.state.steer);
     const chips = [
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
-      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
-      { html: PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
+      { html: MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
+      { html: MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
+    if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
+    if (ARENAMAP) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
+    if (veh.flipping) chips.push({ html: 'FLIPPING OVER', cls: 'alert' });
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
     if (veh.escActive) chips.push({ html: 'ESC', cls: 'warn' });
     if (veh.absActive) chips.push({ html: 'ABS', cls: 'warn' });
@@ -1081,6 +1132,94 @@
     }
   }
 
+  // ------------------------------------------------------------------ flipped over: tell them how to get back up
+  function flipHint(dt) {
+    G.flipHintT -= dt;
+    const up = 1 - 2 * (veh.qx * veh.qx + veh.qz * veh.qz);
+    if (up < 0.35 && Math.hypot(veh.vx, veh.vy, veh.vz) < 3 && !veh.flipping && G.flipHintT <= 0 && G.started) {
+      hud.hint('ROLLED IT! Steer left or right to flip it back over (or Backspace)', 3.5); G.flipHintT = 9;
+    }
+  }
+
+  // ------------------------------------------------------------------ Monster Arena: car crush + freestyle scoring
+  // Tricks are read off the physics: big air (time, height), flips / barrel rolls / 360s (rotation in the air, body
+  // axes), wheelies (rears down, fronts up), nose wheelies (the other way round; a moonwalk if it's rolling backwards),
+  // donuts (spinning in place), crushed junk cars. A landing that ends on its roof or side scores nothing.
+  const FS = { score: 0, best: 0, last: '', air: 0, maxH: 0, rot: [0, 0, 0], land: -1, wh: 0, nw: 0, nwBack: false, don: 0, donQ: 0, crushed: new Set(), scrT: 0, pend: null, sky: false };
+  function trick(text, pts) {
+    FS.score += pts; FS.last = text;
+    hud.toast(`${text}  +${Math.round(pts).toLocaleString()}`, 2.6);
+    arenaScreen(true, text, pts);
+  }
+  function arenaScreen(now, text, pts) {
+    if (!world.arena) return;
+    FS.scrT -= now ? 99 : 0;
+    if (FS.scrT > 0) return;
+    FS.scrT = 0.5;
+    const mph = Math.round(Math.abs(veh.forwardSpeed) * (S.units === 'kmh' ? 3.6 : MPH)) + (S.units === 'kmh' ? ' KM/H' : ' MPH');
+    world.arena.setScreen({ title: CARDEF.car || CARDEF.short.toUpperCase(), big: Math.round(FS.score).toLocaleString(), color: text ? '#a6ff1c' : '#ffffff',
+      sub: text ? text + '  +' + Math.round(pts).toLocaleString() : FS.last || 'FREESTYLE', foot: mph + '  ·  ' + (FS.pend ? 'IN THE AIR' : 'SCORE') });
+  }
+  function arenaUpdate(dt) {
+    if (!ARENAMAP) return;
+    const Wh = veh.wheels;
+    // junk cars flatten under the tyres
+    for (const w of Wh) if (w.contact) {
+      const k = W.arenaCrush(w.cpx, w.cpz, w.Fz, dt);
+      if (k >= 0 && !FS.crushed.has(k)) { const c = W.ARENA_CARS[k]; if (Math.max(c.cA, c.cB) > 0.5) { FS.crushed.add(k); trick('CAR CRUSH', 150); input.rumble(0.8, 0.6, 160); G.shake = Math.max(G.shake, 0.15); } }
+    }
+    if (world.arena) world.arena.update();
+    // fresh cars once they're all flat and the truck is well clear of the pile
+    if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px + 17, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
+    // body axes
+    const { qx, qy, qz, qw } = veh;
+    const ax = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qz * qw), 2 * (qx * qz - qy * qw)];            // right
+    const ay = [2 * (qx * qy - qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qx * qw)];            // up
+    const af = [-2 * (qx * qz + qy * qw), -2 * (qy * qz - qx * qw), -(1 - 2 * (qx * qx + qy * qy))];       // forward
+    const wv = [veh.wx, veh.wy, veh.wz], dot = (a) => a[0] * wv[0] + a[1] * wv[1] + a[2] * wv[2];
+    const air = veh.airborne, up = ay[1], v = Math.hypot(veh.vx, veh.vz);
+    if (air) {
+      FS.air += dt; FS.maxH = Math.max(FS.maxH, veh.py - groundH(veh.px, veh.pz) - sp.cgHeight);
+      FS.rot[0] += dot(ax) * dt; FS.rot[1] += dot(af) * dt; FS.rot[2] += dot(ay) * dt;
+      if (FS.air > 0.4) FS.pend = true;
+    } else if (FS.air > 0) {
+      if (FS.air > 0.45) FS.land = 1.2;
+      else { FS.air = 0; FS.maxH = 0; FS.rot = [0, 0, 0]; FS.pend = null; }
+    }
+    // judge a landing a moment later: still on its wheels?
+    if (FS.land > 0 && !air) {
+      FS.land -= dt;
+      if (up < 0.3) { hud.toast('CRASH!  No score', 2); FS.land = -1; FS.air = 0; FS.maxH = 0; FS.rot = [0, 0, 0]; FS.pend = null; FS.last = 'CRASH'; arenaScreen(true); }
+      else if (FS.land <= 0) {
+        const parts = []; let pts = 0;
+        const p = FS.rot[0] * 57.3, r = FS.rot[1] * 57.3, y = FS.rot[2] * 57.3;
+        const nP = Math.floor((Math.abs(p) + 60) / 360), nR = Math.floor((Math.abs(r) + 60) / 360), nY = Math.floor((Math.abs(y) + 45) / 360);
+        if (nP) { parts.push((nP > 1 ? nP + '× ' : '') + (p > 0 ? 'BACKFLIP' : 'FRONT FLIP')); pts += 1500 * nP; }
+        if (nR) { parts.push((nR > 1 ? nR + '× ' : '') + 'BARREL ROLL'); pts += 1200 * nR; }
+        if (nY) { parts.push(nY * 360 + ' SPIN'); pts += 600 * nY; }
+        if (FS.air > 1.0 || parts.length) { parts.unshift(`${FS.air > 1.6 ? 'HUGE AIR' : 'BIG AIR'} ${FS.air.toFixed(1)} s`); pts += FS.air * 120 + Math.max(0, FS.maxH) * 25; }
+        else if (FS.air > 0.45) { parts.unshift('AIR ' + FS.air.toFixed(1) + ' s'); pts += FS.air * 60; }
+        if (parts.length) trick(parts.join(' + '), pts);
+        FS.land = -1; FS.air = 0; FS.maxH = 0; FS.rot = [0, 0, 0]; FS.pend = null;
+      }
+    }
+    // two-wheel skills
+    const fOn = Wh[0].contact || Wh[1].contact, rOn = Wh[2].contact || Wh[3].contact;
+    const pitch = Math.asin(clamp(af[1], -1, 1)) * 57.3;
+    if (!air && rOn && !fOn && up > 0.2) { FS.wh += dt; if (pitch > 60) FS.sky = true; }
+    else if (FS.wh > 0) { if (FS.wh > 0.9 && up > 0.3) trick(`${FS.sky ? 'SKY WHEELIE' : 'WHEELIE'} ${FS.wh.toFixed(1)} s`, FS.wh * (FS.sky ? 260 : 160)); FS.wh = 0; FS.sky = false; }
+    if (!air && fOn && !rOn && up > 0.2) { FS.nw += dt; if (veh.forwardSpeed < -0.5) FS.nwBack = true; }
+    else if (FS.nw > 0) { if (FS.nw > 0.6 && up > 0.3) trick(`${FS.nwBack ? 'MOONWALK' : 'NOSE WHEELIE'} ${FS.nw.toFixed(1)} s`, FS.nw * (FS.nwBack ? 320 : 240)); FS.nw = 0; FS.nwBack = false; }
+    // donuts: spinning in place on the ground
+    const yawR = dot(ay);
+    if (!air && Math.abs(yawR) > 1.4 && v > 1.5 && up > 0.6) { FS.don += yawR * dt; FS.donQ = 0; }
+    else if (FS.don !== 0) {
+      FS.donQ += dt;
+      if (FS.donQ > 0.6) { const n = Math.floor(Math.abs(FS.don) / (2 * Math.PI)); if (n >= 1) trick(n > 1 ? `DONUTS ×${n}` : 'DONUT', 250 * n); FS.don = 0; FS.donQ = 0; }
+    }
+    if (G.started) arenaScreen(false);
+  }
+
   // ------------------------------------------------------------------ attract camera (before start)
   function attractCamera(t) {
     const r = 7.5 * CAMK, ang = t * 0.15;
@@ -1110,6 +1249,8 @@
       veh.step(dt);
       processEvents();
       dragUpdate(dt);
+      arenaUpdate(dt);
+      flipHint(dt);
       effects(dt);
       rumble(dt);
     }

@@ -33,6 +33,9 @@ Open `HellcatDrive.html` directly in any modern WebGL-supported browser (Chrome,
 - **SRT Demon & Mopar Drag Pak**: High-output drag packages with transbrake, line lock, and drag radials.
 - **Dragsters: Top Fuel, Nitro Funny Car & Top Alcohol**: Up to 11,000 HP nitro-burning beasts with functional deceleration parachutes and multi-stage clutch management; the Funny Car rides its wheelie bars off the line under a carbon flip-top body.
 - **Modified Pulling Tractor**: Multi-engine setups (4x Blown HEMIs or twin supercharged V12 aircraft engines) built for tractor pulling sled competitions.
+- **Monster Truck**: 12,000 lb, ~1,500 hp supercharged methanol 540, 66 in hand-cut tyres, 30 in of suspension travel, four-wheel drive with lockers and four-wheel steering (auto / crab / manual rear steer). The wheels' spin steers it in the air: gas lifts the nose, brake drops it. Picking it takes you to the **Monster Arena** map: a stadium with a big gap jump, a tabletop, whoops, banked corners and a pile of junk cars that really crush, with freestyle tricks (big air, flips, wheelies, nose wheelies, donuts, crushes) scored on the video boards.
+
+Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side and nearly stopped, steer left or right and it rolls back onto its wheels.
 
 ---
 
@@ -51,6 +54,9 @@ Open `HellcatDrive.html` directly in any modern WebGL-supported browser (Chrome,
 | **Neutral Rev** | Hold `R` | — |
 | **Line Lock (Burnout)** | Hold `B` | — |
 | **Parachute (Dragsters)** | `F` | — |
+| **Rear Steer Mode (Monster Truck)** | `G` | — |
+| **Rear Steer Left / Right (Monster Truck)** | Hold `,` / `.` | — |
+| **Flip Back Over** | Steer left / right while on the roof or side | — |
 | **Camera View** | `C` | — |
 | **Look Back** | `V` | — |
 | **Drive Mode (TC / ESC)** | `T` | — |
@@ -79,12 +85,13 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── carmodel.js         # Procedural 3D car mesh generation & materials
 │   ├── dragster.js         # Procedural Top Fuel / Top Alcohol dragster models (body, engine, wing, chutes, growing slicks)
 │   ├── puller.js           # Procedural pulling-tractor models (4× HEMI / 2× Allison V12, weight bar)
+│   ├── monster.js          # Procedural monster truck (tube chassis, 4-links and shocks that follow the suspension, 66 in tyres, livery)
 │   ├── fx.js               # Smoke, skidmarks, tire marks, and particles
 │   ├── game.js             # Core game loop, scene management, cameras, and menus
 │   ├── hud.js              # Gauges, tachometer, minimap, and telemetry HUD
 │   ├── input.js            # Keyboard, gamepad, and steering wheel input handling
 │   ├── vehicle.js          # Vehicle dynamics, suspension, engine torque curves, transmission
-│   ├── worldgen.js         # Procedural road network, elevation, and terrain generation
+│   ├── worldgen.js         # Procedural road network, elevation, terrain, and the Monster Arena's jumps / crushable cars
 │   └── worldrender.js      # Three.js world rendering, lighting, and foliage instancing
 ├── test/                   # Physics benchmarks and audio sanity tests
 └── viewer/                 # Standalone vehicle model viewer files
@@ -112,6 +119,7 @@ Simulation benchmarks and synthetic audio tests can be executed via Node.js:
 
 ```bash
 node test/dragster-test.js
+node test/monster-test.js
 node test/puller-test.js
 node test/sim-test.js
 node test/audio-test.js

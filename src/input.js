@@ -11,6 +11,7 @@
     ['reset', 'Reset car to road'], ['pause', 'Menu / pause'], ['horn', 'Horn'], ['tcMode', 'Drive mode (TC/ESC)'],
     ['lights', 'Headlights'], ['lookBack', 'Look back'], ['reverse', 'Reverse (R ↔ D)'], ['engine', 'Engine start/stop'],
     ['autoManual', 'Auto ↔ manual shifting'], ['chute', 'Parachute (Drag Pak)'], ['nos', 'Hold: nitrous (Fun tab)'],
+    ['rearMode', 'Rear steering mode (monster truck)'], ['rearLeft', 'Hold: rear steer left'], ['rearRight', 'Hold: rear steer right'],
   ];
   const AXES = [['steer', 'Steering'], ['throttle', 'Throttle pedal'], ['brake', 'Brake pedal'], ['clutch', 'Clutch pedal']];
 
@@ -19,7 +20,7 @@
     clutch: ['KeyZ'], handbrake: ['Space'], shiftUp: ['KeyE', 'ShiftRight'], shiftDown: ['KeyQ', 'ControlRight'],
     rev: ['KeyR'], lineLock: ['KeyB'], camera: ['KeyC'], reset: ['Backspace'], pause: ['Escape'], horn: ['KeyH'],
     tcMode: ['KeyT'], lights: ['KeyL'], lookBack: ['KeyV'], reverse: ['KeyX'], engine: ['KeyI'], autoManual: ['KeyM'],
-    park: ['KeyP'], chute: ['KeyF'], nos: ['KeyN'],
+    park: ['KeyP'], chute: ['KeyF'], nos: ['KeyN'], rearMode: ['KeyG'], rearLeft: ['Comma'], rearRight: ['Period'],
   };
 
   const DEFAULT_SETTINGS = {
@@ -89,7 +90,7 @@
           buttons: {
             shiftUp: b(5), shiftDown: b(4), handbrake: b(0), rev: b(1), lineLock: b(2), camera: b(3),
             reset: b(8), pause: b(9), horn: b(10), tcMode: b(11), lights: b(12), lookBack: b(13),
-            reverse: b(14), engine: b(15), autoManual: [], chute: [], nos: [],
+            reverse: b(14), engine: b(15), autoManual: [], chute: [], nos: [], rearMode: [], rearLeft: [], rearRight: [],
           },
         };
       }
