@@ -1444,6 +1444,9 @@
       })());
       const bK = s.bodyK || 240000, bC = s.bodyC || 16000;
       let nC = 0;
+      // (where the body is bearing on the ground and how hard - the arena's junk cars are crushed by it too)
+      const hits = this.bodyHits || (this.bodyHits = []);
+      if (this._bgFrame !== this.time) { this._bgFrame = this.time; hits.length = 0; }
       for (let i = 0; i < P.length; i++) {
         const lx = P[i][0], ly = P[i][1], lz = P[i][2];
         const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
@@ -1465,6 +1468,7 @@
           fxx -= tx * Ff; fyy -= ty * Ff; fzz -= tz * Ff;
         }
         if (Fn > 30000 && vn < -3) this.events.impact = Math.max(this.events.impact, -vn * 0.5);
+        if (hits.length < 36) hits.push(wx_, wz_, Fn);
         apply(fxx, fyy, fzz, rx, ry, rz);
       }
       this.bodyContact = nC;

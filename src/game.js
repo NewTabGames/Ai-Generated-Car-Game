@@ -1173,12 +1173,27 @@
   function arenaUpdate(dt) {
     if (!ARENAMAP) return;
     const Wh = veh.wheels;
-    // junk cars flatten under the tyres
-    for (const w of Wh) if (w.contact) {
-      const k = W.arenaCrush(w.cpx, w.cpz, w.Fz, dt);
-      if (k >= 0 && !FS.crushed.has(k)) { const c = W.ARENA_CARS[k]; if (Math.max(c.cA, c.cB) > 0.5) { FS.crushed.add(k); trick('CAR CRUSH', 150); input.rumble(0.8, 0.6, 160); G.shake = Math.max(G.shake, 0.15); } }
-    }
-    if (world.arena) world.arena.update();
+    // junk cars dent under the tyres - and under the chassis, which rides over the roofs between the tyre tracks
+    const crushAt = (x, z, f) => {
+      const k = W.arenaCrush(x, z, f, dt);
+      if (k < 0) return;
+      const c = W.ARENA_CARS[k], gy = groundH(x, z);
+      if (c.glassEv) {                                        // the cabin caves in: glass everywhere
+        c.glassEv = 0;
+        if (world.arena) world.arena.burst(c.x, Math.max(gy, 0.6) + 0.2, c.z, c.glassN > 1 ? 30 : 45);
+        audio.event('glass', 1); audio.event('crunch', 1.2); input.rumble(0.9, 0.7, 220); G.shake = Math.max(G.shake, 0.18);
+      }
+      if (c.dd > 0.05) {                                      // metal folding: a crunch, a puff of rust and dirt
+        audio.event('crunch', clamp(c.dd * 2.5, 0.35, 1.3)); input.rumble(0.55, 0.45, 110);
+        for (let q = 0; q < 3; q++) smoke.emit(x + (Math.random() - 0.5) * 0.8, gy + 0.15, z + (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 1.5, 0.6 + Math.random(), (Math.random() - 0.5) * 1.5, 0.45, 1.8, 1.2, 0.22, 1.2);
+        c.dd = 0;
+      }
+      if (!FS.crushed.has(k) && (c.cab > 0.4 || c.level > 0.2)) { FS.crushed.add(k); trick('CAR CRUSH', 150); G.shake = Math.max(G.shake, 0.15); }
+    };
+    for (const w of Wh) if (w.contact) crushAt(w.cpx, w.cpz, w.Fz);
+    const bh = veh.bodyHits || [];
+    for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
+    if (world.arena) world.arena.update(dt);
     // fresh cars once they're all flat and the truck is well clear of the pile
     if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px + 17, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
     // body axes

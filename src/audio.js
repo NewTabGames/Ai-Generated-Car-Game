@@ -113,6 +113,8 @@ class CarSynth {
     } else if (e.t === 'shift') { this.clunk = 1; this.clunkPh = 0; }
     else if (e.t === 'grind') { this.grind = 1; }
     else if (e.t === 'impact') { this.imp = Math.min(2.5, (e.v || 1)); this.impRing = this.imp * 0.4; }
+    else if (e.t === 'crunch') { this.crunch = Math.min(1.6, (this.crunch || 0) + (e.v || 1)); this.crThump = Math.min(1.2, (e.v || 1)); }
+    else if (e.t === 'glass') { this.glass = Math.min(1.5, (this.glass || 0) + (e.v || 1)); }
   }
   fire(i) {
     const c = this.cur, e = this.evE[i], k = this.evK[i];
@@ -293,6 +295,21 @@ class CarSynth {
       if (this.grind > 1e-3) {
         const s = this.run(this.clank, w1) * this.grind * 0.9 * (0.5 + 0.5 * Math.sin(this.t * 2 * Math.PI * 70)) * c.fxVol; this.grind *= 0.99985;
         oL += s; oR += s;
+      }
+      // crumpling sheet metal: a dense run of random crackles through a mid band with a dull thump under it
+      if (this.crunch > 1e-3) {
+        if (!this.crk) { this.crk = this.bp(1500, 2.5); this.crk2 = this.bp(420, 1.5); }
+        const tick = this.rnd() < 0.05 * this.crunch ? (this.rnd() - 0.5) * 7 : 0;
+        const s = (this.run(this.crk, tick + w1 * 0.25 * this.crunch) * 0.55 + this.run(this.crk2, w2 * this.crThump) * 0.5) * this.crunch * c.fxVol;
+        this.crunch *= 0.99992; this.crThump *= 0.9997;
+        oL += s; oR += s;
+      }
+      // breaking glass: sparse bright tinkles, high up
+      if (this.glass > 1e-3) {
+        if (!this.gls) this.gls = this.bp(5200, 5);
+        const tick = this.rnd() < 0.012 * this.glass ? (this.rnd() - 0.5) * 9 : 0;
+        const s = this.run(this.gls, tick + w2 * 0.06 * this.glass) * this.glass * 0.6 * c.fxVol; this.glass *= 0.99991;
+        oL += s * 0.9; oR += s;
       }
       if (this.imp > 1e-3) {
         this.impLP += 0.08 * (w1 - this.impLP);

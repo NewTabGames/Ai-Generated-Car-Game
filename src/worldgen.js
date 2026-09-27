@@ -413,21 +413,43 @@
     ob.minX = Math.min(...ex) - Math.abs(rx) * ob.hw; ob.maxX = Math.max(...ex) + Math.abs(rx) * ob.hw;
     ob.minZ = Math.min(...ez) - Math.abs(rz) * ob.hw; ob.maxZ = Math.max(...ez) + Math.abs(rz) * ob.hw;
   }
-  // junk cars on the crush lane: long axis across the lane, side by side along it. State: crush of each half (0-1)
-  const CAR_L = 2.35, CAR_W = 0.92;
+  // junk cars on the crush lane: long axis across the lane, side by side along it. Each car carries a grid of dent depths
+  // (metres, CNA x CNB nodes over its length and width) that the tyres push in wherever they bear on it - the surface
+  // is the car's shape minus the (smoothly interpolated) dents, so the tyres leave real tracks and dents
+  const CAR_L = 2.35, CAR_W = 0.92, CNA = 25, CNB = 11;
   const ARENA_CARS = [];
-  for (let k = 0; k < 6; k++) ARENA_CARS.push({ x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, cA: 0, cB: 0, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912) });
-  const _po = { d: 0 };
-  function carHeight(c, x, z, g) {
-    const a = (x - c.x) * c.flip, b = z - c.z, aa = Math.abs(a), ab = Math.abs(b);
-    if (aa >= CAR_L || ab >= CAR_W) return 0;
-    const cr = c.cA + (c.cB - c.cA) * sstep(-0.6, 0.6, a);                 // crush along the car (two halves)
+  const _cb = { h0: 0, hb: 0 };
+  // the undamaged car: h0 = its height, hb = the body alone (hood / trunk / sills up to the belt line, no cabin)
+  function carBase(c, a, b, o) {
+    const aa = Math.abs(a), ab = Math.abs(b);
+    if (aa >= CAR_L || ab >= CAR_W) { o.h0 = 0; o.hb = 0; return o; }
     const cab0 = -0.75 + 0.15 * c.shape, cab1 = 1.35;                        // windshield base .. rear window base
     const hb = 0.5 + 0.42 * (1 - sstep(1.85, CAR_L, aa));                   // bumpers low, hood / trunk / sills
     const hc = 0.45 * sstep(cab0, cab0 + 0.55, a) * (1 - sstep(cab1 - 0.5, cab1, a));
     const f = 1 - sstep(0.76, CAR_W, ab), gC = 1 - sstep(0.52, 0.74, ab);
-    const sb = 1 - 0.55 * cr, sc = 1 - 0.92 * cr;
-    const h = (hb * sb + hc * gC * sc) * f;
+    o.hb = hb * f; o.h0 = (hb + hc * gC) * f; return o;
+  }
+  for (let k = 0; k < 6; k++) {
+    const c = { x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
+      dent: new Float32Array(CNA * CNB), h0: new Float32Array(CNA * CNB), hb: new Float32Array(CNA * CNB), ver: 0, level: 0, cab: 0, dd: 0, glassEv: 0, glassN: 0 };
+    for (let ia = 0; ia < CNA; ia++) for (let ib = 0; ib < CNB; ib++) {
+      carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
+      c.h0[ia * CNB + ib] = _cb.h0; c.hb[ia * CNB + ib] = _cb.hb;
+    }
+    ARENA_CARS.push(c);
+  }
+  function carDent(c, a, b) {                   // interpolated dent depth at (a, b) in the car's own frame
+    const fa = Math.min(CNA - 1.0001, Math.max(0, (a + CAR_L) / (2 * CAR_L) * (CNA - 1)));
+    const fb = Math.min(CNB - 1.0001, Math.max(0, (b + CAR_W) / (2 * CAR_W) * (CNB - 1)));
+    const ia = Math.floor(fa), ib = Math.floor(fb), ta = fa - ia, tb = fb - ib, d = c.dent, i0 = ia * CNB + ib;
+    return (d[i0] * (1 - tb) + d[i0 + 1] * tb) * (1 - ta) + (d[i0 + CNB] * (1 - tb) + d[i0 + CNB + 1] * tb) * ta;
+  }
+  const _po = { d: 0 };
+  function carHeight(c, x, z, g) {
+    const a = (x - c.x) * c.flip, b = z - c.z;
+    if (Math.abs(a) >= CAR_L || Math.abs(b) >= CAR_W) return 0;
+    carBase(c, a, b, _cb);
+    const h = Math.max(0, _cb.h0 - carDent(c, a, b));
     if (g) {                                                                  // gradient (numeric: it's only 12 small cars)
       const e = 0.03, hx = carHeight(c, x + e, z, null) - carHeight(c, x - e, z, null), hz = carHeight(c, x, z + e, null) - carHeight(c, x, z - e, null);
       g.x = hx / (2 * e); g.z = hz / (2 * e);
@@ -483,19 +505,59 @@
     }
     return best;
   }
-  /** A tyre loaded with fz newtons at (x, z): flattens whichever half of a junk car it's on. Returns the car index if
-   *  anything changed, else -1. */
+  /** A tyre loaded with fz newtons at (x, z) bearing on a junk car: dents it under and around the tyre. How far depends
+   *  on the load and on what's underneath - the roof and pillars fold at the first real weight (down to the belt line),
+   *  the body (hood, trunk, doors) gives way gradually as the load climbs, to ~45 % of its height under a landing -
+   *  and the sheet metal drags the area round the tyre down with it. The metal yields over a few tenths of a second,
+   *  never springs back. Returns the car index if anything moved, else -1; the car's `dd` (depth crushed since the game
+   *  last looked), `level` (how flat it is overall, 0-1) and `glassEv` (the cabin just caved in: glass) go with it. */
   function arenaCrush(x, z, fz, dt) {
-    if (Math.abs(x + 17) > CAR_L + 0.3 || Math.abs(z) > 6.5) return -1;
+    if (Math.abs(x + 17) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
+    const kBody = Math.max(0, Math.min(1, (fz - 6000) / 22000)), R = 0.95;
+    let hit = -1;
     for (let i = 0; i < ARENA_CARS.length; i++) {
       const c = ARENA_CARS[i], a = (x - c.x) * c.flip, b = z - c.z;
-      if (Math.abs(a) > CAR_L || Math.abs(b) > CAR_W + 0.15) continue;
-      const tgt = Math.max(0, Math.min(1, (fz - 4000) / 12000)), k = a < 0 ? 'cA' : 'cB';
-      if (tgt > c[k] + 1e-3) { c[k] += (tgt - c[k]) * Math.min(1, dt * 7); return i; }
+      if (Math.abs(a) > CAR_L + 0.4 || Math.abs(b) > CAR_W + 0.4) continue;
+      let moved = 0;
+      const ia0 = Math.max(0, Math.floor((a - R + CAR_L) / (2 * CAR_L) * (CNA - 1))), ia1 = Math.min(CNA - 1, Math.ceil((a + R + CAR_L) / (2 * CAR_L) * (CNA - 1)));
+      for (let ia = ia0; ia <= ia1; ia++) {
+        const da = -CAR_L + 2 * CAR_L * ia / (CNA - 1) - a;
+        for (let ib = 0; ib < CNB; ib++) {
+          const db = -CAR_W + 2 * CAR_W * ib / (CNB - 1) - b, dist = Math.sqrt(da * da + db * db);
+          if (dist >= R) continue;
+          const k = ia * CNB + ib, h0 = c.h0[k];
+          if (h0 < 0.03) continue;
+          const hEq = Math.min(h0, c.hb[k] * (1 - 0.55 * kBody));
+          const dT = (h0 - hEq) * (1 - sstep(0.3, R, dist));
+          if (dT > c.dent[k] + 1e-4) { const inc = (dT - c.dent[k]) * Math.min(1, dt * 9); c.dent[k] += inc; moved += inc; }
+        }
+      }
+      if (moved > 0) {
+        c.ver++; c.dd += moved / 6; hit = i;
+        let sum = 0, n = 0, cabD = 0, cabH = 0;
+        for (let k = 0; k < CNA * CNB; k++) {
+          if (c.h0[k] < 0.05) continue;
+          sum += c.dent[k] / c.h0[k]; n++;
+          const hc = c.h0[k] - c.hb[k];
+          if (hc > 0.1) { cabD += Math.min(c.dent[k], hc); cabH += hc; }
+        }
+        c.level = n ? sum / n : 0; c.cab = cabH ? cabD / cabH : 0;
+        // the pillars go together: once part of the roof has folded, the rest of it comes down with it
+        if (c.cab > 0.2) {
+          const kk = Math.min(1, (c.cab - 0.2) / 0.45) * 0.9, rate = Math.min(1, dt * 5);
+          for (let k = 0; k < CNA * CNB; k++) {
+            const hc = c.h0[k] - c.hb[k];
+            if (hc > 0.04 && hc * kk > c.dent[k]) c.dent[k] += (hc * kk - c.dent[k]) * rate;
+          }
+        }
+        // glass bursts as the cabin folds: the first windows go at a quarter caved, the rest at two thirds
+        if (c.glassN === 0 && c.cab > 0.25) { c.glassN = 1; c.glassEv = 1; }
+        else if (c.glassN === 1 && c.cab > 0.66) { c.glassN = 2; c.glassEv = 1; }
+      }
     }
-    return -1;
+    return hit;
   }
-  function arenaResetCars() { for (const c of ARENA_CARS) { c.cA = 0; c.cB = 0; } }
+  function arenaResetCars() { for (const c of ARENA_CARS) { c.dent.fill(0); c.ver++; c.level = 0; c.cab = 0; c.dd = 0; c.glassEv = 0; c.glassN = 0; } }
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
@@ -928,6 +990,7 @@
   const W = {
     setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
+    arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
     roadParams, roadCenter, roadSlope, roadInfo, roadPoint, roadUniforms, RAMP, rampsInChunk, rampHeight,
     lowHeight, terrainHeight, gridHeight, ground, forestDensity,

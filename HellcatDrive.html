@@ -645,21 +645,43 @@
     ob.minX = Math.min(...ex) - Math.abs(rx) * ob.hw; ob.maxX = Math.max(...ex) + Math.abs(rx) * ob.hw;
     ob.minZ = Math.min(...ez) - Math.abs(rz) * ob.hw; ob.maxZ = Math.max(...ez) + Math.abs(rz) * ob.hw;
   }
-  // junk cars on the crush lane: long axis across the lane, side by side along it. State: crush of each half (0-1)
-  const CAR_L = 2.35, CAR_W = 0.92;
+  // junk cars on the crush lane: long axis across the lane, side by side along it. Each car carries a grid of dent depths
+  // (metres, CNA x CNB nodes over its length and width) that the tyres push in wherever they bear on it - the surface
+  // is the car's shape minus the (smoothly interpolated) dents, so the tyres leave real tracks and dents
+  const CAR_L = 2.35, CAR_W = 0.92, CNA = 25, CNB = 11;
   const ARENA_CARS = [];
-  for (let k = 0; k < 6; k++) ARENA_CARS.push({ x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, cA: 0, cB: 0, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912) });
-  const _po = { d: 0 };
-  function carHeight(c, x, z, g) {
-    const a = (x - c.x) * c.flip, b = z - c.z, aa = Math.abs(a), ab = Math.abs(b);
-    if (aa >= CAR_L || ab >= CAR_W) return 0;
-    const cr = c.cA + (c.cB - c.cA) * sstep(-0.6, 0.6, a);                 // crush along the car (two halves)
+  const _cb = { h0: 0, hb: 0 };
+  // the undamaged car: h0 = its height, hb = the body alone (hood / trunk / sills up to the belt line, no cabin)
+  function carBase(c, a, b, o) {
+    const aa = Math.abs(a), ab = Math.abs(b);
+    if (aa >= CAR_L || ab >= CAR_W) { o.h0 = 0; o.hb = 0; return o; }
     const cab0 = -0.75 + 0.15 * c.shape, cab1 = 1.35;                        // windshield base .. rear window base
     const hb = 0.5 + 0.42 * (1 - sstep(1.85, CAR_L, aa));                   // bumpers low, hood / trunk / sills
     const hc = 0.45 * sstep(cab0, cab0 + 0.55, a) * (1 - sstep(cab1 - 0.5, cab1, a));
     const f = 1 - sstep(0.76, CAR_W, ab), gC = 1 - sstep(0.52, 0.74, ab);
-    const sb = 1 - 0.55 * cr, sc = 1 - 0.92 * cr;
-    const h = (hb * sb + hc * gC * sc) * f;
+    o.hb = hb * f; o.h0 = (hb + hc * gC) * f; return o;
+  }
+  for (let k = 0; k < 6; k++) {
+    const c = { x: -17, z: -4.75 + 1.9 * k, flip: k % 2 ? -1 : 1, hue: hash01(k, 7, 911), shape: hash01(k, 3, 912),
+      dent: new Float32Array(CNA * CNB), h0: new Float32Array(CNA * CNB), hb: new Float32Array(CNA * CNB), ver: 0, level: 0, cab: 0, dd: 0, glassEv: 0, glassN: 0 };
+    for (let ia = 0; ia < CNA; ia++) for (let ib = 0; ib < CNB; ib++) {
+      carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
+      c.h0[ia * CNB + ib] = _cb.h0; c.hb[ia * CNB + ib] = _cb.hb;
+    }
+    ARENA_CARS.push(c);
+  }
+  function carDent(c, a, b) {                   // interpolated dent depth at (a, b) in the car's own frame
+    const fa = Math.min(CNA - 1.0001, Math.max(0, (a + CAR_L) / (2 * CAR_L) * (CNA - 1)));
+    const fb = Math.min(CNB - 1.0001, Math.max(0, (b + CAR_W) / (2 * CAR_W) * (CNB - 1)));
+    const ia = Math.floor(fa), ib = Math.floor(fb), ta = fa - ia, tb = fb - ib, d = c.dent, i0 = ia * CNB + ib;
+    return (d[i0] * (1 - tb) + d[i0 + 1] * tb) * (1 - ta) + (d[i0 + CNB] * (1 - tb) + d[i0 + CNB + 1] * tb) * ta;
+  }
+  const _po = { d: 0 };
+  function carHeight(c, x, z, g) {
+    const a = (x - c.x) * c.flip, b = z - c.z;
+    if (Math.abs(a) >= CAR_L || Math.abs(b) >= CAR_W) return 0;
+    carBase(c, a, b, _cb);
+    const h = Math.max(0, _cb.h0 - carDent(c, a, b));
     if (g) {                                                                  // gradient (numeric: it's only 12 small cars)
       const e = 0.03, hx = carHeight(c, x + e, z, null) - carHeight(c, x - e, z, null), hz = carHeight(c, x, z + e, null) - carHeight(c, x, z - e, null);
       g.x = hx / (2 * e); g.z = hz / (2 * e);
@@ -715,19 +737,59 @@
     }
     return best;
   }
-  /** A tyre loaded with fz newtons at (x, z): flattens whichever half of a junk car it's on. Returns the car index if
-   *  anything changed, else -1. */
+  /** A tyre loaded with fz newtons at (x, z) bearing on a junk car: dents it under and around the tyre. How far depends
+   *  on the load and on what's underneath - the roof and pillars fold at the first real weight (down to the belt line),
+   *  the body (hood, trunk, doors) gives way gradually as the load climbs, to ~45 % of its height under a landing -
+   *  and the sheet metal drags the area round the tyre down with it. The metal yields over a few tenths of a second,
+   *  never springs back. Returns the car index if anything moved, else -1; the car's `dd` (depth crushed since the game
+   *  last looked), `level` (how flat it is overall, 0-1) and `glassEv` (the cabin just caved in: glass) go with it. */
   function arenaCrush(x, z, fz, dt) {
-    if (Math.abs(x + 17) > CAR_L + 0.3 || Math.abs(z) > 6.5) return -1;
+    if (Math.abs(x + 17) > CAR_L + 0.6 || Math.abs(z) > 6.8 || fz < 2500) return -1;
+    const kBody = Math.max(0, Math.min(1, (fz - 6000) / 22000)), R = 0.95;
+    let hit = -1;
     for (let i = 0; i < ARENA_CARS.length; i++) {
       const c = ARENA_CARS[i], a = (x - c.x) * c.flip, b = z - c.z;
-      if (Math.abs(a) > CAR_L || Math.abs(b) > CAR_W + 0.15) continue;
-      const tgt = Math.max(0, Math.min(1, (fz - 4000) / 12000)), k = a < 0 ? 'cA' : 'cB';
-      if (tgt > c[k] + 1e-3) { c[k] += (tgt - c[k]) * Math.min(1, dt * 7); return i; }
+      if (Math.abs(a) > CAR_L + 0.4 || Math.abs(b) > CAR_W + 0.4) continue;
+      let moved = 0;
+      const ia0 = Math.max(0, Math.floor((a - R + CAR_L) / (2 * CAR_L) * (CNA - 1))), ia1 = Math.min(CNA - 1, Math.ceil((a + R + CAR_L) / (2 * CAR_L) * (CNA - 1)));
+      for (let ia = ia0; ia <= ia1; ia++) {
+        const da = -CAR_L + 2 * CAR_L * ia / (CNA - 1) - a;
+        for (let ib = 0; ib < CNB; ib++) {
+          const db = -CAR_W + 2 * CAR_W * ib / (CNB - 1) - b, dist = Math.sqrt(da * da + db * db);
+          if (dist >= R) continue;
+          const k = ia * CNB + ib, h0 = c.h0[k];
+          if (h0 < 0.03) continue;
+          const hEq = Math.min(h0, c.hb[k] * (1 - 0.55 * kBody));
+          const dT = (h0 - hEq) * (1 - sstep(0.3, R, dist));
+          if (dT > c.dent[k] + 1e-4) { const inc = (dT - c.dent[k]) * Math.min(1, dt * 9); c.dent[k] += inc; moved += inc; }
+        }
+      }
+      if (moved > 0) {
+        c.ver++; c.dd += moved / 6; hit = i;
+        let sum = 0, n = 0, cabD = 0, cabH = 0;
+        for (let k = 0; k < CNA * CNB; k++) {
+          if (c.h0[k] < 0.05) continue;
+          sum += c.dent[k] / c.h0[k]; n++;
+          const hc = c.h0[k] - c.hb[k];
+          if (hc > 0.1) { cabD += Math.min(c.dent[k], hc); cabH += hc; }
+        }
+        c.level = n ? sum / n : 0; c.cab = cabH ? cabD / cabH : 0;
+        // the pillars go together: once part of the roof has folded, the rest of it comes down with it
+        if (c.cab > 0.2) {
+          const kk = Math.min(1, (c.cab - 0.2) / 0.45) * 0.9, rate = Math.min(1, dt * 5);
+          for (let k = 0; k < CNA * CNB; k++) {
+            const hc = c.h0[k] - c.hb[k];
+            if (hc > 0.04 && hc * kk > c.dent[k]) c.dent[k] += (hc * kk - c.dent[k]) * rate;
+          }
+        }
+        // glass bursts as the cabin folds: the first windows go at a quarter caved, the rest at two thirds
+        if (c.glassN === 0 && c.cab > 0.25) { c.glassN = 1; c.glassEv = 1; }
+        else if (c.glassN === 1 && c.cab > 0.66) { c.glassN = 2; c.glassEv = 1; }
+      }
     }
-    return -1;
+    return hit;
   }
-  function arenaResetCars() { for (const c of ARENA_CARS) { c.cA = 0; c.cB = 0; } }
+  function arenaResetCars() { for (const c of ARENA_CARS) { c.dent.fill(0); c.ver++; c.level = 0; c.cab = 0; c.dd = 0; c.glassEv = 0; c.glassN = 0; } }
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
@@ -1160,6 +1222,7 @@
   const W = {
     setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
+    arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
     roadParams, roadCenter, roadSlope, roadInfo, roadPoint, roadUniforms, RAMP, rampsInChunk, rampHeight,
     lowHeight, terrainHeight, gridHeight, ground, forestDensity,
@@ -2617,6 +2680,9 @@
       })());
       const bK = s.bodyK || 240000, bC = s.bodyC || 16000;
       let nC = 0;
+      // (where the body is bearing on the ground and how hard - the arena's junk cars are crushed by it too)
+      const hits = this.bodyHits || (this.bodyHits = []);
+      if (this._bgFrame !== this.time) { this._bgFrame = this.time; hits.length = 0; }
       for (let i = 0; i < P.length; i++) {
         const lx = P[i][0], ly = P[i][1], lz = P[i][2];
         const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
@@ -2638,6 +2704,7 @@
           fxx -= tx * Ff; fyy -= ty * Ff; fzz -= tz * Ff;
         }
         if (Fn > 30000 && vn < -3) this.events.impact = Math.max(this.events.impact, -vn * 0.5);
+        if (hits.length < 36) hits.push(wx_, wz_, Fn);
         apply(fxx, fyy, fzz, rx, ry, rz);
       }
       this.bodyContact = nC;
@@ -3161,6 +3228,8 @@ class CarSynth {
     } else if (e.t === 'shift') { this.clunk = 1; this.clunkPh = 0; }
     else if (e.t === 'grind') { this.grind = 1; }
     else if (e.t === 'impact') { this.imp = Math.min(2.5, (e.v || 1)); this.impRing = this.imp * 0.4; }
+    else if (e.t === 'crunch') { this.crunch = Math.min(1.6, (this.crunch || 0) + (e.v || 1)); this.crThump = Math.min(1.2, (e.v || 1)); }
+    else if (e.t === 'glass') { this.glass = Math.min(1.5, (this.glass || 0) + (e.v || 1)); }
   }
   fire(i) {
     const c = this.cur, e = this.evE[i], k = this.evK[i];
@@ -3341,6 +3410,21 @@ class CarSynth {
       if (this.grind > 1e-3) {
         const s = this.run(this.clank, w1) * this.grind * 0.9 * (0.5 + 0.5 * Math.sin(this.t * 2 * Math.PI * 70)) * c.fxVol; this.grind *= 0.99985;
         oL += s; oR += s;
+      }
+      // crumpling sheet metal: a dense run of random crackles through a mid band with a dull thump under it
+      if (this.crunch > 1e-3) {
+        if (!this.crk) { this.crk = this.bp(1500, 2.5); this.crk2 = this.bp(420, 1.5); }
+        const tick = this.rnd() < 0.05 * this.crunch ? (this.rnd() - 0.5) * 7 : 0;
+        const s = (this.run(this.crk, tick + w1 * 0.25 * this.crunch) * 0.55 + this.run(this.crk2, w2 * this.crThump) * 0.5) * this.crunch * c.fxVol;
+        this.crunch *= 0.99992; this.crThump *= 0.9997;
+        oL += s; oR += s;
+      }
+      // breaking glass: sparse bright tinkles, high up
+      if (this.glass > 1e-3) {
+        if (!this.gls) this.gls = this.bp(5200, 5);
+        const tick = this.rnd() < 0.012 * this.glass ? (this.rnd() - 0.5) * 9 : 0;
+        const s = this.run(this.gls, tick + w2 * 0.06 * this.glass) * this.glass * 0.6 * c.fxVol; this.glass *= 0.99991;
+        oL += s * 0.9; oR += s;
       }
       if (this.imp > 1e-3) {
         this.impLP += 0.08 * (w1 - this.impLP);
@@ -8157,33 +8241,24 @@ void main(){
         patch(Math.min(xa, xb), Math.max(xa, xb), Math.min(za, zb), Math.max(za, zb), 0.4);
       }
 
-      // junk cars on the crush lane: a heightfield body (the same shape the tyres ride on) with two crushed states as
-      // morph targets - the physics flattens each half of each car and the mesh follows
+      // junk cars on the crush lane: a heightfield body - exactly the surface the tyres ride on, dents and all - rebuilt
+      // whenever the physics dents it: crumpled (jagged wrinkles grow with the dent), the sides splay out as it
+      // flattens, the paint scraped to bare metal and printed with dirt where the tyres went, its own tyres squashed
       const cars = [];
       const CL = W.CAR_L, CW = W.CAR_W, wheelMat = new THREE.MeshStandardMaterial({ color: 0x131313, roughness: 0.9 });
+      const JUNK = ['#6e1a17', '#1f3a5e', '#cfcabd', '#35573a', '#a8956c', '#262628', '#80868c', '#9c4a22', '#4a2b4f', '#b0a14e'];
       for (const c of W.ARENA_CARS) {
         const as = [-CL], bs = [];
         for (let i = 0; i <= 46; i++) as.push(-CL + 2 * CL * i / 46);
         as.push(CL);
         for (let j = 0; j <= 18; j++) bs.push(-CW + 2 * CW * j / 18);
         const na = as.length, nb = bs.length, N = na * nb;
-        const state = (cA, cB) => {
-          const sA = c.cA, sB = c.cB; c.cA = cA; c.cB = cB;
-          const p = new Float32Array(N * 3);
-          for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
-            const k = i * nb + j, x = c.x + as[i] * c.flip, z = c.z + bs[j];
-            p[k * 3] = x - c.x; p[k * 3 + 2] = z - c.z;
-            p[k * 3 + 1] = i === 0 || i === na - 1 ? 0 : W.arenaCarHeight(c, x, z);
-          }
-          c.cA = sA; c.cB = sB; return p;
-        };
-        const p0 = state(0, 0), pA = state(1, 0), pB = state(0, 1);
-        // paint: a faded, sun-bleached colour per car, dark glass on the cabin, black bumpers, rust
-        const JUNK = ['#6e1a17', '#1f3a5e', '#cfcabd', '#35573a', '#a8956c', '#262628', '#80868c', '#9c4a22', '#4a2b4f', '#b0a14e'];
-        const col = new Float32Array(N * 3), cc = new THREE.Color(JUNK[Math.floor(c.hue * JUNK.length) % JUNK.length]).multiplyScalar(0.85 + 0.25 * c.shape);
+        const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), col0 = new Float32Array(N * 3), crum = new Float32Array(N), scr = new Float32Array(N);
+        const cc = new THREE.Color(JUNK[Math.floor(c.hue * JUNK.length) % JUNK.length]).multiplyScalar(0.85 + 0.25 * c.shape);
         const cab0 = -0.75 + 0.15 * c.shape, cab1 = 1.35;
         for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
-          const k = i * nb + j, a = as[i], b = Math.abs(bs[j]), aa = Math.abs(a), y = p0[k * 3 + 1];
+          const k = i * nb + j, a = as[i], b = Math.abs(bs[j]), aa = Math.abs(a), x = c.x + a * c.flip, z = c.z + bs[j];
+          const y = i === 0 || i === na - 1 ? 0 : W.arenaCarHeight(c, x, z);
           const hb = (0.5 + 0.42 * (1 - sst(1.85, CL, aa))) * (1 - sst(0.76, CW, b));
           let r = cc.r, g = cc.g, bl = cc.b;
           const cabin = y > hb + 0.08 && a > cab0 && a < cab1;
@@ -8192,27 +8267,85 @@ void main(){
           if (aa > 2.12) { r = 0.08; g = 0.08; bl = 0.08; }
           const rust = W.hash01(Math.floor((a + 3) * 2.5), Math.floor((bs[j] + 2) * 2.5), 77 + cars.length) > 0.86 ? 0.55 : 1;
           if (rust < 1 && !(cabin && !roof)) { r = r * 0.35 + 0.1; g = g * 0.35 + 0.045; bl = bl * 0.3 + 0.015; }   // rust
-          col[k * 3] = r; col[k * 3 + 1] = g; col[k * 3 + 2] = bl;
+          col0[k * 3] = r; col0[k * 3 + 1] = g; col0[k * 3 + 2] = bl;
+          crum[k] = W.hash01(i * 13 + cars.length * 101, j * 7, 919) * 2 - 1;          // this vertex's wrinkle
+          scr[k] = W.hash01(i * 5, j * 11 + cars.length * 37, 921);                       // scrape pattern
         }
         const idx = [];
-        for (let i = 0; i < na - 1; i++) for (let j = 0; j < nb - 1; j++) { const a = i * nb + j, b = a + 1, c2 = a + nb, d = c2 + 1; idx.push(a, b, c2, b, d, c2); }
+        for (let i = 0; i < na - 1; i++) for (let j = 0; j < nb - 1; j++) {
+          const a = i * nb + j, b = a + 1, c2 = a + nb, d = c2 + 1;
+          if (c.flip < 0) idx.push(a, c2, b, b, c2, d); else idx.push(a, b, c2, b, d, c2);   // (winding faces up either way)
+        }
         const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(p0, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
-        g.computeVertexNormals();
-        const nrm = (p) => { const t = new THREE.BufferGeometry(); t.setAttribute('position', new THREE.BufferAttribute(p, 3)); t.setIndex(idx); t.computeVertexNormals(); return t.attributes.normal; };
-        // (the winding faces up for flip = 1; mirrored cars get their triangles turned round)
-        if (c.flip < 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; } g.setIndex(idx); g.computeVertexNormals(); }
-        g.morphAttributes.position = [new THREE.BufferAttribute(pA, 3), new THREE.BufferAttribute(pB, 3)];
-        g.morphAttributes.normal = [nrm(pA), nrm(pB)];
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
         const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide }));
-        m.position.set(c.x, 0.002, c.z); m.castShadow = true; m.receiveShadow = true; m.morphTargetInfluences = [0, 0];
+        m.position.set(c.x, 0.002, c.z); m.castShadow = true; m.receiveShadow = true;
         ag.add(m);
         const wh = [];
         for (const wa of [-1.45, 1.45]) for (const wb of [-0.74, 0.74]) {
           const w = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.2, 18), wheelMat); w.rotation.x = Math.PI / 2;
-          w.position.set(c.x + wa * c.flip, 0.31, c.z + wb); w.castShadow = true; ag.add(w); wh.push({ w, half: wa < 0 ? 'cA' : 'cB' });
+          w.position.set(c.x + wa * c.flip, 0.31, c.z + wb); w.castShadow = true; ag.add(w); wh.push({ w, x: c.x + wa * c.flip, z: c.z + wb });
         }
-        cars.push({ c, m, wh });
+        const car = { c, m, wh, ver: -1 };
+        car.refresh = () => {
+          for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
+            const k = i * nb + j, a = as[i], x = c.x + a * c.flip, z = c.z + bs[j];
+            const edge = i === 0 || i === na - 1;
+            const d = edge ? 0 : W.arenaCarDent(c, x, z), dn = Math.min(1, d / 0.3);
+            let y = edge ? 0 : W.arenaCarHeight(c, x, z);
+            if (!edge && y > 0.02) y = Math.max(0.01, y + crum[k] * 0.05 * dn);
+            pos[k * 3] = a * c.flip; pos[k * 3 + 1] = y; pos[k * 3 + 2] = bs[j] * (1 + 0.09 * dn);
+            // bare metal where the paint's scraped off, dirt from the tyres over the worst of it
+            let r = col0[k * 3], gg = col0[k * 3 + 1], bl = col0[k * 3 + 2];
+            if (scr[k] < 0.16 * dn) { r = r * 0.4 + 0.16; gg = gg * 0.4 + 0.16; bl = bl * 0.4 + 0.17; }
+            const dirt = 0.45 * Math.min(1, d / 0.45);
+            col[k * 3] = r + (0.1 - r) * dirt; col[k * 3 + 1] = gg + (0.062 - gg) * dirt; col[k * 3 + 2] = bl + (0.035 - bl) * dirt;
+          }
+          g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true;
+          g.computeVertexNormals(); g.computeBoundingSphere();
+          for (const t of wh) { const sq = 1 - 0.55 * Math.min(1, W.arenaCarDent(c, t.x, t.z) / 0.3); t.w.scale.z = sq; t.w.position.y = 0.31 * sq; }
+          car.ver = c.ver;
+        };
+        car.refresh();
+        cars.push(car);
+      }
+      // glass: shards burst out of a caving cabin, bounce and lie glittering in the dirt; a few flakes of rust and paint
+      const SHN = 260, shGeo = new THREE.TetrahedronGeometry(0.03);
+      shGeo.scale(1.6, 0.35, 1);
+      const shMat = new THREE.MeshStandardMaterial({ color: 0xd6eef5, roughness: 0.05, metalness: 0.6, emissive: 0x223038, transparent: true, opacity: 0.85 });
+      const shards = new THREE.InstancedMesh(shGeo, shMat, SHN); shards.count = 0; shards.frustumCulled = false; ag.add(shards);
+      const SH = { n: 0, p: new Float32Array(SHN * 3), v: new Float32Array(SHN * 3), r: new Float32Array(SHN * 3), w: new Float32Array(SHN * 3), life: new Float32Array(SHN), rest: new Uint8Array(SHN) };
+      const _sm = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _se = new THREE.Euler(), _sp = new THREE.Vector3(), _ss = new THREE.Vector3(1, 1, 1);
+      function burst(x, y, z, n) {
+        for (let k = 0; k < n; k++) {
+          const i = SH.n < SHN ? SH.n++ : Math.floor(Math.random() * SHN), a = Math.random() * 6.283, sp = 1 + Math.random() * 3.5;
+          SH.p[i * 3] = x + (Math.random() - 0.5) * 1.2; SH.p[i * 3 + 1] = y + Math.random() * 0.3; SH.p[i * 3 + 2] = z + (Math.random() - 0.5) * 1.2;
+          SH.v[i * 3] = Math.cos(a) * sp; SH.v[i * 3 + 1] = 1.5 + Math.random() * 3.5; SH.v[i * 3 + 2] = Math.sin(a) * sp;
+          for (let q = 0; q < 3; q++) { SH.r[i * 3 + q] = Math.random() * 6.3; SH.w[i * 3 + q] = (Math.random() - 0.5) * 30; }
+          SH.life[i] = 25 + Math.random() * 10; SH.rest[i] = 0;
+        }
+      }
+      function shardsUpdate(dt) {
+        let any = false;
+        for (let i = 0; i < SH.n; i++) {
+          if (SH.life[i] <= 0) { _sm.makeScale(0, 0, 0); shards.setMatrixAt(i, _sm); continue; }
+          SH.life[i] -= dt; any = true;
+          if (!SH.rest[i]) {
+            SH.v[i * 3 + 1] -= 9.81 * dt;
+            for (let q = 0; q < 3; q++) { SH.p[i * 3 + q] += SH.v[i * 3 + q] * dt; SH.r[i * 3 + q] += SH.w[i * 3 + q] * dt; }
+            const gy = W.arenaHeight(SH.p[i * 3], SH.p[i * 3 + 2]) + 0.01;
+            if (SH.p[i * 3 + 1] < gy) {
+              SH.p[i * 3 + 1] = gy;
+              if (SH.v[i * 3 + 1] < -1.2) { SH.v[i * 3 + 1] *= -0.25; SH.v[i * 3] *= 0.5; SH.v[i * 3 + 2] *= 0.5; for (let q = 0; q < 3; q++) SH.w[i * 3 + q] *= 0.4; }
+              else { SH.rest[i] = 1; SH.r[i * 3] = (Math.random() - 0.5) * 0.3; SH.r[i * 3 + 2] = (Math.random() - 0.5) * 0.3; }   // lies flat
+            }
+          }
+          const fade = Math.min(1, SH.life[i] / 3);
+          _se.set(SH.r[i * 3], SH.r[i * 3 + 1], SH.r[i * 3 + 2]); _sq.setFromEuler(_se);
+          _sp.set(SH.p[i * 3], SH.p[i * 3 + 1], SH.p[i * 3 + 2]); _ss.setScalar(fade * (0.7 + 0.6 * ((i * 0.618) % 1)));
+          _sm.compose(_sp, _sq, _ss); shards.setMatrixAt(i, _sm);
+        }
+        shards.count = SH.n; shards.instanceMatrix.needsUpdate = any || shards.count > 0;
       }
 
       // ---- the stadium: concrete wall with banners, debris fence, the seating bowl, roof ring with floodlights, two
@@ -8323,12 +8456,11 @@ void main(){
       }
       drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · WHOOPS' });
       arena = {
-        update() {
-          for (const k of cars) {
-            k.m.morphTargetInfluences[0] = k.c.cA; k.m.morphTargetInfluences[1] = k.c.cB;
-            for (const { w, half } of k.wh) { const sq = 1 - 0.5 * k.c[half]; w.scale.z = sq; w.position.y = 0.31 * sq; }   // (the tyres squash flat too)
-          }
+        update(dt) {
+          for (const k of cars) if (k.ver !== k.c.ver) k.refresh();
+          shardsUpdate(dt || 0);
         },
+        burst,
         setScreen: drawScreen, floodM,
       };
     }
@@ -10005,12 +10137,27 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   function arenaUpdate(dt) {
     if (!ARENAMAP) return;
     const Wh = veh.wheels;
-    // junk cars flatten under the tyres
-    for (const w of Wh) if (w.contact) {
-      const k = W.arenaCrush(w.cpx, w.cpz, w.Fz, dt);
-      if (k >= 0 && !FS.crushed.has(k)) { const c = W.ARENA_CARS[k]; if (Math.max(c.cA, c.cB) > 0.5) { FS.crushed.add(k); trick('CAR CRUSH', 150); input.rumble(0.8, 0.6, 160); G.shake = Math.max(G.shake, 0.15); } }
-    }
-    if (world.arena) world.arena.update();
+    // junk cars dent under the tyres - and under the chassis, which rides over the roofs between the tyre tracks
+    const crushAt = (x, z, f) => {
+      const k = W.arenaCrush(x, z, f, dt);
+      if (k < 0) return;
+      const c = W.ARENA_CARS[k], gy = groundH(x, z);
+      if (c.glassEv) {                                        // the cabin caves in: glass everywhere
+        c.glassEv = 0;
+        if (world.arena) world.arena.burst(c.x, Math.max(gy, 0.6) + 0.2, c.z, c.glassN > 1 ? 30 : 45);
+        audio.event('glass', 1); audio.event('crunch', 1.2); input.rumble(0.9, 0.7, 220); G.shake = Math.max(G.shake, 0.18);
+      }
+      if (c.dd > 0.05) {                                      // metal folding: a crunch, a puff of rust and dirt
+        audio.event('crunch', clamp(c.dd * 2.5, 0.35, 1.3)); input.rumble(0.55, 0.45, 110);
+        for (let q = 0; q < 3; q++) smoke.emit(x + (Math.random() - 0.5) * 0.8, gy + 0.15, z + (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 1.5, 0.6 + Math.random(), (Math.random() - 0.5) * 1.5, 0.45, 1.8, 1.2, 0.22, 1.2);
+        c.dd = 0;
+      }
+      if (!FS.crushed.has(k) && (c.cab > 0.4 || c.level > 0.2)) { FS.crushed.add(k); trick('CAR CRUSH', 150); G.shake = Math.max(G.shake, 0.15); }
+    };
+    for (const w of Wh) if (w.contact) crushAt(w.cpx, w.cpz, w.Fz);
+    const bh = veh.bodyHits || [];
+    for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
+    if (world.arena) world.arena.update(dt);
     // fresh cars once they're all flat and the truck is well clear of the pile
     if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px + 17, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
     // body axes

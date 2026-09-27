@@ -207,6 +207,7 @@ for (const surf of [3, 0]) {
       v.step(1 / 240);
       if (onStep) onStep(v);
       for (const w of v.wheels) if (w.contact) WG.arenaCrush(w.cpx, w.cpz, w.Fz, 1 / 240);
+      const bh = v.bodyHits || []; for (let i = 0; i < bh.length; i += 3) WG.arenaCrush(bh[i], bh[i + 1], bh[i + 2], 1 / 240);
       const f = v.wheels.reduce((a, w) => a + w.Fz, 0) / (v.spec.mass * 9.81); if (!v.airborne) maxG = Math.max(maxG, f);
       if (v.airborne) { air += 1 / 240; pitchRot += (v.wx * (1 - 2 * (v.qy * v.qy + v.qz * v.qz)) + v.wy * 2 * (v.qx * v.qy + v.qz * v.qw) + v.wz * 2 * (v.qx * v.qz - v.qy * v.qw)) / 240; }
       peakH = Math.max(peakH, v.py - WG.ground(v.px, v.pz, g).h - 1.26);
@@ -216,8 +217,8 @@ for (const surf of [3, 0]) {
   };
   WG.arenaResetCars();
   const c = run(-17, -32, 0, 1, 11, 9);
-  const crushed = WG.ARENA_CARS.filter((k) => Math.max(k.cA, k.cB) > 0.5).length;
-  console.log(`arena car crush @ 11 mph: ${crushed}/6 cars flattened, peak ${c.maxG.toFixed(1)} g, air ${c.air.toFixed(2)} s, ${c.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${c.v.pz.toFixed(0)}${nan(c.v) ? ' NaN!' : ''}`);
+  const crushed = WG.ARENA_CARS.filter((k) => k.cab > 0.4 || k.level > 0.2).length, lv = WG.ARENA_CARS.map((k) => Math.round(k.level * 100) + '%').join(' '), cab = WG.ARENA_CARS.map((k) => Math.round(k.cab * 100) + '%').join(' ');
+  console.log(`arena car crush @ 11 mph: ${crushed}/6 cars crushed (flat ${lv}; roofs caved ${cab}), peak ${c.maxG.toFixed(1)} g, air ${c.air.toFixed(2)} s, ${c.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${c.v.pz.toFixed(0)}${nan(c.v) ? ' NaN!' : ''}`);
   for (const mph of [28, 34, 40]) {
     const r = run(17, -48, 0, 1, mph, 7);
     console.log(`arena tabletop @ ${mph} mph: air ${r.air.toFixed(2)} s, ${r.peakH.toFixed(1)} m above the ground, landing ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'CRASHED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`);
