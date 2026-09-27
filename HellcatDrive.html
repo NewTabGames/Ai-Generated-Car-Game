@@ -185,7 +185,7 @@
       <button class="carbtn" data-car="hellcat"><b>SRT HELLCAT</b><span>717 hp · 656 lb-ft · P Zero street tyres</span></button>
       <button class="carbtn" data-car="demon"><b>SRT DEMON 170</b><span>1,025 hp · 945 lb-ft · drag radials · TransBrake</span></button>
       <button class="carbtn" data-car="dragpak"><b>MOPAR DRAG PAK</b><span>supercharged 354 HEMI · race car · wheelie bars · chute</span></button>
-      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>monster truck · dragsters · pulling tractor…</span></button>
+      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · dragsters…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
       <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button>
@@ -204,7 +204,7 @@
       <button class="carbtn" data-car="hellcat"><b>CHALLENGER SRT HELLCAT</b><span>717 hp · 656 lb-ft · 3.6 s 0-60 · 11.8 s ¼ mile</span></button>
       <button class="carbtn" data-car="demon"><b>CHALLENGER SRT DEMON 170</b><span>1,025 hp E85 · 945 lb-ft · 1.66 s 0-60 · 8.91 s @ 151 mph</span></button>
       <button class="carbtn" data-car="dragpak"><b>CHALLENGER MOPAR DRAG PAK</b><span>354 cu in Whipple HEMI · NHRA Factory Stock · 7.5 s @ 180 mph</span></button>
-      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>monster truck · dragsters · pulling tractor…</span></button>
+      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · dragsters…</span></button>
     </div>
     <div id="tabs"></div>
     <div id="tabbody"></div>
@@ -1383,6 +1383,25 @@
     // hand-cut by the crew into deep paddles. They dig into the arena's clay and hook harder than any street tyre
     // (enough to stand the truck on its rear wheels), slide a long way sideways before they let go, and are only so-so
     // on pavement. No temperature to speak of.
+    // Karts: 5 in rims, tiny stiff tyres - 11x7.10-5 rears, 10x4.50-5 fronts. Racing slicks (TaG / KZ) are soft and bite
+    // hard once warm (a kart pulls 2 g on a rubbered-in track) but warm up and fade fast; rental karts run hard,
+    // long-life compounds. Useless on dirt and grass.
+    kartR: { name: 'Racing slick 11x7.10-5', short: 'Kart slicks', width: 0.18, radius: 0.14,
+      muX: 1.7, muY: 1.65, loose: 0.55, kappaPeak: 0.08, alphaPeak: 0.1, relaxX: 0.08, relaxY: 0.12,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 420, cold: 0.84, coldT: 20, warmT: 45, hotT: 80, overheat: 0.006, prep: 1.15,
+      crr: [0.9, 1.5, 1.6, 1.5, 1, 0.9] },
+    kartF: { name: 'Racing slick 10x4.50-5', short: 'Kart slicks', width: 0.115, radius: 0.127,
+      muX: 1.6, muY: 1.62, loose: 0.55, kappaPeak: 0.08, alphaPeak: 0.1, relaxX: 0.07, relaxY: 0.1,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 300, cold: 0.84, coldT: 20, warmT: 45, hotT: 80, overheat: 0.006, prep: 1.15,
+      crr: [0.9, 1.5, 1.6, 1.5, 1, 0.9] },
+    kartRentR: { name: 'Rental hard compound 11x7.10-5', short: 'Rental tyres', width: 0.18, radius: 0.14,
+      muX: 1.25, muY: 1.2, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.08, relaxY: 0.12,
+      B: 1.75, C: 1.4, E: -0.25, heatCap: 900, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
+      crr: [1, 1.5, 1.6, 1.5, 1, 1] },
+    kartRentF: { name: 'Rental hard compound 10x4.50-5', short: 'Rental tyres', width: 0.115, radius: 0.127,
+      muX: 1.2, muY: 1.18, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.07, relaxY: 0.1,
+      B: 1.75, C: 1.4, E: -0.25, heatCap: 650, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
+      crr: [1, 1.5, 1.6, 1.5, 1, 1] },
     monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838,
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
@@ -3056,6 +3075,72 @@
     bodyK: 900000, bodyC: 60000, bodyMu: 0.6,
     tyreEnvelope: true, wheelGyro: true,
   } };
+  // Karts. No suspension (the chassis flexes and the tyres are the springs), a solid rear axle (the inside rear tyre lifts
+  // in a corner, so it's modelled as a loose coupling rather than a spool), direct steering, the driver sitting upright
+  // on the floor tray. The engine sits beside the seat and drives the axle by chain. Pick a class with
+  // CARS.kart.make(key): a 4-stroke rental kart, a 125 cc TaG kart (centrifugal clutch, direct drive) or a KZ shifter.
+  const kartPts = (cg, fw) => {
+    const P = (x, y, z) => [x, y - cg, z + 1.05 * (fw - 0.5)];
+    return [P(-0.45, 0.12, -0.98), P(0.45, 0.12, -0.98), P(-0.68, 0.1, 0.82), P(0.68, 0.1, 0.82), P(-0.7, 0.1, 0), P(0.7, 0.1, 0),
+      P(-0.6, 0.12, -0.55), P(0.6, 0.12, -0.55), P(0, 0.03, -0.3), P(0, 0.03, 0.4), P(0, 0.98, 0.1), P(-0.2, 0.75, 0.15), P(0.2, 0.75, 0.15)];
+  };
+  CARS.kart = { name: 'Kart', short: 'Kart', more: true, spec: {
+    name: 'Kart', Fz0: 650, loadSens: 0.12,
+    springF: 55000, springR: 65000, dampBumpF: 650, dampRebF: 650, dampBumpR: 850, dampRebR: 850, dampKnee: 0.3,
+    arbF: 0, arbR: 0, travelUp: 0.02, travelDown: 0.015, suspS0: 0.05, bumpStopK: 400000, fzMax: 20000,
+    noABS: true, noESC: true, maxSteer: 0.42, steerRate: 4.5, steerRatio: 5.5, ackermann: 0.7, rearToe: 0,
+    // (the axle coupling stays gentle: with wheels this light a stiff one chatters at 1 kHz and scrubs the fronts away)
+    lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.95, noLockup: true, noCoastBlip: true, blipMax: 0.2, boostMax: 0,
+    handbrakeTorque: 150, bodyHalfW: 0.7, bodyFront: -1.02, bodyRear: 0.84, bodyBottom: -0.27, bodyTop: 0.66,
+    bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
+  } };
+  CARS.kart.classes = {
+    // rental: a Honda-type 390 cc 4-stroke single (~13 hp, governed to ~4,000 rpm), centrifugal clutch, one gear, a
+    // heavy steel frame inside a full wraparound bumper, hard tyres, one rear disc. ~30-35 mph
+    rental: { name: 'Rental Kart', short: 'Rental', car: 'RENTAL 42', hp: 13, tq: 20, spec: {
+      mass: 235, Ipitch: 40, Iyaw: 52, Iroll: 16, cgHeight: 0.33, wheelbase: 1.07, frontWeight: 0.42,
+      trackF: 1.12, trackR: 1.3, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.025, wheelInertiaR: 0.07,
+      frontTire: 'kartRentF', rearTire: 'kartRentR', brakeTorqueF: 0, brakeTorqueR: 170,
+      idleRpm: 1500, limiterRpm: 4000, redlineRpm: 3800, engineInertia: 0.03, fricA: 1.2, fricB: 0.8, starterTorque: 8,
+      torqueCurve: [[0, 12], [1000, 16], [1500, 17.5], [2000, 18.8], [2500, 19.5], [3000, 19.3], [3500, 18.5], [3800, 17.8], [4000, 16], [4500, 10]],
+      autoRatios: [1.0], autoRev: 1.0, autoFinal: 4.0, launchRpm: 2600,
+      dragClutch: { rpm0: 1900, rpm1: 2800, kc: 0.0005, rev: 20, base: [[0, 25]] },
+      CdA: 0.55, bodyPts: kartPts(0.33, 0.42),
+    } },
+    // TaG 125 (IAME X30-type): a water-cooled 125 cc 2-stroke single, ~30 hp at ~14,000, 16,000 rpm limiter, touch-and-go
+    // electric start, centrifugal clutch straight to the axle sprocket, rear brakes only, 158 kg with the driver. ~75 mph
+    tag: { name: 'TaG 125 Kart', short: 'TaG 125', car: 'X30', hp: 30, tq: 12.4, spec: {
+      mass: 158, Ipitch: 28, Iyaw: 36, Iroll: 12, cgHeight: 0.3, wheelbase: 1.04, frontWeight: 0.42,
+      trackF: 1.12, trackR: 1.38, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.02, wheelInertiaR: 0.05,
+      frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 0, brakeTorqueR: 180,
+      idleRpm: 2800, limiterRpm: 16000, redlineRpm: 15500, engineInertia: 0.006, fricA: 0.8, fricB: 0.25, starterTorque: 4,
+      torqueCurve: [[0, 2], [4000, 5], [6000, 7.5], [8000, 9.8], [10000, 11.6], [11500, 12.4], [13000, 12.0], [14000, 11.3], [15000, 10.2],
+        [15750, 9.3], [16500, 7.5], [17500, 4]],
+      autoRatios: [1.0], autoRev: 1.0, autoFinal: 7.0, launchRpm: 8000,
+      // (the centrifugal clutch bites around 8,000: it slips on the launch with the engine up in its powerband)
+      dragClutch: { rpm0: 6500, rpm1: 9500, kc: 0.000012, rev: 6, base: [[0, 6]] },
+      CdA: 0.42, bodyPts: kartPts(0.3, 0.42),
+    } },
+    // KZ2 shifter: a 125 cc 2-stroke single with a 6-speed sequential box, ~48 hp at 13,500, brakes on all four wheels,
+    // 175 kg with the driver. Clutchless upshifts in ~40 ms. 0-60 in ~3 s, ~90+ mph
+    kz: { name: 'KZ2 Shifter Kart', short: 'KZ Shifter', car: 'KZ 125', hp: 48, tq: 20, spec: {
+      mass: 175, Ipitch: 30, Iyaw: 38, Iroll: 13, cgHeight: 0.3, wheelbase: 1.05, frontWeight: 0.42,
+      trackF: 1.14, trackR: 1.4, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.022, wheelInertiaR: 0.05,
+      frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 110, brakeTorqueR: 170,
+      idleRpm: 2800, limiterRpm: 14500, redlineRpm: 14200, shiftRpm: 13900, engineInertia: 0.007, fricA: 1.0, fricB: 0.3, starterTorque: 4,
+      torqueCurve: [[0, 3], [4000, 7], [6000, 10.5], [8000, 14], [10000, 17.5], [11500, 19.6], [12500, 20.0], [13500, 18.8], [14200, 17.2],
+        [15000, 14], [16000, 9]],
+      autoRatios: [2.0, 1.56, 1.29, 1.11, 1.0, 0.92], autoRev: 2.0, autoFinal: 5.3, shiftTimeWOT: 0.04, shiftTimePart: 0.08, shiftCutDepth: 0.45,
+      launchRpm: 9000,
+      dragClutch: { rpm0: 6000, rpm1: 9000, kc: 0.00003, rev: 10, base: [[0, 14]] },
+      CdA: 0.45, bodyPts: kartPts(0.3, 0.42),
+    } },
+  };
+  CARS.kart.make = function (key) {
+    const k = key in CARS.kart.classes ? key : 'tag', c = CARS.kart.classes[k];
+    return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
+      spec: Object.assign({}, CARS.kart.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
+  };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock
@@ -3197,7 +3282,8 @@ class CarSynth {
   }
   newCycle() {
     const c = this.cur, race = c.race || 0, idleN = Math.max(0, 1 - c.rpm / (2300 + 1500 * race));
-    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : 8, sp = 720 / nc;
+    // (singles: a 4-stroke fires once per 720 deg, a 2-stroke every turn - cyl 1 / cyl 2)
+    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 8, sp = 720 / nc;
     // lopey cam: timing scatter at idle, and a weak/strong firing pattern that repeats for a few cycles (the chop)
     const lope = (3 + 6 * idleN) * (1 + 1.2 * race);
     let n = 0;
@@ -3215,7 +3301,7 @@ class CarSynth {
         let j = n++;
         while (j > 0 && this.evA[j - 1] > a) { this.evA[j] = this.evA[j - 1]; this.evE[j] = this.evE[j - 1]; this.evK[j] = this.evK[j - 1]; this.evB[j] = this.evB[j - 1]; j--; }
         // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12: banks alternate evenly
-        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
+        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 2 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
       }
     }
     this.nev = n;
@@ -3265,7 +3351,7 @@ class CarSynth {
     const eDecay = Math.exp(-1 / (sr * (0.0019 - 0.0008 * rpmN) * (1 + 0.9 * deep))), sDecay = Math.exp(-1 / (sr * 0.007 * (1 + 0.6 * deep)));
     const bright = 0.25 + 0.95 * load * Math.min(1, rpm / 4800);
     const g = [(3.1 - 0.7 * rpmN) * (1 + 0.7 * deep), 2.1 * (1 + 0.35 * deep), 1.15 + 0.2 * race, 0.3 + 0.55 * bright + 0.4 * race * bright, 0.06 + 0.3 * bright + 0.28 * race * bright];
-    const bodyOrd = c.cyl === 12 ? 6 : 4;          // each bank's firing order (V8 bank: 2/rev, V12 bank: 3/rev)
+    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
     const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN);   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
@@ -7261,6 +7347,302 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
+<script>/* src/kart.js */
+/* Hellcat Drive — procedural go-karts.
+   Rental: a steel frame inside a full wraparound rubber bumper, a boxy 4-stroke single (fuel tank on top, pull
+   starter), a big plastic seat. TaG 125: a race chassis with nose cone, front fairing and number panel, sidepods and rear
+   bumper, a water-cooled 125 cc 2-stroke beside the seat with its expansion chamber curling back, radiator on the left.
+   KZ shifter: the same with a bigger engine and gearbox, a gear lever by the wheel and front brakes. 5 in wheels,
+   solid rear axle with the sprocket, chain and brake disc, the driver sitting up in the seat.
+   Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
+   Returns the same interface as HCCarModel.build. */
+(function (root) {
+  'use strict';
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+  function build(THREE, opts) {
+    opts = opts || {};
+    const CLS = opts.cls === 'rental' ? 'rental' : opts.cls === 'kz' ? 'kz' : 'tag';
+    const RENT = CLS === 'rental', KZ = CLS === 'kz';
+    const cgH = opts.cgHeight || 0.3, zOff = opts.zOff || 0;
+    const cgToFront = opts.cgToFront || 0.6, cgToRear = opts.cgToRear || 0.44;
+    const L = cgToFront + cgToRear, zF = -L / 2, zR = L / 2;
+    const RR = 0.14, RF = 0.127, WR = 0.18, WF = 0.115;
+    const trackF = opts.trackF || 1.12, trackR = opts.trackR || 1.38;
+    const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || { 'B5 Blue': 0x1e6fc4 };
+    const NUM = RENT ? '42' : KZ ? '1' : '23';
+    const rootG = new THREE.Group(); rootG.name = 'kart';
+    const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const toRoot = (v) => v.clone().add(V3(0, -cgH, zOff));
+
+    // ---------------------------------------------------------------- helpers
+    function canvasTex(w, h, draw) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+      draw(g, w, h);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+    }
+    const add = (parent, geo, mat, x, y, z, rx, ry, rz, cast) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = cast !== false; m.receiveShadow = true;
+      parent.add(m); return m;
+    };
+    function rbox(w, h, d, r) {
+      r = Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3);
+      const s = new THREE.Shape(), x0 = -w / 2 + r, y0 = -h / 2 + r, x1 = w / 2 - r, y1 = h / 2 - r;
+      s.moveTo(x0, -h / 2 + r); s.lineTo(x0, y1); s.lineTo(x1, y1); s.lineTo(x1, y0); s.lineTo(x0, y0);
+      const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+      g.translate(0, 0, -(d - 2 * r) / 2); return g;
+    }
+    const tubeAB = (parent, a, b, r, mat, seg) => {
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = add(parent, new THREE.CylinderGeometry(r, r, len, seg || 10), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      return m;
+    };
+    const pipe = (parent, pts, r, mat, closed) => add(parent, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, !!closed), pts.length * 10, r, 12, !!closed), mat, 0, 0, 0);
+    const cylX = (r0, r1, len, seg, open) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24, 1, !!open); g.rotateZ(Math.PI / 2); return g; };
+    function latheX(pts, seg) { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg || 40); g.rotateZ(-Math.PI / 2); return g; }
+    // a smooth plastic panel: a rounded outline in (x, y) extruded d thick
+    function panel(pts, d, bevel) {
+      const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]);
+      const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelThickness: bevel || 0.012, bevelSize: bevel || 0.012, bevelSegments: 3, curveSegments: 6 });
+      g.translate(0, 0, -d / 2); return g;
+    }
+
+    // ---------------------------------------------------------------- materials
+    const M = {};
+    M.paint = new THREE.MeshPhysicalMaterial({ color: PAINTS[opts.paint] || 0x1e6fc4, metalness: 0.05, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.1 });
+    M.frame = new THREE.MeshStandardMaterial({ color: RENT ? 0xf2c200 : KZ ? 0x303236 : 0xd9dbde, roughness: RENT ? 0.45 : 0.18, metalness: RENT ? 0.2 : 0.9 });
+    M.black = new THREE.MeshStandardMaterial({ color: 0x141415, roughness: 0.6, metalness: 0.1 });
+    M.plastic = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55, metalness: 0.05 });
+    M.rubber = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
+    M.bumper = new THREE.MeshStandardMaterial({ color: 0x202224, roughness: 0.75 });
+    M.alu = new THREE.MeshStandardMaterial({ color: 0xb4b8be, roughness: 0.35, metalness: 0.85 });
+    M.mag = new THREE.MeshStandardMaterial({ color: RENT ? 0x9ca0a6 : 0xd7d9dc, roughness: 0.3, metalness: 0.8 });
+    M.cast = new THREE.MeshStandardMaterial({ color: 0x5f6268, roughness: 0.5, metalness: 0.7 });
+    M.chrome = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.08, metalness: 1 });
+    M.pipe = new THREE.MeshStandardMaterial({ color: 0x7c7266, roughness: 0.45, metalness: 0.8 });
+    M.red = new THREE.MeshStandardMaterial({ color: 0xc81a1a, roughness: 0.4, metalness: 0.3 });
+    M.engRed = new THREE.MeshStandardMaterial({ color: 0xb01818, roughness: 0.45, metalness: 0.3 });
+    M.tank = new THREE.MeshPhysicalMaterial({ color: 0x8fb7cf, roughness: 0.2, transparent: true, opacity: 0.75, depthWrite: false });
+    M.suit = new THREE.MeshStandardMaterial({ color: RENT ? 0x2a3440 : 0x1b1d22, roughness: 0.8 });
+    M.helmet = new THREE.MeshPhysicalMaterial({ color: RENT ? 0x202020 : 0xf2f2f2, roughness: 0.25, clearcoat: 1 });
+    M.visor = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.05, metalness: 0.8 });
+    M.rad = new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.5, metalness: 0.6 });
+    M.tail = new THREE.MeshStandardMaterial({ color: 0x3a0306, emissive: 0xff1010, emissiveIntensity: 0.3, roughness: 0.3 });
+    const numTex = canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = RENT ? '#f2c200' : '#f4f4f0'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#111'; g.font = '900 170px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(NUM, w / 2, h / 2 + 8);
+    });
+    M.num = new THREE.MeshStandardMaterial({ map: numTex, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2 });
+
+    // ---------------------------------------------------------------- chassis (30 mm tube)
+    const chassis = new THREE.Group(); model.add(chassis);
+    const T = (a, b, r) => tubeAB(chassis, a, b, r || 0.015, M.frame, 10);
+    const y0 = 0.05, zNose = -0.98, zTail = zR + 0.22;
+    for (const sx of [-1, 1]) {
+      // main rails: narrow at the front axle, out round the seat, back to the rear axle bearings
+      T(V3(sx * 0.2, y0, zNose + 0.12), V3(sx * 0.27, y0, zF - 0.02)); T(V3(sx * 0.27, y0, zF - 0.02), V3(sx * 0.33, y0, -0.1));
+      T(V3(sx * 0.33, y0, -0.1), V3(sx * 0.36, y0, zR - 0.02)); T(V3(sx * 0.36, y0, zR - 0.02), V3(sx * 0.28, y0 + 0.02, zTail - 0.05));
+      // front stub axles' mounts (C-brackets) and the nerf bar tubes out to the sidepods
+      T(V3(sx * 0.27, y0, zF), V3(sx * (trackF / 2 - 0.1), RF - 0.01, zF), 0.017);
+      T(V3(sx * 0.33, y0, -0.35), V3(sx * 0.62, y0 + 0.03, -0.3)); T(V3(sx * 0.62, y0 + 0.03, -0.3), V3(sx * 0.62, y0 + 0.03, 0.25));
+      T(V3(sx * 0.62, y0 + 0.03, 0.25), V3(sx * 0.36, y0, 0.3));
+      // seat stays up to the seat's upper edge
+      T(V3(sx * 0.33, y0, 0.3), V3(sx * 0.16, 0.36, 0.38), 0.011);
+    }
+    for (const z of [zNose + 0.12, zF - 0.02, -0.1, zR - 0.02]) { const hw = z < zF ? 0.2 : z < -0.05 ? 0.3 : 0.35; T(V3(-hw, y0, z), V3(hw, y0, z), 0.013); }
+    // floor tray under the driver's legs
+    add(chassis, rbox(0.52, 0.01, 0.72, 0.004), M.plastic, 0, y0 - 0.012, -0.55);
+    // rear axle (50 mm) with the bearings, brake disc and caliper, and the sprocket on the engine side
+    add(chassis, cylX(0.025, 0.025, trackR - 0.12, 16), M.alu, 0, RR, zR);
+    for (const sx of [-1, 1]) add(chassis, rbox(0.06, 0.09, 0.07, 0.01), M.cast, sx * 0.36, RR, zR);
+    add(chassis, cylX(0.095, 0.095, 0.008, 28), M.alu, -0.2, RR, zR); add(chassis, rbox(0.04, 0.07, 0.08, 0.01), M.red, -0.2, RR + 0.08, zR);
+    add(chassis, cylX(0.075, 0.075, 0.006, 28), M.cast, 0.26, RR, zR);
+
+    // ---------------------------------------------------------------- bodywork
+    const body = new THREE.Group(); model.add(body);
+    if (RENT) {
+      // full wraparound bumper: a fat rubber ring round the whole kart, on stays from the frame
+      const ring = [], hx = 0.83, zb0 = -1.04, zb1 = zTail + 0.12, rc = 0.2;
+      const corner = (cx, cz, a0) => { for (let k = 0; k <= 5; k++) { const a = a0 + k * Math.PI / 10; ring.push(V3(cx + Math.cos(a) * rc, 0.16, cz + Math.sin(a) * rc)); } };
+      corner(hx - rc, zb1 - rc, 0); corner(-hx + rc, zb1 - rc, Math.PI / 2); corner(-hx + rc, zb0 + rc, Math.PI); corner(hx - rc, zb0 + rc, 1.5 * Math.PI);
+      pipe(body, ring, 0.075, M.bumper, true);
+      for (const [x, z] of [[0.6, zb0 + 0.1], [-0.6, zb0 + 0.1], [0.78, -0.1], [-0.78, -0.1], [0.6, zb1 - 0.08], [-0.6, zb1 - 0.08]]) T(V3(Math.sign(x) * 0.3, y0 + 0.02, z * 0.8), V3(x, 0.16, z), 0.014);
+      // seat: a big moulded plastic bucket
+      add(body, rbox(0.46, 0.08, 0.44, 0.04), M.plastic, -0.02, 0.1, 0.2);
+      add(body, rbox(0.46, 0.5, 0.08, 0.04), M.plastic, -0.02, 0.36, 0.44, -0.3, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.06, 0.24, 0.44, 0.03), M.plastic, sx * 0.23 - 0.02, 0.2, 0.22);
+      // front panel with the number
+      add(body, rbox(0.42, 0.34, 0.04, 0.03), M.paint, 0, 0.26, -0.62, 0.25, 0, 0);
+      add(body, new THREE.PlaneGeometry(0.2, 0.2), M.num, 0, 0.26 + 0.247 * 0.036, -0.62 - 0.969 * 0.036, 0.25, Math.PI, 0, false);
+    } else {
+      // nose cone: a rounded bumper fairing across the front
+      // (its front silhouette, extruded fore and aft with rounded edges)
+      add(body, panel([[-0.5, 0.0], [0.5, 0.0], [0.56, 0.08], [0.48, 0.17], [0.22, 0.22], [-0.22, 0.22], [-0.48, 0.17], [-0.56, 0.08]], 0.18, 0.03), M.paint, 0, 0.05, -0.91);
+      add(body, rbox(0.96, 0.04, 0.2, 0.015), M.plastic, 0, 0.05, -0.91);
+      // front fairing between the legs and the nose, number panel on it
+      // (leaning back towards the driver; the number faces forward on it)
+      add(body, rbox(0.36, 0.3, 0.04, 0.03), M.paint, 0, 0.24, -0.66, 0.35, 0, 0);
+      add(body, new THREE.PlaneGeometry(0.2, 0.2), M.num, 0, 0.24 + 0.343 * 0.036, -0.66 - 0.94 * 0.036, 0.35, Math.PI, 0, false);
+      // sidepods
+      for (const sx of [-1, 1]) {
+        const pod = add(body, rbox(0.26, 0.16, 0.74, 0.05), M.paint, sx * 0.56, 0.13, -0.03);
+        pod.rotation.y = sx * 0.04;
+        add(body, rbox(0.2, 0.02, 0.6, 0.01), M.plastic, sx * 0.56, 0.215, -0.03);
+      }
+      // rear bumper: a moulded plastic bar across the back
+      add(body, rbox(1.46, 0.16, 0.12, 0.05), M.plastic, 0, 0.15, zTail + 0.08);
+      for (const sx of [-1, 1]) T(V3(sx * 0.28, y0 + 0.02, zTail - 0.05), V3(sx * 0.5, 0.13, zTail + 0.06), 0.013);
+      // race seat: a narrow fiberglass shell
+      add(body, rbox(0.36, 0.06, 0.34, 0.03), M.black, -0.03, 0.08, 0.18);
+      add(body, rbox(0.38, 0.46, 0.06, 0.03), M.black, -0.03, 0.32, 0.4, -0.35, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.04, 0.2, 0.36, 0.02), M.black, sx * 0.19 - 0.03, 0.16, 0.2);
+      // fuel tank between the legs
+      add(body, rbox(0.16, 0.12, 0.2, 0.05), M.tank, 0, 0.11, -0.38, 0, 0, 0, false);
+    }
+
+    // ---------------------------------------------------------------- engine beside the seat (right), chain to the axle
+    const eng = new THREE.Group(); model.add(eng);
+    const ex = 0.37, ez = 0.18;
+    const tips = [];
+    if (RENT) {
+      // 4-stroke single: crankcase, slanted cylinder with fins under a shroud, fuel tank on top, pull starter, muffler
+      add(eng, rbox(0.28, 0.2, 0.3, 0.03), M.engRed, ex, 0.2, ez);
+      add(eng, rbox(0.24, 0.18, 0.2, 0.03), M.black, ex + 0.02, 0.36, ez - 0.02, 0, 0, -0.35);
+      add(eng, rbox(0.26, 0.1, 0.3, 0.04), M.engRed, ex - 0.01, 0.5, ez);
+      add(eng, new THREE.CylinderGeometry(0.03, 0.03, 0.04, 12), M.black, ex - 0.01, 0.57, ez + 0.05);
+      const st = add(eng, cylX(0.1, 0.1, 0.04, 24), M.black, ex + 0.16, 0.26, ez); st.castShadow = true;
+      add(eng, rbox(0.12, 0.12, 0.26, 0.04), M.cast, ex + 0.08, 0.2, ez + 0.28);
+      const mf = V3(ex + 0.08, 0.2, ez + 0.42); tips.push(toRoot(mf));
+    } else {
+      // 2-stroke single: crankcase (and the 6-speed box for the KZ), finned-looking head, carb + airbox, water pump
+      add(eng, rbox(KZ ? 0.24 : 0.2, 0.18, KZ ? 0.3 : 0.22, 0.03), M.cast, ex, 0.17, ez);
+      const cyl = add(eng, rbox(0.14, 0.16, 0.14, 0.03), M.alu, ex, 0.32, ez - 0.03); cyl.rotation.x = -0.35;
+      add(eng, rbox(0.15, 0.05, 0.15, 0.02), M.cast, ex, 0.41, ez - 0.07, -0.35, 0, 0);
+      add(eng, new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), M.black, ex, 0.46, ez - 0.08);                 // plug cap
+      add(eng, cylX(0.035, 0.035, 0.08, 16), M.cast, ex - 0.12, 0.28, ez);                                     // carb
+      add(eng, rbox(0.14, 0.14, 0.2, 0.05), M.black, ex - 0.12, 0.34, ez + 0.2);                             // airbox (behind the seat)
+      tubeAB(eng, V3(ex - 0.12, 0.28, ez), V3(ex - 0.12, 0.32, ez + 0.12), 0.03, M.black);
+      if (KZ) { add(eng, cylX(0.07, 0.07, 0.04, 20), M.alu, ex + 0.13, 0.18, ez + 0.05); tubeAB(eng, V3(0.16, 0.2, -0.42), V3(0.2, 0.42, -0.4), 0.008, M.alu); add(eng, new THREE.SphereGeometry(0.02, 10, 8), M.black, 0.2, 0.43, -0.4); }
+      // expansion chamber: out of the cylinder, down and swelling, back along the right side to the silencer
+      const e0 = V3(ex + 0.02, 0.3, ez - 0.14), segs = [[e0, 0.022], [V3(ex + 0.1, 0.18, ez - 0.22), 0.028], [V3(ex + 0.2, 0.12, ez - 0.12), 0.045],
+        [V3(ex + 0.25, 0.13, ez + 0.08), 0.058], [V3(ex + 0.26, 0.15, ez + 0.26), 0.05], [V3(ex + 0.24, 0.17, ez + 0.42), 0.028]];
+      for (let i = 0; i < segs.length - 1; i++) { const [a, ra] = segs[i], [b, rb] = segs[i + 1]; const m = tubeAB(eng, a, b, (ra + rb) / 2, M.pipe, 14); m.geometry = new THREE.CylinderGeometry(rb, ra, a.distanceTo(b), 14); }
+      const sil0 = V3(ex + 0.24, 0.17, ez + 0.42), sil1 = V3(ex + 0.2, 0.22, zTail + 0.02);
+      tubeAB(eng, sil0, sil1, 0.042, M.alu, 16);
+      tips.push(toRoot(sil1.clone().add(V3(0, 0, 0.03))));
+      // radiator on the left of the seat, hoses across
+      add(eng, rbox(0.04, 0.28, KZ ? 0.34 : 0.28, 0.01), M.rad, -0.4, 0.28, 0.08);
+      tubeAB(eng, V3(-0.38, 0.22, 0.2), V3(ex - 0.08, 0.2, ez + 0.02), 0.012, M.black);
+    }
+    // chain from the engine sprocket back to the axle sprocket
+    const csy = RENT ? 0.2 : 0.16;
+    tubeAB(eng, V3(0.26, csy + 0.03, ez + 0.02), V3(0.26, RR + 0.072, zR), 0.006, M.black, 6);
+    tubeAB(eng, V3(0.26, csy - 0.03, ez + 0.02), V3(0.26, RR - 0.072, zR), 0.006, M.black, 6);
+    add(eng, cylX(0.03, 0.03, 0.012, 16), M.cast, 0.26, csy, ez + 0.02);
+
+    // ---------------------------------------------------------------- driver
+    const driver = new THREE.Group(); model.add(driver);
+    const sY = 0.12, sZ = 0.26;
+    add(driver, rbox(0.36, 0.48, 0.24, 0.1), M.suit, -0.03, sY + 0.3, sZ + 0.02, -0.3, 0, 0);
+    for (const sx of [-1, 1]) {
+      tubeAB(driver, V3(sx * 0.16 - 0.03, sY + 0.46, sZ - 0.02), V3(sx * 0.14, sY + 0.34, sZ - 0.38), 0.042, M.suit);
+      add(driver, new THREE.SphereGeometry(0.038, 10, 8), M.black, sx * 0.14, sY + 0.36, sZ - 0.42);
+      tubeAB(driver, V3(sx * 0.1 - 0.03, sY + 0.08, sZ - 0.05), V3(sx * 0.12, sY + 0.16, sZ - 0.5), 0.058, M.suit);
+      tubeAB(driver, V3(sx * 0.12, sY + 0.16, sZ - 0.5), V3(sx * 0.1, sY + 0.02, sZ - 0.95), 0.045, M.suit);
+      add(driver, rbox(0.08, 0.1, 0.16, 0.03), M.black, sx * 0.1, sY - 0.01, sZ - 0.98);
+    }
+    tubeAB(driver, V3(-0.03, sY + 0.52, sZ + 0.06), V3(-0.03, sY + 0.64, sZ - 0.02), 0.05, M.suit);                  // neck
+    add(driver, new THREE.SphereGeometry(0.14, 24, 16), M.helmet, -0.03, sY + 0.72, sZ - 0.04);
+    { const vg = new THREE.SphereGeometry(0.143, 24, 12, -Math.PI / 2 - 0.85, 1.7, 1.25, 0.5); add(driver, vg, M.visor, -0.03, sY + 0.72, sZ - 0.04, 0, 0, 0, false); }
+    if (!RENT) add(driver, new THREE.BoxGeometry(0.014, 0.05, 0.17), M.paint, -0.03, sY + 0.855, sZ - 0.04, 0, 0, 0, false);
+    const eye = V3(-0.03, sY + 0.69, sZ - 0.1);
+
+    // ---------------------------------------------------------------- steering wheel with a data display
+    const clusterCanvas = document.createElement('canvas'); clusterCanvas.width = 512; clusterCanvas.height = 256;
+    const clusterTex = new THREE.CanvasTexture(clusterCanvas); clusterTex.colorSpace = THREE.SRGBColorSpace;
+    const colG = new THREE.Group(); colG.position.set(0, sY + 0.41, sZ - 0.47); colG.rotation.x = -0.95; model.add(colG);
+    tubeAB(model, V3(0, 0.07, -0.78), V3(0, sY + 0.36, sZ - 0.47), 0.012, M.frame, 8);
+    const steerWheel = new THREE.Group(); colG.add(steerWheel);
+    add(steerWheel, new THREE.TorusGeometry(0.15, 0.016, 10, 30), M.black, 0, 0, 0);
+    for (let k = 0; k < 3; k++) { const sp = add(steerWheel, new THREE.BoxGeometry(0.016, 0.15, 0.008), M.alu, 0, 0, 0.004); sp.rotation.z = k * 2.094 + Math.PI; sp.geometry.translate(0, 0.075, 0); }
+    add(steerWheel, rbox(0.14, 0.07, 0.02, 0.008), M.black, 0, 0.03, 0.012);
+    add(steerWheel, new THREE.PlaneGeometry(0.12, 0.06), new THREE.MeshBasicMaterial({ map: clusterTex, toneMapped: false }), 0, 0.03, 0.0235, 0, 0, 0, false);
+
+    // ---------------------------------------------------------------- wheels
+    const tyreR = latheX([[0.068, -0.09], [0.085, -0.094], [0.11, -0.092], [0.13, -0.08], [RR, -0.06], [RR, 0.06], [0.13, 0.08], [0.11, 0.092], [0.085, 0.094], [0.068, 0.09]], 36);
+    const tyreF = latheX([[0.066, -0.057], [0.085, -0.06], [0.108, -0.056], [RF - 0.006, -0.042], [RF, -0.03], [RF, 0.03], [RF - 0.006, 0.042], [0.108, 0.056], [0.085, 0.06], [0.066, 0.057]], 36);
+    function rim(g, w) {
+      const barrel = new THREE.CylinderGeometry(0.066, 0.066, w * 0.95, 28, 1, true); barrel.rotateZ(Math.PI / 2); add(g, barrel, M.mag, 0, 0, 0);
+      const face = new THREE.CylinderGeometry(0.066, 0.066, 0.008, 28); face.rotateZ(Math.PI / 2); add(g, face, M.mag, w * 0.3, 0, 0);
+      for (let k = 0; k < 3; k++) { const a = k * 2.094; const n = new THREE.CylinderGeometry(0.006, 0.006, 0.02, 6); n.rotateZ(Math.PI / 2); add(g, n, M.chrome, w * 0.3 + 0.01, Math.cos(a) * 0.035, Math.sin(a) * 0.035, 0, 0, 0, false); }
+      add(g, cylX(0.018, 0.022, 0.03, 12), M.alu, w * 0.3 + 0.01, 0, 0);
+    }
+    const wheels = [];
+    for (let i = 0; i < 4; i++) {
+      const frontW = i < 2, left = (i & 1) === 0, side = left ? -1 : 1;
+      const corner = new THREE.Group();
+      corner.position.set(side * (frontW ? trackF : trackR) / 2, (frontW ? RF : RR) - cgH, (frontW ? -cgToFront : cgToRear));
+      rootG.add(corner);
+      const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
+      const spin = new THREE.Group(); flip.add(spin);
+      if (frontW) {
+        add(spin, tyreF, M.rubber, 0, 0, 0); rim(spin, WF);
+        // spindle and kingpin (steers, doesn't spin), a brake disc on the KZ
+        add(flip, cylX(0.012, 0.012, 0.12, 8), M.chrome, -0.07, 0, 0);
+        add(flip, new THREE.CylinderGeometry(0.014, 0.014, 0.11, 8), M.frame, -0.13, 0.01, 0);
+        if (KZ) { add(flip, cylX(0.075, 0.075, 0.005, 24), M.cast, -0.06, 0, 0); add(flip, rbox(0.03, 0.05, 0.06, 0.008), M.red, -0.06, 0.06, 0); }
+      } else { add(spin, tyreR, M.rubber, 0, 0, 0); rim(spin, WR); }
+      wheels.push({ corner, flip, spin, left, front: frontW, side });
+    }
+    // tie rods from the column to the spindles (static - a little artistic licence)
+    for (const sx of [-1, 1]) tubeAB(model, V3(0, 0.1, -0.74), V3(sx * (trackF / 2 - 0.16), 0.11, zF + 0.05), 0.007, M.chrome, 6);
+
+    // ---------------------------------------------------------------- lights (rental: a strip light; none on race karts)
+    const headlights = [];
+    if (RENT) { const tl = add(body, rbox(0.2, 0.05, 0.02, 0.01), M.tail, 0, 0.18, zTail + 0.12); tl.castShadow = false; }
+
+    // ---------------------------------------------------------------- the data display on the wheel
+    const cgx = clusterCanvas.getContext('2d');
+    function drawCluster(t) {
+      const g = cgx, w = 512, h = 256;
+      g.fillStyle = '#0a0c0e'; g.fillRect(0, 0, w, h);
+      // shift lights across the top
+      const r = clamp(t.rpm / (t.redline || 14000), 0, 1.1);
+      for (let k = 0; k < 10; k++) { g.fillStyle = r > 0.6 + k * 0.04 ? (k < 5 ? '#29ff5a' : k < 8 ? '#ffd21a' : '#ff2a1a') : '#1b1f22'; g.fillRect(16 + k * 48, 12, 40, 22); }
+      g.fillStyle = '#e8f0f4'; g.font = 'bold 110px "Courier New", monospace'; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(String(Math.round(t.rpm)).padStart(5, ' '), 12, 120);
+      g.font = 'bold 44px Arial'; g.fillStyle = '#8fb2c6'; g.fillText('RPM', 400, 96);
+      g.fillStyle = '#ffffff'; g.font = 'bold 80px Arial'; g.textAlign = 'right'; g.fillText(t.gear.replace(/^[DM]/, '') || 'D', 500, 150);
+      g.textAlign = 'left'; g.font = 'bold 50px Arial'; g.fillStyle = '#e8f0f4'; g.fillText(Math.round(t.speedMph) + ' MPH', 16, 212);
+      g.fillStyle = '#8fb2c6'; g.font = '30px Arial'; g.fillText(Math.round(t.water) + '°F', 320, 212);
+      clusterTex.needsUpdate = true;
+    }
+    function drawScreen() {}
+    function setPaint(name) { const c = PAINTS[name]; if (c === undefined) return; M.paint.color.setHex(c); }
+    function setLights(o) { M.tail.emissiveIntensity = o.brake ? 4 : (o.night ? 1 : 0.3); }
+    function setInteriorVisible(v, cockpit) { driver.visible = !cockpit; }
+    function setTransmission() {}
+    function setTires() {}
+    function setChute() {}
+
+    rootG.traverse((o) => { if (o.isMesh && o.material && o.material.transparent) o.castShadow = false; });
+    return {
+      root: rootG, model, exterior: model, interior: model, wheels, steerWheel, eye: toRoot(eye),
+      exhaustTips: tips, materials: M, headlights, tailLens: [], mirrors: [],
+      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, variant: 'kart', cls: CLS,
+    };
+  }
+
+  root.HCKart = { build };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
 <script>/* src/worldrender.js */
 /* Hellcat Drive — world rendering: streamed LOD terrain chunks (roads drawn per-pixel in the terrain shader),
    instanced vegetation / rocks, farm buildings, power lines, signs, water, sky and lighting presets. */
@@ -8966,7 +9348,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -8982,7 +9364,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
-    car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf',
+    car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -9012,23 +9394,25 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
-  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster';
-  const BIG = PULLER || DRAGSTER || MONSTER;             // race engines: their own sound set-up, rumble and shake
+  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart';
+  const BIG = PULLER || DRAGSTER || MONSTER || KART;     // race engines: their own sound set-up, rumble and shake
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
+    : KART ? VEH.CARS.kart.make(S.kartClass)
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
   const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
-  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER;   // factory-fixed driveline and tyres
+  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER || KART;   // factory-fixed driveline and tyres
   // chase camera: distance / height scale (the tractor is 7 m long and 2.4 m tall; a dragster is 9 m long with its
   // wing 2.2 m up, so the camera sits further back and higher to see over it)
   // (the monster truck is 12 ft tall and 12.5 ft wide: further back and well up)
-  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : 1;
+  // (a kart is 6 ft long and sits a foot off the ground: in close and low)
+  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
-  const OFFROAD = () => !PULLER && !DRAGSTER && !MONSTER && !!(S.offroad && S.offroad[S.car]);   // KO2 all-terrains + lift, saved per car
+  const OFFROAD = () => !PULLER && !DRAGSTER && !MONSTER && !KART && !!(S.offroad && S.offroad[S.car]);   // KO2 all-terrains + lift, saved per car
   const tireF = () => (OFFROAD() ? 'offroad' : FIXED ? carSpec.frontTire : 'street');
   const tireR = () => (OFFROAD() ? 'offroad' : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
@@ -9049,7 +9433,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     mass: STOCK.mass, grip: 1, downforce: 0, drag: 1, brakes: 1, stiff: 1, steer: 1, gravity: 1, smoke: 1,
   });
   S.tune = S.tune || {};
-  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : S.car;
+  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : S.car;
   const tune = Object.assign(tuneDefaults(), S.tune[TKEY] || {});
   S.tune[TKEY] = tune;
   function applyTune() {
@@ -9114,7 +9498,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   };
   const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
   const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
-    : MONSTER ? MON.build(THREE, carOpts) : CAR.build(THREE, carOpts);
+    : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls })) : CAR.build(THREE, carOpts);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -9189,6 +9573,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (PULLER) setTimeout(() => hud.hint('Pulling tractor: shift up (E) for DRIVE, hold SPACE and floor it, let go of SPACE to dump the clutch. On dirt it stands up on its weight bar — lift to steer! Ease into the throttle in turns.', 9), 1600);
     else if (DRAGSTER) setTimeout(() => hud.hint(CARDEF.short + ' dragster: shift up (E) for DRIVE. Burnout: hold B and floor it (it rolls — no front brakes). Stage, hold SPACE (clutch pedal) and floor it, let go on green. '
       + (DRAGMAP ? 'The chutes pop by themselves past the ' + (FINISH === 1000 ? '1,000 ft' : '¼ mile') + ' line (F pulls them).' : 'It lives on the Drag Strip map (Esc → Drive → Map).'), 11), 1600);
+    else if (KART) setTimeout(() => hud.hint('Go-kart: shift up (E) for DRIVE and floor it. No suspension and a solid rear axle: brake in a straight line, turn in smoothly, let it roll through the corner.'
+      + (CARDEF.cls === 'kz' ? ' KZ shifter: 6 gears - E / Q or the paddles (M holds it in manual).' : CARDEF.cls === 'tag' ? ' The clutch grabs around 8,000 rpm - keep it screaming.' : ''), 10), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it. Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
@@ -9244,6 +9630,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         ['tf', 'Top Fuel', '11,000 hp nitromethane HEMI · direct drive · 1,000 ft in ~3.64 s @ 335+ mph · 0-100 mph in 0.8 s', 'Pitch Black'],
         ['fc', 'Funny Car', 'The same 11,000 hp nitro HEMI under a carbon flip-top body · 125 in wheelbase · wheelie bars · 1,000 ft in ~3.88 s @ 330 mph', 'TorRed'],
         ['tad', 'Top Alcohol', '3,900 hp blown methanol HEMI · 2-speed · ¼ mile in ~5.2 s @ 275 mph', 'Frostbite'],
+      ] },
+    { id: 'kart', name: 'GO-KARTS', paint: 'B5 Blue',
+      sub: 'Rental, TaG 125 and KZ shifter karts · 2-stroke screamers to 16,000 rpm · no suspension, solid rear axle · 1.3 g in the corners',
+      desc: 'A tube frame a few inches off the ground, an engine beside the seat driving the rear axle by chain, direct steering and slicks the size of dinner plates. No suspension and no differential - the frame flexes, the inside rear tyre lifts, and you feel every ripple. The rental kart is slow and forgiving behind its wraparound bumper; the TaG 125 is a proper race kart; the KZ shifter is a 48 hp, 6-speed rocket that brakes on all four wheels.',
+      btn: 'GO-KART', tc: 3, optKey: 'kartClass', options: [
+        ['rental', 'Rental kart', '390 cc 4-stroke · ~13 hp · centrifugal clutch · wraparound bumper · hard tyres · ~31 mph', 'Go Mango'],
+        ['tag', 'TaG 125', 'X30-type 125 cc 2-stroke · ~30 hp at 14,000 · centrifugal clutch · 158 kg · ~74 mph', 'B5 Blue'],
+        ['kz', 'KZ shifter', '125 cc 2-stroke · ~48 hp · 6-speed sequential · 4-wheel brakes · 0-60 in ~4 s · ~95 mph', 'TorRed'],
       ] },
     { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
@@ -9430,6 +9824,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           })));
         add(row('Making a pass', 'Burnout: hold B and floor it — no front brakes, so it rolls forward spinning its wet slicks (that\'s the heat they need). Back up (X / reverse, it creeps). Stage, hold SPACE (clutch pedal in) and floor it, let go of SPACE on green. The clutch slips by design — the engine sits near 7,000 rpm and climbs as the clutch locks up. Lift at the finish; the chutes pop by themselves (F pulls them).', el('<span></span>')));
         add(row('Staying straight', 'Traction control on Track (the default) plays crew chief: it backs off the clutch and timing when the slicks start to spin. Off is the real thing — on plain asphalt it goes up in smoke and swaps ends.', el('<span></span>')));
+      }
+      if (KART) {
+        add(row(CARDEF.name, CARDEF.cls === 'kz' ? '125 cc 2-stroke single, ~48 hp at 13,500, 14,500 limiter · 6-speed sequential (E / Q, paddles) · brakes on all four wheels · 175 kg with the driver · slicks'
+          : CARDEF.cls === 'tag' ? 'Water-cooled 125 cc 2-stroke single, ~30 hp at 14,000, 16,000 limiter · centrifugal clutch straight to the axle · rear brake only · 158 kg with the driver · slicks'
+          : '390 cc 4-stroke single, ~13 hp, governed · centrifugal clutch · one rear disc · hard long-life tyres · 235 kg with the driver', el('<span></span>')));
+        add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
+          seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
+            if (v !== CARDEF.cls) { const o = MORE_CARS.find((x) => x.id === 'kart').options.find((x) => x[0] === v); if (o && o[3]) S.paint = o[3]; S.kartClass = v; saveS(); location.reload(); }
+          })));
+        add(row('Driving a kart', 'No suspension, no differential: the tyres and the flexing frame do everything. Brake in a straight line (the rear-braked karts lock up easily), turn in smoothly and carry the speed - scrubbing the fronts or sliding the rear costs time. Slicks need a lap to warm up.', el('<span></span>')));
       }
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
@@ -9872,7 +10276,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       car.root.localToWorld(_v);
       camera.position.copy(_v);
       yawQ.setFromAxisAngle(Y, cam.headYaw + cam.orbitYaw);
-      pitchQ.setFromAxisAngle(X, -0.1 - cam.orbitPitch * 0.8);
+      pitchQ.setFromAxisAngle(X, (KART ? -0.17 : -0.1) - cam.orbitPitch * 0.8);
       camQ.copy(car.root.quaternion).multiply(yawQ).multiply(pitchQ);
       camera.quaternion.copy(camQ);
       camera.fov = S.fov;
@@ -9897,7 +10301,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -9910,7 +10314,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // open cockpit (the V12s' gear-driven centrifugal blowers scream instead of whining)
   // (dragsters: one open-header blown HEMI a few feet behind your head - nitro is a ragged, crackling, earth-shaking
   // roar with a lumpy, misfiring idle; methanol a little cleaner and higher-revving)
-  const ENG_SND = MONSTER ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
+  // (karts: singles - a 4-stroke thumper for the rental, 2-strokes that ring to 14-16,000 through tiny expansion chambers)
+  const ENG_SND = KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
+      : CARDEF.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15 }
+      : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15 })
+    : MONSTER ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
     : DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
     : !PULLER ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
@@ -9987,9 +10395,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     hud.setInputs(veh.input.throttle, veh.input.brake, input.state.clutch, input.source === 'wheel' ? input.raw.steer : input.state.steer);
     const chips = [
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
-      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
-      { html: MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
+      { html: KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
+      { html: KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });

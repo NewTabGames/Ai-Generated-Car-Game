@@ -82,7 +82,8 @@ class CarSynth {
   }
   newCycle() {
     const c = this.cur, race = c.race || 0, idleN = Math.max(0, 1 - c.rpm / (2300 + 1500 * race));
-    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : 8, sp = 720 / nc;
+    // (singles: a 4-stroke fires once per 720 deg, a 2-stroke every turn - cyl 1 / cyl 2)
+    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 8, sp = 720 / nc;
     // lopey cam: timing scatter at idle, and a weak/strong firing pattern that repeats for a few cycles (the chop)
     const lope = (3 + 6 * idleN) * (1 + 1.2 * race);
     let n = 0;
@@ -100,7 +101,7 @@ class CarSynth {
         let j = n++;
         while (j > 0 && this.evA[j - 1] > a) { this.evA[j] = this.evA[j - 1]; this.evE[j] = this.evE[j - 1]; this.evK[j] = this.evK[j - 1]; this.evB[j] = this.evB[j - 1]; j--; }
         // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12: banks alternate evenly
-        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
+        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 2 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
       }
     }
     this.nev = n;
@@ -150,7 +151,7 @@ class CarSynth {
     const eDecay = Math.exp(-1 / (sr * (0.0019 - 0.0008 * rpmN) * (1 + 0.9 * deep))), sDecay = Math.exp(-1 / (sr * 0.007 * (1 + 0.6 * deep)));
     const bright = 0.25 + 0.95 * load * Math.min(1, rpm / 4800);
     const g = [(3.1 - 0.7 * rpmN) * (1 + 0.7 * deep), 2.1 * (1 + 0.35 * deep), 1.15 + 0.2 * race, 0.3 + 0.55 * bright + 0.4 * race * bright, 0.06 + 0.3 * bright + 0.28 * race * bright];
-    const bodyOrd = c.cyl === 12 ? 6 : 4;          // each bank's firing order (V8 bank: 2/rev, V12 bank: 3/rev)
+    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
     const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN);   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar

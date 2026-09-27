@@ -147,6 +147,25 @@
     // hand-cut by the crew into deep paddles. They dig into the arena's clay and hook harder than any street tyre
     // (enough to stand the truck on its rear wheels), slide a long way sideways before they let go, and are only so-so
     // on pavement. No temperature to speak of.
+    // Karts: 5 in rims, tiny stiff tyres - 11x7.10-5 rears, 10x4.50-5 fronts. Racing slicks (TaG / KZ) are soft and bite
+    // hard once warm (a kart pulls 2 g on a rubbered-in track) but warm up and fade fast; rental karts run hard,
+    // long-life compounds. Useless on dirt and grass.
+    kartR: { name: 'Racing slick 11x7.10-5', short: 'Kart slicks', width: 0.18, radius: 0.14,
+      muX: 1.7, muY: 1.65, loose: 0.55, kappaPeak: 0.08, alphaPeak: 0.1, relaxX: 0.08, relaxY: 0.12,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 420, cold: 0.84, coldT: 20, warmT: 45, hotT: 80, overheat: 0.006, prep: 1.15,
+      crr: [0.9, 1.5, 1.6, 1.5, 1, 0.9] },
+    kartF: { name: 'Racing slick 10x4.50-5', short: 'Kart slicks', width: 0.115, radius: 0.127,
+      muX: 1.6, muY: 1.62, loose: 0.55, kappaPeak: 0.08, alphaPeak: 0.1, relaxX: 0.07, relaxY: 0.1,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 300, cold: 0.84, coldT: 20, warmT: 45, hotT: 80, overheat: 0.006, prep: 1.15,
+      crr: [0.9, 1.5, 1.6, 1.5, 1, 0.9] },
+    kartRentR: { name: 'Rental hard compound 11x7.10-5', short: 'Rental tyres', width: 0.18, radius: 0.14,
+      muX: 1.25, muY: 1.2, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.08, relaxY: 0.12,
+      B: 1.75, C: 1.4, E: -0.25, heatCap: 900, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
+      crr: [1, 1.5, 1.6, 1.5, 1, 1] },
+    kartRentF: { name: 'Rental hard compound 10x4.50-5', short: 'Rental tyres', width: 0.115, radius: 0.127,
+      muX: 1.2, muY: 1.18, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.07, relaxY: 0.1,
+      B: 1.75, C: 1.4, E: -0.25, heatCap: 650, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
+      crr: [1, 1.5, 1.6, 1.5, 1, 1] },
     monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838,
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
@@ -1820,6 +1839,72 @@
     bodyK: 900000, bodyC: 60000, bodyMu: 0.6,
     tyreEnvelope: true, wheelGyro: true,
   } };
+  // Karts. No suspension (the chassis flexes and the tyres are the springs), a solid rear axle (the inside rear tyre lifts
+  // in a corner, so it's modelled as a loose coupling rather than a spool), direct steering, the driver sitting upright
+  // on the floor tray. The engine sits beside the seat and drives the axle by chain. Pick a class with
+  // CARS.kart.make(key): a 4-stroke rental kart, a 125 cc TaG kart (centrifugal clutch, direct drive) or a KZ shifter.
+  const kartPts = (cg, fw) => {
+    const P = (x, y, z) => [x, y - cg, z + 1.05 * (fw - 0.5)];
+    return [P(-0.45, 0.12, -0.98), P(0.45, 0.12, -0.98), P(-0.68, 0.1, 0.82), P(0.68, 0.1, 0.82), P(-0.7, 0.1, 0), P(0.7, 0.1, 0),
+      P(-0.6, 0.12, -0.55), P(0.6, 0.12, -0.55), P(0, 0.03, -0.3), P(0, 0.03, 0.4), P(0, 0.98, 0.1), P(-0.2, 0.75, 0.15), P(0.2, 0.75, 0.15)];
+  };
+  CARS.kart = { name: 'Kart', short: 'Kart', more: true, spec: {
+    name: 'Kart', Fz0: 650, loadSens: 0.12,
+    springF: 55000, springR: 65000, dampBumpF: 650, dampRebF: 650, dampBumpR: 850, dampRebR: 850, dampKnee: 0.3,
+    arbF: 0, arbR: 0, travelUp: 0.02, travelDown: 0.015, suspS0: 0.05, bumpStopK: 400000, fzMax: 20000,
+    noABS: true, noESC: true, maxSteer: 0.42, steerRate: 4.5, steerRatio: 5.5, ackermann: 0.7, rearToe: 0,
+    // (the axle coupling stays gentle: with wheels this light a stiff one chatters at 1 kHz and scrubs the fronts away)
+    lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.95, noLockup: true, noCoastBlip: true, blipMax: 0.2, boostMax: 0,
+    handbrakeTorque: 150, bodyHalfW: 0.7, bodyFront: -1.02, bodyRear: 0.84, bodyBottom: -0.27, bodyTop: 0.66,
+    bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
+  } };
+  CARS.kart.classes = {
+    // rental: a Honda-type 390 cc 4-stroke single (~13 hp, governed to ~4,000 rpm), centrifugal clutch, one gear, a
+    // heavy steel frame inside a full wraparound bumper, hard tyres, one rear disc. ~30-35 mph
+    rental: { name: 'Rental Kart', short: 'Rental', car: 'RENTAL 42', hp: 13, tq: 20, spec: {
+      mass: 235, Ipitch: 40, Iyaw: 52, Iroll: 16, cgHeight: 0.33, wheelbase: 1.07, frontWeight: 0.42,
+      trackF: 1.12, trackR: 1.3, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.025, wheelInertiaR: 0.07,
+      frontTire: 'kartRentF', rearTire: 'kartRentR', brakeTorqueF: 0, brakeTorqueR: 170,
+      idleRpm: 1500, limiterRpm: 4000, redlineRpm: 3800, engineInertia: 0.03, fricA: 1.2, fricB: 0.8, starterTorque: 8,
+      torqueCurve: [[0, 12], [1000, 16], [1500, 17.5], [2000, 18.8], [2500, 19.5], [3000, 19.3], [3500, 18.5], [3800, 17.8], [4000, 16], [4500, 10]],
+      autoRatios: [1.0], autoRev: 1.0, autoFinal: 4.0, launchRpm: 2600,
+      dragClutch: { rpm0: 1900, rpm1: 2800, kc: 0.0005, rev: 20, base: [[0, 25]] },
+      CdA: 0.55, bodyPts: kartPts(0.33, 0.42),
+    } },
+    // TaG 125 (IAME X30-type): a water-cooled 125 cc 2-stroke single, ~30 hp at ~14,000, 16,000 rpm limiter, touch-and-go
+    // electric start, centrifugal clutch straight to the axle sprocket, rear brakes only, 158 kg with the driver. ~75 mph
+    tag: { name: 'TaG 125 Kart', short: 'TaG 125', car: 'X30', hp: 30, tq: 12.4, spec: {
+      mass: 158, Ipitch: 28, Iyaw: 36, Iroll: 12, cgHeight: 0.3, wheelbase: 1.04, frontWeight: 0.42,
+      trackF: 1.12, trackR: 1.38, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.02, wheelInertiaR: 0.05,
+      frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 0, brakeTorqueR: 180,
+      idleRpm: 2800, limiterRpm: 16000, redlineRpm: 15500, engineInertia: 0.006, fricA: 0.8, fricB: 0.25, starterTorque: 4,
+      torqueCurve: [[0, 2], [4000, 5], [6000, 7.5], [8000, 9.8], [10000, 11.6], [11500, 12.4], [13000, 12.0], [14000, 11.3], [15000, 10.2],
+        [15750, 9.3], [16500, 7.5], [17500, 4]],
+      autoRatios: [1.0], autoRev: 1.0, autoFinal: 7.0, launchRpm: 8000,
+      // (the centrifugal clutch bites around 8,000: it slips on the launch with the engine up in its powerband)
+      dragClutch: { rpm0: 6500, rpm1: 9500, kc: 0.000012, rev: 6, base: [[0, 6]] },
+      CdA: 0.42, bodyPts: kartPts(0.3, 0.42),
+    } },
+    // KZ2 shifter: a 125 cc 2-stroke single with a 6-speed sequential box, ~48 hp at 13,500, brakes on all four wheels,
+    // 175 kg with the driver. Clutchless upshifts in ~40 ms. 0-60 in ~3 s, ~90+ mph
+    kz: { name: 'KZ2 Shifter Kart', short: 'KZ Shifter', car: 'KZ 125', hp: 48, tq: 20, spec: {
+      mass: 175, Ipitch: 30, Iyaw: 38, Iroll: 13, cgHeight: 0.3, wheelbase: 1.05, frontWeight: 0.42,
+      trackF: 1.14, trackR: 1.4, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.022, wheelInertiaR: 0.05,
+      frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 110, brakeTorqueR: 170,
+      idleRpm: 2800, limiterRpm: 14500, redlineRpm: 14200, shiftRpm: 13900, engineInertia: 0.007, fricA: 1.0, fricB: 0.3, starterTorque: 4,
+      torqueCurve: [[0, 3], [4000, 7], [6000, 10.5], [8000, 14], [10000, 17.5], [11500, 19.6], [12500, 20.0], [13500, 18.8], [14200, 17.2],
+        [15000, 14], [16000, 9]],
+      autoRatios: [2.0, 1.56, 1.29, 1.11, 1.0, 0.92], autoRev: 2.0, autoFinal: 5.3, shiftTimeWOT: 0.04, shiftTimePart: 0.08, shiftCutDepth: 0.45,
+      launchRpm: 9000,
+      dragClutch: { rpm0: 6000, rpm1: 9000, kc: 0.00003, rev: 10, base: [[0, 14]] },
+      CdA: 0.45, bodyPts: kartPts(0.3, 0.42),
+    } },
+  };
+  CARS.kart.make = function (key) {
+    const k = key in CARS.kart.classes ? key : 'tag', c = CARS.kart.classes[k];
+    return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
+      spec: Object.assign({}, CARS.kart.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
+  };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock
