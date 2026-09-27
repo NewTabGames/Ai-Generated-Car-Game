@@ -4981,8 +4981,10 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const inner = (sd) => Math.sign(sd) === -Math.sign(ex);
       for (const sd of [-1, 1]) for (let k = 0; k < 4; k++) {
         const zp = -0.255 + k * 0.17, px = sd * 0.4, py = 0.165;
+        // (the two engines' inner ports are only ~20 cm apart: each inner row stubs out just clear of its own head and
+        // goes straight up, leaving a gap between the rows - they used to meet in the middle and run through each other)
         const pts = inner(sd)
-          ? [V3(px, py, zp), V3(px + sd * 0.09, py + 0.01, zp), V3(px + sd * 0.1, py + 0.3, zp + 0.05), V3(px + sd * 0.07, py + 0.62, zp + 0.2)]
+          ? [V3(px, py, zp), V3(px + sd * 0.035, py + 0.02, zp), V3(px + sd * 0.04, py + 0.3, zp + 0.05), V3(px + sd * 0.03, py + 0.62, zp + 0.2)]
           : [V3(px, py, zp), V3(px + sd * 0.11, py - 0.02, zp), V3(px + sd * 0.2, py + 0.22, zp + 0.08), V3(px + sd * 0.26, py + 0.5, zp + 0.26)];
         pipe(g, pts, 0.03, M.header, 18);
         const e = pts[3];
@@ -5040,8 +5042,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     } else {
       // two tandem pairs side by side; couplers between the front and rear engine of each pair
       for (const sx of [-1, 1]) {
-        hemi(sx * 0.5, -1.1, true); hemi(sx * 0.5, -0.06, false);
-        const cp = new THREE.CylinderGeometry(0.07, 0.07, 0.26, 16); cp.rotateX(Math.PI / 2); add(engG, cp, M.polish, sx * 0.5, CY_H - 0.04, -0.58);
+        // (0.53 apart from the centre line: the inner valve covers of the two engines clear each other by ~3 cm)
+        hemi(sx * 0.53, -1.1, true); hemi(sx * 0.53, -0.06, false);
+        const cp = new THREE.CylinderGeometry(0.07, 0.07, 0.26, 16); cp.rotateX(Math.PI / 2); add(engG, cp, M.polish, sx * 0.53, CY_H - 0.04, -0.58);
       }
       splitZ = 0.85;
     }
