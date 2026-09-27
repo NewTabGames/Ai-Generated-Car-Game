@@ -1,5 +1,6 @@
 // Dragsters: passes on a prepped strip, calibrated to real time slips.
 //   Top Fuel (1,000 ft): ~0.82 s 60 ft, ~2.2 s 330 ft, ~2.95 s @ ~295 mph at the 660, ~3.7 s @ ~330 mph at 1,000 ft
+//   Funny Car (1,000 ft): ~0.86 s 60 ft, ~3.05 s @ ~280 mph at the 660, ~3.87 s @ ~332 mph (rides its wheelie bars on the hit)
 //   Top Alcohol (1/4 mile): ~0.95 s 60 ft, ~3.3 s @ ~220 mph at the 1/8, ~5.2 s @ ~275 mph
 // plus: the chute stop, street asphalt (up in smoke), cold tyres, the front end on the hit, top-end stability.
 // Run: node test/dragster-test.js [tf|tad] ['{"spec overrides"}']
@@ -30,7 +31,7 @@ function run(cls, label, { surface = 5, tc = 2, launchRpm, warm = 85, over, chut
   const launchSeen = v.rpm();
   v.input.handbrake = 0; v.input.throttle = 1;
   const dt = 1 / 240, z0 = v.pz;
-  let t = 0, tStart = null, prevD = 0, peakG = 0, maxPitch = 0, air = 0, lockT = null, maxRpm = 0, minRpm = 1e9, maxSlip = 0, lastGear = v.gear;
+  let t = 0, tStart = null, prevD = 0, peakG = 0, maxPitch = 0, air = 0, lockT = null, maxRpm = 0, minRpm = 1e9, maxSlip = 0, lastGear = v.gear, maxBar = 0, barT = 0;
   const shifts = [], res = {}, trapStart = {}, rpmAt = {};
   const marks = [[18.288, '60'], [100.584, '330'], [201.168, '660'], [304.8, '1000'], [402.336, '1320']];
   for (; t < 12; t += dt) {
@@ -46,7 +47,7 @@ function run(cls, label, { surface = 5, tc = 2, launchRpm, warm = 85, over, chut
       }
       prevD = dist;
       if (res['60'] === undefined || res['1000'] === undefined) {
-        peakG = Math.max(peakG, v.gLong); maxPitch = Math.max(maxPitch, pitchDeg(v));
+        peakG = Math.max(peakG, v.gLong); maxPitch = Math.max(maxPitch, pitchDeg(v)); maxBar = Math.max(maxBar, v.wheelieBarLoad || 0); if (v.wheelieBarLoad > 100) barT += dt;
         if (!v.wheels[0].contact && !v.wheels[1].contact) air += dt;
         maxRpm = Math.max(maxRpm, v.rpm()); if (t > 0.2) minRpm = Math.min(minRpm, v.rpm());
         const vr = 0.5 * (v.wheels[2].omega * v.wheels[2].radius + v.wheels[3].omega * v.wheels[3].radius);
@@ -59,7 +60,7 @@ function run(cls, label, { surface = 5, tc = 2, launchRpm, warm = 85, over, chut
   }
   const f = (x, d) => (x === undefined ? '--' : x.toFixed(d === undefined ? 3 : d));
   console.log(`${label.padEnd(30)} launch ${launchSeen.toFixed(0)} | 60' ${f(res['60'])} 330' ${f(res['330'])} 660' ${f(res['660'])}@${f(res['660mph'], 1)} 1000' ${f(res['1000'])}@${f(res['1000mph'], 1)} 1320' ${f(res['1320'])}@${f(res['1320mph'], 1)}`);
-  console.log(`${''.padEnd(30)} peak ${peakG.toFixed(2)} g | nose up ${maxPitch.toFixed(1)}° fronts off ${air.toFixed(2)} s | rpm ${Math.round(minRpm)}-${Math.round(maxRpm)}, ${Math.round(rpmAt['1000'] || 0)} at 1000' | clutch locks ${lockT ? lockT.toFixed(2) + ' s' : 'never'} | slip max ${(maxSlip * 100).toFixed(0)} % | tyre ${(v.wheels[2].radius / v.wheels[2].tire.radius * 36).toFixed(1)} in (36 in static)${shifts.length ? ' | ' + shifts.join(', ') : ''} | rear ${v.wheels[2].temp.toFixed(0)}C`);
+  console.log(`${''.padEnd(30)} peak ${peakG.toFixed(2)} g | nose up ${maxPitch.toFixed(1)}° fronts off ${air.toFixed(2)} s${v.spec.wheelieBar ? ` bars ${barT.toFixed(2)} s / ${Math.round(maxBar)} N` : ''} | rpm ${Math.round(minRpm)}-${Math.round(maxRpm)}, ${Math.round(rpmAt['1000'] || 0)} at 1000' | clutch locks ${lockT ? lockT.toFixed(2) + ' s' : 'never'} | slip max ${(maxSlip * 100).toFixed(0)} % | tyre ${(v.wheels[2].radius / v.wheels[2].tire.radius * 36).toFixed(1)} in (36 in static)${shifts.length ? ' | ' + shifts.join(', ') : ''} | rear ${v.wheels[2].temp.toFixed(0)}C`);
   if (chute) {
     v.input.throttle = 0;
     const v0 = v.forwardSpeed; v.toggleChute();
@@ -75,7 +76,7 @@ function run(cls, label, { surface = 5, tc = 2, launchRpm, warm = 85, over, chut
   return v;
 }
 
-for (const cls of ['tf', 'tad']) {
+for (const cls of ['tf', 'fc', 'tad']) {
   if (ONLY && ONLY !== cls) continue;
   const d = CARS.dragster.make(cls);
   console.log(`== ${d.name}`);
@@ -119,8 +120,10 @@ function handling(cls) {
     // default). With TC Off, throttle on street asphalt lights the slicks and it swaps ends - that one is on you
     let spins = 0, worst = 0, runs = 0;
     for (const mph of [60, 90, 120]) for (const [thr, tc] of [[0, 3], [0, 2], [0.4, 2], [1, 2]]) {
-      const v = mk(cls, 0); v.tcMode = tc; runs++;
+      // (get up to speed on Track so the slicks aren't already on fire, then switch to the mode under test)
+      const v = mk(cls, 0); v.tcMode = 2; runs++;
       for (let i = 0; i < 120 * 60 && v.forwardSpeed * MPH < mph; i++) { v.input.throttle = 0.6; v.step(1 / 120); }
+      v.tcMode = tc;
       let kb = 0, m = 0;
       for (let s = 0; s < 4; s += 1 / 120) {
         const dir = s < 0.7 ? 1 : s < 1.4 ? -1 : 0;

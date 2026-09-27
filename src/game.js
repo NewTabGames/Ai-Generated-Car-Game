@@ -52,11 +52,11 @@
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass)
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
-  const TOPFUEL = DRAGSTER && CARDEF.cls === 'tf';
+  const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
   const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER;   // factory-fixed driveline and tyres
   // chase camera: distance / height scale (the tractor is 7 m long and 2.4 m tall; a dragster is 9 m long with its
   // wing 2.2 m up, so the camera sits further back and higher to see over it)
-  const CAMK = PULLER ? 1.65 : DRAGSTER ? 1.3 : 1, CAMH = PULLER ? 1.65 : DRAGSTER ? 1.45 : 1;
+  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
@@ -265,10 +265,11 @@
         ['v12', '2× Allison V12', 'Two 28 L WWII-fighter V-1710s, supercharged · 6,400 hp · 10,400 lb-ft · 4,000 rpm'],
       ] },
     { id: 'dragster', name: 'DRAGSTERS', paint: 'Pitch Black',
-      sub: 'Rear-engine rails · supercharged HEMIs · 36 in slicks that grow at speed · huge rear wing · twin chutes · 5 g launches',
-      desc: 'A 25 ft chromoly rail with a blown HEMI right behind your helmet. No gearbox to speak of: a multi-disc clutch slips by design for most of the run while the timers bring it in, the slicks grow inches taller at speed and the wing pins it down. Rear brakes only — the chutes do the stopping. Best on the Drag Strip map.',
+      sub: 'Top Fuel & Top Alcohol rails and a nitro Funny Car · supercharged HEMIs · 36 in slicks that grow at speed · twin chutes · 5 g launches',
+      desc: 'A 25 ft chromoly rail with a blown HEMI right behind your helmet - or the Funny Car: the same engine in front of you under a carbon body, on a wheelbase half as long. No gearbox to speak of: a multi-disc clutch slips by design for most of the run while the timers bring it in, the slicks grow inches taller at speed and the wing pins it down. Rear brakes only — the chutes do the stopping. Best on the Drag Strip map.',
       btn: 'DRAGSTER', tc: 2, optKey: 'dragClass', options: [
         ['tf', 'Top Fuel', '11,000 hp nitromethane HEMI · direct drive · 1,000 ft in ~3.64 s @ 335+ mph · 0-100 mph in 0.8 s', 'Pitch Black'],
+        ['fc', 'Funny Car', 'The same 11,000 hp nitro HEMI under a carbon flip-top body · 125 in wheelbase · wheelie bars · 1,000 ft in ~3.88 s @ 330 mph', 'TorRed'],
         ['tad', 'Top Alcohol', '3,900 hp blown methanol HEMI · 2-speed · ¼ mile in ~5.2 s @ 275 mph', 'Frostbite'],
       ] },
   ];
@@ -436,8 +437,9 @@
         add(row('Staying straight', 'Traction control on Track (the default) keeps the tyres hooked so it stays straight at speed. Off is the real thing: floor it in a turn on pavement and it swaps ends.', el('<span></span>')));
       }
       if (DRAGSTER) {
-        add(row(CARDEF.name, TOPFUEL
-          ? '500 ci HEMI on 90 % nitromethane, 14-71 blower at 58 psi, ~11,000 hp · no gearbox: 6-disc slipper clutch into a 3.20 rear end · 36x17.5 slicks · 2,330 lb · rear brakes + two chutes · races to 1,000 ft'
+        add(row(CARDEF.name, FUNNY
+          ? 'The Top Fuel engine ahead of the driver under a one-piece carbon flip-top body · 125 in wheelbase, 2,600 lb · 6-disc slipper clutch into a 3.20 rear end · wheelie bars (it stands up on the hit) · rear brakes + two chutes · races to 1,000 ft'
+          : NITRO ? '500 ci HEMI on 90 % nitromethane, 14-71 blower at 58 psi, ~11,000 hp · no gearbox: 6-disc slipper clutch into a 3.20 rear end · 36x17.5 slicks · 2,330 lb · rear brakes + two chutes · races to 1,000 ft'
           : '526 ci blown methanol HEMI, ~3,900 hp · 5-disc clutch into a 2-speed planetary box · 34.5x17 slicks · 2,050 lb · rear brakes + two chutes · races the full ¼ mile', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
           seg(Object.entries(VEH.CARS.dragster.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
@@ -768,7 +770,7 @@
       }
     }
     // nitro burns in the pipes: a Top Fuel engine under power lights all eight zoomies (alcohol burns nearly invisible)
-    if (DRAGSTER) flames.burn(veh.running && !veh.fuelCut ? clamp(veh.thrEff * veh.tcCut * (veh.rpm() - 3000) / 4500, 0, 1) * (TOPFUEL ? 1 : 0.35) : 0);
+    if (DRAGSTER) flames.burn(veh.running && !veh.fuelCut ? clamp(veh.thrEff * veh.tcCut * (veh.rpm() - 3000) / 4500, 0, 1) * (NITRO ? 1 : 0.35) : 0);
     smoke.update(dt, 1.3, 0.5);
     smoke.setLight(world.sun.color, world.sun.intensity, world.preset === 'night' ? 0.08 : world.preset === 'sunset' ? 0.42 : 0.55);
     flames.update(dt);
@@ -840,7 +842,7 @@
       if (PULLER && veh.running) { const sh = 0.0025 + 0.007 * clamp(veh.thrEff, 0, 1); cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.5; }
       // dragster: the engine is bolted to the frame right behind your seat - and 5 g shoves your head back
       if (DRAGSTER && veh.running) {
-        const sh = 0.002 + (TOPFUEL ? 0.009 : 0.005) * clamp(veh.thrEff, 0, 1) + 0.002 * clamp(veh.gLong / 4, 0, 1);
+        const sh = 0.002 + (NITRO ? 0.009 : 0.005) * clamp(veh.thrEff, 0, 1) + 0.002 * clamp(veh.gLong / 4, 0, 1);
         cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.6;
       }
       const hy = (G.lookBack ? Math.PI * 0.92 : -veh.steerAngle * 0.4);
@@ -874,7 +876,7 @@
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if ((PULLER || DRAGSTER) && veh.running) { const sh = (DRAGSTER ? 0.003 : 0.004) + (TOPFUEL ? 0.016 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if ((PULLER || DRAGSTER) && veh.running) { const sh = (DRAGSTER ? 0.003 : 0.004) + (NITRO ? 0.016 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -887,7 +889,7 @@
   // open cockpit (the V12s' gear-driven centrifugal blowers scream instead of whining)
   // (dragsters: one open-header blown HEMI a few feet behind your head - nitro is a ragged, crackling, earth-shaking
   // roar with a lumpy, misfiring idle; methanol a little cleaner and higher-revving)
-  const ENG_SND = DRAGSTER ? (TOPFUEL ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
+  const ENG_SND = DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
     : !PULLER ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
     : CARDEF.engine === 'v12' ? { nEng: 2, cyl: 12, fmul: 0.5, deep: 1, loud: 1, open: 1, whK: 2.0, whPure: 1, whine: 1.2, rpmRef: 3700, race: 0.5 }
@@ -963,9 +965,9 @@
     hud.setInputs(veh.input.throttle, veh.input.brake, input.state.clutch, input.source === 'wheel' ? input.raw.steer : input.state.steer);
     const chips = [
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
-      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (TOPFUEL ? ' · nitro' : ' · methanol') : '') },
-      { html: PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (TOPFUEL ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (TOPFUEL ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
+      { html: PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
+      { html: PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : OFFROAD() ? 'KO2 all-terrains · 2" lift' : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
@@ -1010,7 +1012,9 @@
     if (!DRAGMAP || !world.drag) return;
     DR.t += dt;
     const f0 = veh.wheels[0], f1 = veh.wheels[1];
-    const cpz = (f0.cpz + f1.cpz) / 2, cpx = (f0.cpx + f1.cpx) / 2;
+    // (front hubs, not the tyres' contact points: those freeze where the tyre left the ground, so a car carrying its
+    // front wheels off the line - Funny Car, Drag Pak on its bars - started the clock late and read a bogus 60 ft)
+    const cpz = (f0.hz + f1.hz) / 2, cpx = (f0.hx + f1.hx) / 2;
     const lead = cpz - HC, trail = cpz + HC;
     const side = cpx >= 0 ? 1 : -1;
     const inLane = Math.abs(Math.abs(cpx) - W.DRAG.LANE) < 2.6;

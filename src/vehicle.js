@@ -131,6 +131,13 @@
     tadslick: { name: '34.5x17.0-16 drag slicks', short: 'TA slicks', width: 0.43, radius: 0.438,
       muX: 2.25, muY: 1.22, loose: 0.6, kappaPeak: 0.16, alphaPeak: 0.16, relaxX: 0.3, relaxY: 0.5,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 3800, cold: 0.62, coldT: 25, warmT: 65, hotT: 120, overheat: 0.004, prep: 1.95, grow: 0.11 },
+    // Funny Car front runners: taller and wider than a dragster's (the car is heavier and steers more). Still skinny, so
+    // they give up first in a turn (a spooled rear scrubs away a lot of the slicks' cornering grip; with fronts any
+    // grippier the short car swapped ends in lane changes)
+    fcfront: { name: '25.0x4.5-15 front runners', short: 'FC fronts', width: 0.114, radius: 0.318,
+      muX: 1.05, muY: 0.8, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.1, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1400, cold: 0.95, coldT: 20, warmT: 45, hotT: 110, overheat: 0.004, prep: 1.0,
+      crr: [0.7, 1, 1, 1, 1, 0.7] },
     // dragster front runners: 22.5 in tall, 2.5 in wide, 90 psi - they only have to roll and point the car
     dragfront: { name: '22.5x2.5-17 front runners', short: 'Front runners', width: 0.064, radius: 0.286,
       muX: 1.0, muY: 0.95, loose: 0.75, kappaPeak: 0.1, alphaPeak: 0.09, relaxX: 0.14, relaxY: 0.3,
@@ -671,7 +678,7 @@
         const loadR = clamp(w.Fz / s.Fz0, 0.35, 2.5);
         const sx = kE / (ty.kappaPeak * Math.pow(loadR, 0.2)), sy = tE / (ty.alphaPeak * Math.pow(loadR, 0.55));
         const rho = Math.sqrt(sx * sx + sy * sy);
-        w.rho = rho;
+        w.rho = rho; w.syN = sy;
         const Fzn = w.Fz;
         const loadF = clamp(1 - s.loadSens * (Fzn / s.Fz0 - 1), 0.72, 1.18);
         // burnout in a dragster (no front brakes to hold it): the slicks come out of the water box wet and spin up
@@ -813,7 +820,11 @@
         const peak = W[2].tire.kappaPeak * (s.tcPeakK || [0.6, 0.9, 1.0][this.tcMode] || 1);
         // (tcTargets: tyres that bite at a lot more slip - the tractor's pulling tyres peak at ~22 % - get targets near
         // their own peak in every mode, instead of a road tyre's 6-17 % that would starve them)
-        const target = s.tcTargets ? s.tcTargets[this.tcMode] : Math.min(this.tcMode === 0 ? 0.06 : this.tcMode === 1 ? 0.11 : 0.17, peak);
+        let target = s.tcTargets ? s.tcTargets[this.tcMode] : Math.min(this.tcMode === 0 ? 0.06 : this.tcMode === 1 ? 0.11 : 0.17, peak);
+        // (tcCombined - dragsters: keep the driven tyres inside their friction circle. The more cornering load the rears
+        // carry, the less wheelspin is allowed, so a hard-driven slick can't be pushed past its limit in a turn. Without
+        // it, part throttle on street asphalt used all the rear grip and the short Funny Car swapped ends in a lane change)
+        if (s.tcCombined) { const sy = Math.max(Math.abs(W[2].syN || 0), Math.abs(W[3].syN || 0)); target *= Math.sqrt(Math.max(0, 1 - sy * sy)); }
         const err = slip - target;
         // look-ahead: rear wheels accelerating away from the car (slip rising) -> start pulling torque early
         const dS = this.tcSlipPrev === undefined ? 0 : (slip - this.tcSlipPrev) / h;
@@ -1468,7 +1479,7 @@
     brakeTorqueF: 0, noABS: true, noESC: true,
     maxSteer: 0.3, steerRate: 2.2, steerRatio: 10, ackermann: 0.3, rearToe: 0,
     lsdPreload: 1500, lsdRamp: 0.7, driveEff: 0.95,       // spool
-    noLockup: true, launchLimiter: true, launchRpm: 4500, thrExp: 1.3, noCoastBlip: true, blipMax: 0.05, tcRefBody: true, burnoutWet: 0.3,
+    noLockup: true, launchLimiter: true, launchRpm: 4500, thrExp: 1.3, noCoastBlip: true, blipMax: 0.05, tcRefBody: true, burnoutWet: 0.3, tcCombined: true,
     fricA: 70, fricB: 50,
   } };
   CARS.dragster.classes = {
@@ -1490,6 +1501,28 @@
       CdA: 1.0, wings: [{ ClA: 3.2, CdA: 0.8, z: 2.48, y: 1.31 }, { ClA: 0.75, CdA: 0.1, z: -5.99, y: -0.24 }],
       chuteCdA: 2.6, chuteZ: 3.25, chuteY: 0.85,
       bodyHalfW: 0.92, bodyFront: -6.44, bodyRear: 3.48, bodyBottom: -0.37, bodyTop: 1.46,
+    } },
+    // Nitro Funny Car: the Top Fuel engine and clutch in a 125 in wheelbase chassis under a one-piece carbon flip-top
+    // body, the engine ahead of the driver, 2,600 lb. Short and heavy with the CG well forward of the rear axle... and
+    // still it stands up on the hit, so it runs wheelie bars. The body and its big rear spoiler make the downforce.
+    // 1,000 ft: ~0.86 s 60 ft, ~3.05 s @ ~280 mph at the 660, ~3.87 s @ ~332 mph (record 3.79 s / 341 mph)
+    fc: { name: 'Nitro Funny Car', short: 'Funny Car', car: 'HEMI HAVOC', hp: 11000, tq: 7420, finishFt: 1000, spec: {
+      mass: 1179, Ipitch: 1900, Iyaw: 2100, Iroll: 380, cgHeight: 0.39, wheelbase: 3.175, frontWeight: 0.45,
+      trackF: 1.28, trackR: 1.4, wheelRadius: 0.457, wheelRadiusF: 0.318, wheelRadiusR: 0.457, wheelInertiaF: 0.45, wheelInertiaR: 3.6,
+      frontTire: 'fcfront', rearTire: 'tfslick', springF: 90000, springR: 300000, dampBumpF: 2500, dampRebF: 2500, dampBumpR: 6500, dampRebR: 6500,
+      brakeTorqueR: 2800, handbrakeTorque: 2800, maxSteer: 0.4, steerRate: 2.6,
+      idleRpm: 2000, limiterRpm: 9000, redlineRpm: 8600, engineInertia: 0.55, starterTorque: 700,
+      torqueCurve: [[0, 1200], [1000, 2300], [2000, 3400], [3000, 4500], [4000, 5450], [5000, 6300], [6000, 6950], [7000, 7350],
+        [7500, 7420], [8000, 7300], [8500, 7000], [9000, 6400], [10000, 4800]],
+      boostMax: 58, autoRatios: [1.0], autoRev: 1.0, autoFinal: 3.2,
+      dragClutch: { rpm0: 3000, rpm1: 4500, kc: 0.00874, rev: 260,
+        base: [[0, 2500], [1.0, 2800], [2.0, 3300], [3.0, 4200], [4.0, 6000]] },
+      launchRetard: [0.66, 2.8],
+      // (the low nose and splitter make real downforce: without it the front never comes back down at 4 g)
+      CdA: 1.25, wings: [{ ClA: 2.6, CdA: 0.6, z: 1.93, y: 0.96 }, { ClA: 1.3, CdA: 0.05, z: -2.75, y: -0.19 }],
+      wheelieBar: { len: 1.55, clr: 0.1, halfW: 0.28, r: 0.06, k: 400000, damp: 20000, Fmax: 40000 },
+      chuteCdA: 2.6, chuteZ: 2.18, chuteY: 0.4,
+      bodyHalfW: 0.98, bodyFront: -3.1, bodyRear: 2.05, bodyBottom: -0.29, bodyTop: 0.89,
     } },
     // Top Alcohol: 526 ci HEMI on methanol with a roots blower, ~3,900 hp, 2-speed planetary box behind a 5-disc clutch,
     // 2,050 lb, 280 in wheelbase, runs the full 1/4 mile: ~0.95 s 60 ft, ~5.2 s @ ~275 mph

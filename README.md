@@ -31,7 +31,7 @@ Open `HellcatDrive.html` directly in any modern WebGL-supported browser (Chrome,
 
 - **Dodge Challenger SRT Hellcat**: Supercharged 6.2L HEMI, customizable colors, street & drag tire compounds, switchable TC/ESC modes.
 - **SRT Demon & Mopar Drag Pak**: High-output drag packages with transbrake, line lock, and drag radials.
-- **Top Fuel & Top Alcohol Dragsters**: Up to 11,000 HP nitro-burning beasts with functional deceleration parachutes and multi-stage clutch management.
+- **Dragsters: Top Fuel, Nitro Funny Car & Top Alcohol**: Up to 11,000 HP nitro-burning beasts with functional deceleration parachutes and multi-stage clutch management; the Funny Car rides its wheelie bars off the line under a carbon flip-top body.
 - **Modified Pulling Tractor**: Multi-engine setups (4x Blown HEMIs or twin supercharged V12 aircraft engines) built for tractor pulling sled competitions.
 
 ---
