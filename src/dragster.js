@@ -225,7 +225,7 @@
       const g = new THREE.ExtrudeGeometry(airfoil(c, t, camber), { depth: span, bevelEnabled: false, curveSegments: 4 });
       g.rotateY(Math.PI / 2); g.translate(-span / 2, 0, 0);
       const m = add(parent, g, mat, x, y, z);
-      m.rotation.x = aoa;                    // + = trailing edge up
+      m.rotation.x = -aoa;                   // + = trailing edge up (a downforce wing kicks its trailing edge up)
       return m;
     }
     const zFW = zF - 0.5, fwSpan = TF ? 1.04 : 0.96;
@@ -328,7 +328,8 @@
     // ---------------------------------------------------------------- rear wing on its struts
     const wSpan = TF ? 1.9 : 1.6, wy = TF ? 1.52 : 1.36, wz = zR + (TF ? 0.42 : 0.38), sc = TF ? 1 : 0.82;
     wingEl(model, wSpan, 0.95 * sc, 0.075 * sc, 0.03 * sc, M.carbon, 0, wy, wz, 0.2);
-    wingEl(model, wSpan, 0.55 * sc, 0.045 * sc, 0.02 * sc, M.paintW, 0, wy + 0.22 * sc, wz + 0.58 * sc, 0.55);
+    // flap: its leading edge tucked just above and ahead of the main plane's trailing edge (the slot), kicked up steeply
+    wingEl(model, wSpan, 0.55 * sc, 0.045 * sc, 0.02 * sc, M.paintW, 0, wy + 0.275 * sc, wz + 0.655 * sc, 0.55);
     if (TF) wingEl(model, wSpan, 0.4, 0.035, 0.015, M.carbon, 0, wy + 0.56, wz + 0.5, 0.32);
     const epH = (TF ? 1.02 : 0.8), epL = TF ? 1.42 : 1.2, epY = wy + (TF ? 0.18 : 0.1), epZ = wz + (TF ? 0.28 : 0.24);
     const epTex = canvasTex(1024, 736, (g, w, h) => {

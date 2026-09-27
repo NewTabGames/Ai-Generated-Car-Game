@@ -758,6 +758,7 @@
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
       G.emitAcc[i] += rate * dt * tune.smoke;
+      if (G.emitAcc[i] >= 1) smoke.setGround(groundH(w.cpx, w.cpz));
       while (G.emitAcc[i] >= 1) {
         G.emitAcc[i] -= 1;
         const back = w.omega * w.radius - (veh.vx * fx + veh.vz * fz);
@@ -788,6 +789,9 @@
       vw.spin.rotation.x = vw.left ? sp_ : -sp_;
       // slicks thrown taller (and narrower) at speed
       if (vw.tyre && vw.growMax && w.tire.grow) vw.tyre.morphTargetInfluences[0] = clamp((w.radius / w.tire.radius - 1) / vw.growMax, 0, 1);
+      // tell the smoke where this tyre is, so puffs fade into it instead of slicing through it
+      vw.corner.getWorldPosition(_v); _v2.set(1, 0, 0).applyQuaternion(vw.corner.getWorldQuaternion(_q));
+      smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
@@ -828,7 +832,8 @@
     if (cam.mode === 2) {
       camera.near = 0.02;
       // head: g-force lean + look into corners
-      const tx = clamp(-veh.gLat * 0.025, -0.05, 0.05), tz = clamp(veh.gLong * 0.02, -0.04, 0.04);
+      // (a dragster's 5 g shoves your head a little further back into the rest)
+      const tx = clamp(-veh.gLat * 0.025, -0.05, 0.05), tz = clamp(veh.gLong * 0.02, -0.04, DRAGSTER ? 0.08 : 0.04);
       cam.head.x += (tx - cam.head.x) * Math.min(1, dt * 6); cam.head.z += (tz - cam.head.z) * Math.min(1, dt * 6);
       cam.head.y = (veh.fuelCut ? (Math.random() - 0.5) * 0.004 : 0) + (Math.random() - 0.5) * 0.0015 * clamp(Math.abs(speed) / 60, 0, 1);
       // tractor: sitting on the frame right behind the engines, everything shakes
@@ -836,7 +841,7 @@
       // dragster: the engine is bolted to the frame right behind your seat - and 5 g shoves your head back
       if (DRAGSTER && veh.running) {
         const sh = 0.002 + (TOPFUEL ? 0.009 : 0.005) * clamp(veh.thrEff, 0, 1) + 0.002 * clamp(veh.gLong / 4, 0, 1);
-        cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.6; cam.head.z += clamp(veh.gLong, 0, 5) * 0.008;
+        cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.6;
       }
       const hy = (G.lookBack ? Math.PI * 0.92 : -veh.steerAngle * 0.4);
       cam.headYaw += (hy - cam.headYaw) * Math.min(1, dt * 5);

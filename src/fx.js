@@ -26,30 +26,64 @@
       this.P = new Float32Array(max * 3); this.V = new Float32Array(max * 3);
       this.age = new Float32Array(max); this.life = new Float32Array(max);
       this.s0 = new Float32Array(max); this.gr = new Float32Array(max); this.a0 = new Float32Array(max);
-      this.rot = new Float32Array(max); this.rv = new Float32Array(max); this.shade = new Float32Array(max);
+      this.rot = new Float32Array(max); this.rv = new Float32Array(max); this.shade = new Float32Array(max); this.gnd = new Float32Array(max);
       const base = new THREE.PlaneGeometry(1, 1);
       const g = new THREE.InstancedBufferGeometry();
       g.index = base.index; g.attributes.position = base.attributes.position; g.attributes.uv = base.attributes.uv;
       this.iPos = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.iPos.setUsage(THREE.DynamicDrawUsage);
       this.iData = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4); this.iData.setUsage(THREE.DynamicDrawUsage);
-      g.setAttribute('iPos', this.iPos); g.setAttribute('iData', this.iData);
+      this.iGnd = new THREE.InstancedBufferAttribute(new Float32Array(max), 1); this.iGnd.setUsage(THREE.DynamicDrawUsage);
+      g.setAttribute('iPos', this.iPos); g.setAttribute('iData', this.iData); g.setAttribute('iGnd', this.iGnd);
       g.instanceCount = 0;
       this.geo = g;
-      this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: smokeTexture(THREE) }, uLight: { value: new THREE.Color(0.9, 0.9, 0.9) }, uAmb: { value: new THREE.Color(0.55, 0.58, 0.62) } }]);
+      this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: smokeTexture(THREE) }, uLight: { value: new THREE.Color(0.9, 0.9, 0.9) }, uAmb: { value: new THREE.Color(0.55, 0.58, 0.62) },
+        // the car's tyres (centre, axle direction, radius + half width) for soft intersections, see setWheel
+        uWc: { value: [0, 1, 2, 3].map(() => new THREE.Vector3()) }, uWa: { value: [0, 1, 2, 3].map(() => new THREE.Vector3(1, 0, 0)) },
+        uWr: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) } }]);
       this.mat = new THREE.ShaderMaterial({
         uniforms: this.uniforms, transparent: true, depthWrite: false, fog: true,
-        vertexShader: `attribute vec3 iPos; attribute vec4 iData; varying vec2 vUv; varying float vA; varying float vShade;
+        // Soft particles: a flat billboard that slices through a tyre or the ground leaves a hard straight edge (it read
+        // as the tyre sinking into the track), so each fragment fades out as it nears a tyre's surface or the pavement
+        vertexShader: `attribute vec3 iPos; attribute vec4 iData; attribute float iGnd; varying vec2 vUv; varying float vA; varying float vShade;
+varying vec3 vWp; varying float vGnd;
 #include <fog_pars_vertex>
-void main(){ vUv = uv; vA = iData.y; vShade = iData.w;
+void main(){ vUv = uv; vA = iData.y; vShade = iData.w; vGnd = iGnd;
   float c = cos(iData.z), s = sin(iData.z);
   vec2 p = vec2(position.x * c - position.y * s, position.x * s + position.y * c) * iData.x;
+  // world position of this corner of the billboard (camera right / up from the view matrix)
+  vWp = iPos + vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]) * p.x + vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]) * p.y;
   vec4 mvPosition = viewMatrix * vec4(iPos, 1.0); mvPosition.xy += p;
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`,
         fragmentShader: `uniform sampler2D map; uniform vec3 uLight; uniform vec3 uAmb; varying vec2 vUv; varying float vA; varying float vShade;
+uniform vec3 uWc[4]; uniform vec3 uWa[4]; uniform vec2 uWr[4]; varying vec3 vWp; varying float vGnd;
 #include <fog_pars_fragment>
-void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA; if (a < 0.004) discard;
+// distance along the view ray from the camera to tyre k (a cylinder: tread + both sidewalls), 1e9 if the ray misses it
+float tyreHit(vec3 ro, vec3 rd, int k) {
+  vec3 ax = uWa[k]; vec2 rw = uWr[k]; vec3 o = ro - uWc[k];
+  float oa = dot(o, ax), da = dot(rd, ax);
+  vec3 op = o - ax * oa, dp = rd - ax * da;
+  float A = dot(dp, dp), B = dot(op, dp), C = dot(op, op) - rw.x * rw.x, th = 1e9;
+  float disc = B * B - A * C;
+  if (A > 1e-6 && disc > 0.0) { float t0 = (-B - sqrt(disc)) / A; if (t0 > 0.0 && abs(oa + t0 * da) <= rw.y) th = t0; }
+  if (abs(da) > 1e-5) for (int s = 0; s < 2; s++) {
+    float t1 = ((s == 0 ? -rw.y : rw.y) - oa) / da; vec3 q = op + dp * t1;
+    if (t1 > 0.0 && dot(q, q) <= rw.x * rw.x) th = min(th, t1);
+  }
+  return th;
+}
+void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
+  // soft particles: fade a puff by how far it sits in front of whatever is behind it on this view ray - the pavement
+  // or one of the car's tyres - so it never cuts a hard line through them
+  vec3 rd = vWp - cameraPosition; float tf = length(rd); rd /= tf;
+  if (rd.y < -1e-4) a *= smoothstep(0.0, 0.45, (vGnd - cameraPosition.y) / rd.y - tf);
+  for (int k = 0; k < 4; k++) {
+    if (uWr[k].x <= 0.0) continue;
+    float th = tyreHit(cameraPosition, rd, k);
+    if (th < 1e8) a *= smoothstep(0.0, 0.3, th - tf);
+  }
+  if (a < 0.004) discard;
   vec3 base = mix(vec3(0.9, 0.9, 0.92), vec3(0.52, 0.43, 0.32), vShade);
   vec3 col = base * (uAmb + uLight * (t.r * 0.6));
   gl_FragColor = vec4(col, a);
@@ -67,7 +101,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA; if (a < 0.004) di
       this.V[i * 3] = vx; this.V[i * 3 + 1] = vy; this.V[i * 3 + 2] = vz;
       this.age[i] = 0; this.life[i] = life; this.s0[i] = size; this.gr[i] = grow; this.a0[i] = alpha;
       this.rot[i] = Math.random() * 6.28; this.rv[i] = (Math.random() - 0.5) * 0.6; this.shade[i] = shade;
+      this.gnd[i] = this.groundY !== undefined ? this.groundY : y - 0.2;
     }
+    // ground height under the next emissions (the particles fade out into it rather than cutting a hard line)
+    setGround(h) { this.groundY = h; }
+    // tyre k (0..3) for the soft intersections: centre, axle direction, radius, half width (r = 0 disables it)
+    setWheel(k, c, axis, r, hw) { const u = this.uniforms; u.uWc.value[k].copy(c); u.uWa.value[k].copy(axis); u.uWr.value[k].set(r, hw); }
     update(dt, windX, windZ, groundFn) {
       const P = this.P, V = this.V;
       for (let i = 0; i < this.n; i++) {
@@ -78,7 +117,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA; if (a < 0.004) di
             P[i * 3] = P[j * 3]; P[i * 3 + 1] = P[j * 3 + 1]; P[i * 3 + 2] = P[j * 3 + 2];
             V[i * 3] = V[j * 3]; V[i * 3 + 1] = V[j * 3 + 1]; V[i * 3 + 2] = V[j * 3 + 2];
             this.age[i] = this.age[j]; this.life[i] = this.life[j]; this.s0[i] = this.s0[j]; this.gr[i] = this.gr[j];
-            this.a0[i] = this.a0[j]; this.rot[i] = this.rot[j]; this.rv[i] = this.rv[j]; this.shade[i] = this.shade[j];
+            this.a0[i] = this.a0[j]; this.rot[i] = this.rot[j]; this.rv[i] = this.rv[j]; this.shade[i] = this.shade[j]; this.gnd[i] = this.gnd[j];
           }
           i--; continue;
         }
@@ -89,15 +128,15 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA; if (a < 0.004) di
         P[i * 3] += V[i * 3] * dt; P[i * 3 + 1] += V[i * 3 + 1] * dt; P[i * 3 + 2] += V[i * 3 + 2] * dt;
         this.rot[i] += this.rv[i] * dt;
       }
-      const ip = this.iPos.array, id = this.iData.array;
+      const ip = this.iPos.array, id = this.iData.array, ig = this.iGnd.array;
       for (let i = 0; i < this.n; i++) {
         const t = this.age[i] / this.life[i];
-        ip[i * 3] = P[i * 3]; ip[i * 3 + 1] = P[i * 3 + 1]; ip[i * 3 + 2] = P[i * 3 + 2];
+        ip[i * 3] = P[i * 3]; ip[i * 3 + 1] = P[i * 3 + 1]; ip[i * 3 + 2] = P[i * 3 + 2]; ig[i] = this.gnd[i];
         id[i * 4] = this.s0[i] + this.gr[i] * Math.pow(this.age[i], 0.65);
         id[i * 4 + 1] = this.a0[i] * Math.min(1, this.age[i] * 6) * Math.pow(1 - t, 1.6);
         id[i * 4 + 2] = this.rot[i]; id[i * 4 + 3] = this.shade[i];
       }
-      this.iPos.needsUpdate = true; this.iData.needsUpdate = true;
+      this.iPos.needsUpdate = true; this.iData.needsUpdate = true; this.iGnd.needsUpdate = true;
       this.geo.instanceCount = this.n;
       void groundFn;
     }

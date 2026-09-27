@@ -77,8 +77,8 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 ├── src/                    # Game source modules
 │   ├── audio.js            # Real-time procedural engine synth & tire FX
 │   ├── carmodel.js         # Procedural 3D car mesh generation & materials
-│   ├── dragster.js         # Dragster logic, staging tree, and parachute physics
-│   ├── puller.js           # Pulling tractor logic, weight sled, and sled friction
+│   ├── dragster.js         # Procedural Top Fuel / Top Alcohol dragster models (body, engine, wing, chutes, growing slicks)
+│   ├── puller.js           # Procedural pulling-tractor models (4× HEMI / 2× Allison V12, weight bar)
 │   ├── fx.js               # Smoke, skidmarks, tire marks, and particles
 │   ├── game.js             # Core game loop, scene management, cameras, and menus
 │   ├── hud.js              # Gauges, tachometer, minimap, and telemetry HUD
