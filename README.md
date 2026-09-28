@@ -37,7 +37,9 @@ Open `HellcatDrive.html` directly in any modern WebGL-supported browser (Chrome,
 
 - **Go-Karts: Rental, TaG 125, KZ Shifter & Supercharged**: No suspension, a solid rear axle and slicks. A slow, forgiving 4-stroke rental kart behind a wraparound bumper; a 30 hp, 16,000 rpm TaG 125 race kart on a centrifugal clutch (fully in by 6,000 rpm like the real X30's, so it pulls away off the pipe and screams once it comes on it); the rental is governed to ~31 mph; a 48 hp KZ shifter with a 6-speed sequential box and brakes on all four wheels (0-60 in ~4 s, ~95 mph); and a supercharged kart - a 998 cc supercharged superbike four (H2-type centrifugal blower, ~20 psi, ~200 hp) behind the seat of a stretched chassis with a quickshift 6-speed and a wheelie bar: 0-60 in ~2.4 s, ~132 mph, the blower's whistle and its surge chirp when you lift. It starts on Track traction control; Off lights up the slicks at any real throttle.
 
-**Off-road package** (Esc → Drive, every vehicle): the Challengers get BFGoodrich KO2 all-terrains + a 2 in lift; the pulling tractor R-2 deep-lug rears and lugged fronts; the dragsters a sand-drag setup (paddle tyres + ribbed fronts - try the Dirt Drag map); the monster truck full-depth (uncut) lugs; the karts knobbies with a matching sprocket. Each trades pavement grip for bite in the dirt, grass and mud.
+- **Racing Mowers: B-Prepared, FX & Record**: lawn mower racing, built to the US association's classes - blades out, the deck still hung underneath, numbers on all four sides. The B-Prepared is a real garden tractor on its factory frame with the 810 cc V-twin built inside (~38 hp), the mower's own 5-speed transaxle re-geared, turf tyres and no suspension (~80 mph, 0.6 g on pavement, it slides on grass); the FX is a tube chassis under a tractor hood with a 459 cc single on pump gas, a centrifugal clutch, a 3-speed box and kart dirt tyres (~88 mph); the record mower is built like the 150 mph land-speed holders - a 189 hp superbike four with a quickshifter on racing slicks, 0-100 mph in ~6.3 s. New synth sounds for the V-twin (the potato-potato), the big single and the superbike four.
+
+**Off-road package** (Esc → Drive, every vehicle): the Challengers get BFGoodrich KO2 all-terrains + a 2 in lift; the pulling tractor R-2 deep-lug rears and lugged fronts; the dragsters a sand-drag setup (paddle tyres + ribbed fronts - try the Dirt Drag map); the monster truck full-depth (uncut) lugs; the karts knobbies with a matching sprocket; the mowers ag bar-lug tyres. Each trades pavement grip for bite in the dirt, grass and mud.
 
 Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side and nearly stopped, steer left or right and it rolls back onto its wheels.
 
@@ -90,6 +92,7 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── dragster.js         # Procedural Top Fuel / Top Alcohol dragster models (body, engine, wing, chutes, growing slicks)
 │   ├── puller.js           # Procedural pulling-tractor models (4× HEMI / 2× Allison V12, weight bar)
 │   ├── kart.js             # Procedural go-karts (rental with wraparound bumper, TaG 125, KZ shifter and the supercharged kart)
+│   ├── mower.js            # Procedural racing mowers (garden tractor, FX tube chassis, record mower; driver, deck, tyres)
 │   ├── monster.js          # Procedural monster truck (tube chassis, 4-links and shocks that follow the suspension, 66 in tyres, see-through cab, livery)
 │   ├── fx.js               # Smoke, dust, skidmarks and flames (smoke/dust drawn to a screen-fill budget)
 │   ├── game.js             # Core game loop, scene management, cameras, and menus
@@ -126,6 +129,7 @@ Simulation benchmarks and synthetic audio tests can be executed via Node.js:
 node test/dragster-test.js
 node test/monster-test.js
 node test/kart-test.js
+node test/mower-test.js
 node test/puller-test.js
 node test/sim-test.js
 node test/audio-test.js

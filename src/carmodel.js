@@ -236,7 +236,7 @@
   const PAINTS = {
     'TorRed': 0xb3121a, 'Pitch Black': 0x0a0a0c, 'Plum Crazy': 0x4b1f78, 'Go Mango': 0xf2570f, 'B5 Blue': 0x1e6fc4,
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
-    'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52,
+    'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
   };
 
   // ------------------------------------------------------------------ builder

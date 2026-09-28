@@ -1,6 +1,6 @@
 // Off-road package: Pirelli P Zero vs BFGoodrich KO2 LT285/55R20 (+2 in lift) on each surface.
 // 0-60, 60-0, skidpad grip, ride height and a rough dirt track (wheels on the ground, bottoming out).
-// Then the More Cars' own packages (tractor R-2s, sand-drag paddles, full-depth monster lugs, kart knobbies).
+// Then the More Cars' own packages (tractor R-2s, sand-drag paddles, full-depth monster lugs, kart knobbies, mower bar lugs).
 const { Vehicle, CARS, TIRES: VEH_T } = require('../src/vehicle.js');
 const SURF = [[0, 'asphalt'], [1, 'gravel'], [2, 'grass'], [3, 'dirt']];
 const MPH = 2.23694;
@@ -97,7 +97,7 @@ console.log('Drag Pak on KO2s: 0-60 asphalt ' + zeroSixty('offroad', 0, 'dragpak
 // tractor: R-2 deep lugs + lugged fronts · dragsters: sand-drag paddles + rib fronts · monster: full-depth lugs · karts: knobbies
 {
   const { OFFROAD_PKG } = require('../src/vehicle.js');
-  const TC = { puller: 2, dragster: 2, monster: 3, kart: 3 };
+  const TC = { puller: 2, dragster: 2, monster: 3, kart: 3, mower: 3 };
   const upY = (v) => 1 - 2 * (v.qx * v.qx + v.qz * v.qz);
   const pitch = (v) => Math.asin(Math.max(-1, Math.min(1, -2 * (v.qy * v.qz - v.qx * v.qw)))) * 180 / Math.PI;
   const mkM = (car, cls, pkg, surf) => {
@@ -141,7 +141,7 @@ console.log('Drag Pak on KO2s: 0-60 asphalt ' + zeroSixty('offroad', 0, 'dragpak
     return `${best.toFixed(2)} g${spun ? ' (' + spun + ' spun)' : ''}`;
   };
   console.log('\nMore Cars: stock vs their off-road package (0-60 / 300 ft from a stop · steady circle grip)');
-  for (const [car, cls] of [['puller', 'hemi4'], ['dragster', 'tf'], ['dragster', 'fc'], ['monster'], ['kart', 'rental'], ['kart', 'tag'], ['kart', 'kz']]) {
+  for (const [car, cls] of [['puller', 'hemi4'], ['dragster', 'tf'], ['dragster', 'fc'], ['monster'], ['kart', 'rental'], ['kart', 'tag'], ['kart', 'kz'], ['mower', 'bp'], ['mower', 'fx']]) {
     const P = OFFROAD_PKG(car, cls);
     console.log(`${car}${cls ? ' ' + cls : ''} - package ${VEH_T[P.front].short} / ${VEH_T[P.rear].short}`);
     for (const pkg of [false, true]) {

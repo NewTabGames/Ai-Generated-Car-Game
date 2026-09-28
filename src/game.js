@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -18,7 +18,7 @@
 
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
-    car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag',
+    car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -48,19 +48,20 @@
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
-  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart';
-  const BIG = PULLER || DRAGSTER || MONSTER || KART;     // race engines: their own sound set-up, rumble and shake
+  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart', MOWER = S.car === 'mower';
+  const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER;     // race engines: their own sound set-up, rumble and shake
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
-    : KART ? VEH.CARS.kart.make(S.kartClass)
+    : KART ? VEH.CARS.kart.make(S.kartClass) : MOWER ? VEH.CARS.mower.make(S.mowerClass)
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
   const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
-  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER || KART;   // factory-fixed driveline and tyres
+  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER || KART || MOWER;   // factory-fixed driveline and tyres
   // chase camera: distance / height scale (the tractor is 7 m long and 2.4 m tall; a dragster is 9 m long with its
   // wing 2.2 m up, so the camera sits further back and higher to see over it)
   // (the monster truck is 12 ft tall and 12.5 ft wide: further back and well up)
   // (a kart is 6 ft long and sits a foot off the ground: in close and low)
-  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : 1;
+  // (a racing mower is 7 ft long with its driver sitting up 4 ft off the ground)
+  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : MOWER ? 0.68 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : MOWER ? 0.8 : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
@@ -77,6 +78,8 @@
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : MOWER ? ['Bar lugs', 'Bar-lug tyres', 'Ag bar-lug tyres (the chevron tread of a garden tractor that pulls a plough) in place of the race tyres: they dig into dirt and mud, '
+      + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
     : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
       + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, tread hum, and taller effective gearing'];
   const tireF = () => (OFFROAD() ? PKG.front : FIXED ? carSpec.frontTire : 'street');
@@ -99,7 +102,7 @@
     mass: STOCK.mass, grip: 1, downforce: 0, drag: 1, brakes: 1, stiff: 1, steer: 1, gravity: 1, smoke: 1,
   });
   S.tune = S.tune || {};
-  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : S.car;
+  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : MOWER ? 'mower_' + CARDEF.cls : S.car;
   const tune = Object.assign(tuneDefaults(), S.tune[TKEY] || {});
   S.tune[TKEY] = tune;
   function applyTune() {
@@ -164,7 +167,8 @@
   };
   const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
   const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
-    : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls })) : CAR.build(THREE, carOpts);
+    : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
+    : MOWER ? MOW.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls, wheelRadiusF: sp.wheelRadiusF, wheelRadiusR: sp.wheelRadiusR })) : CAR.build(THREE, carOpts);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -243,6 +247,11 @@
     else if (KART) setTimeout(() => hud.hint('Go-kart: shift up (E) for DRIVE and floor it. No suspension and a solid rear axle: brake in a straight line, turn in smoothly, let it roll through the corner.'
       + (CARDEF.cls === 'kz' ? ' KZ shifter: 6 gears - E / Q or the paddles (M holds it in manual).' : CARDEF.cls === 'tag' ? ' The clutch is fully in by 6,000 rpm, so it pulls away off the pipe - it comes alive past ~9,000.'
         : CARDEF.cls === 'sc' ? ' Supercharged: 200 hp through 6 gears (E / Q or the paddles). Traction control is on Track - with it Off, any real throttle lights up the slicks.' : ''), 10), 1600);
+    else if (MOWER) setTimeout(() => hud.hint('Racing mower: shift up (E) for DRIVE and floor it - blades out, racing number on. '
+      + (CARDEF.cls === 'bp' ? 'A real garden tractor on turf tyres: turn in gently and let it slide. '
+        : CARDEF.cls === 'fx' ? 'Tube chassis, 34 hp single, kart dirt tyres: it digs in on grass and dirt. '
+          : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass. ')
+      + 'Lawn mower races run on grass and dirt ovals.', 10), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
@@ -309,6 +318,14 @@
         ['kz', 'KZ shifter', '125 cc 2-stroke · ~48 hp · 6-speed sequential · 4-wheel brakes · 0-60 in ~4 s · ~95 mph', 'TorRed'],
         // (5th: the traction-control mode it starts on - 200 hp on kart slicks spins them at any real throttle)
         ['sc', 'Supercharged', '998 cc supercharged superbike four · ~200 hp · 6-speed + quickshifter · wheelie bar · 0-60 in ~2.4 s · ~132 mph', 'Plum Crazy', 2],
+      ] },
+    { id: 'mower', name: 'RACING MOWERS', paint: 'Sublime',
+      sub: 'B-Prepared garden tractor, FX single and a 150 mph land-speed record mower · blades out, deck on · turf, kart dirt and slick tyres',
+      desc: 'Lawn mower racing, built to the US association\'s classes. The B-Prepared is a real garden tractor on its factory frame and body with the V-twin built inside to ~38 hp, the mower\'s own 5-speed transaxle re-geared, turf tyres and the deck still hung underneath - ~80 mph, sliding on turf tyres. The FX is a tube chassis under a tractor hood: a 459 cc single on pump gas, a centrifugal clutch and kart dirt tyres, ~88 mph. The record mower is built like the 150 mph land-speed holders: a superbike four, a quickshifter and racing slicks - 0-100 mph in ~6.3 s.',
+      btn: 'RACING MOWER', tc: 3, optKey: 'mowerClass', options: [
+        ['bp', 'B-Prepared', 'Garden tractor · built 810 cc V-twin · ~38 hp · 5-speed transaxle · turf tyres · 265 kg · ~80 mph', 'Sublime'],
+        ['fx', 'FX single', 'Tube chassis · 459 cc single · ~34 hp · centrifugal clutch, 3-speed · kart dirt tyres · 205 kg · ~88 mph', 'B5 Blue'],
+        ['rec', 'Record mower', '999 cc superbike four · 189 hp · 6-speed + quickshifter · racing slicks · 0-100 mph in ~6.3 s · ~150 mph', 'TorRed', 2],
       ] },
     { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
@@ -513,6 +530,21 @@
             }
           })));
         add(row('Driving a kart', 'No suspension, no differential: the tyres and the flexing frame do everything. Brake in a straight line (the rear-braked karts lock up easily), turn in smoothly and carry the speed - scrubbing the fronts or sliding the rear costs time. Slicks need a lap to warm up.', el('<span></span>')));
+      }
+      if (MOWER) {
+        add(row(CARDEF.name, CARDEF.cls === 'rec' ? '999 cc superbike inline-four, ~189 hp at 13,000, 116 Nm · 6-speed with a quickshifter (E / Q, paddles) · 18x7.5-10 racing slicks on 10 in wheels · short-travel suspension · ~225 kg with the rider · starts on Track traction control'
+          : CARDEF.cls === 'fx' ? '459 cc OHV single built on pump gas, ~34 hp at 7,400 · centrifugal clutch, 3-speed box, chain to a solid axle · go-kart dirt tyres · no suspension, pinned front axle · hydraulic brakes · 205 kg with the driver'
+            : 'Garden tractor, stamped-steel frame · 810 cc OHV V-twin built inside, ~38 hp at 6,000 · the mower\'s 5-speed transaxle re-geared · foot clutch (worked for you) · turf tyres · no suspension · 265 kg with the driver', el('<span></span>')));
+        add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
+          seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
+            if (v !== CARDEF.cls) {
+              const m = MORE_CARS.find((x) => x.id === 'mower'), o = m.options.find((x) => x[0] === v);
+              if (o && o[3]) S.paint = o[3];
+              if (o) S.tcMode = o[4] !== undefined ? o[4] : m.tc;
+              S.mowerClass = v; saveS(); location.reload();
+            }
+          })));
+        add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
@@ -993,7 +1025,7 @@
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -1009,7 +1041,11 @@
   // (karts: singles - a 4-stroke thumper for the rental, 2-strokes that ring to 14-16,000 through tiny expansion chambers)
   // (the supercharged kart: a 4-into-1 superbike four, and the centrifugal blower's whistle - its impeller turns ~9.3x
   // crank, ~2.2 kHz at the limiter - with the surge chirp when you lift at boost)
-  const ENG_SND = KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
+  // (mowers: a 90 deg V-twin on open pipes, a big single, a superbike four through its end can)
+  const ENG_SND = MOWER ? (CARDEF.cls === 'bp' ? { nEng: 1, cyl: 2, vt: 90, fmul: 1.15, deep: 0.15, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.9, rough: 0.3 }
+      : CARDEF.cls === 'fx' ? { nEng: 1, cyl: 1, fmul: 1.3, deep: 0.05, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 7700, race: 1, rough: 0.3 }
+        : { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13000, race: 0.9, rough: 0.06 })
+    : KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
       : CARDEF.cls === 'sc' ? { nEng: 1, cyl: 4, fmul: 1.6, deep: 0, loud: 0.45, open: 1, whK: 0.155, whPure: 1, whine: 1.5, rpmRef: 13000, race: 0.8, rough: 0.08, surge: 1 }
       : CARDEF.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15, pipe: [9000, 11500] }
       : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15, pipe: [8500, 11000] })
@@ -1092,9 +1128,10 @@
     hud.setInputs(veh.input.throttle, veh.input.brake, input.state.clutch, input.source === 'wheel' ? input.raw.steer : input.state.steer);
     const chips = [
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
-      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
-      { html: KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? PKG_UI[0] : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
+      { html: MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
+        : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
+      { html: OFFROAD() ? PKG_UI[0] : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });

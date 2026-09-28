@@ -226,6 +226,47 @@
       muX: 1.02, muY: 0.98, loose: 1.35, looseKx: [1, 1.05, 1.1, 1.15, 0.85, 1], kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.14,
       B: 1.8, C: 1.3, E: -0.1, heatCap: 1100, cold: 0.97, coldT: 10, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
       crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.03, finalK: 0.165 / 0.14 },
+    // Racing lawn mowers (no radius: each mower's own wheel sizes). B-Prepared: lawnmower turf tyres - the rules ban slicks
+    // and kart tyres - a shallow rounded tread made not to tear up a lawn, run soft (~10 psi). Modest grip anywhere, at
+    // home on grass. (The narrow fronts let go before the 10 in wide rears: equal grip both ends spun it in every corner)
+    mowerTurfF: { name: 'Turf Saver 15x6.00-6', short: 'Turf tyres', width: 0.152,
+      muX: 0.8, muY: 0.72, loose: 0.97, looseKx: [1, 1.0, 1.12, 1.0, 0.8, 1], kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.12, relaxY: 0.2,
+      B: 1.6, C: 1.38, E: -0.2, heatCap: 1500, cold: 0.97, coldT: 10, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.02,
+      crr: [1.3, 1.2, 1.1, 1.1, 1, 1.3] },
+    mowerTurfR: { name: 'Turf Saver 20x10.00-8', short: 'Turf tyres', width: 0.254,
+      muX: 0.9, muY: 0.86, loose: 1.12, looseKx: [1, 1.0, 1.12, 1.0, 0.8, 1], kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.22,
+      B: 1.6, C: 1.38, E: -0.2, heatCap: 2400, cold: 0.97, coldT: 10, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.02,
+      crr: [1.3, 1.2, 1.1, 1.1, 1, 1.3] },
+    // Factory Experimental: go-kart dirt-oval tyres (allowed in FX) - a soft treaded compound that bites hard on clay and
+    // grass; on smooth asphalt the tread blocks squirm
+    mowerDirtF: { name: 'Kart dirt tyre 11x4.50-5', short: 'Kart dirt tyres', width: 0.115,
+      muX: 0.98, muY: 0.94, loose: 1.36, looseKx: [1, 1.0, 1.0, 1.12, 0.8, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.08, relaxY: 0.12,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 500, cold: 0.9, coldT: 15, warmT: 40, hotT: 90, overheat: 0.004, prep: 1.05,
+      crr: [1.1, 1.3, 1.3, 1.2, 1, 1.1] },
+    mowerDirtR: { name: 'Kart dirt tyre 13x7.00-6', short: 'Kart dirt tyres', width: 0.178,
+      muX: 1.0, muY: 0.94, loose: 1.36, looseKx: [1, 1.0, 1.0, 1.12, 0.8, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.09, relaxY: 0.13,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 700, cold: 0.9, coldT: 15, warmT: 40, hotT: 90, overheat: 0.004, prep: 1.05,
+      crr: [1.1, 1.3, 1.3, 1.2, 1, 1.1] },
+    // the land-speed mower: Formula-Student-type 18x7.5-10 racing slicks on 10 in wheels. Sticky on pavement once warm,
+    // hopeless on grass
+    mowerSlickF: { name: 'Racing slick 18x7.5-10', short: 'Racing slicks', width: 0.19,
+      muX: 1.12, muY: 1.1, loose: 0.55, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.12, relaxY: 0.2,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 900, cold: 0.86, coldT: 20, warmT: 50, hotT: 100, overheat: 0.004, prep: 1.1,
+      crr: [0.9, 1.4, 1.5, 1.4, 1, 0.9] },
+    mowerSlickR: { name: 'Racing slick 18x7.5-10', short: 'Racing slicks', width: 0.19,
+      muX: 1.12, muY: 1.08, loose: 0.55, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.12, relaxY: 0.2,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 900, cold: 0.86, coldT: 20, warmT: 50, hotT: 100, overheat: 0.004, prep: 1.1,
+      crr: [0.9, 1.4, 1.5, 1.4, 1, 0.9] },
+    // mowers' off-road package: ag bar-lug tyres (the chevron tread of a garden tractor that pulls a plough). They dig into
+    // dirt and mud; on grass about the same as turf tyres (the bars tear it up), on pavement they squirm
+    mowerBarF: { name: 'Bar-lug 16x6.50-8', short: 'Bar lugs', width: 0.165,
+      muX: 0.78, muY: 0.68, loose: 1.3, looseKx: [1, 1.08, 0.85, 1.18, 1.45, 1], kappaPeak: 0.16, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.22,
+      B: 1.5, C: 1.35, E: -0.15, heatCap: 2000, cold: 1, coldT: 0, warmT: 1, hotT: 150, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1, 1.6], massAdd: 1.5, inertiaAdd: 0.02 },
+    mowerBarR: { name: 'Bar-lug 23x10.50-12', short: 'Bar lugs', width: 0.26,
+      muX: 0.8, muY: 0.74, loose: 1.45, looseKx: [1, 1.08, 0.85, 1.18, 1.45, 1], kappaPeak: 0.16, alphaPeak: 0.15, relaxX: 0.16, relaxY: 0.24,
+      B: 1.5, C: 1.35, E: -0.15, heatCap: 3000, cold: 1, coldT: 0, warmT: 1, hotT: 150, overheat: 0.001, prep: 1.0,
+      crr: [1.6, 1.3, 1.2, 1.1, 1, 1.6], massAdd: 3, inertiaAdd: 0.06 },
   };
   // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
   function OFFROAD_PKG(car, cls) {
@@ -233,6 +274,7 @@
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
     if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
+    if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     return { front: 'offroad', rear: 'offroad' };
   }
   function MF(rho, t) {
@@ -2089,6 +2131,97 @@
     const k = key in CARS.kart.classes ? key : 'tag', c = CARS.kart.classes[k];
     return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
       spec: Object.assign({}, CARS.kart.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
+  };
+  // Racing lawn mowers (USLMRA-type classes): blades out, a cutting deck still hung underneath, the driver on a real mower
+  // seat. The race classes have no suspension - the soft tyres and the seat are it. (A lawn tractor's front axle pivots on
+  // a centre pin; modelled free, all the roll resistance sat at the back, the inside rear lifted at ~0.6 g and it spun
+  // in every corner - it's taken as shimmed solid, as racers do.) High seats and narrow tracks: push too hard and they tip.
+  // CARS.mower.make(key): a B-Prepared racing lawn tractor, a Factory Experimental single, a land-speed record mower.
+  const mowerPts = (cg, fw, wb, pts) => pts.map(([x, y, z]) => [x, y - cg, z + wb * (fw - 0.5)]);
+  const mowerBox = (pts) => [-1, 1].map((sx) => pts.map(([x, y, z]) => [sx * x, y, z])).flat();
+  CARS.mower = { name: 'Racing Mower', short: 'Mower', more: true, spec: {
+    name: 'Racing Mower', Fz0: 900, loadSens: 0.1,
+    noABS: true, noESC: true, noLockup: true, noCoastBlip: true, blipMax: 0.2, boostMax: 0, rearToe: 0,
+    dampKnee: 0.3, bumpStopK: 400000, fzMax: 30000, handbrakeTorque: 150,
+    // (traction control is a game aid here: slip from the solid rear axle's mean speed against the body's)
+    tcRefBody: true, tcAxleMean: true,
+    bodyK: 80000, bodyC: 4000, bodyMu: 0.5,
+  } };
+  CARS.mower.classes = {
+    // B-Prepared: a full-size garden tractor on its stamped-steel frame and factory body, the deck hung empty underneath,
+    // an 810 cc OHV V-twin built inside (cams, billet flywheel, big carb, open pipes: ~38 hp where it made 20), the
+    // mower's own 5-speed transaxle (and its diff) re-geared through bigger pulleys, a foot clutch (worked for you),
+    // motorcycle discs on the rear axle (and small ones up front - rear-only it stopped at 0.37 g), turf tyres. 265 kg
+    // with the driver; ~80 mph flat out
+    bp: { name: 'B-Prepared Racing Mower', short: 'B-Prepared', car: 'BP 810', hp: 38, tq: 36, spec: {
+      mass: 265, Ipitch: 80, Iyaw: 92, Iroll: 32, cgHeight: 0.42, wheelbase: 1.22, frontWeight: 0.44,
+      trackF: 0.82, trackR: 0.78, wheelRadius: 0.254, wheelRadiusF: 0.19, wheelRadiusR: 0.254, wheelInertiaF: 0.08, wheelInertiaR: 0.25,
+      frontTire: 'mowerTurfF', rearTire: 'mowerTurfR', brakeTorqueF: 70, brakeTorqueR: 150,
+      springF: 38000, springR: 48000, dampBumpF: 700, dampRebF: 700, dampBumpR: 900, dampRebR: 900,
+      arbF: 0, arbR: 0, travelUp: 0.035, travelDown: 0.02, suspS0: 0.05,
+      maxSteer: 0.62, steerRate: 3.5, steerRatio: 9, ackermann: 0.6,
+      lsdPreload: 15, lsdRamp: 0.1, driveEff: 0.85,
+      idleRpm: 1400, limiterRpm: 6800, redlineRpm: 6500, shiftRpm: 6400, engineInertia: 0.06, fricA: 1.5, fricB: 0.9, starterTorque: 10,
+      torqueCurve: [[0, 14], [1500, 22], [2500, 28], [3500, 33], [4500, 36], [5500, 35], [6000, 33], [6500, 30], [7000, 25], [7500, 18]],
+      autoRatios: [3.0, 2.0, 1.5, 1.2, 1.0], autoRev: 3.0, autoFinal: 4.9, shiftTimeWOT: 0.3, shiftTimePart: 0.4, shiftCutDepth: 0.2,
+      launchRpm: 3200,
+      dragClutch: { rpm0: 1900, rpm1: 3200, kc: 0.00045, rev: 12, base: [[0, 20]], muSlip: 0.2, slipRef: 150 },
+      CdA: 0.75,
+      bodyHalfW: 0.52, bodyFront: -1.07, bodyRear: 0.78, bodyBottom: -0.34, bodyTop: 1.03,
+      bodyPts: mowerPts(0.42, 0.44, 1.22, mowerBox([[0.35, 0.28, -1.0], [0.3, 0.62, -0.95], [0.3, 0.72, -0.35], [0.52, 0.12, -0.45], [0.52, 0.12, 0.25],
+        [0.5, 0.6, 0.6], [0.35, 0.3, 0.85], [0.25, 1.2, 0.3]]).concat([[0, 0.95, 0.45], [0, 0.95, -0.35], [0, 1.45, 0.25]])),
+    } },
+    // Factory Experimental (single): a hand-built tube chassis under a lawn tractor's hood and fenders, the deck a shell, a
+    // 459 cc OHV single built to the limit on pump gas (~34 hp at 7,400), a centrifugal clutch, a 3-speed box and a chain
+    // to a solid axle, go-kart dirt tyres, a pinned front axle, hydraulic brakes all round. 205 kg (the 450 lb minimum)
+    // with the driver; ~88 mph
+    fx: { name: 'FX Racing Mower', short: 'FX single', car: 'FXS 459', hp: 34, tq: 26.5, spec: {
+      mass: 205, Ipitch: 55, Iyaw: 66, Iroll: 20, cgHeight: 0.36, wheelbase: 1.22, frontWeight: 0.42,
+      trackF: 0.86, trackR: 0.82, wheelRadius: 0.165, wheelRadiusF: 0.14, wheelRadiusR: 0.165, wheelInertiaF: 0.03, wheelInertiaR: 0.07,
+      frontTire: 'mowerDirtF', rearTire: 'mowerDirtR', brakeTorqueF: 110, brakeTorqueR: 160,
+      springF: 50000, springR: 60000, dampBumpF: 650, dampRebF: 650, dampBumpR: 850, dampRebR: 850,
+      arbF: 0, arbR: 0, travelUp: 0.02, travelDown: 0.015, suspS0: 0.05,
+      maxSteer: 0.5, steerRate: 4, steerRatio: 7, ackermann: 0.6,
+      lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.92,
+      idleRpm: 1600, limiterRpm: 8000, redlineRpm: 7700, shiftRpm: 7700, engineInertia: 0.035, fricA: 1.0, fricB: 0.5, starterTorque: 6,
+      torqueCurve: [[0, 10], [2000, 16], [3000, 20], [4000, 23.5], [5000, 25.8], [6000, 26.5], [7000, 25], [7400, 24], [8000, 20], [8500, 14]],
+      autoRatios: [2.1, 1.45, 1.0], autoRev: 2.1, autoFinal: 3.44, shiftTimeWOT: 0.12, shiftTimePart: 0.2, shiftCutDepth: 0.3,
+      launchRpm: 4200,
+      dragClutch: { rpm0: 2800, rpm1: 4200, kc: 0.00023, rev: 10, base: [[0, 10]], muSlip: 0.2, slipRef: 180 },
+      CdA: 0.55,
+      bodyHalfW: 0.5, bodyFront: -1.0, bodyRear: 0.8, bodyBottom: -0.3, bodyTop: 0.98,
+      bodyPts: mowerPts(0.36, 0.42, 1.22, mowerBox([[0.32, 0.22, -0.98], [0.28, 0.52, -0.9], [0.28, 0.6, -0.35], [0.5, 0.1, -0.4], [0.5, 0.1, 0.25],
+        [0.48, 0.45, 0.6], [0.35, 0.22, 0.85], [0.24, 1.08, 0.3]]).concat([[0, 0.8, 0.45], [0, 0.85, -0.3], [0, 1.33, 0.25]])),
+    } },
+    // Land-speed record mower (built like the 150 mph record holders): a lawn tractor's body in carbon over a T45 steel
+    // tube frame, a 999 cc superbike four (~189 hp at 13,000, 116 Nm) with its 6-speed and a quickshifter on paddles,
+    // 18x7.5-10 racing slicks, short-travel suspension, big discs all round. ~140 kg + the rider; 0-100 mph in ~6.3 s
+    // (the record), ~150 mph
+    rec: { name: 'Land-Speed Record Mower', short: 'Record', car: '1000 SUPERBIKE', hp: 189, tq: 85.6, spec: {
+      mass: 225, Ipitch: 75, Iyaw: 95, Iroll: 26, cgHeight: 0.42, wheelbase: 1.38, frontWeight: 0.42,
+      trackF: 1.12, trackR: 1.16, wheelRadius: 0.229, wheelRadiusF: 0.229, wheelRadiusR: 0.229, wheelInertiaF: 0.12, wheelInertiaR: 0.14,
+      frontTire: 'mowerSlickF', rearTire: 'mowerSlickR', brakeTorqueF: 260, brakeTorqueR: 260,
+      springF: 30000, springR: 36000, dampBumpF: 1400, dampRebF: 1800, dampBumpR: 1700, dampRebR: 2200,
+      arbF: 3000, arbR: 2000, travelUp: 0.05, travelDown: 0.04, suspS0: 0.1,
+      maxSteer: 0.42, steerRate: 3, steerRatio: 10, ackermann: 0.5,
+      lsdPreload: 20, lsdRamp: 0.1, driveEff: 0.9,
+      idleRpm: 1300, limiterRpm: 13400, redlineRpm: 13000, shiftRpm: 12900, engineInertia: 0.03, fricA: 3, fricB: 1.6, starterTorque: 25,
+      torqueCurve: [[0, 25], [3000, 45], [5000, 58], [7000, 68], [9000, 78], [11000, 85.6], [12000, 82], [13000, 76.5], [13500, 72], [14000, 64],
+        [15000, 40]],
+      // (the bike's 6-speed through its 1.717 primary and the chain: 3.98 overall before the box - ~79 mph in 1st, ~150 in 6th)
+      autoRatios: [2.286, 1.778, 1.5, 1.333, 1.214, 1.138], autoRev: 2.286, autoFinal: 3.98, shiftTimeWOT: 0.05, shiftTimePart: 0.09, shiftCutDepth: 0.4,
+      launchRpm: 7000, engineTc: true, thrExp: 1.3,
+      dragClutch: { rpm0: 3500, rpm1: 7000, kc: 0.00012, rev: 30, base: [[0, 50]], muSlip: 0.25, slipRef: 220 },
+      CdA: 0.58,
+      bodyHalfW: 0.66, bodyFront: -1.4, bodyRear: 1.2, bodyBottom: -0.34, bodyTop: 1.0,
+      bodyPts: mowerPts(0.42, 0.42, 1.38, mowerBox([[0.4, 0.2, -1.3], [0.36, 0.6, -1.2], [0.36, 0.72, -0.45], [0.62, 0.12, -0.5], [0.62, 0.12, 0.35],
+        [0.62, 0.55, 0.7], [0.45, 0.3, 1.25], [0.25, 1.15, 0.35]]).concat([[0, 0.95, 0.5], [0, 0.95, -0.4], [0, 1.42, 0.3]])),
+    } },
+  };
+  CARS.mower.make = function (key) {
+    const k = key in CARS.mower.classes ? key : 'bp', c = CARS.mower.classes[k];
+    return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
+      spec: Object.assign({}, CARS.mower.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
   };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
