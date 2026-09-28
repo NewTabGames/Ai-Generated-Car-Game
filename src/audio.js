@@ -4,8 +4,11 @@
    the V8 burble, pulse rate gives the pitch, fixed formants give the Hellcat's timbre.
    Plus: twin-screw supercharger whine, intake roar, overrun crackles, rev-limiter stutter, tyre squeal,
    burnout roar, wind, road/gravel noise, starter, shift clunks, impacts, horn.
-   Small engines: 4-stroke and 2-stroke singles, 90-deg V-twins (vt: fires 270 / 450 deg apart - the potato-potato)
-   and inline fours (flat-plane crank, 4-into-1), all into one pipe; a centrifugal blower's surge chirp on a lift (surge).
+   Small engines: 4-stroke and 2-stroke singles, 90-deg V-twins (vt: fires 270 / 450 deg apart - the potato-potato),
+   inline triples (every 240 deg, the off-beat thrum) and inline fours (flat-plane crank, 4-into-1), all into one pipe;
+   even-fire V6s (a bank each side, every 120 deg); a centrifugal blower's surge chirp on a lift (surge).
+   Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
+   load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
    Multi-engine mode (pulling tractor): up to 4 V8s or V12s geared onto one crankline, each with its own firing
    sequence and exhaust, fired a few degrees apart so they hit like one enormous engine; deeper, longer exhaust pulses,
    a sub-bass layer and a hotter output stage for sheer volume.
@@ -26,7 +29,8 @@ class CarSynth {
       nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0,
       pipe: 0,     // (2-strokes) 0 off the pipe .. 1 in the expansion chamber's tuned band
       vt: 0,       // cyl 2 with vt > 0: a 4-stroke V-twin with that V angle instead of a 2-stroke single
-      surge: 0 };  // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
+      surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
+      ev: 0 };     // 1: an electric motor (whK = its whine Hz per rpm)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -89,7 +93,7 @@ class CarSynth {
     const c = this.cur, race = c.race || 0, idleN = Math.max(0, 1 - c.rpm / (2300 + 1500 * race));
     // (singles: a 4-stroke fires once per 720 deg, a 2-stroke every turn - cyl 1 / cyl 2; an inline four every 180;
     // a V-twin (vt) fires its second cylinder 180 + V deg after the first, then waits 540 - V: 270 / 450 for a 90 deg V)
-    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 4 ? 4 : 8, sp = 720 / nc;
+    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 ? 3 : c.cyl === 4 ? 4 : c.cyl === 6 ? 6 : 8, sp = 720 / nc;
     const vt = nc === 2 && c.vt > 0 ? c.vt : 0;
     // lopey cam: timing scatter at idle, and a weak/strong firing pattern that repeats for a few cycles (the chop)
     const lope = (3 + 6 * idleN) * (1 + 1.2 * race);
@@ -107,8 +111,8 @@ class CarSynth {
         // (kept sorted by crank angle: insertion)
         let j = n++;
         while (j > 0 && this.evA[j - 1] > a) { this.evA[j] = this.evA[j - 1]; this.evE[j] = this.evE[j - 1]; this.evK[j] = this.evK[j - 1]; this.evB[j] = this.evB[j - 1]; j--; }
-        // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12: banks alternate evenly
-        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 4 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
+        // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12 / V6: banks alternate evenly
+        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 6 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
       }
     }
     this.nev = n;
@@ -138,7 +142,7 @@ class CarSynth {
     else if (k === this.strongIdx[e]) a *= 1 + 0.25 * idleN * (1 + 0.8 * race);
     // (a 2-stroke single fires the same cylinder every turn: no cylinder-to-cylinder pattern)
     a *= (1 + (this.cylAmp[e * 12 + (c.cyl === 2 && !(c.vt > 0) ? 0 : k)] - 1) * (1 - 0.75 * smoothN)) * (1 + (this.rnd() - 0.5) * (0.18 - 0.1 * smoothN + 0.25 * c.rough));
-    if (c.cyl === 1 || c.cyl === 2 || c.cyl === 4) {
+    if (c.cyl === 1 || c.cyl === 2 || c.cyl === 3 || c.cyl === 4) {
       // a single has one exhaust: every pulse goes down the same pipe (through both resonator banks, for width).
       // Handing alternate pulses to the two banks made a 2-stroke warble at half its firing rate, like a twin
       const hA = a * 0.62;
@@ -154,7 +158,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -171,15 +175,17 @@ class CarSynth {
     const two = c.cyl === 2 && !(c.vt > 0);
     const pp = two ? Math.min(1, Math.max(0, c.pipe || 0)) : -1;
     if (pp >= 0) { g[0] *= 1.3 - 0.5 * pp; g[1] *= 1.1 - 0.2 * pp; g[3] *= 0.65 + 0.95 * pp; g[4] *= 0.5 + 1.5 * pp; }
-    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle)
+    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 || c.cyl === 6 ? 3 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle; a triple / a V6 bank 3 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
     const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0);   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
-    const bodyAmp = (c.run > 0.5 ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
-    const roarAmp = (c.run > 0.5 ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
+    const ev = c.ev > 0.5;
+    const bodyAmp = (c.run > 0.5 && !ev ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
+    const roarAmp = (c.run > 0.5 && !ev ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
     const aRoar = 1 - Math.exp(-2 * Math.PI * (160 + rpm * 0.1) / sr);
     let engGain = (c.run > 0.5 ? 0.5 + 0.5 * load : 0.3) * (0.62 + 0.38 * rpmN) * c.engVol * 0.55 * (1 + 0.3 * race) * (1 + loud * (0.1 + 0.9 * load)) / Math.sqrt(nE);
     if (pp >= 0) engGain *= 0.82 + 0.4 * pp * (0.4 + 0.6 * load);
+    if (ev) engGain = 0;
     const interior = c.open ? 0 : c.interior;
     // open cockpit: you sit right behind the engines, nothing in between
     if (c.open && c.interior > 0.5) engGain *= 1.2;
@@ -197,11 +203,14 @@ class CarSynth {
     if (c.surge > 0.5 && (this.thrSlow || 0) - t.thr > 0.35 && boostN > 0.3 && c.run > 0.5 && !(this.flut > 0.05)) { this.flut = boostN; this.flPh = 0; }
     this.thrSlow = (this.thrSlow || 0) + (t.thr - (this.thrSlow || 0)) * (1 - Math.exp(-n / (sr * 0.08)));
     const flDecay = Math.exp(-1 / (sr * 0.28));
-    const whAmp = c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
+    // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
+    // fades out towards a standstill)
+    const whAmp = ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+      : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
     this.setBP(this.intake, 280 + rpm * 0.09, 1.2);
-    const intakeAmp = (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
+    const intakeAmp = ev ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
     // tyres
     this.sqDrift += (this.rnd() - 0.5) * 0.08; this.sqDrift *= 0.97;
     const sqF = 760 + 380 * c.sqPitch + 60 * this.sqDrift;
@@ -286,6 +295,13 @@ class CarSynth {
         + this.run(this.whBP, w1) * whAmp * 0.9 + this.run(this.hiss, w2) * whAmp * 0.25 * boostN;
       const ik = this.run(this.intake, w2) * intakeAmp;
       oL += wh + ik; oR += wh + ik;
+      if (ev && whAmp > 1e-5) {
+        // the reduction gear's mesh whine (~2.3x the motor's note) and the inverter's switching hiss
+        this.whPh2 += 2 * Math.PI * whF * 2.31 / sr; if (this.whPh2 > 6.283185307) this.whPh2 -= 6.283185307;
+        if (!this.evHs) this.evHs = this.bp(6500, 1.5);
+        const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
+        oL += gm; oR += gm;
+      }
       if (this.flut > 1e-3) {
         if (!this.flBP) { this.flBP = this.bp(1900, 2.2); this.flBP2 = this.bp(3400, 4); }
         this.flPh += 2 * Math.PI * (17 + 12 * this.flut) / sr;

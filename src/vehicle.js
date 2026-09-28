@@ -267,6 +267,49 @@
       muX: 0.8, muY: 0.74, loose: 1.45, looseKx: [1, 1.08, 0.85, 1.18, 1.45, 1], kappaPeak: 0.16, alphaPeak: 0.15, relaxX: 0.16, relaxY: 0.24,
       B: 1.5, C: 1.35, E: -0.15, heatCap: 3000, cold: 1, coldT: 0, warmT: 1, hotT: 150, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1, 1.6], massAdd: 3, inertiaAdd: 0.06 },
+
+    // ---- the Car Crushers 2 cars (no radius: each car's own wheel size)
+    // Couch Car: 13 in R-compound race tyres tucked under the sofa - it needs every bit of bite for ~850 hp on 340 kg
+    couchF: { name: 'R-compound 20.0x7.5-13', short: 'R-comp 13 in', width: 0.2,
+      muX: 1.35, muY: 1.22, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.26,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 1500, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+    couchR: { name: 'R-compound 20.5x10.0-13', short: 'R-comp 13 in', width: 0.26,
+      muX: 1.5, muY: 1.26, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.15, relaxY: 0.27,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 1800, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+    // Banana Car: the F-150's all-season truck tyres
+    truckAS: { name: 'P235/75R15 all-season', short: 'All-season', width: 0.235,
+      muX: 1.05, muY: 0.92, loose: 1.1, kappaPeak: 0.12, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.45,
+      B: 1.7, C: 1.35, E: -0.2, heatCap: 4000, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.02,
+      crr: [1.1, 1, 1, 1, 1, 1.1] },
+    // Blue Bird: Dunlop 37 x 7 land-speed tyres - thin treadless rubber on a cord carcass, built to spin at 300 mph, not to grip
+    lsr37: { name: 'Dunlop 37 x 7 land-speed', short: 'Dunlop 37x7', width: 0.18,
+      muX: 1.0, muY: 0.86, loose: 0.75, kappaPeak: 0.1, alphaPeak: 0.1, relaxX: 0.3, relaxY: 0.55,
+      B: 1.6, C: 1.45, E: -0.25, heatCap: 6000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05 },
+    // Mini Dookie: skinny low-rolling-resistance eco tyres
+    eco: { name: '145/70R15 eco', short: 'Eco tyres', width: 0.145,
+      muX: 1.0, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.16, relaxY: 0.32,
+      B: 1.8, C: 1.4, E: -0.2, heatCap: 2400, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
+      crr: [0.75, 1, 1, 1, 1, 0.75] },
+    // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
+    tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
+      muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [1.2, 1.2, 1.2, 1.1, 1, 1.2] },
+    // Turbo Scooter 3000: soft-compound 10 in street-scooter tyres (at 215 kg it needs them to push against the wind)
+    scooter10: { name: '10 x 3.00 soft street', short: 'Soft 10 in', width: 0.08,
+      muX: 1.15, muY: 1.0, loose: 0.9, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.08, relaxY: 0.14,
+      B: 1.7, C: 1.42, E: -0.2, heatCap: 600, cold: 0.93, coldT: 10, warmT: 40, hotT: 100, overheat: 0.004, prep: 1.05,
+      crr: [1.1, 1.2, 1.2, 1.1, 1, 1.1] },
+    // Razors Edge: golf-cart 18 x 8.50-8 tyres on the stretched cart chassis
+    golf: { name: '18 x 8.50-8 cart tyre', short: 'Cart tyres', width: 0.215,
+      muX: 0.95, muY: 0.86, loose: 1.05, kappaPeak: 0.11, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.26,
+      B: 1.7, C: 1.38, E: -0.2, heatCap: 1600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [1.1, 1.1, 1.05, 1.05, 1, 1.1] },
+    // their off-road package: knobbies in each car's own size, a touch of lift
+    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
+      muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 1500, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.02, lift: 0.02 },
   };
   // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
   function OFFROAD_PKG(car, cls) {
@@ -275,6 +318,7 @@
     if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
+    if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
   function MF(rho, t) {
@@ -580,6 +624,7 @@
     }
 
     startEngine() {
+      if (this.spec.electric) { this.running = true; this.cranking = false; this.stalled = false; return; }
       if (this.running || this.cranking) return;
       this.cranking = true; this.crankT = 0; this.stalled = false;
     }
@@ -931,6 +976,19 @@
       }
       this.squeal = squeal;
 
+      // ---------------- afloat (floats: the Banana Car): rear tyres turning in the water paddle it along - their push
+      // on the hull, and the water's drag back on the tyres through the driveline
+      if (s.floats && this.floatSub > 0.05) {
+        const pw = s.floats.paddle, pmax = s.floats.paddleMax || 900;
+        for (let i = 2; i < 4; i++) {
+          const w = W[i];
+          if (w.contact) continue;
+          const F = clamp(pw * (w.omega * w.radius - vFwd) * Math.min(1, this.floatSub), -pmax, pmax);
+          w.fx = F;
+          Fx -= m02 * F; Fy -= m12 * F; Fz -= m22 * F;
+        }
+      }
+
       // ---------------- brakes
       this._brakes(h, speed);
 
@@ -1015,7 +1073,45 @@
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
       const sub = wl0 - (py - 0.25);
-      if (sub > 0) {
+      if (s.floats) {
+        // (floats) a sealed hull: buoyancy at ten points along its bottom from how deep each one sits, so it floats level
+        // at its draft and rights itself; heave damping, the hull's drag through the water (a keel sideways), and the
+        // front wheels acting as rudders. The engine breathes high up - it keeps running
+        const fl = s.floats, N = 10, ly = fl.bottom - s.cgHeight + (s.cgDrop || 0), zc = s.wheelbase * (s.frontWeight - 0.5);
+        const Aw = fl.len * 2 * fl.halfW * fl.fill, kA = 1000 * GRAV * Aw / N, draft = mass / (1000 * Aw);
+        let dSum = 0;
+        for (let k = 0; k < N; k++) {
+          const lx = (k & 1 ? 1 : -1) * fl.halfW * 0.95, lz = ((k >> 1) / 4 - 0.5) * fl.len * 0.85 + zc;
+          const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
+          const d = clamp(wl0 - (py + ry), 0, fl.depth);
+          if (d <= 0) continue;
+          dSum += d;
+          const cvy = vy + (wz * rx - wx * rz);
+          const F = kA * d - 900 * cvy * Math.min(1, d / 0.1);
+          Fy += F; Tx -= rz * F; Tz += rx * F;
+        }
+        this.floatSub = dSum / (N * draft);
+        const wet = Math.min(1, this.floatSub);
+        this.inWater = wet;
+        if (wet > 0) {
+          const dF = -(220 * vFwd + 160 * vFwd * Math.abs(vFwd)) * wet, dS = -(2500 * vRight + 1200 * vRight * Math.abs(vRight)) * wet;
+          Fx += -m02 * dF + m00 * dS; Fy += -m12 * dF + m10 * dS; Fz += -m22 * dF + m20 * dS;
+          Tx -= 2500 * wx * wet; Ty -= 3000 * wy * wet; Tz -= 2500 * wz * wet;
+          for (let i = 0; i < 2; i++) {
+            const w = W[i];
+            if (w.contact) continue;
+            const sn = Math.sin(w.steer), cs = Math.cos(w.steer);
+            let fx = m00 * sn - m02 * cs, fz = m20 * sn - m22 * cs;
+            const fn = Math.hypot(fx, fz) || 1; fx /= fn; fz /= fn;
+            const rx = w.hx - px, ry = w.hy - py, rz = w.hz - pz;
+            const cvx = vx + (wy * rz - wz * ry), cvz = vz + (wx * ry - wy * rx);
+            const F = -fl.rudder * (cvx * -fz + cvz * fx) * Math.max(Math.abs(cvx * fx + cvz * fz), 0.5) * wet;
+            const Fxr = -fz * F, Fzr = fx * F;
+            Fx += Fxr; Fz += Fzr;
+            Tx += ry * Fzr; Ty += rz * Fxr - rx * Fzr; Tz -= ry * Fxr;
+          }
+        }
+      } else if (sub > 0) {
         const depth = Math.min(sub, 1.4);
         this.inWater = depth;
         Fy += mass * GRAV * 0.5 * depth;
@@ -1223,6 +1319,10 @@
     _engine(h) {
       const s = this.spec, inp = this.input;
       let rpm = this.eOmega * RAD2RPM;
+      // electric motor (electric): always live - no starter, no idle, no stall - with full torque from a standstill, and
+      // the controller holds its top speed by fading the torque out instead of a fuel cut
+      const EV = !!s.electric;
+      if (EV) { this.running = true; this.cranking = false; this.stalled = false; }
       // start / crank
       if (this.cranking) {
         this.crankT += h;
@@ -1257,7 +1357,7 @@
         thr = clamp((tgt - this.eOmega) * 0.011, 0, 0.75);
       }
       // idle governor (PI) with post-start flare
-      if (this.running) {
+      if (this.running && !EV) {
         this.idleFlare *= Math.exp(-h / 1.1);
         // cammed idle hunts a little: the tach needle dances +-30-40 rpm
         const tgt = s.idleRpm + this.idleFlare + 11 * Math.sin(this.time * 6.9) + 6 * Math.sin(this.time * 2.3 + 1.1);
@@ -1267,7 +1367,8 @@
         if (thr < idleThr) thr = idleThr;
       }
       // rev limiter (fuel cut with hysteresis); the Fun tab can remove it
-      if (rpm > s.limiterRpm && !s.noLimiter) this.fuelCut = true;
+      if (EV) this.fuelCut = false;
+      else if (rpm > s.limiterRpm && !s.noLimiter) this.fuelCut = true;
       else if (rpm < s.limiterRpm - 230 || s.noLimiter) this.fuelCut = false;
       // launch control / TransBrake: hold rpm with spark cut, keep the throttle open so boost is ready (Torque Reserve)
       // (launchLimiter: a starting-line rev limiter that works whatever the traction-control setting)
@@ -1280,17 +1381,37 @@
       // mechanical governor (rental karts): the flyweights close the throttle progressively as the revs near the governed
       // speed, so it holds a steady top speed instead of banging off a rev limiter
       if (s.governorRpm) thr = Math.min(thr, clamp((s.governorRpm - rpm) / s.governorBand, 0, 1));
+      if (EV && !s.noLimiter) thr *= clamp((s.limiterRpm - rpm) / 250, 0, 1);
       if (this.fuelCut || !this.running) thr = 0;
       // throttle-body / manifold lag
       const tau = thr > this.thrEff ? 0.065 : 0.045;
       this.thrEff += (thr - this.thrEff) * Math.min(1, h / tau);
-      const Twot = curveAt(s.torqueCurve, rpm / (s.rpmStretch || 1)) * LBFT * (s.torqueScale || 1) - windage(s, rpm);
+      let Twot = curveAt(s.torqueCurve, rpm / (s.rpmStretch || 1)) * LBFT * (s.torqueScale || 1) - windage(s, rpm);
+      // turbocharger (turbo): the torque curve is the engine on full boost, but the turbine takes a moment to spool -
+      // boost follows the throttle and the exhaust flow (rpm) with a lag, and the torque climbs with it from its
+      // off-boost base (on the launch limiter the throttle is held open, so it spools up on the line)
+      if (s.turbo) {
+        const tb = s.turbo, flow = clamp((rpm - tb.rpm0) / (tb.rpm1 - tb.rpm0), 0, 1);
+        const tgt = this.thrEff * flow * (this.running ? 1 : 0), sp0 = this.spool || 0;
+        this.spool = sp0 + (tgt - sp0) * Math.min(1, h / (tgt > sp0 ? tb.lag : tb.lag * 0.4));
+        Twot *= tb.base + (1 - tb.base) * this.spool;
+      }
       const Tf = (s.fricA + s.fricB * rpm / 1000) * Math.tanh(this.eOmega / 4);
       // ignition timing on the hit (nitro dragsters): the crew chief pulls timing for the first second of the run and
       // brings it back in on the timers as the car gathers speed and the tyres can take it
       let retard = 1;
       if (s.launchRetard) { const x = clamp(this.dcT / s.launchRetard[1], 0, 1); retard = s.launchRetard[0] + (1 - s.launchRetard[0]) * x * x * (3 - 2 * x); }
-      let Te = (this.running && !this.fuelCut) ? this.thrEff * Twot * retard * this.tcCut * this.escCut * shiftCut * launchCut - (1 - this.thrEff) * Tf : -Tf;
+      // wheelie control (wheelieCtl: the nose-up pitch in degrees where it starts - a game aid like traction control, off
+      // with TC Off): the motor controller reads the pitch and its rate and trims the torque as the nose comes up, so
+      // the scooter launches with its front skimming the road instead of pogoing on its anti-tip wheels
+      if (s.wheelieCtl && this.tcMode < 3) {
+        const { qx, qy, qz, qw } = this, m12 = 2 * (qy * qz - qx * qw);
+        const m00 = 1 - 2 * (qy * qy + qz * qz), m10 = 2 * (qx * qy + qz * qw), m20 = 2 * (qx * qz - qy * qw);
+        const ahead = (Math.asin(clamp(-m12, -1, 1)) + 0.12 * (this.wx * m00 + this.wy * m10 + this.wz * m20)) * 57.3;
+        const tgt = clamp(1 - (ahead - s.wheelieCtl) / 4, 0.1, 1), wc0 = this.wcCut === undefined ? 1 : this.wcCut;
+        this.wcCut = wc0 + (tgt - wc0) * Math.min(1, h / 0.03);
+      } else this.wcCut = 1;
+      let Te = (this.running && !this.fuelCut) ? this.thrEff * Twot * retard * this.tcCut * this.escCut * shiftCut * launchCut * this.wcCut - (1 - this.thrEff) * Tf : -Tf;
       if (this.cranking) Te += s.starterTorque * Math.max(0, 1 - rpm / 380);
       // nitrous (Fun tab): a fixed horsepower shot on top, while the button is held at wide-open throttle
       this.nosActive = !!(inp.nos && s.nosHp > 0 && this.running && !this.fuelCut && thr > 0.6 && rpm > 1500 && this.gear !== 0 && !this.launchHold);
@@ -1300,7 +1421,8 @@
       // from low revs; a centrifugal one (centrifugal: the supercharged kart's) builds it with the square of its speed
       const bShape = s.centrifugal ? Math.pow(clamp(rpm / s.redlineRpm, 0, 1), 2) : Math.pow(clamp((rpm - 900) / 3600, 0, 1), 0.65);
       const bTgt = s.boostMax * this.thrEff * bShape * (this.running ? 1 : 0);
-      this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
+      if (s.turbo) this.boost = s.boostMax * this.spool;
+      else this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
       // overrun pops & crackles
       const dThr = this.lastThr - inp.throttle;
       if (dThr > 0.35 && rpm > 3000 && this.running) this.overrunT = 0.9 + Math.random() * 0.8;
@@ -1312,7 +1434,7 @@
       }
       if (this.fuelCut && Math.random() < h * 2.5 * (s.popScale !== undefined ? s.popScale : 1)) this.events.backfire++;
       // stall detection
-      if (this.running && rpm < 330 && this.locked && this.gear !== 0) {
+      if (this.running && rpm < 330 && this.locked && this.gear !== 0 && !EV) {
         this.running = false; this.stalled = true;
       }
     }
@@ -1355,7 +1477,7 @@
       const s = this.spec, inp = this.input;
       this.revHoldActive = !!inp.revHold;
       const standing = Math.abs(this.forwardSpeed) < 2.5;
-      if (inp.handbrake > 0.5 && this.gear !== 0 && !this.park && (this.launchHold || standing)) this.launchHold = true;
+      if (inp.handbrake > 0.5 && this.gear !== 0 && !this.park && (this.launchHold || standing) && !s.electric) this.launchHold = true;
       else this.launchHold = false;
       // dragster clutch timers: start when the pedal comes out (SPACE released, or floored from a stop), reset at a stop
       if (s.dragClutch) {
@@ -1551,7 +1673,9 @@
         wl.omega = brakeClamp(wl.omega, TbL, Ir, h);
         wr.omega = brakeClamp(wr.omega, TbR, Ir, h);
       }
-      if (this.eOmega < 0) this.eOmega = 0;
+      // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
+      // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
+      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
@@ -1578,6 +1702,10 @@
       const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
       const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
+      // (awdFront: the front axle's share of the drive - a rear-biased road-car system sends most of it to the back
+      // and lets the centre coupling pass more forward when the rears slip)
+      const fF = s.awdFront !== undefined ? s.awdFront : 0.5, SH = this._sh4 || (this._sh4 = [0, 0, 0, 0]);
+      SH[0] = SH[1] = fF / 2; SH[2] = SH[3] = (1 - fF) / 2;
       const mode = this._coupling(this.eOmega - wc0 * G);
       if (mode !== 2) this.locked = false;
       if (mode === 0) {
@@ -1593,7 +1721,7 @@
         if (Tp > 0 && we > 1) { const SR = wt / we; TRr = SR < 0.85 ? s.tcStall - (s.tcStall - 1) * Math.max(0, SR) / 0.85 : 1; }
         this.eOmega += h * (Te - Tp) / Ie;
         const Tin = Tp * TRr * G * eff;
-        for (let i = 0; i < 4; i++) W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia;
+        for (let i = 0; i < 4; i++) W[i].omega += h * (SH[i] * Tin + Ti[i] + T[i]) / W[i].inertia;
         this.lastTin = Tin;
       } else {
         const cap = this._cap, Itot = Isum + Ie * G * G;
@@ -1602,7 +1730,8 @@
           const Treq = Te - Ie * G * wcDot - Ie * wc0 * Gdot;
           if (Math.abs(Treq) > cap) this.locked = false;
           else {
-            for (let i = 0; i < 4; i++) W[i].omega += h * wcDot + h * (T[i] + Ti[i] - W[i].inertia * Tsum / Isum) / W[i].inertia;
+            const Tl = s.awdFront !== undefined ? G * eff * Treq : 0;     // (the locked carrier shares by inertia; re-split it)
+            for (let i = 0; i < 4; i++) W[i].omega += h * wcDot + h * (T[i] + Ti[i] - W[i].inertia * Tsum / Isum + (Tl ? (SH[i] - W[i].inertia / Isum) * Tl : 0)) / W[i].inertia;
             this.eOmega = (wc0 + h * wcDot) * G;
             this.lastTin = G * eff * Treq;
           }
@@ -1613,7 +1742,7 @@
           this.eOmega += h * (Te - Tcl) / Ie;
           const Tin = Tcl * G * eff;
           let wc1 = 0;
-          for (let i = 0; i < 4; i++) { W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia; wc1 += W[i].inertia * W[i].omega; }
+          for (let i = 0; i < 4; i++) { W[i].omega += h * (SH[i] * Tin + Ti[i] + T[i]) / W[i].inertia; wc1 += W[i].inertia * W[i].omega; }
           wc1 /= Isum;
           const dE1 = this.eOmega - wc1 * G;
           if (cap > 0 && (dE1 === 0 || (dE1 > 0 ? 1 : -1) !== sg)) {
@@ -1627,7 +1756,18 @@
       }
       // brakes on all four corners (+ the parking pawl, through the lockers)
       const pk = this.park ? 20000 : 0;
-      if (this.locked && G !== 0) {
+      if (this.locked && G !== 0 && s.awdFront !== undefined) {
+        // (a road car's diffs, awdFront: each brake works on its own wheel - only the part common to all four, and the
+        // parking pawl, goes through the driveline with the engine on it. Pooled, the stability control's brake on one
+        // front wheel braked all four and spun the car it was trying to straighten)
+        let bMin = Infinity, wc = 0;
+        for (let i = 0; i < 4; i++) { bMin = Math.min(bMin, W[i].brakeT); wc += W[i].inertia * W[i].omega; }
+        wc /= Isum;
+        const wcB = brakeClamp(wc, 4 * (bMin + pk), Isum + Ie * G * G, h);
+        let wm = 0;
+        for (let i = 0; i < 4; i++) { W[i].omega = brakeClamp(W[i].omega + wcB - wc, W[i].brakeT - bMin, W[i].inertia, h); wm += W[i].inertia * W[i].omega; }
+        this.eOmega = wm / Isum * G;
+      } else if (this.locked && G !== 0) {
         let wc = 0, Tb = 0;
         for (let i = 0; i < 4; i++) { wc += W[i].inertia * W[i].omega; Tb += W[i].brakeT + pk; }
         wc /= Isum;
@@ -1635,7 +1775,9 @@
         for (let i = 0; i < 4; i++) W[i].omega += wcB - wc;
         this.eOmega = wcB * G;
       } else for (let i = 0; i < 4; i++) W[i].omega = brakeClamp(W[i].omega, W[i].brakeT + pk, W[i].inertia, h);
-      if (this.eOmega < 0) this.eOmega = 0;
+      // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
+      // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
+      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
@@ -2223,6 +2365,222 @@
     return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
       spec: Object.assign({}, CARS.mower.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
   };
+  // ------------------------------------------------------------------ Car Crushers 2 cars
+  // Nine vehicles from the Roblox game Car Crushers 2, each built the way it would have to be for real to do what it does
+  // in the game (its top speed and weight there) and left to the real physics: the couch is twitchy, the scooter and
+  // the porta potty tip over in a turn, the Blue Bird needs miles to reach 300 mph. Plain CARS entries (cc: true) - the
+  // game lists them with the Challengers. (ccPts: model space - ground under the wheelbase centre, forward -z - to CG frame)
+  const ccPts = (cg, fw, wb, pts) => pts.map(([x, y, z]) => [x, y - cg, z + wb * (fw - 0.5)]);
+  // a box's corners and mid-edges (both sides), for the body / roll-over contacts
+  const ccBox = (hw, y0, y1, z0, z1) => [-1, 1].map((sx) => [[hw, y0, z0], [hw, y0, z1], [hw, y1, z0], [hw, y1, z1], [hw, y0, (z0 + z1) / 2], [hw, y1, (z0 + z1) / 2],
+    [hw, (y0 + y1) / 2, z0], [hw, (y0 + y1) / 2, z1]].map(([x, y, z]) => [sx * x, y, z])).flat();
+  const EV_CLUTCH = { rpm0: -2, rpm1: -1, kc: 0, base: [[0, 6000]], rev: 6000 };   // (an electric motor: always coupled)
+  // an electric motor's torque curve: constant torque to its base speed, constant power past it (lb-ft)
+  const evCurve = (Nm, kW, maxRpm) => {
+    const base = kW * 1000 / Nm * 30 / Math.PI, c = [[0, Nm / LBFT], [base, Nm / LBFT]];
+    for (let r = Math.ceil(base / 1000) * 1000; r <= maxRpm + 1000; r += 1000) if (r > base) c.push([r, kW * 1000 / (r * Math.PI / 30) / LBFT]);
+    return c;
+  };
+  // Couch Car: a three-seat leather sofa on a hidden tube chassis, four 13 in wheels tucked under it, a 1.6 L turbo triple
+  // built like a drag engine (~850 hp on 40 psi and E85) under the seat with its three pipes out of the right arm, a
+  // sequential 5-speed with a quickshifter and a locked diff. ~190 mph (the game's figure) is where 850 hp runs out
+  // against a sofa's drag - which at that speed is over its own weight: the game's 300 kg couch could never push it
+  // (its rear tyres just spin at ~150); with the engine, frame and driver it's 520 kg. On a 1.3 m wheelbase it is as
+  // twitchy as it sounds
+  CARS.couch = { name: 'Couch Car', short: 'Couch Car', car: '1.6 TURBO TRIPLE', hp: 850, tq: 600, cc: true, kbLat: 9, spec: {
+    name: 'Couch Car',
+    mass: 520, Ipitch: 75, Iyaw: 160, Iroll: 135, cgHeight: 0.38, wheelbase: 1.3, frontWeight: 0.5,
+    trackF: 1.6, trackR: 1.6, wheelRadius: 0.254, wheelInertiaF: 0.3, wheelInertiaR: 0.4,
+    frontTire: 'couchF', rearTire: 'couchR', Fz0: 1200, loadSens: 0.1,
+    springF: 45000, springR: 52000, dampBumpF: 1500, dampRebF: 2100, dampBumpR: 1700, dampRebR: 2400,
+    arbF: 9000, arbR: 4500, travelUp: 0.05, travelDown: 0.05, suspS0: 0.12, rearToe: 0.002,
+    brakeTorqueF: 650, brakeTorqueR: 450, handbrakeTorque: 500, noABS: true, noESC: true,
+    maxSteer: 0.45, steerRate: 4.5, steerRatio: 12, ackermann: 0.6,
+    idleRpm: 1000, limiterRpm: 8600, redlineRpm: 8300, shiftRpm: 8300, engineInertia: 0.1, fricA: 8, fricB: 3, starterTorque: 40,
+    torqueCurve: [[0, 90], [1000, 110], [2000, 170], [3000, 300], [4000, 450], [5000, 560], [6000, 600], [7000, 595], [7800, 572], [8500, 520], [9500, 380]],
+    turbo: { lag: 0.45, base: 0.3, rpm0: 2200, rpm1: 5000 }, boostMax: 40,
+    autoRatios: [2.6, 1.85, 1.42, 1.15, 0.96], autoRev: 2.6, autoFinal: 2.56, shiftTimeWOT: 0.06, shiftTimePart: 0.1, shiftCutDepth: 0.6,
+    launchRpm: 5500, engineTc: true, noCoastBlip: true, blipMax: 0.3,
+    dragClutch: { rpm0: 3000, rpm1: 5600, kc: 0, base: [[0, 1400]], muSlip: 0.2, slipRef: 200, rev: 400 },
+    lsdPreload: 250, lsdRamp: 0.3, driveEff: 0.9,
+    CdA: 1.18,
+    bodyHalfW: 1.0, bodyFront: -0.9, bodyRear: 0.6, bodyBottom: -0.25, bodyTop: 0.55,
+    bodyPts: ccPts(0.38, 0.5, 1.3, ccBox(1.0, 0.14, 0.95, -0.72, 0.45).concat([[0, 0.14, -0.1], [0, 0.95, 0.4]])),
+  } };
+  // Egg Rod: the Mork & Mindy egg car as a hot rod - a fibreglass egg for a cockpit, a 350 small-block (~360 hp) behind
+  // it on an open frame, a TH350 3-speed automatic, posi rear, fat rear tyres on copper wheels and a big rear wing.
+  // 1,450 kg; ~142 mph flat out in top
+  CARS.eggrod = { name: 'Egg Rod', short: 'Egg Rod', car: '350 SMALL-BLOCK', hp: 360, tq: 390, cc: true, spec: {
+    name: 'Egg Rod',
+    mass: 1450, Ipitch: 1500, Iyaw: 1650, Iroll: 420, cgHeight: 0.5, wheelbase: 2.5, frontWeight: 0.42,
+    trackF: 1.5, trackR: 1.56, wheelRadius: 0.35, wheelRadiusF: 0.31, wheelRadiusR: 0.35, wheelInertiaF: 1.1, wheelInertiaR: 1.8,
+    frontTire: 'street', rearTire: 'street',
+    springF: 38000, springR: 44000, dampBumpF: 2800, dampRebF: 4200, dampBumpR: 3200, dampRebR: 4800,
+    arbF: 20000, arbR: 8000, travelUp: 0.08, travelDown: 0.1, suspS0: 0.28,
+    brakeTorqueF: 1800, brakeTorqueR: 1000, handbrakeTorque: 1500, noABS: true, noESC: true,
+    maxSteer: 0.55, steerRate: 4.5, steerRatio: 15,
+    idleRpm: 800, limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5700, engineInertia: 0.25, fricA: 22, fricB: 14, starterTorque: 150,
+    torqueCurve: [[0, 200], [1000, 280], [2000, 340], [3000, 375], [4000, 390], [4500, 388], [5000, 375], [5500, 344], [6000, 300], [6500, 240], [7000, 180]],
+    boostMax: 0,
+    autoRatios: [2.52, 1.52, 1.0], autoRev: 2.07, autoFinal: 2.8, tcK: 0.0068, tcStall: 2.0, noLockup: true,
+    lsdPreload: 120, lsdRamp: 0.35, driveEff: 0.86,
+    CdA: 0.95, wings: [{ y: 1.25, z: 1.25, ClA: 0.45, CdA: 0.12 }],
+    bodyHalfW: 0.85, bodyFront: -2.15, bodyRear: 1.35, bodyBottom: -0.3, bodyTop: 0.95,
+  } };
+  // Banana Car: the Big Banana Car - a fibreglass banana on a 1993 Ford F-150's frame, the truck's 5.0 L V8 (185 hp) and
+  // 4-speed automatic, five seats in a row. ~85 mph. And, as in the game, it floats: the sealed hull displaces its
+  // weight with ~0.4 m of draft and the spinning rear tyres paddle it along (the fronts steer it like rudders)
+  CARS.banana = { name: 'Banana Car', short: 'Banana Car', car: '5.0 V8 · F-150', hp: 185, tq: 270, cc: true, kbLat: 7, spec: {
+    name: 'Banana Car',
+    mass: 1730, Ipitch: 3600, Iyaw: 3800, Iroll: 520, cgHeight: 0.72, wheelbase: 3.0, frontWeight: 0.5,
+    trackF: 1.63, trackR: 1.66, wheelRadius: 0.369, wheelInertiaF: 1.5, wheelInertiaR: 1.7,
+    frontTire: 'truckAS', rearTire: 'truckAS',
+    springF: 45000, springR: 52000, dampBumpF: 3200, dampRebF: 4800, dampBumpR: 3600, dampRebR: 5400,
+    arbF: 15000, arbR: 4000, travelUp: 0.09, travelDown: 0.12, suspS0: 0.3,
+    brakeTorqueF: 2200, brakeTorqueR: 1300, handbrakeTorque: 1800,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 17,
+    idleRpm: 650, limiterRpm: 4700, redlineRpm: 4500, shiftRpm: 4400, engineInertia: 0.3, fricA: 20, fricB: 12, starterTorque: 150,
+    torqueCurve: [[0, 170], [800, 210], [1500, 250], [2400, 270], [3000, 265], [3800, 256], [4200, 235], [4600, 205], [5000, 170]],
+    boostMax: 0,
+    autoRatios: [2.4, 1.47, 1.0, 0.67], autoRev: 2.0, autoFinal: 3.55, tcK: 0.008, tcStall: 2.1, lockupTorque: 600,
+    lsdPreload: 20, lsdRamp: 0.1, driveEff: 0.85, govSpeed: 85 / 2.23694, govGrace: 0.5,
+    CdA: 1.35,
+    floats: { bottom: 0.32, depth: 0.95, len: 5.4, halfW: 0.58, fill: 0.72, paddle: 240, paddleMax: 900, rudder: 180 },
+    bodyHalfW: 0.8, bodyFront: -2.9, bodyRear: 3.3, bodyBottom: -0.4, bodyTop: 0.6,
+    bodyPts: ccPts(0.72, 0.5, 3.0, ccBox(0.62, 0.3, 1.3, -2.9, 2.2).concat(ccBox(0.3, 0.9, 1.8, 2.2, 3.4)).concat([[0, 1.1, -3.35], [0, 2.05, 3.55]])),
+  } };
+  // Blue Bird: Campbell's 1935 Campbell-Napier-Railton Blue Bird - a 36.7 L supercharged Rolls-Royce R V12 (2,350 hp at
+  // 3,200 rpm, the Schneider Trophy seaplane engine), a 3-speed gearbox, twin rear wheels, Dunlop 37 x 7 tyres, ~5 t.
+  // It did 301.129 mph at Bonneville on 3 September 1935 - the first car past 300. It needs miles to get there, steers
+  // like a ship and stops like one (drums all round)
+  CARS.bluebird = { name: 'Blue Bird', short: 'Blue Bird', car: 'ROLLS-ROYCE R V12', hp: 2350, tq: 3860, cc: true, spec: {
+    name: 'Blue Bird',
+    mass: 4900, Ipitch: 19000, Iyaw: 20000, Iroll: 1500, cgHeight: 0.62, wheelbase: 4.17, frontWeight: 0.5,
+    trackF: 1.6, trackR: 1.55, wheelRadius: 0.47, wheelInertiaF: 6, wheelInertiaR: 12,
+    frontTire: 'lsr37', rearTire: 'lsr37', Fz0: 12000,
+    springF: 220000, springR: 240000, dampBumpF: 14000, dampRebF: 18000, dampBumpR: 16000, dampRebR: 20000,
+    arbF: 0, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15, rearToe: 0,
+    brakeTorqueF: 5000, brakeTorqueR: 4200, handbrakeTorque: 4000, noABS: true, noESC: true,
+    maxSteer: 0.16, steerRate: 1.2, steerRatio: 30, ackermann: 0.3,
+    idleRpm: 600, limiterRpm: 3450, redlineRpm: 3300, shiftRpm: 3250, engineInertia: 4.0, fricA: 150, fricB: 60, starterTorque: 1500,
+    torqueCurve: [[0, 1500], [800, 2000], [1500, 2800], [2000, 3300], [2500, 3700], [2900, 3900], [3200, 3857], [3400, 3650], [3700, 3200]],
+    centrifugal: true, boostMax: 18,
+    autoRatios: [2.4, 1.55, 1.0], autoRev: 2.4, autoFinal: 1.17, shiftTimeWOT: 0.5, shiftTimePart: 0.6, shiftCutDepth: 0.6,
+    launchRpm: 1600, noCoastBlip: true, blipMax: 0.2,
+    dragClutch: { rpm0: 1300, rpm1: 2800, kc: 0, base: [[0, 7500]], muSlip: 0.15, slipRef: 60, rev: 3000 },
+    lsdPreload: 400, lsdRamp: 0.2, driveEff: 0.9,
+    CdA: 0.93,
+    bodyHalfW: 0.8, bodyFront: -3.6, bodyRear: 4.6, bodyBottom: -0.42, bodyTop: 0.72,
+    bodyPts: ccPts(0.62, 0.5, 4.17, ccBox(0.55, 0.2, 1.1, -3.9, 3.2).concat(ccBox(0.25, 0.4, 1.9, 3.2, 4.3)).concat([[0, 1.3, 0.8], [0, 0.6, -4.4]])),
+  } };
+  // Nissan GT-R (R35), in the Liberty Walk widebody the game's car wears: the 2017 car's VR38DETT 3.8 L twin-turbo V6
+  // (565 hp at 6,800, 467 lb-ft from 3,300 to 5,800), the GR6 6-speed dual-clutch, ATTESA E-TS all-wheel drive
+  // (rear-biased; a clutch sends up to half to the front), 1,752 kg. Bolt-on overfenders, wider track, air ride, a GT
+  // wing. 0-60 ~2.9 s with launch control, ~196 mph
+  CARS.gtr = { name: 'Nissan GT-R (R35) Liberty Walk', short: 'Nissan GTR', car: 'VR38DETT', hp: 565, tq: 467, cc: true, spec: {
+    name: 'Nissan GT-R (R35) Liberty Walk',
+    mass: 1830, Ipitch: 2500, Iyaw: 2750, Iroll: 600, cgHeight: 0.47, wheelbase: 2.78, frontWeight: 0.54,
+    trackF: 1.66, trackR: 1.68, wheelRadius: 0.354, wheelInertiaF: 1.5, wheelInertiaR: 1.7,
+    frontTire: 'street', rearTire: 'street',
+    springF: 68000, springR: 64000, dampBumpF: 3800, dampRebF: 6000, dampBumpR: 3700, dampRebR: 5800,
+    arbF: 36000, arbR: 21000, travelUp: 0.06, travelDown: 0.09, suspS0: 0.25,
+    brakeTorqueF: 4400, brakeTorqueR: 2600, handbrakeTorque: 2500,
+    maxSteer: 0.56, steerRate: 5, steerRatio: 16,
+    idleRpm: 750, limiterRpm: 7100, redlineRpm: 7000, shiftRpm: 6900, engineInertia: 0.22, fricA: 26, fricB: 18, starterTorque: 170,
+    torqueCurve: [[0, 170], [1000, 230], [2000, 330], [2800, 430], [3300, 467], [5800, 467], [6400, 452], [6800, 436], [7100, 410], [7500, 360]],
+    turbo: { lag: 0.25, base: 0.5, rpm0: 1500, rpm1: 3000 }, boostMax: 13,
+    autoRatios: [4.056, 2.301, 1.595, 1.248, 1.001, 0.796], autoRev: 3.383, autoFinal: 3.7, shiftTimeWOT: 0.15, shiftTimePart: 0.25, shiftCutDepth: 0.3,
+    launchRpm: 4000, engineTc: true, tcRefBody: true,
+    dragClutch: { rpm0: 2400, rpm1: 4400, kc: 0, base: [[0, 1100]], muSlip: 0.15, slipRef: 150, rev: 500 },
+    awd: true, awdFront: 0.25, lsdPreload: 180, lsdPreloadF: 50, centerPreload: 700, lsdRamp: 0.25, driveEff: 0.87,
+    CdA: 0.64, ClA: 0.15,
+    bodyHalfW: 1.0, bodyFront: -2.28, bodyRear: 2.43, bodyBottom: -0.33, bodyTop: 0.86,
+  } };
+  // Mini Dookie: the game's Pamingo Mini (the Fiat Pongo concept) - a one-seat electric city pod, a 15 kW / 60 Nm motor
+  // through a single 9:1 reduction, skinny eco tyres. 670 kg; ~55 mph and in no hurry getting there
+  CARS.mini = { name: 'Mini Dookie', short: 'Mini Dookie', car: '15 kW ELECTRIC', hp: 20, tq: 44, cc: true, kbLat: 7, spec: {
+    name: 'Mini Dookie',
+    mass: 670, Ipitch: 420, Iyaw: 450, Iroll: 180, cgHeight: 0.52, wheelbase: 1.7, frontWeight: 0.5,
+    trackF: 1.2, trackR: 1.2, wheelRadius: 0.28, wheelInertiaF: 0.5, wheelInertiaR: 0.55,
+    frontTire: 'eco', rearTire: 'eco',
+    springF: 22000, springR: 24000, dampBumpF: 1500, dampRebF: 2200, dampBumpR: 1600, dampRebR: 2400,
+    arbF: 8000, arbR: 0, travelUp: 0.07, travelDown: 0.08, suspS0: 0.2,
+    brakeTorqueF: 900, brakeTorqueR: 500, handbrakeTorque: 700, noESC: true,
+    maxSteer: 0.62, steerRate: 4, steerRatio: 14,
+    electric: true, idleRpm: 0, limiterRpm: 8000, redlineRpm: 8000, shiftRpm: 9000, engineInertia: 0.02, fricA: 1, fricB: 0.8, starterTorque: 0,
+    torqueCurve: evCurve(60, 15, 8000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 9.0, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 5, lsdRamp: 0, driveEff: 0.92,
+    CdA: 0.72,
+    bodyHalfW: 0.66, bodyFront: -1.3, bodyRear: 1.2, bodyBottom: -0.3, bodyTop: 1.1,
+    bodyPts: ccPts(0.52, 0.5, 1.7, ccBox(0.66, 0.2, 1.62, -1.25, 1.15)),
+  } };
+  // Porta Potty: a 2.3 m portable toilet (PolyJohn PJP3-type) on a go-kart frame - four 10 in wheels under its base, a
+  // 670 cc V-twin (~22 hp) and a torque-converter drive behind the seat, the driver on the throne with the door open.
+  // ~290 kg with the driver, and the centre of gravity at hip height on a 1 m track: take a turn at speed and it goes over
+  CARS.potty = { name: 'Porta Potty', short: 'Porta Potty', car: '670 cc V-TWIN', hp: 22, tq: 34, cc: true, kbLat: 5, spec: {
+    name: 'Porta Potty',
+    mass: 290, Ipitch: 110, Iyaw: 60, Iroll: 105, cgHeight: 0.64, wheelbase: 0.95, frontWeight: 0.5,
+    trackF: 1.0, trackR: 1.0, wheelRadius: 0.13, wheelInertiaF: 0.03, wheelInertiaR: 0.04,
+    frontTire: 'tiny10', rearTire: 'tiny10', Fz0: 900, loadSens: 0.1,
+    springF: 30000, springR: 30000, dampBumpF: 900, dampRebF: 900, dampBumpR: 900, dampRebR: 900,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.02, suspS0: 0.05, rearToe: 0,
+    brakeTorqueF: 60, brakeTorqueR: 90, handbrakeTorque: 120, noABS: true, noESC: true,
+    maxSteer: 0.5, steerRate: 3.5, steerRatio: 8, ackermann: 0.6,
+    idleRpm: 1200, limiterRpm: 4200, redlineRpm: 4000, shiftRpm: 3900, engineInertia: 0.05, fricA: 1.5, fricB: 0.9, starterTorque: 10,
+    torqueCurve: [[0, 20], [1500, 28], [2500, 34], [3000, 34], [3600, 32], [4000, 29], [4400, 24], [4800, 18]], boostMax: 0,
+    autoRatios: [2.4, 1.55, 1.0], autoRev: 2.4, autoFinal: 2.75, shiftTimeWOT: 0.35, shiftTimePart: 0.45, shiftCutDepth: 0.2,
+    launchRpm: 2600, noCoastBlip: true, blipMax: 0.2,
+    dragClutch: { rpm0: 1800, rpm1: 2800, kc: 0.0002, rev: 15, base: [[0, 8]], muSlip: 0.2, slipRef: 150 },
+    lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.85,
+    CdA: 2.3, bodyK: 80000, bodyC: 4000, bodyMu: 0.5,
+    bodyHalfW: 0.56, bodyFront: -0.6, bodyRear: 0.6, bodyBottom: -0.5, bodyTop: 1.7,
+    bodyPts: ccPts(0.64, 0.5, 0.95, ccBox(0.56, 0.1, 2.36, -0.6, 0.6).concat([[0, 2.42, 0]])),
+  } };
+  // Turbo Scooter 3000: a four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor thrown away for a
+  // 100 kW axial-flux motor and a lithium pack - 220 Nm straight to the rear axle through a 2.42:1 belt, 10 in tyres, the
+  // basket still on the front and the battery pack in the footwell. 215 kg with the rider; ~119 mph. The motor
+  // controller's wheelie control and the anti-tip wheels at the back stop it looping over on the launch; nothing stops it
+  // rolling over in a turn - the rider sits high on a half-metre track
+  CARS.scooter = { name: 'Turbo Scooter 3000', short: 'Turbo Scooter', car: '100 kW ELECTRIC', hp: 134, tq: 162, cc: true, kbLat: 3, spec: {
+    name: 'Turbo Scooter 3000',
+    mass: 215, Ipitch: 45, Iyaw: 30, Iroll: 26, cgHeight: 0.66, wheelbase: 1.1, frontWeight: 0.45,
+    trackF: 0.5, trackR: 0.56, wheelRadius: 0.13, wheelInertiaF: 0.02, wheelInertiaR: 0.04,
+    frontTire: 'scooter10', rearTire: 'scooter10', Fz0: 900, loadSens: 0.1,
+    springF: 30000, springR: 30000, dampBumpF: 900, dampRebF: 1100, dampBumpR: 1100, dampRebR: 1300,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.06, rearToe: 0,
+    brakeTorqueF: 80, brakeTorqueR: 100, handbrakeTorque: 100, noABS: true, noESC: true,
+    maxSteer: 0.6, steerRate: 3, steerRatio: 5, ackermann: 0.6,
+    electric: true, idleRpm: 0, limiterRpm: 10000, redlineRpm: 10000, shiftRpm: 11000, engineInertia: 0.03, fricA: 1, fricB: 1.6, starterTorque: 0,
+    torqueCurve: evCurve(220, 100, 10000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 2.42, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 6, lsdRamp: 0, driveEff: 0.92,
+    wheelieBar: { len: 0.32, clr: 0.08, halfW: 0.18, r: 0.04, k: 150000, damp: 5000, Fmax: 5000 }, wheelieCtl: 1,
+    CdA: 0.68, bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
+    bodyHalfW: 0.32, bodyFront: -0.95, bodyRear: 0.6, bodyBottom: -0.5, bodyTop: 0.9,
+    bodyPts: ccPts(0.66, 0.45, 1.1, ccBox(0.3, 0.1, 0.45, -0.8, 0.64).concat(ccBox(0.25, 0.55, 1.35, 0.0, 0.45))
+      .concat([[0, 1.55, 0.35], [0, 1.0, -0.6], [0, 0.5, -0.9]])),
+  } };
+  // Razors Edge: the game's Halloween special after the Lo Res Car - a golf cart's chassis under a long faceted body of
+  // smoked glass panels edged in neon. Here: a stretched cart frame with a 110 kW / 250 Nm motor through a 4.95:1
+  // reduction, 18 x 8.50-8 cart tyres, two seats. 530 kg with the driver; ~142 mph, the glass wedge cleaving the air
+  CARS.razor = { name: 'Razors Edge', short: 'Razors Edge', car: '110 kW ELECTRIC', hp: 148, tq: 184, cc: true, spec: {
+    name: 'Razors Edge',
+    mass: 530, Ipitch: 520, Iyaw: 600, Iroll: 110, cgHeight: 0.42, wheelbase: 2.3, frontWeight: 0.45,
+    trackF: 1.12, trackR: 1.12, wheelRadius: 0.26, wheelInertiaF: 0.3, wheelInertiaR: 0.35,
+    frontTire: 'golf', rearTire: 'golf',
+    springF: 20000, springR: 24000, dampBumpF: 1200, dampRebF: 1700, dampBumpR: 1400, dampRebR: 2000,
+    arbF: 7000, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15,
+    brakeTorqueF: 350, brakeTorqueR: 300, handbrakeTorque: 400, noABS: true, noESC: true,
+    maxSteer: 0.55, steerRate: 4, steerRatio: 14,
+    electric: true, idleRpm: 0, limiterRpm: 12000, redlineRpm: 12000, shiftRpm: 13000, engineInertia: 0.04, fricA: 1, fricB: 1.5, starterTorque: 0,
+    torqueCurve: evCurve(250, 110, 12000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 4.95, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 10, lsdRamp: 0.05, driveEff: 0.92,
+    CdA: 0.5,
+    bodyHalfW: 0.8, bodyFront: -2.3, bodyRear: 2.3, bodyBottom: -0.28, bodyTop: 0.85,
+    bodyPts: ccPts(0.42, 0.45, 2.3, ccBox(0.84, 0.16, 0.5, -1.4, 1.5).concat([[0, 0.3, -2.25], [0, 0.95, 2.2], [0, 1.28, -0.5], [-0.55, 0.9, 0.5], [0.55, 0.9, 0.5]])),
+  } };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock

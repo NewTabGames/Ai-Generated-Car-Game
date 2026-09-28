@@ -38,7 +38,7 @@
   #cockpitSpeed { position: absolute; left: 50%; bottom: 100px; background: var(--bg); padding: 3px 10px; border-radius: 4px; transform: translateX(-50%); font-size: 13px; color: var(--dim); }
   /* overlays */
   .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(20,20,24,0.55), rgba(0,0,0,0.88)); z-index: 10; }
-  #title .box { text-align: center; max-width: 720px; padding: 30px; }
+  #title .box { text-align: center; max-width: 800px; padding: 30px; }
   #title h1 { font-size: 64px; margin: 0; letter-spacing: 0.04em; font-style: italic; font-weight: 900; }
   #title h1 span { color: var(--red); }
   #title p { color: var(--dim); line-height: 1.5; }
@@ -93,14 +93,19 @@
   #wizard .sub { color: var(--dim); font-size: 14px; min-height: 40px; }
   #wizard .detect { margin: 14px auto; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; font-size: 14px; min-height: 42px; color: #bfe6c3; }
   #wizard .actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
-  #carPick, #carPickTitle { display: flex; gap: 8px; }
+  #carPick, #carPickTitle { display: flex; gap: 8px; flex-wrap: wrap; }
   #carPick { padding: 12px 18px 0; }
   #carPickTitle { justify-content: center; margin: 0 0 12px; }
   .carbtn { flex: 1; pointer-events: auto; background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--txt); padding: 10px 14px; border-radius: 6px; cursor: pointer; text-align: left; }
-  #carPickTitle .carbtn { flex: 0 0 200px; }
+  #carPickTitle .carbtn { flex: 0 0 180px; }
   .carbtn.more { flex: 0 0 150px; background: rgba(255,255,255,0.02); border-style: dashed; }
-  #carPickTitle .carbtn.more { flex: 0 0 170px; }
+  #carPickTitle .carbtn.more { flex: 0 0 150px; }
   .carbtn.more.on { border-style: solid; }
+  .ccbreak { flex-basis: 100%; height: 0; }
+  .carbtn.cc { flex: 0 0 calc(20% - 6.4px); padding: 6px 10px; }
+  #carPickTitle .carbtn.cc { flex: 0 0 calc(20% - 6.4px); }
+  .carbtn.cc b { font-size: 12.5px; }
+  .carbtn.cc span { font-size: 11px; }
   #moreCars { z-index: 30; }
   #moreCars .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); pointer-events: auto; }
   #moreCars header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -1584,6 +1589,49 @@
       muX: 0.8, muY: 0.74, loose: 1.45, looseKx: [1, 1.08, 0.85, 1.18, 1.45, 1], kappaPeak: 0.16, alphaPeak: 0.15, relaxX: 0.16, relaxY: 0.24,
       B: 1.5, C: 1.35, E: -0.15, heatCap: 3000, cold: 1, coldT: 0, warmT: 1, hotT: 150, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1, 1.6], massAdd: 3, inertiaAdd: 0.06 },
+
+    // ---- the Car Crushers 2 cars (no radius: each car's own wheel size)
+    // Couch Car: 13 in R-compound race tyres tucked under the sofa - it needs every bit of bite for ~850 hp on 340 kg
+    couchF: { name: 'R-compound 20.0x7.5-13', short: 'R-comp 13 in', width: 0.2,
+      muX: 1.35, muY: 1.22, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.26,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 1500, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+    couchR: { name: 'R-compound 20.5x10.0-13', short: 'R-comp 13 in', width: 0.26,
+      muX: 1.5, muY: 1.26, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.15, relaxY: 0.27,
+      B: 1.8, C: 1.45, E: -0.25, heatCap: 1800, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+    // Banana Car: the F-150's all-season truck tyres
+    truckAS: { name: 'P235/75R15 all-season', short: 'All-season', width: 0.235,
+      muX: 1.05, muY: 0.92, loose: 1.1, kappaPeak: 0.12, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.45,
+      B: 1.7, C: 1.35, E: -0.2, heatCap: 4000, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.02,
+      crr: [1.1, 1, 1, 1, 1, 1.1] },
+    // Blue Bird: Dunlop 37 x 7 land-speed tyres - thin treadless rubber on a cord carcass, built to spin at 300 mph, not to grip
+    lsr37: { name: 'Dunlop 37 x 7 land-speed', short: 'Dunlop 37x7', width: 0.18,
+      muX: 1.0, muY: 0.86, loose: 0.75, kappaPeak: 0.1, alphaPeak: 0.1, relaxX: 0.3, relaxY: 0.55,
+      B: 1.6, C: 1.45, E: -0.25, heatCap: 6000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05 },
+    // Mini Dookie: skinny low-rolling-resistance eco tyres
+    eco: { name: '145/70R15 eco', short: 'Eco tyres', width: 0.145,
+      muX: 1.0, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.16, relaxY: 0.32,
+      B: 1.8, C: 1.4, E: -0.2, heatCap: 2400, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
+      crr: [0.75, 1, 1, 1, 1, 0.75] },
+    // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
+    tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
+      muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [1.2, 1.2, 1.2, 1.1, 1, 1.2] },
+    // Turbo Scooter 3000: soft-compound 10 in street-scooter tyres (at 215 kg it needs them to push against the wind)
+    scooter10: { name: '10 x 3.00 soft street', short: 'Soft 10 in', width: 0.08,
+      muX: 1.15, muY: 1.0, loose: 0.9, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.08, relaxY: 0.14,
+      B: 1.7, C: 1.42, E: -0.2, heatCap: 600, cold: 0.93, coldT: 10, warmT: 40, hotT: 100, overheat: 0.004, prep: 1.05,
+      crr: [1.1, 1.2, 1.2, 1.1, 1, 1.1] },
+    // Razors Edge: golf-cart 18 x 8.50-8 tyres on the stretched cart chassis
+    golf: { name: '18 x 8.50-8 cart tyre', short: 'Cart tyres', width: 0.215,
+      muX: 0.95, muY: 0.86, loose: 1.05, kappaPeak: 0.11, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.26,
+      B: 1.7, C: 1.38, E: -0.2, heatCap: 1600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [1.1, 1.1, 1.05, 1.05, 1, 1.1] },
+    // their off-road package: knobbies in each car's own size, a touch of lift
+    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
+      muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
+      B: 1.8, C: 1.3, E: -0.1, heatCap: 1500, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.02, lift: 0.02 },
   };
   // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
   function OFFROAD_PKG(car, cls) {
@@ -1592,6 +1640,7 @@
     if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
+    if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
   function MF(rho, t) {
@@ -1897,6 +1946,7 @@
     }
 
     startEngine() {
+      if (this.spec.electric) { this.running = true; this.cranking = false; this.stalled = false; return; }
       if (this.running || this.cranking) return;
       this.cranking = true; this.crankT = 0; this.stalled = false;
     }
@@ -2248,6 +2298,19 @@
       }
       this.squeal = squeal;
 
+      // ---------------- afloat (floats: the Banana Car): rear tyres turning in the water paddle it along - their push
+      // on the hull, and the water's drag back on the tyres through the driveline
+      if (s.floats && this.floatSub > 0.05) {
+        const pw = s.floats.paddle, pmax = s.floats.paddleMax || 900;
+        for (let i = 2; i < 4; i++) {
+          const w = W[i];
+          if (w.contact) continue;
+          const F = clamp(pw * (w.omega * w.radius - vFwd) * Math.min(1, this.floatSub), -pmax, pmax);
+          w.fx = F;
+          Fx -= m02 * F; Fy -= m12 * F; Fz -= m22 * F;
+        }
+      }
+
       // ---------------- brakes
       this._brakes(h, speed);
 
@@ -2332,7 +2395,45 @@
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
       const sub = wl0 - (py - 0.25);
-      if (sub > 0) {
+      if (s.floats) {
+        // (floats) a sealed hull: buoyancy at ten points along its bottom from how deep each one sits, so it floats level
+        // at its draft and rights itself; heave damping, the hull's drag through the water (a keel sideways), and the
+        // front wheels acting as rudders. The engine breathes high up - it keeps running
+        const fl = s.floats, N = 10, ly = fl.bottom - s.cgHeight + (s.cgDrop || 0), zc = s.wheelbase * (s.frontWeight - 0.5);
+        const Aw = fl.len * 2 * fl.halfW * fl.fill, kA = 1000 * GRAV * Aw / N, draft = mass / (1000 * Aw);
+        let dSum = 0;
+        for (let k = 0; k < N; k++) {
+          const lx = (k & 1 ? 1 : -1) * fl.halfW * 0.95, lz = ((k >> 1) / 4 - 0.5) * fl.len * 0.85 + zc;
+          const rx = m00 * lx + m01 * ly + m02 * lz, ry = m10 * lx + m11 * ly + m12 * lz, rz = m20 * lx + m21 * ly + m22 * lz;
+          const d = clamp(wl0 - (py + ry), 0, fl.depth);
+          if (d <= 0) continue;
+          dSum += d;
+          const cvy = vy + (wz * rx - wx * rz);
+          const F = kA * d - 900 * cvy * Math.min(1, d / 0.1);
+          Fy += F; Tx -= rz * F; Tz += rx * F;
+        }
+        this.floatSub = dSum / (N * draft);
+        const wet = Math.min(1, this.floatSub);
+        this.inWater = wet;
+        if (wet > 0) {
+          const dF = -(220 * vFwd + 160 * vFwd * Math.abs(vFwd)) * wet, dS = -(2500 * vRight + 1200 * vRight * Math.abs(vRight)) * wet;
+          Fx += -m02 * dF + m00 * dS; Fy += -m12 * dF + m10 * dS; Fz += -m22 * dF + m20 * dS;
+          Tx -= 2500 * wx * wet; Ty -= 3000 * wy * wet; Tz -= 2500 * wz * wet;
+          for (let i = 0; i < 2; i++) {
+            const w = W[i];
+            if (w.contact) continue;
+            const sn = Math.sin(w.steer), cs = Math.cos(w.steer);
+            let fx = m00 * sn - m02 * cs, fz = m20 * sn - m22 * cs;
+            const fn = Math.hypot(fx, fz) || 1; fx /= fn; fz /= fn;
+            const rx = w.hx - px, ry = w.hy - py, rz = w.hz - pz;
+            const cvx = vx + (wy * rz - wz * ry), cvz = vz + (wx * ry - wy * rx);
+            const F = -fl.rudder * (cvx * -fz + cvz * fx) * Math.max(Math.abs(cvx * fx + cvz * fz), 0.5) * wet;
+            const Fxr = -fz * F, Fzr = fx * F;
+            Fx += Fxr; Fz += Fzr;
+            Tx += ry * Fzr; Ty += rz * Fxr - rx * Fzr; Tz -= ry * Fxr;
+          }
+        }
+      } else if (sub > 0) {
         const depth = Math.min(sub, 1.4);
         this.inWater = depth;
         Fy += mass * GRAV * 0.5 * depth;
@@ -2540,6 +2641,10 @@
     _engine(h) {
       const s = this.spec, inp = this.input;
       let rpm = this.eOmega * RAD2RPM;
+      // electric motor (electric): always live - no starter, no idle, no stall - with full torque from a standstill, and
+      // the controller holds its top speed by fading the torque out instead of a fuel cut
+      const EV = !!s.electric;
+      if (EV) { this.running = true; this.cranking = false; this.stalled = false; }
       // start / crank
       if (this.cranking) {
         this.crankT += h;
@@ -2574,7 +2679,7 @@
         thr = clamp((tgt - this.eOmega) * 0.011, 0, 0.75);
       }
       // idle governor (PI) with post-start flare
-      if (this.running) {
+      if (this.running && !EV) {
         this.idleFlare *= Math.exp(-h / 1.1);
         // cammed idle hunts a little: the tach needle dances +-30-40 rpm
         const tgt = s.idleRpm + this.idleFlare + 11 * Math.sin(this.time * 6.9) + 6 * Math.sin(this.time * 2.3 + 1.1);
@@ -2584,7 +2689,8 @@
         if (thr < idleThr) thr = idleThr;
       }
       // rev limiter (fuel cut with hysteresis); the Fun tab can remove it
-      if (rpm > s.limiterRpm && !s.noLimiter) this.fuelCut = true;
+      if (EV) this.fuelCut = false;
+      else if (rpm > s.limiterRpm && !s.noLimiter) this.fuelCut = true;
       else if (rpm < s.limiterRpm - 230 || s.noLimiter) this.fuelCut = false;
       // launch control / TransBrake: hold rpm with spark cut, keep the throttle open so boost is ready (Torque Reserve)
       // (launchLimiter: a starting-line rev limiter that works whatever the traction-control setting)
@@ -2597,17 +2703,37 @@
       // mechanical governor (rental karts): the flyweights close the throttle progressively as the revs near the governed
       // speed, so it holds a steady top speed instead of banging off a rev limiter
       if (s.governorRpm) thr = Math.min(thr, clamp((s.governorRpm - rpm) / s.governorBand, 0, 1));
+      if (EV && !s.noLimiter) thr *= clamp((s.limiterRpm - rpm) / 250, 0, 1);
       if (this.fuelCut || !this.running) thr = 0;
       // throttle-body / manifold lag
       const tau = thr > this.thrEff ? 0.065 : 0.045;
       this.thrEff += (thr - this.thrEff) * Math.min(1, h / tau);
-      const Twot = curveAt(s.torqueCurve, rpm / (s.rpmStretch || 1)) * LBFT * (s.torqueScale || 1) - windage(s, rpm);
+      let Twot = curveAt(s.torqueCurve, rpm / (s.rpmStretch || 1)) * LBFT * (s.torqueScale || 1) - windage(s, rpm);
+      // turbocharger (turbo): the torque curve is the engine on full boost, but the turbine takes a moment to spool -
+      // boost follows the throttle and the exhaust flow (rpm) with a lag, and the torque climbs with it from its
+      // off-boost base (on the launch limiter the throttle is held open, so it spools up on the line)
+      if (s.turbo) {
+        const tb = s.turbo, flow = clamp((rpm - tb.rpm0) / (tb.rpm1 - tb.rpm0), 0, 1);
+        const tgt = this.thrEff * flow * (this.running ? 1 : 0), sp0 = this.spool || 0;
+        this.spool = sp0 + (tgt - sp0) * Math.min(1, h / (tgt > sp0 ? tb.lag : tb.lag * 0.4));
+        Twot *= tb.base + (1 - tb.base) * this.spool;
+      }
       const Tf = (s.fricA + s.fricB * rpm / 1000) * Math.tanh(this.eOmega / 4);
       // ignition timing on the hit (nitro dragsters): the crew chief pulls timing for the first second of the run and
       // brings it back in on the timers as the car gathers speed and the tyres can take it
       let retard = 1;
       if (s.launchRetard) { const x = clamp(this.dcT / s.launchRetard[1], 0, 1); retard = s.launchRetard[0] + (1 - s.launchRetard[0]) * x * x * (3 - 2 * x); }
-      let Te = (this.running && !this.fuelCut) ? this.thrEff * Twot * retard * this.tcCut * this.escCut * shiftCut * launchCut - (1 - this.thrEff) * Tf : -Tf;
+      // wheelie control (wheelieCtl: the nose-up pitch in degrees where it starts - a game aid like traction control, off
+      // with TC Off): the motor controller reads the pitch and its rate and trims the torque as the nose comes up, so
+      // the scooter launches with its front skimming the road instead of pogoing on its anti-tip wheels
+      if (s.wheelieCtl && this.tcMode < 3) {
+        const { qx, qy, qz, qw } = this, m12 = 2 * (qy * qz - qx * qw);
+        const m00 = 1 - 2 * (qy * qy + qz * qz), m10 = 2 * (qx * qy + qz * qw), m20 = 2 * (qx * qz - qy * qw);
+        const ahead = (Math.asin(clamp(-m12, -1, 1)) + 0.12 * (this.wx * m00 + this.wy * m10 + this.wz * m20)) * 57.3;
+        const tgt = clamp(1 - (ahead - s.wheelieCtl) / 4, 0.1, 1), wc0 = this.wcCut === undefined ? 1 : this.wcCut;
+        this.wcCut = wc0 + (tgt - wc0) * Math.min(1, h / 0.03);
+      } else this.wcCut = 1;
+      let Te = (this.running && !this.fuelCut) ? this.thrEff * Twot * retard * this.tcCut * this.escCut * shiftCut * launchCut * this.wcCut - (1 - this.thrEff) * Tf : -Tf;
       if (this.cranking) Te += s.starterTorque * Math.max(0, 1 - rpm / 380);
       // nitrous (Fun tab): a fixed horsepower shot on top, while the button is held at wide-open throttle
       this.nosActive = !!(inp.nos && s.nosHp > 0 && this.running && !this.fuelCut && thr > 0.6 && rpm > 1500 && this.gear !== 0 && !this.launchHold);
@@ -2617,7 +2743,8 @@
       // from low revs; a centrifugal one (centrifugal: the supercharged kart's) builds it with the square of its speed
       const bShape = s.centrifugal ? Math.pow(clamp(rpm / s.redlineRpm, 0, 1), 2) : Math.pow(clamp((rpm - 900) / 3600, 0, 1), 0.65);
       const bTgt = s.boostMax * this.thrEff * bShape * (this.running ? 1 : 0);
-      this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
+      if (s.turbo) this.boost = s.boostMax * this.spool;
+      else this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
       // overrun pops & crackles
       const dThr = this.lastThr - inp.throttle;
       if (dThr > 0.35 && rpm > 3000 && this.running) this.overrunT = 0.9 + Math.random() * 0.8;
@@ -2629,7 +2756,7 @@
       }
       if (this.fuelCut && Math.random() < h * 2.5 * (s.popScale !== undefined ? s.popScale : 1)) this.events.backfire++;
       // stall detection
-      if (this.running && rpm < 330 && this.locked && this.gear !== 0) {
+      if (this.running && rpm < 330 && this.locked && this.gear !== 0 && !EV) {
         this.running = false; this.stalled = true;
       }
     }
@@ -2672,7 +2799,7 @@
       const s = this.spec, inp = this.input;
       this.revHoldActive = !!inp.revHold;
       const standing = Math.abs(this.forwardSpeed) < 2.5;
-      if (inp.handbrake > 0.5 && this.gear !== 0 && !this.park && (this.launchHold || standing)) this.launchHold = true;
+      if (inp.handbrake > 0.5 && this.gear !== 0 && !this.park && (this.launchHold || standing) && !s.electric) this.launchHold = true;
       else this.launchHold = false;
       // dragster clutch timers: start when the pedal comes out (SPACE released, or floored from a stop), reset at a stop
       if (s.dragClutch) {
@@ -2868,7 +2995,9 @@
         wl.omega = brakeClamp(wl.omega, TbL, Ir, h);
         wr.omega = brakeClamp(wr.omega, TbR, Ir, h);
       }
-      if (this.eOmega < 0) this.eOmega = 0;
+      // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
+      // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
+      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
@@ -2895,6 +3024,10 @@
       const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
       const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
+      // (awdFront: the front axle's share of the drive - a rear-biased road-car system sends most of it to the back
+      // and lets the centre coupling pass more forward when the rears slip)
+      const fF = s.awdFront !== undefined ? s.awdFront : 0.5, SH = this._sh4 || (this._sh4 = [0, 0, 0, 0]);
+      SH[0] = SH[1] = fF / 2; SH[2] = SH[3] = (1 - fF) / 2;
       const mode = this._coupling(this.eOmega - wc0 * G);
       if (mode !== 2) this.locked = false;
       if (mode === 0) {
@@ -2910,7 +3043,7 @@
         if (Tp > 0 && we > 1) { const SR = wt / we; TRr = SR < 0.85 ? s.tcStall - (s.tcStall - 1) * Math.max(0, SR) / 0.85 : 1; }
         this.eOmega += h * (Te - Tp) / Ie;
         const Tin = Tp * TRr * G * eff;
-        for (let i = 0; i < 4; i++) W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia;
+        for (let i = 0; i < 4; i++) W[i].omega += h * (SH[i] * Tin + Ti[i] + T[i]) / W[i].inertia;
         this.lastTin = Tin;
       } else {
         const cap = this._cap, Itot = Isum + Ie * G * G;
@@ -2919,7 +3052,8 @@
           const Treq = Te - Ie * G * wcDot - Ie * wc0 * Gdot;
           if (Math.abs(Treq) > cap) this.locked = false;
           else {
-            for (let i = 0; i < 4; i++) W[i].omega += h * wcDot + h * (T[i] + Ti[i] - W[i].inertia * Tsum / Isum) / W[i].inertia;
+            const Tl = s.awdFront !== undefined ? G * eff * Treq : 0;     // (the locked carrier shares by inertia; re-split it)
+            for (let i = 0; i < 4; i++) W[i].omega += h * wcDot + h * (T[i] + Ti[i] - W[i].inertia * Tsum / Isum + (Tl ? (SH[i] - W[i].inertia / Isum) * Tl : 0)) / W[i].inertia;
             this.eOmega = (wc0 + h * wcDot) * G;
             this.lastTin = G * eff * Treq;
           }
@@ -2930,7 +3064,7 @@
           this.eOmega += h * (Te - Tcl) / Ie;
           const Tin = Tcl * G * eff;
           let wc1 = 0;
-          for (let i = 0; i < 4; i++) { W[i].omega += h * (0.25 * Tin + Ti[i] + T[i]) / W[i].inertia; wc1 += W[i].inertia * W[i].omega; }
+          for (let i = 0; i < 4; i++) { W[i].omega += h * (SH[i] * Tin + Ti[i] + T[i]) / W[i].inertia; wc1 += W[i].inertia * W[i].omega; }
           wc1 /= Isum;
           const dE1 = this.eOmega - wc1 * G;
           if (cap > 0 && (dE1 === 0 || (dE1 > 0 ? 1 : -1) !== sg)) {
@@ -2944,7 +3078,18 @@
       }
       // brakes on all four corners (+ the parking pawl, through the lockers)
       const pk = this.park ? 20000 : 0;
-      if (this.locked && G !== 0) {
+      if (this.locked && G !== 0 && s.awdFront !== undefined) {
+        // (a road car's diffs, awdFront: each brake works on its own wheel - only the part common to all four, and the
+        // parking pawl, goes through the driveline with the engine on it. Pooled, the stability control's brake on one
+        // front wheel braked all four and spun the car it was trying to straighten)
+        let bMin = Infinity, wc = 0;
+        for (let i = 0; i < 4; i++) { bMin = Math.min(bMin, W[i].brakeT); wc += W[i].inertia * W[i].omega; }
+        wc /= Isum;
+        const wcB = brakeClamp(wc, 4 * (bMin + pk), Isum + Ie * G * G, h);
+        let wm = 0;
+        for (let i = 0; i < 4; i++) { W[i].omega = brakeClamp(W[i].omega + wcB - wc, W[i].brakeT - bMin, W[i].inertia, h); wm += W[i].inertia * W[i].omega; }
+        this.eOmega = wm / Isum * G;
+      } else if (this.locked && G !== 0) {
         let wc = 0, Tb = 0;
         for (let i = 0; i < 4; i++) { wc += W[i].inertia * W[i].omega; Tb += W[i].brakeT + pk; }
         wc /= Isum;
@@ -2952,7 +3097,9 @@
         for (let i = 0; i < 4; i++) W[i].omega += wcB - wc;
         this.eOmega = wcB * G;
       } else for (let i = 0; i < 4; i++) W[i].omega = brakeClamp(W[i].omega, W[i].brakeT + pk, W[i].inertia, h);
-      if (this.eOmega < 0) this.eOmega = 0;
+      // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
+      // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
+      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
@@ -3540,6 +3687,222 @@
     return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,
       spec: Object.assign({}, CARS.mower.spec, c.spec, { name: c.name + ' "' + c.car + '"' }) };
   };
+  // ------------------------------------------------------------------ Car Crushers 2 cars
+  // Nine vehicles from the Roblox game Car Crushers 2, each built the way it would have to be for real to do what it does
+  // in the game (its top speed and weight there) and left to the real physics: the couch is twitchy, the scooter and
+  // the porta potty tip over in a turn, the Blue Bird needs miles to reach 300 mph. Plain CARS entries (cc: true) - the
+  // game lists them with the Challengers. (ccPts: model space - ground under the wheelbase centre, forward -z - to CG frame)
+  const ccPts = (cg, fw, wb, pts) => pts.map(([x, y, z]) => [x, y - cg, z + wb * (fw - 0.5)]);
+  // a box's corners and mid-edges (both sides), for the body / roll-over contacts
+  const ccBox = (hw, y0, y1, z0, z1) => [-1, 1].map((sx) => [[hw, y0, z0], [hw, y0, z1], [hw, y1, z0], [hw, y1, z1], [hw, y0, (z0 + z1) / 2], [hw, y1, (z0 + z1) / 2],
+    [hw, (y0 + y1) / 2, z0], [hw, (y0 + y1) / 2, z1]].map(([x, y, z]) => [sx * x, y, z])).flat();
+  const EV_CLUTCH = { rpm0: -2, rpm1: -1, kc: 0, base: [[0, 6000]], rev: 6000 };   // (an electric motor: always coupled)
+  // an electric motor's torque curve: constant torque to its base speed, constant power past it (lb-ft)
+  const evCurve = (Nm, kW, maxRpm) => {
+    const base = kW * 1000 / Nm * 30 / Math.PI, c = [[0, Nm / LBFT], [base, Nm / LBFT]];
+    for (let r = Math.ceil(base / 1000) * 1000; r <= maxRpm + 1000; r += 1000) if (r > base) c.push([r, kW * 1000 / (r * Math.PI / 30) / LBFT]);
+    return c;
+  };
+  // Couch Car: a three-seat leather sofa on a hidden tube chassis, four 13 in wheels tucked under it, a 1.6 L turbo triple
+  // built like a drag engine (~850 hp on 40 psi and E85) under the seat with its three pipes out of the right arm, a
+  // sequential 5-speed with a quickshifter and a locked diff. ~190 mph (the game's figure) is where 850 hp runs out
+  // against a sofa's drag - which at that speed is over its own weight: the game's 300 kg couch could never push it
+  // (its rear tyres just spin at ~150); with the engine, frame and driver it's 520 kg. On a 1.3 m wheelbase it is as
+  // twitchy as it sounds
+  CARS.couch = { name: 'Couch Car', short: 'Couch Car', car: '1.6 TURBO TRIPLE', hp: 850, tq: 600, cc: true, kbLat: 9, spec: {
+    name: 'Couch Car',
+    mass: 520, Ipitch: 75, Iyaw: 160, Iroll: 135, cgHeight: 0.38, wheelbase: 1.3, frontWeight: 0.5,
+    trackF: 1.6, trackR: 1.6, wheelRadius: 0.254, wheelInertiaF: 0.3, wheelInertiaR: 0.4,
+    frontTire: 'couchF', rearTire: 'couchR', Fz0: 1200, loadSens: 0.1,
+    springF: 45000, springR: 52000, dampBumpF: 1500, dampRebF: 2100, dampBumpR: 1700, dampRebR: 2400,
+    arbF: 9000, arbR: 4500, travelUp: 0.05, travelDown: 0.05, suspS0: 0.12, rearToe: 0.002,
+    brakeTorqueF: 650, brakeTorqueR: 450, handbrakeTorque: 500, noABS: true, noESC: true,
+    maxSteer: 0.45, steerRate: 4.5, steerRatio: 12, ackermann: 0.6,
+    idleRpm: 1000, limiterRpm: 8600, redlineRpm: 8300, shiftRpm: 8300, engineInertia: 0.1, fricA: 8, fricB: 3, starterTorque: 40,
+    torqueCurve: [[0, 90], [1000, 110], [2000, 170], [3000, 300], [4000, 450], [5000, 560], [6000, 600], [7000, 595], [7800, 572], [8500, 520], [9500, 380]],
+    turbo: { lag: 0.45, base: 0.3, rpm0: 2200, rpm1: 5000 }, boostMax: 40,
+    autoRatios: [2.6, 1.85, 1.42, 1.15, 0.96], autoRev: 2.6, autoFinal: 2.56, shiftTimeWOT: 0.06, shiftTimePart: 0.1, shiftCutDepth: 0.6,
+    launchRpm: 5500, engineTc: true, noCoastBlip: true, blipMax: 0.3,
+    dragClutch: { rpm0: 3000, rpm1: 5600, kc: 0, base: [[0, 1400]], muSlip: 0.2, slipRef: 200, rev: 400 },
+    lsdPreload: 250, lsdRamp: 0.3, driveEff: 0.9,
+    CdA: 1.18,
+    bodyHalfW: 1.0, bodyFront: -0.9, bodyRear: 0.6, bodyBottom: -0.25, bodyTop: 0.55,
+    bodyPts: ccPts(0.38, 0.5, 1.3, ccBox(1.0, 0.14, 0.95, -0.72, 0.45).concat([[0, 0.14, -0.1], [0, 0.95, 0.4]])),
+  } };
+  // Egg Rod: the Mork & Mindy egg car as a hot rod - a fibreglass egg for a cockpit, a 350 small-block (~360 hp) behind
+  // it on an open frame, a TH350 3-speed automatic, posi rear, fat rear tyres on copper wheels and a big rear wing.
+  // 1,450 kg; ~142 mph flat out in top
+  CARS.eggrod = { name: 'Egg Rod', short: 'Egg Rod', car: '350 SMALL-BLOCK', hp: 360, tq: 390, cc: true, spec: {
+    name: 'Egg Rod',
+    mass: 1450, Ipitch: 1500, Iyaw: 1650, Iroll: 420, cgHeight: 0.5, wheelbase: 2.5, frontWeight: 0.42,
+    trackF: 1.5, trackR: 1.56, wheelRadius: 0.35, wheelRadiusF: 0.31, wheelRadiusR: 0.35, wheelInertiaF: 1.1, wheelInertiaR: 1.8,
+    frontTire: 'street', rearTire: 'street',
+    springF: 38000, springR: 44000, dampBumpF: 2800, dampRebF: 4200, dampBumpR: 3200, dampRebR: 4800,
+    arbF: 20000, arbR: 8000, travelUp: 0.08, travelDown: 0.1, suspS0: 0.28,
+    brakeTorqueF: 1800, brakeTorqueR: 1000, handbrakeTorque: 1500, noABS: true, noESC: true,
+    maxSteer: 0.55, steerRate: 4.5, steerRatio: 15,
+    idleRpm: 800, limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5700, engineInertia: 0.25, fricA: 22, fricB: 14, starterTorque: 150,
+    torqueCurve: [[0, 200], [1000, 280], [2000, 340], [3000, 375], [4000, 390], [4500, 388], [5000, 375], [5500, 344], [6000, 300], [6500, 240], [7000, 180]],
+    boostMax: 0,
+    autoRatios: [2.52, 1.52, 1.0], autoRev: 2.07, autoFinal: 2.8, tcK: 0.0068, tcStall: 2.0, noLockup: true,
+    lsdPreload: 120, lsdRamp: 0.35, driveEff: 0.86,
+    CdA: 0.95, wings: [{ y: 1.25, z: 1.25, ClA: 0.45, CdA: 0.12 }],
+    bodyHalfW: 0.85, bodyFront: -2.15, bodyRear: 1.35, bodyBottom: -0.3, bodyTop: 0.95,
+  } };
+  // Banana Car: the Big Banana Car - a fibreglass banana on a 1993 Ford F-150's frame, the truck's 5.0 L V8 (185 hp) and
+  // 4-speed automatic, five seats in a row. ~85 mph. And, as in the game, it floats: the sealed hull displaces its
+  // weight with ~0.4 m of draft and the spinning rear tyres paddle it along (the fronts steer it like rudders)
+  CARS.banana = { name: 'Banana Car', short: 'Banana Car', car: '5.0 V8 · F-150', hp: 185, tq: 270, cc: true, kbLat: 7, spec: {
+    name: 'Banana Car',
+    mass: 1730, Ipitch: 3600, Iyaw: 3800, Iroll: 520, cgHeight: 0.72, wheelbase: 3.0, frontWeight: 0.5,
+    trackF: 1.63, trackR: 1.66, wheelRadius: 0.369, wheelInertiaF: 1.5, wheelInertiaR: 1.7,
+    frontTire: 'truckAS', rearTire: 'truckAS',
+    springF: 45000, springR: 52000, dampBumpF: 3200, dampRebF: 4800, dampBumpR: 3600, dampRebR: 5400,
+    arbF: 15000, arbR: 4000, travelUp: 0.09, travelDown: 0.12, suspS0: 0.3,
+    brakeTorqueF: 2200, brakeTorqueR: 1300, handbrakeTorque: 1800,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 17,
+    idleRpm: 650, limiterRpm: 4700, redlineRpm: 4500, shiftRpm: 4400, engineInertia: 0.3, fricA: 20, fricB: 12, starterTorque: 150,
+    torqueCurve: [[0, 170], [800, 210], [1500, 250], [2400, 270], [3000, 265], [3800, 256], [4200, 235], [4600, 205], [5000, 170]],
+    boostMax: 0,
+    autoRatios: [2.4, 1.47, 1.0, 0.67], autoRev: 2.0, autoFinal: 3.55, tcK: 0.008, tcStall: 2.1, lockupTorque: 600,
+    lsdPreload: 20, lsdRamp: 0.1, driveEff: 0.85, govSpeed: 85 / 2.23694, govGrace: 0.5,
+    CdA: 1.35,
+    floats: { bottom: 0.32, depth: 0.95, len: 5.4, halfW: 0.58, fill: 0.72, paddle: 240, paddleMax: 900, rudder: 180 },
+    bodyHalfW: 0.8, bodyFront: -2.9, bodyRear: 3.3, bodyBottom: -0.4, bodyTop: 0.6,
+    bodyPts: ccPts(0.72, 0.5, 3.0, ccBox(0.62, 0.3, 1.3, -2.9, 2.2).concat(ccBox(0.3, 0.9, 1.8, 2.2, 3.4)).concat([[0, 1.1, -3.35], [0, 2.05, 3.55]])),
+  } };
+  // Blue Bird: Campbell's 1935 Campbell-Napier-Railton Blue Bird - a 36.7 L supercharged Rolls-Royce R V12 (2,350 hp at
+  // 3,200 rpm, the Schneider Trophy seaplane engine), a 3-speed gearbox, twin rear wheels, Dunlop 37 x 7 tyres, ~5 t.
+  // It did 301.129 mph at Bonneville on 3 September 1935 - the first car past 300. It needs miles to get there, steers
+  // like a ship and stops like one (drums all round)
+  CARS.bluebird = { name: 'Blue Bird', short: 'Blue Bird', car: 'ROLLS-ROYCE R V12', hp: 2350, tq: 3860, cc: true, spec: {
+    name: 'Blue Bird',
+    mass: 4900, Ipitch: 19000, Iyaw: 20000, Iroll: 1500, cgHeight: 0.62, wheelbase: 4.17, frontWeight: 0.5,
+    trackF: 1.6, trackR: 1.55, wheelRadius: 0.47, wheelInertiaF: 6, wheelInertiaR: 12,
+    frontTire: 'lsr37', rearTire: 'lsr37', Fz0: 12000,
+    springF: 220000, springR: 240000, dampBumpF: 14000, dampRebF: 18000, dampBumpR: 16000, dampRebR: 20000,
+    arbF: 0, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15, rearToe: 0,
+    brakeTorqueF: 5000, brakeTorqueR: 4200, handbrakeTorque: 4000, noABS: true, noESC: true,
+    maxSteer: 0.16, steerRate: 1.2, steerRatio: 30, ackermann: 0.3,
+    idleRpm: 600, limiterRpm: 3450, redlineRpm: 3300, shiftRpm: 3250, engineInertia: 4.0, fricA: 150, fricB: 60, starterTorque: 1500,
+    torqueCurve: [[0, 1500], [800, 2000], [1500, 2800], [2000, 3300], [2500, 3700], [2900, 3900], [3200, 3857], [3400, 3650], [3700, 3200]],
+    centrifugal: true, boostMax: 18,
+    autoRatios: [2.4, 1.55, 1.0], autoRev: 2.4, autoFinal: 1.17, shiftTimeWOT: 0.5, shiftTimePart: 0.6, shiftCutDepth: 0.6,
+    launchRpm: 1600, noCoastBlip: true, blipMax: 0.2,
+    dragClutch: { rpm0: 1300, rpm1: 2800, kc: 0, base: [[0, 7500]], muSlip: 0.15, slipRef: 60, rev: 3000 },
+    lsdPreload: 400, lsdRamp: 0.2, driveEff: 0.9,
+    CdA: 0.93,
+    bodyHalfW: 0.8, bodyFront: -3.6, bodyRear: 4.6, bodyBottom: -0.42, bodyTop: 0.72,
+    bodyPts: ccPts(0.62, 0.5, 4.17, ccBox(0.55, 0.2, 1.1, -3.9, 3.2).concat(ccBox(0.25, 0.4, 1.9, 3.2, 4.3)).concat([[0, 1.3, 0.8], [0, 0.6, -4.4]])),
+  } };
+  // Nissan GT-R (R35), in the Liberty Walk widebody the game's car wears: the 2017 car's VR38DETT 3.8 L twin-turbo V6
+  // (565 hp at 6,800, 467 lb-ft from 3,300 to 5,800), the GR6 6-speed dual-clutch, ATTESA E-TS all-wheel drive
+  // (rear-biased; a clutch sends up to half to the front), 1,752 kg. Bolt-on overfenders, wider track, air ride, a GT
+  // wing. 0-60 ~2.9 s with launch control, ~196 mph
+  CARS.gtr = { name: 'Nissan GT-R (R35) Liberty Walk', short: 'Nissan GTR', car: 'VR38DETT', hp: 565, tq: 467, cc: true, spec: {
+    name: 'Nissan GT-R (R35) Liberty Walk',
+    mass: 1830, Ipitch: 2500, Iyaw: 2750, Iroll: 600, cgHeight: 0.47, wheelbase: 2.78, frontWeight: 0.54,
+    trackF: 1.66, trackR: 1.68, wheelRadius: 0.354, wheelInertiaF: 1.5, wheelInertiaR: 1.7,
+    frontTire: 'street', rearTire: 'street',
+    springF: 68000, springR: 64000, dampBumpF: 3800, dampRebF: 6000, dampBumpR: 3700, dampRebR: 5800,
+    arbF: 36000, arbR: 21000, travelUp: 0.06, travelDown: 0.09, suspS0: 0.25,
+    brakeTorqueF: 4400, brakeTorqueR: 2600, handbrakeTorque: 2500,
+    maxSteer: 0.56, steerRate: 5, steerRatio: 16,
+    idleRpm: 750, limiterRpm: 7100, redlineRpm: 7000, shiftRpm: 6900, engineInertia: 0.22, fricA: 26, fricB: 18, starterTorque: 170,
+    torqueCurve: [[0, 170], [1000, 230], [2000, 330], [2800, 430], [3300, 467], [5800, 467], [6400, 452], [6800, 436], [7100, 410], [7500, 360]],
+    turbo: { lag: 0.25, base: 0.5, rpm0: 1500, rpm1: 3000 }, boostMax: 13,
+    autoRatios: [4.056, 2.301, 1.595, 1.248, 1.001, 0.796], autoRev: 3.383, autoFinal: 3.7, shiftTimeWOT: 0.15, shiftTimePart: 0.25, shiftCutDepth: 0.3,
+    launchRpm: 4000, engineTc: true, tcRefBody: true,
+    dragClutch: { rpm0: 2400, rpm1: 4400, kc: 0, base: [[0, 1100]], muSlip: 0.15, slipRef: 150, rev: 500 },
+    awd: true, awdFront: 0.25, lsdPreload: 180, lsdPreloadF: 50, centerPreload: 700, lsdRamp: 0.25, driveEff: 0.87,
+    CdA: 0.64, ClA: 0.15,
+    bodyHalfW: 1.0, bodyFront: -2.28, bodyRear: 2.43, bodyBottom: -0.33, bodyTop: 0.86,
+  } };
+  // Mini Dookie: the game's Pamingo Mini (the Fiat Pongo concept) - a one-seat electric city pod, a 15 kW / 60 Nm motor
+  // through a single 9:1 reduction, skinny eco tyres. 670 kg; ~55 mph and in no hurry getting there
+  CARS.mini = { name: 'Mini Dookie', short: 'Mini Dookie', car: '15 kW ELECTRIC', hp: 20, tq: 44, cc: true, kbLat: 7, spec: {
+    name: 'Mini Dookie',
+    mass: 670, Ipitch: 420, Iyaw: 450, Iroll: 180, cgHeight: 0.52, wheelbase: 1.7, frontWeight: 0.5,
+    trackF: 1.2, trackR: 1.2, wheelRadius: 0.28, wheelInertiaF: 0.5, wheelInertiaR: 0.55,
+    frontTire: 'eco', rearTire: 'eco',
+    springF: 22000, springR: 24000, dampBumpF: 1500, dampRebF: 2200, dampBumpR: 1600, dampRebR: 2400,
+    arbF: 8000, arbR: 0, travelUp: 0.07, travelDown: 0.08, suspS0: 0.2,
+    brakeTorqueF: 900, brakeTorqueR: 500, handbrakeTorque: 700, noESC: true,
+    maxSteer: 0.62, steerRate: 4, steerRatio: 14,
+    electric: true, idleRpm: 0, limiterRpm: 8000, redlineRpm: 8000, shiftRpm: 9000, engineInertia: 0.02, fricA: 1, fricB: 0.8, starterTorque: 0,
+    torqueCurve: evCurve(60, 15, 8000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 9.0, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 5, lsdRamp: 0, driveEff: 0.92,
+    CdA: 0.72,
+    bodyHalfW: 0.66, bodyFront: -1.3, bodyRear: 1.2, bodyBottom: -0.3, bodyTop: 1.1,
+    bodyPts: ccPts(0.52, 0.5, 1.7, ccBox(0.66, 0.2, 1.62, -1.25, 1.15)),
+  } };
+  // Porta Potty: a 2.3 m portable toilet (PolyJohn PJP3-type) on a go-kart frame - four 10 in wheels under its base, a
+  // 670 cc V-twin (~22 hp) and a torque-converter drive behind the seat, the driver on the throne with the door open.
+  // ~290 kg with the driver, and the centre of gravity at hip height on a 1 m track: take a turn at speed and it goes over
+  CARS.potty = { name: 'Porta Potty', short: 'Porta Potty', car: '670 cc V-TWIN', hp: 22, tq: 34, cc: true, kbLat: 5, spec: {
+    name: 'Porta Potty',
+    mass: 290, Ipitch: 110, Iyaw: 60, Iroll: 105, cgHeight: 0.64, wheelbase: 0.95, frontWeight: 0.5,
+    trackF: 1.0, trackR: 1.0, wheelRadius: 0.13, wheelInertiaF: 0.03, wheelInertiaR: 0.04,
+    frontTire: 'tiny10', rearTire: 'tiny10', Fz0: 900, loadSens: 0.1,
+    springF: 30000, springR: 30000, dampBumpF: 900, dampRebF: 900, dampBumpR: 900, dampRebR: 900,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.02, suspS0: 0.05, rearToe: 0,
+    brakeTorqueF: 60, brakeTorqueR: 90, handbrakeTorque: 120, noABS: true, noESC: true,
+    maxSteer: 0.5, steerRate: 3.5, steerRatio: 8, ackermann: 0.6,
+    idleRpm: 1200, limiterRpm: 4200, redlineRpm: 4000, shiftRpm: 3900, engineInertia: 0.05, fricA: 1.5, fricB: 0.9, starterTorque: 10,
+    torqueCurve: [[0, 20], [1500, 28], [2500, 34], [3000, 34], [3600, 32], [4000, 29], [4400, 24], [4800, 18]], boostMax: 0,
+    autoRatios: [2.4, 1.55, 1.0], autoRev: 2.4, autoFinal: 2.75, shiftTimeWOT: 0.35, shiftTimePart: 0.45, shiftCutDepth: 0.2,
+    launchRpm: 2600, noCoastBlip: true, blipMax: 0.2,
+    dragClutch: { rpm0: 1800, rpm1: 2800, kc: 0.0002, rev: 15, base: [[0, 8]], muSlip: 0.2, slipRef: 150 },
+    lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.85,
+    CdA: 2.3, bodyK: 80000, bodyC: 4000, bodyMu: 0.5,
+    bodyHalfW: 0.56, bodyFront: -0.6, bodyRear: 0.6, bodyBottom: -0.5, bodyTop: 1.7,
+    bodyPts: ccPts(0.64, 0.5, 0.95, ccBox(0.56, 0.1, 2.36, -0.6, 0.6).concat([[0, 2.42, 0]])),
+  } };
+  // Turbo Scooter 3000: a four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor thrown away for a
+  // 100 kW axial-flux motor and a lithium pack - 220 Nm straight to the rear axle through a 2.42:1 belt, 10 in tyres, the
+  // basket still on the front and the battery pack in the footwell. 215 kg with the rider; ~119 mph. The motor
+  // controller's wheelie control and the anti-tip wheels at the back stop it looping over on the launch; nothing stops it
+  // rolling over in a turn - the rider sits high on a half-metre track
+  CARS.scooter = { name: 'Turbo Scooter 3000', short: 'Turbo Scooter', car: '100 kW ELECTRIC', hp: 134, tq: 162, cc: true, kbLat: 3, spec: {
+    name: 'Turbo Scooter 3000',
+    mass: 215, Ipitch: 45, Iyaw: 30, Iroll: 26, cgHeight: 0.66, wheelbase: 1.1, frontWeight: 0.45,
+    trackF: 0.5, trackR: 0.56, wheelRadius: 0.13, wheelInertiaF: 0.02, wheelInertiaR: 0.04,
+    frontTire: 'scooter10', rearTire: 'scooter10', Fz0: 900, loadSens: 0.1,
+    springF: 30000, springR: 30000, dampBumpF: 900, dampRebF: 1100, dampBumpR: 1100, dampRebR: 1300,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.06, rearToe: 0,
+    brakeTorqueF: 80, brakeTorqueR: 100, handbrakeTorque: 100, noABS: true, noESC: true,
+    maxSteer: 0.6, steerRate: 3, steerRatio: 5, ackermann: 0.6,
+    electric: true, idleRpm: 0, limiterRpm: 10000, redlineRpm: 10000, shiftRpm: 11000, engineInertia: 0.03, fricA: 1, fricB: 1.6, starterTorque: 0,
+    torqueCurve: evCurve(220, 100, 10000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 2.42, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 6, lsdRamp: 0, driveEff: 0.92,
+    wheelieBar: { len: 0.32, clr: 0.08, halfW: 0.18, r: 0.04, k: 150000, damp: 5000, Fmax: 5000 }, wheelieCtl: 1,
+    CdA: 0.68, bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
+    bodyHalfW: 0.32, bodyFront: -0.95, bodyRear: 0.6, bodyBottom: -0.5, bodyTop: 0.9,
+    bodyPts: ccPts(0.66, 0.45, 1.1, ccBox(0.3, 0.1, 0.45, -0.8, 0.64).concat(ccBox(0.25, 0.55, 1.35, 0.0, 0.45))
+      .concat([[0, 1.55, 0.35], [0, 1.0, -0.6], [0, 0.5, -0.9]])),
+  } };
+  // Razors Edge: the game's Halloween special after the Lo Res Car - a golf cart's chassis under a long faceted body of
+  // smoked glass panels edged in neon. Here: a stretched cart frame with a 110 kW / 250 Nm motor through a 4.95:1
+  // reduction, 18 x 8.50-8 cart tyres, two seats. 530 kg with the driver; ~142 mph, the glass wedge cleaving the air
+  CARS.razor = { name: 'Razors Edge', short: 'Razors Edge', car: '110 kW ELECTRIC', hp: 148, tq: 184, cc: true, spec: {
+    name: 'Razors Edge',
+    mass: 530, Ipitch: 520, Iyaw: 600, Iroll: 110, cgHeight: 0.42, wheelbase: 2.3, frontWeight: 0.45,
+    trackF: 1.12, trackR: 1.12, wheelRadius: 0.26, wheelInertiaF: 0.3, wheelInertiaR: 0.35,
+    frontTire: 'golf', rearTire: 'golf',
+    springF: 20000, springR: 24000, dampBumpF: 1200, dampRebF: 1700, dampBumpR: 1400, dampRebR: 2000,
+    arbF: 7000, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15,
+    brakeTorqueF: 350, brakeTorqueR: 300, handbrakeTorque: 400, noABS: true, noESC: true,
+    maxSteer: 0.55, steerRate: 4, steerRatio: 14,
+    electric: true, idleRpm: 0, limiterRpm: 12000, redlineRpm: 12000, shiftRpm: 13000, engineInertia: 0.04, fricA: 1, fricB: 1.5, starterTorque: 0,
+    torqueCurve: evCurve(250, 110, 12000), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 4.95, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 10, lsdRamp: 0.05, driveEff: 0.92,
+    CdA: 0.5,
+    bodyHalfW: 0.8, bodyFront: -2.3, bodyRear: 2.3, bodyBottom: -0.28, bodyTop: 0.85,
+    bodyPts: ccPts(0.42, 0.45, 2.3, ccBox(0.84, 0.16, 0.5, -1.4, 1.5).concat([[0, 0.3, -2.25], [0, 0.95, 2.2], [0, 1.28, -0.5], [-0.55, 0.9, 0.5], [0.55, 0.9, 0.5]])),
+  } };
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock
@@ -3606,8 +3969,11 @@
    the V8 burble, pulse rate gives the pitch, fixed formants give the Hellcat's timbre.
    Plus: twin-screw supercharger whine, intake roar, overrun crackles, rev-limiter stutter, tyre squeal,
    burnout roar, wind, road/gravel noise, starter, shift clunks, impacts, horn.
-   Small engines: 4-stroke and 2-stroke singles, 90-deg V-twins (vt: fires 270 / 450 deg apart - the potato-potato)
-   and inline fours (flat-plane crank, 4-into-1), all into one pipe; a centrifugal blower's surge chirp on a lift (surge).
+   Small engines: 4-stroke and 2-stroke singles, 90-deg V-twins (vt: fires 270 / 450 deg apart - the potato-potato),
+   inline triples (every 240 deg, the off-beat thrum) and inline fours (flat-plane crank, 4-into-1), all into one pipe;
+   even-fire V6s (a bank each side, every 120 deg); a centrifugal blower's surge chirp on a lift (surge).
+   Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
+   load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
    Multi-engine mode (pulling tractor): up to 4 V8s or V12s geared onto one crankline, each with its own firing
    sequence and exhaust, fired a few degrees apart so they hit like one enormous engine; deeper, longer exhaust pulses,
    a sub-bass layer and a hotter output stage for sheer volume.
@@ -3628,7 +3994,8 @@ class CarSynth {
       nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0,
       pipe: 0,     // (2-strokes) 0 off the pipe .. 1 in the expansion chamber's tuned band
       vt: 0,       // cyl 2 with vt > 0: a 4-stroke V-twin with that V angle instead of a 2-stroke single
-      surge: 0 };  // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
+      surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
+      ev: 0 };     // 1: an electric motor (whK = its whine Hz per rpm)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -3691,7 +4058,7 @@ class CarSynth {
     const c = this.cur, race = c.race || 0, idleN = Math.max(0, 1 - c.rpm / (2300 + 1500 * race));
     // (singles: a 4-stroke fires once per 720 deg, a 2-stroke every turn - cyl 1 / cyl 2; an inline four every 180;
     // a V-twin (vt) fires its second cylinder 180 + V deg after the first, then waits 540 - V: 270 / 450 for a 90 deg V)
-    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 4 ? 4 : 8, sp = 720 / nc;
+    const nE = this.nESet || 1, nc = c.cyl === 12 ? 12 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 ? 3 : c.cyl === 4 ? 4 : c.cyl === 6 ? 6 : 8, sp = 720 / nc;
     const vt = nc === 2 && c.vt > 0 ? c.vt : 0;
     // lopey cam: timing scatter at idle, and a weak/strong firing pattern that repeats for a few cycles (the chop)
     const lope = (3 + 6 * idleN) * (1 + 1.2 * race);
@@ -3709,8 +4076,8 @@ class CarSynth {
         // (kept sorted by crank angle: insertion)
         let j = n++;
         while (j > 0 && this.evA[j - 1] > a) { this.evA[j] = this.evA[j - 1]; this.evE[j] = this.evE[j - 1]; this.evK[j] = this.evK[j - 1]; this.evB[j] = this.evB[j - 1]; j--; }
-        // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12: banks alternate evenly
-        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 4 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
+        // V8: cross-plane, banks by cylinder number (uneven per-bank spacing = the burble); V12 / V6: banks alternate evenly
+        this.evA[j] = a; this.evE[j] = e; this.evK[j] = k; this.evB[j] = nc === 12 || nc <= 6 ? (k & 1) : ((this.order[k] & 1) ? 0 : 1);
       }
     }
     this.nev = n;
@@ -3740,7 +4107,7 @@ class CarSynth {
     else if (k === this.strongIdx[e]) a *= 1 + 0.25 * idleN * (1 + 0.8 * race);
     // (a 2-stroke single fires the same cylinder every turn: no cylinder-to-cylinder pattern)
     a *= (1 + (this.cylAmp[e * 12 + (c.cyl === 2 && !(c.vt > 0) ? 0 : k)] - 1) * (1 - 0.75 * smoothN)) * (1 + (this.rnd() - 0.5) * (0.18 - 0.1 * smoothN + 0.25 * c.rough));
-    if (c.cyl === 1 || c.cyl === 2 || c.cyl === 4) {
+    if (c.cyl === 1 || c.cyl === 2 || c.cyl === 3 || c.cyl === 4) {
       // a single has one exhaust: every pulse goes down the same pipe (through both resonator banks, for width).
       // Handing alternate pulses to the two banks made a 2-stroke warble at half its firing rate, like a twin
       const hA = a * 0.62;
@@ -3756,7 +4123,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -3773,15 +4140,17 @@ class CarSynth {
     const two = c.cyl === 2 && !(c.vt > 0);
     const pp = two ? Math.min(1, Math.max(0, c.pipe || 0)) : -1;
     if (pp >= 0) { g[0] *= 1.3 - 0.5 * pp; g[1] *= 1.1 - 0.2 * pp; g[3] *= 0.65 + 0.95 * pp; g[4] *= 0.5 + 1.5 * pp; }
-    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle)
+    const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 || c.cyl === 6 ? 3 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle; a triple / a V6 bank 3 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
     const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0);   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
-    const bodyAmp = (c.run > 0.5 ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
-    const roarAmp = (c.run > 0.5 ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
+    const ev = c.ev > 0.5;
+    const bodyAmp = (c.run > 0.5 && !ev ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
+    const roarAmp = (c.run > 0.5 && !ev ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
     const aRoar = 1 - Math.exp(-2 * Math.PI * (160 + rpm * 0.1) / sr);
     let engGain = (c.run > 0.5 ? 0.5 + 0.5 * load : 0.3) * (0.62 + 0.38 * rpmN) * c.engVol * 0.55 * (1 + 0.3 * race) * (1 + loud * (0.1 + 0.9 * load)) / Math.sqrt(nE);
     if (pp >= 0) engGain *= 0.82 + 0.4 * pp * (0.4 + 0.6 * load);
+    if (ev) engGain = 0;
     const interior = c.open ? 0 : c.interior;
     // open cockpit: you sit right behind the engines, nothing in between
     if (c.open && c.interior > 0.5) engGain *= 1.2;
@@ -3799,11 +4168,14 @@ class CarSynth {
     if (c.surge > 0.5 && (this.thrSlow || 0) - t.thr > 0.35 && boostN > 0.3 && c.run > 0.5 && !(this.flut > 0.05)) { this.flut = boostN; this.flPh = 0; }
     this.thrSlow = (this.thrSlow || 0) + (t.thr - (this.thrSlow || 0)) * (1 - Math.exp(-n / (sr * 0.08)));
     const flDecay = Math.exp(-1 / (sr * 0.28));
-    const whAmp = c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
+    // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
+    // fades out towards a standstill)
+    const whAmp = ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+      : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
     this.setBP(this.intake, 280 + rpm * 0.09, 1.2);
-    const intakeAmp = (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
+    const intakeAmp = ev ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
     // tyres
     this.sqDrift += (this.rnd() - 0.5) * 0.08; this.sqDrift *= 0.97;
     const sqF = 760 + 380 * c.sqPitch + 60 * this.sqDrift;
@@ -3888,6 +4260,13 @@ class CarSynth {
         + this.run(this.whBP, w1) * whAmp * 0.9 + this.run(this.hiss, w2) * whAmp * 0.25 * boostN;
       const ik = this.run(this.intake, w2) * intakeAmp;
       oL += wh + ik; oR += wh + ik;
+      if (ev && whAmp > 1e-5) {
+        // the reduction gear's mesh whine (~2.3x the motor's note) and the inverter's switching hiss
+        this.whPh2 += 2 * Math.PI * whF * 2.31 / sr; if (this.whPh2 > 6.283185307) this.whPh2 -= 6.283185307;
+        if (!this.evHs) this.evHs = this.bp(6500, 1.5);
+        const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
+        oL += gm; oR += gm;
+      }
       if (this.flut > 1e-3) {
         if (!this.flBP) { this.flBP = this.bp(1900, 2.2); this.flBP2 = this.bp(3400, 4); }
         this.flPh += 2 * Math.PI * (17 + 12 * this.flut) / sr;
@@ -4058,9 +4437,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   // fraction of full lock (31.3 deg) that demands aLat m/s^2 at speed v (bicycle model) plus a slip allowance
-  function physSteerLimit(v, aLat, slip) {
+  // (the game can hand it another vehicle's geometry - kb: { wb, maxSteer, aLat } - so a scooter that tips over at 0.4 g
+  // isn't steered into 1 g by the keyboard; unset, it's the Challenger's)
+  function physSteerLimit(v, aLat, slip, kb) {
     v = Math.abs(v);
     if (v < 1) return 1;
+    if (kb) return clamp((Math.atan(kb.wb * kb.aLat / (v * v)) + slip * Math.min(1, Math.max(0, (kb.aLat - 3) / 7)) * kb.wb / 2.946) / kb.maxSteer, 0, 1);
     return clamp((Math.atan(2.946 * aLat / (v * v)) + slip) / 0.545, 0, 1);
   }
 
@@ -4249,7 +4631,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       } else {
         let ks = this.kbSteer;
         // keyboard: limit lock at speed, optional gentle countersteer help
-        ks *= physSteerLimit(speed, 10, 0.02);
+        ks *= physSteerLimit(speed, 10, 0.02, this.kbGeom);
         if (st.kbCountersteer && vehicleYawHint !== undefined && tgt === 0) ks = clamp(ks + vehicleYawHint * 0.5, -1, 1);
         steer = ks; thr = Math.max(kbThr, padThr); brk = Math.max(kbBrk, padBrk); clu = this.kb('clutch') ? 1 : padClu;
       }
@@ -4562,6 +4944,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     'TorRed': 0xb3121a, 'Pitch Black': 0x0a0a0c, 'Plum Crazy': 0x4b1f78, 'Go Mango': 0xf2570f, 'B5 Blue': 0x1e6fc4,
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
+    // (the Car Crushers 2 cars' colours)
+    'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020,
   };
 
   // ------------------------------------------------------------------ builder
@@ -8847,6 +9231,938 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
+<script>/* src/crushers.js */
+/* Hellcat Drive — procedural models of the Car Crushers 2 cars (the Roblox game's joke and special vehicles, built
+   as they'd have to be for real):
+   Couch Car      a brown leather three-seat sofa on hidden 13 in wheels, its turbo triple's three pipes out of the right
+                  arm, a white footplate and a steering stick in front of the cushions
+   Egg Rod        the Mork & Mindy egg car as a hot rod: a white fibreglass egg with a wraparound canopy and sky-blue
+                  swooshes, a chromed small-block on the open frame behind it, copper wheels, a big wing
+   Banana Car     a fibreglass banana on a pickup's frame: five seats sunk in a row, a little windscreen, the stem at the
+                  back, a tube bumper with round lamps, black fenders over the truck wheels
+   Blue Bird      Campbell's 1935 streamliner: a long blue body, the nose intake, white disc wheels outside it with
+                  fairings flowing into the sides, the cockpit far back behind a tiny screen, a tail fin
+   Nissan GTR     an R35 in a Liberty Walk widebody: bolt-on overfenders, a black hood and roof, a front splitter, deep-dish
+                  wheels, the four round tail lamps and a GT wing on tall struts
+   Mini Dookie    a tall one-seat city pod: glass front, glass roof, an orange seat, 5-spoke wheels
+   Porta Potty    a blue portable toilet with a white roof on a kart frame, the door swung open, the driver on the throne
+   Turbo Scooter  a red four-wheel mobility scooter: the basket, the tiller with its mirrors, the high-back seat
+   Razors Edge    a long faceted wedge of smoked glass edged in neon (the paint colour), a graveyard on its flanks, a golf
+                  cart's frame and seats inside
+   Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
+   Returns the same interface as HCCarModel.build. */
+(function (root) {
+  'use strict';
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+  function build(THREE, opts) {
+    opts = opts || {};
+    const CAR = opts.car || 'couch';
+    const cgH = opts.cgHeight || 0.5, zOff = opts.zOff || 0;
+    const cgToFront = opts.cgToFront || 1, cgToRear = opts.cgToRear || 1;
+    const L = cgToFront + cgToRear, zF = -L / 2, zR = L / 2;
+    const RF = opts.wheelRadiusF || opts.wheelRadius || 0.3, RR = opts.wheelRadiusR || opts.wheelRadius || 0.3;
+    const trackF = opts.trackF || 1.5, trackR = opts.trackR || 1.5;
+    const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || {};
+    const rootG = new THREE.Group(); rootG.name = CAR;
+    const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const toRoot = (v) => v.clone().add(V3(0, -cgH, zOff));
+
+    // ---------------------------------------------------------------- helpers
+    function canvasTex(w, h, draw) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+      draw(g, w, h);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+    }
+    const add = (parent, geo, mat, x, y, z, rx, ry, rz, cast) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = cast !== false; m.receiveShadow = true;
+      parent.add(m); return m;
+    };
+    function rbox(w, h, d, r) {
+      r = Math.max(0.002, Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3));
+      const s = new THREE.Shape(), x0 = -w / 2 + r, y0 = -h / 2 + r, x1 = w / 2 - r, y1 = h / 2 - r;
+      s.moveTo(x0, -h / 2 + r); s.lineTo(x0, y1); s.lineTo(x1, y1); s.lineTo(x1, y0); s.lineTo(x0, y0);
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(1e-3, d - 2 * r), bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+      g.translate(0, 0, -(d - 2 * r) / 2); return g;
+    }
+    const tubeAB = (parent, a, b, r, mat, seg) => {
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = add(parent, new THREE.CylinderGeometry(r, r, len, seg || 10), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      return m;
+    };
+    const pipe = (parent, pts, r, mat, seg) => add(parent, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 10, r, seg || 12, false), mat, 0, 0, 0);
+    const cylX = (r0, r1, len, seg, open) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24, 1, !!open); g.rotateZ(Math.PI / 2); return g; };
+    const cylZ = (r0, r1, len, seg, open) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24, 1, !!open); g.rotateX(Math.PI / 2); return g; };
+    function latheX(pts, seg) { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg || 40); g.rotateZ(-Math.PI / 2); return g; }
+    function mergeGeos(list) {
+      const parts = list.map((g) => (g.index ? g.toNonIndexed() : g));
+      let n = 0; for (const g of parts) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of parts) { if (!g.attributes.normal) g.computeVertexNormals(); pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      out.computeBoundingSphere(); return out;
+    }
+    // a (z, y) side profile extruded across the car, centred on x = 0, w wide
+    function profile(pts, w, bevel) {
+      const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]);
+      const b = bevel || 0.02;
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(1e-3, w - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 3, curveSegments: 8 });
+      g.rotateY(Math.PI / 2); g.scale(1, 1, -1);
+      const p = g.attributes.position;
+      if (!g.index) for (let k = 0; k < p.count; k += 3) for (const a of [p, g.attributes.uv]) { const sz = a.itemSize; for (let c = 0; c < sz; c++) { const t = a.array[(k + 1) * sz + c]; a.array[(k + 1) * sz + c] = a.array[(k + 2) * sz + c]; a.array[(k + 2) * sz + c] = t; } }
+      g.translate(-(w / 2 - b), 0, 0); g.computeVertexNormals();
+      return g;
+    }
+    // Loft: a body from cross-sections along z. Each section is a superellipse (exponent n: 2 round, 4+ boxy) from yb
+    // to yt, half-width w at mid height narrowing (or widening) to w*tw at the top and w*bw at the bottom, centred on
+    // xc. mat(x, y, z) picks each triangle's material slot (windows, a black roof, stripes ...) -> geometry groups.
+    function loft(secs, o) {
+      o = o || {};
+      const N = o.seg || 40, pos = [], idx = [];
+      for (const s of secs) {
+        const n = s.n || 2, e = 2 / n, yc = (s.yb + s.yt) / 2, hh = (s.yt - s.yb) / 2;
+        for (let k = 0; k < N; k++) {
+          const a = -Math.PI / 2 + k / N * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+          const sx = Math.sign(c) * Math.pow(Math.abs(c), e), sy = Math.sign(sn) * Math.pow(Math.abs(sn), e);
+          const wf = sy > 0 ? 1 + ((s.tw === undefined ? 1 : s.tw) - 1) * sy : 1 + ((s.bw === undefined ? 1 : s.bw) - 1) * -sy;
+          pos.push((s.xc || 0) + s.w * wf * sx, yc + hh * sy, s.z);
+        }
+      }
+      const R = secs.length;
+      // end caps: a centre point each end
+      const c0 = pos.length / 3; pos.push(secs[0].xc || 0, (secs[0].yb + secs[0].yt) / 2, secs[0].z);
+      const c1 = pos.length / 3; pos.push(secs[R - 1].xc || 0, (secs[R - 1].yb + secs[R - 1].yt) / 2, secs[R - 1].z);
+      const tris = [];
+      for (let r = 0; r < R - 1; r++) for (let k = 0; k < N; k++) {
+        const a = r * N + k, b = r * N + (k + 1) % N, c = (r + 1) * N + k, d = (r + 1) * N + (k + 1) % N;
+        tris.push([a, c, b, a, d, k, r], [b, c, d, a, d, k, r]);
+      }
+      if (o.caps !== false) for (let k = 0; k < N; k++) { tris.push([c0, k, (k + 1) % N]); tris.push([c1, (R - 1) * N + (k + 1) % N, (R - 1) * N + k]); }
+      // (the ring runs anticlockwise seen from -z; flip the winding so faces point outwards)
+      const buckets = [];
+      for (const t of tris) {
+        const q = t.length > 3, cx = q ? (pos[t[3] * 3] + pos[t[4] * 3]) / 2 : (pos[t[0] * 3] + pos[t[1] * 3] + pos[t[2] * 3]) / 3,
+          cy = q ? (pos[t[3] * 3 + 1] + pos[t[4] * 3 + 1]) / 2 : (pos[t[0] * 3 + 1] + pos[t[1] * 3 + 1] + pos[t[2] * 3 + 1]) / 3,
+          cz = q ? (pos[t[3] * 3 + 2] + pos[t[4] * 3 + 2]) / 2 : (pos[t[0] * 3 + 2] + pos[t[1] * 3 + 2] + pos[t[2] * 3 + 2]) / 3;
+        const m = o.mat ? o.mat(cx, cy, cz, q ? t[5] : -1, q ? t[6] : -1) : 0;
+        (buckets[m] || (buckets[m] = [])).push(t[0], t[2], t[1]);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      let start = 0;
+      buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); g.addGroup(start, b.length, m); start += b.length; });
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      if (o.flat) { const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng; }
+      return g;
+    }
+    // A car body the Challenger's way: a cross-section at each station, built from explicit points round the right half
+    // (bottom centre -> sill -> the side -> shoulder -> belt -> greenhouse -> roof centre) and mirrored. The bottom
+    // rises over the wheels (the arches cut themselves), and every band of points keeps its meaning along the car, so
+    // the windows, a black roof or hood are whole bands between stations - clean edges, no jaggies.
+    // o: stations [z], and functions of z: W (half width), yB (bottom, arches included), ySh (shoulder: top of the side),
+    // Wb / yBelt (the belt line where the glass starts), Wt (greenhouse half width at the roof), yT (roof / hood / deck
+    // height), bulge (outward curve of the side); mat(band, z) -> material slot (band 0-2 underside, 3-8 side,
+    // 9-10 shoulder, 11-14 greenhouse, 15-16 roof)
+    function carBody(o) {
+      const secs = o.stations.map((z) => {
+        const W = o.W(z), yB = o.yB(z), ySh = Math.max(o.ySh(z), yB + 0.08), yBelt = Math.max(o.yBelt(z), ySh + 0.01), yT = Math.max(o.yT(z), yBelt + 0.01);
+        const Wb = o.Wb(z), Wt = o.Wt(z), bl = o.bulge ? o.bulge(z) : 0.015, P = [];
+        P.push([0, yB], [W * 0.5, yB], [W - 0.05, yB + 0.002], [W - 0.012, yB + 0.022]);
+        for (let k = 0; k <= 5; k++) { const t = k / 5, y = yB + 0.05 + (ySh - yB - 0.05) * t; P.push([W - 0.01 * (1 - t) + bl * Math.sin(Math.PI * t) * 0.6, y]); }
+        P.push([W - 0.02, ySh + (yBelt - ySh) * 0.55], [Wb, yBelt]);
+        for (let k = 1; k <= 4; k++) { const t = k / 4, y = yBelt + (yT - 0.02 - yBelt) * (1 - Math.pow(1 - t, 1.6)); P.push([Wb + (Wt - Wb) * Math.pow(t, 0.9), y]); }
+        P.push([Wt * 0.55, yT - 0.004], [0, yT]);
+        return { z, P };
+      });
+      const pos = [], buckets = [], nP = secs[0].P.length;
+      const vid = (r, i, side) => r * nP * 2 + (side > 0 ? i : nP + i);
+      for (const s of secs) { for (const [x, y] of s.P) pos.push(x, y, s.z); for (const [x, y] of s.P) pos.push(-x, y, s.z); }
+      for (let r = 0; r < secs.length - 1; r++) {
+        const zm = (secs[r].z + secs[r + 1].z) / 2;
+        for (let i = 0; i < nP - 1; i++) {
+          const m = o.mat ? o.mat(i, zm) : 0, B = buckets[m] || (buckets[m] = []);
+          for (const sd of [1, -1]) {
+            const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd);
+            if (sd > 0) B.push(a, b, c, b, d, c); else B.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      // end caps: a fan from the middle of each end section
+      for (const [r, f] of [[0, -1], [secs.length - 1, 1]]) {
+        const s = secs[r], ci = pos.length / 3; pos.push(0, (s.P[0][1] + s.P[nP - 1][1]) / 2, s.z);
+        const B = buckets[o.capMat || 0] || (buckets[o.capMat || 0] = []);
+        for (const sd of [1, -1]) for (let i = 0; i < nP - 1; i++) {
+          const a = vid(r, i, sd), b = vid(r, i + 1, sd);
+          if (f * sd > 0) B.push(ci, a, b); else B.push(ci, b, a);
+        }
+      }
+      const g = new THREE.BufferGeometry(), idx = [];
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      let start = 0;
+      buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); g.addGroup(start, b.length, m); start += b.length; });
+      g.setIndex(idx); g.computeVertexNormals();
+      return g;
+    }
+    // piecewise-smooth lookup (z, value) pairs
+    const tbl = (T) => (x) => {
+      if (x <= T[0][0]) return T[0][1];
+      for (let i = 1; i < T.length; i++) if (x <= T[i][0]) { const a = T[i - 1], b = T[i], t = (x - a[0]) / (b[0] - a[0]), s = t * t * (3 - 2 * t) * 0.4 + t * 0.6; return a[1] + (b[1] - a[1]) * s; }
+      return T[T.length - 1][1];
+    };
+    // stations: every d metres from z0 to z1, plus the given break points (window edges, arches)
+    const stationsOf = (z0, z1, d, brk) => { const S = new Set(); for (let z = z0; z < z1 - 1e-6; z += d) S.add(+z.toFixed(4)); S.add(z1); for (const b of brk || []) S.add(b); return [...S].sort((a, b) => a - b); };
+    // the bottom of the body with the wheel arches cut out of it
+    const archY = (base, axles, R, rA) => (z) => { let y = base(z); for (const zc of axles) { const d = Math.abs(z - zc); if (d < rA) y = Math.max(y, R + Math.sqrt(rA * rA - d * d) * 0.96); } return y; };
+    // a flat polygon mesh from a list of 3D points (a convex face), both sides
+    function facesGeo(verts, faces) {
+      const pos = [];
+      for (const f of faces) for (let i = 1; i < f.length - 1; i++) for (const k of [f[0], f[i], f[i + 1]]) pos.push(verts[k][0], verts[k][1], verts[k][2]);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+    }
+    // an arc (a fender / flare) around a wheel at (z, y), radius r0..r1, from angle a0 to a1 (0 = forward-down... see use),
+    // w wide across x, starting at x0
+    function arcGeo(zc, yc, r0, r1, a0, a1, w) {
+      const s = new THREE.Shape();
+      s.absarc(zc, yc, r1, a0, a1, false); s.absarc(zc, yc, r0, a1, a0, true);
+      const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 24 });
+      g.rotateY(Math.PI / 2); g.scale(1, 1, -1);
+      const p = g.attributes.position; for (let k = 0; k < p.count; k += 3) for (const a of [p, g.attributes.uv]) { const sz = a.itemSize; for (let c = 0; c < sz; c++) { const t = a.array[(k + 1) * sz + c]; a.array[(k + 1) * sz + c] = a.array[(k + 2) * sz + c]; a.array[(k + 2) * sz + c] = t; } }
+      g.computeVertexNormals(); return g;
+    }
+
+    // ---------------------------------------------------------------- materials
+    const DEF_PAINT = { couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0x1f4fd1, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
+    const M = {};
+    M.paint = CAR === 'couch' ? new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.62, metalness: 0.02 })
+      : CAR === 'banana' ? new THREE.MeshPhysicalMaterial({ color: paintHex, roughness: 0.42, metalness: 0, clearcoat: 0.5, clearcoatRoughness: 0.3, flatShading: true })
+        : CAR === 'potty' ? new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.55, metalness: 0 })
+          : CAR === 'razor' ? new THREE.MeshStandardMaterial({ color: 0x000000, emissive: paintHex, emissiveIntensity: 2.4, toneMapped: false })
+            : new THREE.MeshPhysicalMaterial({ color: paintHex, metalness: CAR === 'gtr' ? 0.5 : 0.1, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06, side: CAR === 'gtr' || CAR === 'mini' || CAR === 'eggrod' ? THREE.DoubleSide : THREE.FrontSide });
+    M.black = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.55, metalness: 0.15 });
+    M.gloss = new THREE.MeshPhysicalMaterial({ color: 0x0c0c0e, roughness: 0.18, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05, side: THREE.DoubleSide });
+    M.rubber = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.92 });
+    M.chrome = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.06, metalness: 1 });
+    M.alu = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.3, metalness: 0.85 });
+    M.steel = new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.5, metalness: 0.7 });
+    M.white = new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.45, metalness: 0.02 });
+    M.seat = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.7 });
+    M.grey = new THREE.MeshStandardMaterial({ color: 0x5a5c60, roughness: 0.6 });
+    M.glass = new THREE.MeshPhysicalMaterial({ color: 0x8a98a4, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.2 });
+    M.tint = new THREE.MeshPhysicalMaterial({ color: 0x1c2228, roughness: 0.03, metalness: 0.3, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false });
+    M.skin = new THREE.MeshStandardMaterial({ color: 0xc89478, roughness: 0.6 });
+    M.hair = new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: 0.8 });
+    M.visor = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.05, metalness: 0.8 });
+    M.head = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2 });
+    M.tail = new THREE.MeshStandardMaterial({ color: 0x5a0808, emissive: 0xff1a10, emissiveIntensity: 0.4, roughness: 0.3 });
+    M.amber = new THREE.MeshStandardMaterial({ color: 0x8a4a08, emissive: 0xff8a10, emissiveIntensity: 0.25, roughness: 0.3 });
+    M.mesh = new THREE.MeshStandardMaterial({ map: canvasTex(128, 64, (g, w, h) => {
+      g.fillStyle = '#060607'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3c40'; g.lineWidth = 2;
+      for (let x = -h; x < w; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke(); }
+    }), roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
+    const SUITS = { couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
+    M.suit = new THREE.MeshStandardMaterial({ color: SUITS[CAR] || 0x333333, roughness: 0.8 });
+    M.pants = new THREE.MeshStandardMaterial({ color: CAR === 'bluebird' || CAR === 'eggrod' || CAR === 'gtr' ? SUITS[CAR] : 0x2a3446, roughness: 0.85 });
+    M.helmet = new THREE.MeshPhysicalMaterial({ color: { couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' ? 0 : 1 });
+
+    const P = { tips: [], spots: [], hideCockpit: [], lampSlots: [] };
+    const body = new THREE.Group(); model.add(body);
+
+    // ---------------------------------------------------------------- a seated driver
+    // o: hip (V3 on the seat), lean (+ = reclined), hands [left, right] (V3), knee {dx, y, z}, foot {dx, y, z},
+    // helmet true / false (false: a bare head with hair), goggles (1935), torsoW
+    function person(o) {
+      const g = new THREE.Group(), lean = o.lean || 0, hip = o.hip, tw = o.torsoW || 0.36;
+      add(g, rbox(tw, 0.5, 0.23, 0.1), M.suit, hip.x, hip.y + 0.25 * Math.cos(lean) + 0.04, hip.z + 0.25 * Math.sin(lean), lean, 0, 0);
+      const shY = hip.y + 0.46 * Math.cos(lean) + 0.04, shZ = hip.z + 0.46 * Math.sin(lean);
+      for (const sx of [-1, 1]) {
+        const sh = V3(hip.x + sx * (tw / 2 - 0.03), shY - 0.02, shZ);
+        const hand = o.hands ? o.hands[sx < 0 ? 0 : 1] : V3(hip.x + sx * 0.2, hip.y + 0.15, hip.z - 0.22);
+        const el = V3((sh.x + hand.x) / 2 + sx * 0.07, Math.min(sh.y, hand.y) - 0.08, (sh.z + hand.z) / 2 + 0.06);
+        tubeAB(g, sh, el, 0.045, M.suit); tubeAB(g, el, hand, 0.038, M.suit);
+        add(g, new THREE.SphereGeometry(0.04, 10, 8), o.helmet === false ? M.skin : M.black, hand.x, hand.y, hand.z);
+        const hp = V3(hip.x + sx * 0.1, hip.y + 0.06, hip.z);
+        const kn = V3(hip.x + sx * o.knee.dx, o.knee.y, o.knee.z), ft = V3(hip.x + sx * o.foot.dx, o.foot.y, o.foot.z);
+        tubeAB(g, hp, kn, 0.065, M.pants); tubeAB(g, kn, ft, 0.05, M.pants);
+        add(g, rbox(0.1, 0.09, 0.22, 0.03), M.black, ft.x, ft.y - 0.02, ft.z - 0.05);
+      }
+      const hd = V3(hip.x, shY + 0.26, shZ - 0.03);
+      tubeAB(g, V3(hip.x, shY, shZ), V3(hip.x, hd.y - 0.1, hd.z), 0.05, o.helmet === false ? M.skin : M.suit);
+      if (o.helmet === false || o.goggles) {
+        add(g, new THREE.SphereGeometry(0.105, 20, 14), M.skin, hd.x, hd.y - 0.01, hd.z);
+        if (o.goggles) {
+          // 1935: a leather helmet and goggles
+          add(g, new THREE.SphereGeometry(0.113, 20, 12, 0, Math.PI * 2, 0, 1.75), M.helmet, hd.x, hd.y, hd.z + 0.005);
+          for (const sx of [-1, 1]) add(g, cylZ(0.03, 0.03, 0.03, 14), M.chrome, hd.x + sx * 0.042, hd.y + 0.02, hd.z - 0.095);
+          add(g, new THREE.TorusGeometry(0.108, 0.008, 6, 24), M.black, hd.x, hd.y + 0.02, hd.z, 0, 0, 0);
+        } else add(g, new THREE.SphereGeometry(0.112, 20, 12, 0, Math.PI * 2, 0, 1.3), M.hair, hd.x, hd.y + 0.005, hd.z + 0.012);
+      } else {
+        add(g, new THREE.SphereGeometry(0.14, 24, 16), M.helmet, hd.x, hd.y, hd.z);
+        add(g, new THREE.SphereGeometry(0.143, 24, 12, -Math.PI / 2 - 0.85, 1.7, 1.25, 0.5), M.visor, hd.x, hd.y, hd.z, 0, 0, 0, false);
+      }
+      g.userData.eye = V3(hd.x, hd.y - 0.01, hd.z - 0.09);
+      return g;
+    }
+    // steering wheel on its column: centre, tilt (rad back from vertical), radius, style
+    function steering(c, tilt, r, style) {
+      const colG = new THREE.Group(); colG.position.copy(c); colG.rotation.x = -tilt; model.add(colG);
+      const sw = new THREE.Group(); colG.add(sw);
+      add(sw, new THREE.TorusGeometry(r, style === 'thin' ? 0.009 : 0.016, 10, 32), style === 'wood' ? new THREE.MeshStandardMaterial({ color: 0x6b3f1f, roughness: 0.5 }) : M.black, 0, 0, 0);
+      for (let k = 0; k < 3; k++) { const s = add(sw, new THREE.BoxGeometry(0.016, r, 0.008), style === 'wood' ? M.chrome : M.alu, 0, 0, 0.004); s.rotation.z = k * 2.094 + Math.PI; s.geometry.translate(0, r / 2, 0); }
+      add(sw, new THREE.CylinderGeometry(r * 0.25, r * 0.25, 0.03, 16), M.black, 0, 0, 0.01, Math.PI / 2, 0, 0);
+      return { colG, sw };
+    }
+    const clusterCanvas = document.createElement('canvas'); clusterCanvas.width = 512; clusterCanvas.height = 256;
+    const clusterTex = new THREE.CanvasTexture(clusterCanvas); clusterTex.colorSpace = THREE.SRGBColorSpace;
+    const M_cluster = new THREE.MeshBasicMaterial({ map: clusterTex, toneMapped: false });
+    // headlight spots (the monster truck's / Challenger's way): a pair at the front, off until the lights come on
+    function spots(x, y, z, aim) {
+      for (const sx of [-1, 1]) {
+        const sl = new THREE.SpotLight(0xf2f4ff, 0, 90, 0.5, 0.45, 1.4);
+        sl.position.copy(toRoot(V3(sx * x, y, z))); sl.target.position.copy(toRoot(V3(sx * x * 1.2, 0, z - (aim || 40))));
+        rootG.add(sl); rootG.add(sl.target); sl.visible = false; P.spots.push(sl);
+      }
+    }
+
+    // ================================================================ the cars
+    let driver, SW, wheelStyle = {}, cluster = null, WF = 0.2, WR = 0.2;
+    const B = {};
+
+    // ---------------------------------------------------------------- Couch Car
+    B.couch = () => {
+      WF = 0.2; WR = 0.26;
+      wheelStyle = { rim: 'steel', rimR: 0.165, tread: 'slick' };
+      M.pipe = new THREE.MeshStandardMaterial({ color: 0xa87a52, roughness: 0.55 });   // the lighter piping on the leather
+      M.plate = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.35, metalness: 0.3 });
+      const z0 = -0.4, z1 = 0.4, D = z1 - z0;
+      // base between the arms, two seat cushions, the backrest and two back cushions (tilted back a little)
+      add(body, rbox(1.64, 0.22, D, 0.05), M.paint, 0, 0.4, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.8, 0.14, 0.6, 0.065), M.paint, sx * 0.405, 0.575, -0.09);
+      add(body, rbox(1.64, 0.56, 0.2, 0.06), M.paint, 0, 0.74, 0.3, 0.12, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.78, 0.4, 0.14, 0.07), M.paint, sx * 0.405, 0.8, 0.17, 0.12, 0, 0);
+      // arms, rolled over at the top, with the piping down their fronts and along the top
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.22, 0.4, D, 0.06), M.paint, sx * 0.93, 0.49, 0);
+        add(body, cylZ(0.115, 0.115, D - 0.02, 20), M.paint, sx * 0.93, 0.69, 0);
+        add(body, cylZ(0.12, 0.12, 0.014, 20), M.pipe, sx * 0.93, 0.69, z0 + 0.004);
+        add(body, new THREE.BoxGeometry(0.018, 0.4, 0.014), M.pipe, sx * 0.93, 0.47, z0 - 0.002);
+      }
+      add(body, new THREE.BoxGeometry(0.014, 0.4, 0.02), M.pipe, 0, 0.8, 0.105, 0.12, 0, 0);   // the seam between the back cushions
+      // a fabric skirt round the base
+      add(body, new THREE.BoxGeometry(2.08, 0.04, D + 0.02), M.pipe, 0, 0.3, 0);
+      // the white footplate out front, the chassis under it all, the steering stick
+      add(body, rbox(1.3, 0.025, 0.56, 0.01), M.plate, 0, 0.17, -0.67);
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.5, 0.18, -0.95), V3(sx * 0.5, 0.2, 0.95), 0.025, M.black);
+      tubeAB(body, V3(-0.8, 0.254, zF), V3(0.8, 0.254, zF), 0.022, M.black); tubeAB(body, V3(-0.8, 0.254, zR), V3(0.8, 0.254, zR), 0.03, M.black);
+      tubeAB(body, V3(-0.5, 0.2, 0.9), V3(0.5, 0.2, 0.9), 0.025, M.black);
+      const stk = [V3(-0.4, 0.18, -0.82), V3(-0.4, 0.42, -0.8), V3(-0.4, 0.62, -0.72), V3(-0.4, 0.8, -0.6)];
+      pipe(body, stk, 0.018, M.grey);
+      SW = steering(V3(-0.4, 0.82, -0.58), 0.9, 0.13, 'thin');
+      cluster = { parent: body, pos: V3(-0.4, 0.83, -0.66), rot: -0.9, w: 0.1, h: 0.05 };
+      // the turbo triple's three pipes out of the right arm, curling back
+      for (let k = 0; k < 3; k++) {
+        const y = 0.42 + k * 0.075;
+        const pts = [V3(0.9, y, -0.26), V3(1.06, y, -0.3), V3(1.15, y - 0.02, -0.24), V3(1.18, y - 0.035, -0.1)];
+        pipe(body, pts, 0.028, M.steel); add(body, cylZ(0.03, 0.03, 0.04, 14), M.steel, 1.18, y - 0.035, -0.09);
+        P.tips.push(toRoot(V3(1.18, y - 0.035, -0.05)));
+      }
+      driver = person({ hip: V3(-0.4, 0.66, 0.05), lean: 0.22, hands: [V3(-0.49, 0.84, -0.55), V3(-0.31, 0.84, -0.55)],
+        knee: { dx: 0.12, y: 0.72, z: -0.32 }, foot: { dx: 0.16, y: 0.2, z: -0.72 } });
+    };
+
+    // ---------------------------------------------------------------- Egg Rod
+    B.eggrod = () => {
+      WF = 0.215; WR = 0.31;
+      wheelStyle = { rim: 'copper', rimR: 0.19, tread: 'road', rimRR: 0.2 };
+      M.sky = new THREE.MeshPhysicalMaterial({ color: 0x86c3ec, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });
+      // the egg: narrow end forward, flattened a little underneath, with the canopy wrapped round its nose and top, and a
+      // pair of sky-blue swooshes down its flanks
+      const zc = -0.62, Lh = 1.26, secs = [];
+      const eggAt = (t) => { const s = Math.sqrt(Math.max(0.0004, 1 - t * t)), f = 1 + 0.11 * t; return { z: zc + t * Lh, w: 0.8 * s * f, yb: 0.8 - 0.6 * s * f * 0.98, yt: 0.8 + 0.62 * s * f, n: 2, bw: 0.9 }; };
+      for (let i = 0; i <= 56; i++) secs.push(eggAt(-1 + 2 * (0.5 - 0.5 * Math.cos(Math.PI * i / 56))));
+      const eggMat = (x, y, z, k) => (k >= 0 && z < -0.22 && z > -1.86 && k >= 21 && k < 51 ? 1 : 0);
+      add(body, loft(secs, { seg: 72, mat: eggMat }), [M.paint, M.tint], 0, 0, 0);
+      // (a point on the egg's surface at (z, y), right side)
+      const eggX = (z, y) => { const e = eggAt((z - zc) / Lh), yc = (e.yb + e.yt) / 2, hh = (e.yt - e.yb) / 2, sy = clamp((y - yc) / hh, -0.999, 0.999); return e.w * (sy < 0 ? 1 - 0.1 * -sy : 1) * Math.sqrt(1 - sy * sy); };
+      const swoosh = (z0, z1, yf, hw0) => {
+        const pos = [], idx = [], n = 40;
+        for (const sx of [-1, 1]) {
+          const base = pos.length / 3;
+          for (let i = 0; i <= n; i++) {
+            const u = i / n, z = z0 + (z1 - z0) * u, hw = hw0 * Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.15)), 0.45) + 0.004, yc = yf(u);
+            for (const y of [yc - hw, yc + hw]) pos.push(sx * (eggX(z, y) + 0.005), y, z);
+          }
+          for (let i = 0; i < n; i++) { const a = base + i * 2; if (sx > 0) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+        }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+        add(body, g, M.sky, 0, 0, 0, 0, 0, 0, false);
+      };
+      swoosh(-1.4, 0.55, (u) => 0.48 + 0.42 * u + 0.08 * Math.sin(Math.PI * u), 0.04);
+      swoosh(-0.95, 0.5, (u) => 0.38 + 0.26 * u + 0.05 * Math.sin(Math.PI * u), 0.022);
+      // door seam and handle on each side
+      for (const sx of [-1, 1]) {
+        add(body, new THREE.BoxGeometry(0.01, 0.012, 0.03), M.chrome, sx * 0.78, 0.9, -0.08);
+      }
+      // sidepods behind the egg with their vents
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.26, 0.26, 1.0, 0.07), M.paint, sx * 0.72, 0.36, 0.5);
+        for (let k = 0; k < 5; k++) add(body, new THREE.BoxGeometry(0.012, 0.03, 0.55), M.black, sx * 0.852, 0.3 + k * 0.035, 0.52);
+        add(body, new THREE.BoxGeometry(0.01, 0.025, 0.9), M.sky, sx * 0.853, 0.47, 0.5);
+      }
+      // the open frame behind: rails, a chromed small-block with its air cleaner, zoomie headers
+      for (const sx of [-1, 1]) { tubeAB(body, V3(sx * 0.42, 0.3, 0.3), V3(sx * 0.42, 0.3, 1.75), 0.03, M.black); tubeAB(body, V3(sx * 0.42, 0.3, 1.2), V3(sx * 0.32, 0.72, 0.6), 0.022, M.black); }
+      tubeAB(body, V3(-0.42, 0.3, 1.75), V3(0.42, 0.3, 1.75), 0.03, M.black);
+      add(body, rbox(0.44, 0.32, 0.62, 0.05), M.steel, 0, 0.5, 0.95);
+      for (const sx of [-1, 1]) add(body, rbox(0.12, 0.08, 0.56, 0.02), M.chrome, sx * 0.17, 0.72, 0.95, 0, 0, sx * 0.5);
+      add(body, cylZ(0.05, 0.05, 0.1, 12), M.steel, 0, 0.72, 0.95);
+      add(body, new THREE.CylinderGeometry(0.2, 0.2, 0.08, 28), M.chrome, 0, 0.84, 0.95);
+      add(body, new THREE.CylinderGeometry(0.06, 0.06, 0.09, 16), M.chrome, 0, 0.92, 0.95);
+      for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) {
+        const z = 0.74 + k * 0.14, a = V3(sx * 0.26, 0.52, z), b = V3(sx * 0.42, 0.56, z + 0.03), c = V3(sx * 0.5, 0.74, z + 0.12);
+        pipe(body, [a, b, c], 0.022, M.chrome); P.tips.push(toRoot(c));
+      }
+      // the wing: struts, a white plane, sky-blue endplates; tail lamps under it
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.4, 0.34, 1.62), V3(sx * 0.4, 1.28, 1.72), 0.025, M.black);
+      add(body, rbox(1.56, 0.045, 0.44, 0.02), M.paint, 0, 1.31, 1.74, 0.12, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.035, 0.34, 0.54, 0.03), M.sky, sx * 0.78, 1.34, 1.74);
+      for (const sx of [-1, 1]) { const tl = add(body, rbox(0.14, 0.05, 0.03, 0.01), M.tail, sx * 0.32, 0.36, 1.78); tl.castShadow = false; }
+      // small headlamps low on the nose
+      for (const sx of [-1, 1]) add(body, cylZ(0.045, 0.045, 0.03, 18), M.head, sx * 0.28, 0.5, -1.72);
+      spots(0.28, 0.5, -1.74);
+      // front suspension out to the wheels
+      for (const sx of [-1, 1]) for (const y of [0.24, 0.38]) tubeAB(body, V3(sx * 0.3, y, zF), V3(sx * 0.66, y + 0.02, zF), 0.018, M.black);
+      // inside: a seat, the dash with the display, the wheel
+      add(body, rbox(0.46, 0.08, 0.44, 0.03), M.seat, 0, 0.36, -0.28); add(body, rbox(0.46, 0.55, 0.08, 0.03), M.seat, 0, 0.64, -0.02, 0.3, 0, 0);
+      add(body, rbox(0.62, 0.05, 0.2, 0.02), M.black, 0, 0.8, -1.0, -0.3, 0, 0);
+      SW = steering(V3(0, 0.84, -0.85), 0.55, 0.16);
+      cluster = { parent: body, pos: V3(0, 0.9, -1.0), rot: -0.55, w: 0.18, h: 0.09 };
+      driver = person({ hip: V3(0, 0.42, -0.26), lean: 0.3, hands: [V3(-0.13, 0.86, -0.82), V3(0.13, 0.86, -0.82)],
+        knee: { dx: 0.1, y: 0.58, z: -0.7 }, foot: { dx: 0.14, y: 0.28, z: -1.15 } });
+      P.hideCockpit.push(driver);
+    };
+
+    // ---------------------------------------------------------------- Banana Car
+    B.banana = () => {
+      WF = 0.235; WR = 0.235;
+      wheelStyle = { rim: 'steel5', rimR: 0.19, tread: 'truck' };
+      M.stem = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.8, flatShading: true });
+      const cp = [[-3.4, 0.74, 0.03], [-3.2, 0.78, 0.17], [-2.8, 0.84, 0.33], [-2.2, 0.9, 0.44], [-1.4, 0.95, 0.5], [-0.4, 0.99, 0.52], [0.6, 1.04, 0.51],
+        [1.5, 1.12, 0.47], [2.2, 1.26, 0.4], [2.75, 1.45, 0.3], [3.1, 1.66, 0.2], [3.35, 1.86, 0.12], [3.45, 1.95, 0.08]];
+      const curve = new THREE.CatmullRomCurve3(cp.map(([z, y, r]) => V3(r, y, z)));
+      const secs = [];
+      for (let i = 0; i <= 40; i++) { const p = curve.getPoint(i / 40); secs.push({ z: p.z, w: p.x * 1.05, yb: p.y - p.x * 0.95, yt: p.y + p.x * 0.95, n: 2 }); }
+      add(body, loft(secs, { seg: 10, flat: true }), M.paint, 0, 0, 0);
+      const topAt = (z) => { let best = secs[0]; for (const s of secs) if (Math.abs(s.z - z) < Math.abs(best.z - z)) best = s; return best.yt; };
+      // the tips: dark at the front, the stem at the back
+      add(body, new THREE.SphereGeometry(0.06, 8, 6), M.stem, 0, 0.74, -3.42);
+      const st = add(body, new THREE.CylinderGeometry(0.06, 0.075, 0.26, 6), M.stem, 0, 2.02, 3.52, 0.9, 0, 0);
+      void st;
+      // five seats sunk in a row: dark wells, seat backs and headrests
+      const seatZ = [-1.05, -0.3, 0.45, 1.2, 1.95];
+      seatZ.forEach((z, i) => {
+        const y = topAt(z);
+        add(body, rbox(0.62, 0.03, 0.58, 0.05), M.black, 0, y - 0.012, z);
+        add(body, rbox(0.46, 0.44, 0.1, 0.04), M.seat, 0, y + 0.13, z + 0.22, 0.2, 0, 0);
+        add(body, rbox(0.24, 0.16, 0.08, 0.03), M.seat, 0, y + 0.42, z + 0.28, 0.2, 0, 0);
+        void i;
+      });
+      // windscreen and mirrors in front of the driver
+      const yF = topAt(-1.55);
+      add(body, rbox(0.72, 0.03, 0.04, 0.01), M.black, 0, yF + 0.02, -1.52);
+      const ws = add(body, new THREE.PlaneGeometry(0.66, 0.34), M.glass, 0, yF + 0.2, -1.5, -0.45, 0, 0, false); ws.castShadow = false;
+      for (const sx of [-1, 1]) { tubeAB(body, V3(sx * 0.34, yF, -1.52), V3(sx * 0.3, yF + 0.37, -1.4), 0.012, M.black); tubeAB(body, V3(sx * 0.42, yF - 0.02, -1.45), V3(sx * 0.56, yF + 0.08, -1.45), 0.01, M.black); add(body, rbox(0.03, 0.1, 0.14, 0.01), M.black, sx * 0.58, yF + 0.1, -1.45); }
+      // the truck frame under it, the tube bumper with its round lamps, fenders
+      for (const sx of [-1, 1]) {
+        add(body, new THREE.BoxGeometry(0.06, 0.14, 5.2), M.black, sx * 0.42, 0.46, -0.2);
+        for (const z of [-2.2, -1.0, 0.2, 1.4, 2.3]) tubeAB(body, V3(sx * 0.42, 0.5, z), V3(sx * 0.26, 0.82, z), 0.03, M.black);
+      }
+      tubeAB(body, V3(-0.95, 0.5, -3.1), V3(0.95, 0.5, -3.1), 0.045, M.black);
+      tubeAB(body, V3(-0.95, 0.5, -3.1), V3(-1.02, 0.5, -2.92), 0.04, M.black); tubeAB(body, V3(0.95, 0.5, -3.1), V3(1.02, 0.5, -2.92), 0.04, M.black);
+      for (const sx of [-1, 1]) {
+        tubeAB(body, V3(sx * 0.42, 0.46, -2.8), V3(sx * 0.5, 0.5, -3.1), 0.035, M.black);
+        add(body, cylZ(0.07, 0.07, 0.07, 18), M.black, sx * 0.7, 0.6, -3.14); add(body, cylZ(0.058, 0.058, 0.02, 18), M.head, sx * 0.7, 0.6, -3.18);
+        add(body, rbox(0.05, 0.05, 0.04, 0.01), M.amber, sx * 1.0, 0.5, -3.02);
+        for (const [z, r] of [[zF, RF], [zR, RR]]) add(body, arcGeo(z, r, r + 0.05, r + 0.08, 0.35, Math.PI - 0.35, 0.3), M.black, sx * ((z < 0 ? trackF : trackR) / 2) - 0.15, 0, 0);
+        const tl = add(body, rbox(0.12, 0.08, 0.03, 0.01), M.tail, sx * 0.38, 0.62, 2.76); tl.castShadow = false;
+      }
+      tubeAB(body, V3(-0.45, 0.56, 2.72), V3(0.45, 0.56, 2.72), 0.03, M.black);
+      spots(0.7, 0.6, -3.2);
+      // driver's dash and wheel
+      add(body, rbox(0.56, 0.1, 0.18, 0.03), M.black, 0, yF - 0.02, -1.38, -0.4, 0, 0);
+      SW = steering(V3(0, yF + 0.04, -1.24), 0.75, 0.17);
+      cluster = { parent: body, pos: V3(0, yF + 0.02, -1.4), rot: -0.7, w: 0.14, h: 0.07 };
+      P.tips.push(toRoot(V3(0.35, 0.4, 2.7)));
+      const hy = topAt(-1.05) - 0.09;
+      driver = person({ hip: V3(0, hy, -1.0), lean: 0.18, hands: [V3(-0.14, yF + 0.07, -1.22), V3(0.14, yF + 0.07, -1.22)],
+        knee: { dx: 0.11, y: hy + 0.12, z: -1.4 }, foot: { dx: 0.14, y: hy - 0.22, z: -1.62 }, helmet: false });
+    };
+
+    // ---------------------------------------------------------------- Blue Bird
+    B.bluebird = () => {
+      WF = 0.18; WR = 0.2;
+      wheelStyle = { rim: 'disc', rimR: 0.3, tread: 'slick' };
+      const S = [[-4.35, 0.2, 0.44, 0.84], [-4.22, 0.36, 0.33, 0.96], [-3.95, 0.47, 0.27, 1.05], [-3.4, 0.53, 0.25, 1.1], [-2.4, 0.56, 0.24, 1.13], [-1.2, 0.58, 0.25, 1.16],
+        [0.0, 0.6, 0.26, 1.18], [0.8, 0.6, 0.27, 1.17], [1.6, 0.58, 0.28, 1.14], [2.5, 0.53, 0.3, 1.08], [3.3, 0.43, 0.34, 1.0], [3.95, 0.3, 0.4, 0.93], [4.38, 0.1, 0.5, 0.86]];
+      add(body, loft(S.map(([z, w, yb, yt]) => ({ z, w, yb, yt, n: 2.6, tw: 0.82 })), { seg: 40 }), M.paint, 0, 0, 0);
+      // wheel fairings flowing into the flanks: behind the front wheels, ahead of the rears
+      for (const sx of [-1, 1]) {
+        const xw = sx * trackF / 2, xb = sx * 0.5;
+        // (a spat over the back of each front wheel that tapers into the side; ahead of each rear wheel a pod swelling out
+        // of the side to meet it)
+        const spat = (zw, xw0, hw, R) => {
+          const S = [];
+          for (let i = 0; i <= 16; i++) {
+            const u = i / 16, z = zw - R - 0.08 + u * (2 * R + 1.25), a = clamp((z - (zw - R - 0.08)) / (R + 0.1), 0, 1), tail = clamp((z - zw) / (R + 1.2), 0, 1);
+            const nose = Math.sqrt(Math.max(0.02, 1 - (1 - a) * (1 - a)));
+            S.push({ z, xc: xw0 + (sx * 0.5 - xw0) * tail * tail, w: (hw * (1 - 0.55 * tail)) * nose + 0.02, yb: R - 0.02 + 0.06 * tail, yt: R + (R + 0.1) * nose * (1 - 0.45 * tail * tail), n: 2.3, bw: 1 });
+          }
+          add(body, loft(S, { seg: 28 }), M.paint, 0, 0, 0);
+        };
+        spat(zF, xw, 0.16, RF);
+        spat(zR, sx * (trackR / 2 - 0.1), 0.22, RR);
+        // the side's ports and chrome strip
+        for (let k = 0; k < 4; k++) add(body, cylX(0.028, 0.028, 0.02, 14), M.black, sx * 0.575, 1.0, -1.1 + k * 0.13);
+        add(body, new THREE.BoxGeometry(0.012, 0.02, 1.6), M.chrome, sx * 0.605, 0.72, 0.2);
+        add(body, new THREE.SphereGeometry(0.05, 14, 10), M.paint, sx * 0.6, 0.72, 1.1);
+        // exhaust stubs along the top of the engine bay
+        for (let k = 0; k < 6; k++) { const z = -2.9 + k * 0.26; add(body, cylX(0.025, 0.025, 0.08, 10), M.steel, sx * 0.54, 1.02, z); P.tips.push(toRoot(V3(sx * 0.6, 1.02, z))); }
+      }
+      // the nose intake
+      add(body, new THREE.CircleGeometry(0.22, 28), M.black, 0, 0.66, -4.33, 0, Math.PI, 0, false).scale.set(0.9, 1.25, 1);
+      // tail fin
+      const fin = profile([[3.0, 1.05], [3.4, 1.35], [4.15, 1.85], [4.4, 1.85], [4.42, 0.9], [3.0, 1.0]], 0.06, 0.02);
+      add(body, fin, M.paint, 0, 0, 0);
+      // cockpit well, the little screen, the driver's head and shoulders above the rim
+      add(body, rbox(0.56, 0.03, 0.84, 0.2), M.black, 0, 1.175, 1.15);
+      const rim = add(body, new THREE.TorusGeometry(0.3, 0.035, 10, 32), new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.7 }), 0, 1.19, 1.15, Math.PI / 2, 0, 0); rim.scale.set(1, 1.45, 1);
+      const ws = add(body, new THREE.PlaneGeometry(0.46, 0.2), M.glass, 0, 1.28, 0.62, -0.6, 0, 0, false); ws.castShadow = false;
+      add(body, new THREE.BoxGeometry(0.48, 0.02, 0.02), M.chrome, 0, 1.19, 0.66);
+      add(body, loft([{ z: 1.5, w: 0.05, yb: 1.12, yt: 1.2 }, { z: 1.62, w: 0.15, yb: 1.1, yt: 1.36 }, { z: 1.9, w: 0.15, yb: 1.08, yt: 1.34 }, { z: 2.6, w: 0.08, yb: 1.04, yt: 1.12 }, { z: 3.0, w: 0.02, yb: 1.0, yt: 1.02 }].map((q) => Object.assign(q, { n: 2.2 })), { seg: 24 }), M.paint, 0, 0, 0);   // headrest fairing
+      SW = steering(V3(0, 1.05, 0.82), 0.25, 0.2, 'wood');
+      cluster = { parent: body, pos: V3(0, 1.1, 0.7), rot: -0.3, w: 0.16, h: 0.08 };
+      driver = person({ hip: V3(0, 0.6, 1.3), lean: 0.22, hands: [V3(-0.16, 1.07, 0.86), V3(0.16, 1.07, 0.86)],
+        knee: { dx: 0.11, y: 0.72, z: 0.85 }, foot: { dx: 0.14, y: 0.42, z: 0.35 }, goggles: true });
+    };
+
+    // ---------------------------------------------------------------- Nissan GTR (Liberty Walk)
+    B.gtr = () => {
+      WF = 0.285; WR = 0.315;
+      wheelStyle = { rim: 'deepdish', rimR: 0.254, tread: 'road' };
+      M.carbon = new THREE.MeshPhysicalMaterial({ color: 0x08090a, roughness: 0.42, metalness: 0.25, clearcoat: 0.35, clearcoatRoughness: 0.25, envMapIntensity: 0.5, side: THREE.DoubleSide });
+      M.ti = new THREE.MeshStandardMaterial({ color: 0x8b7b9a, roughness: 0.25, metalness: 1 });
+      const flare = (z) => { let f = 0; for (const zc of [zF, zR]) { const d = Math.abs(z - zc); if (d < 0.78) f = Math.max(f, 0.075 * Math.pow(1 - (d / 0.78) ** 2, 0.55)); } return f; };
+      const Wbase = tbl([[-2.37, 0.78], [-2.28, 0.9], [-2.1, 0.94], [-1.8, 0.955], [-0.9, 0.95], [0.5, 0.95], [1.9, 0.965], [2.25, 0.94], [2.39, 0.9]]);
+      const W = (z) => Wbase(z) + flare(z);
+      const ZW = -0.66, ZR = 1.64;                    // windshield base, rear-window base
+
+      const g = carBody({
+        stations: stationsOf(-2.37, 2.39, 0.06, [ZW, 0.12, 0.5, 0.6, 1.2, ZR, zF - 0.43, zF + 0.43, zR - 0.43, zR + 0.43]),
+        W, bulge: () => 0.012,
+        yB: archY(tbl([[-2.37, 0.24], [-2.25, 0.16], [2.2, 0.16], [2.39, 0.3]]), [zF, zR], RF, 0.43),
+        ySh: tbl([[-2.37, 0.56], [-2.2, 0.66], [-1.8, 0.74], [-1.39, 0.78], [-0.8, 0.79], [0.3, 0.8], [1.2, 0.83], [1.6, 0.85], [2.1, 0.86], [2.39, 0.79]]),
+        yBelt: tbl([[-2.37, 0.6], [-2.2, 0.71], [-1.8, 0.79], [-1.4, 0.84], [ZW, 0.9], [0.3, 0.9], [1.3, 0.93], [ZR, 0.95], [2.0, 0.955], [2.39, 0.88]]),
+        Wb: (z) => W(z) - 0.085 - flare(z),
+        yT: tbl([[-2.37, 0.62], [-2.3, 0.7], [-2.1, 0.77], [-1.7, 0.83], [-1.2, 0.87], [ZW, 0.925], [-0.3, 1.13], [0.12, 1.28], [0.5, 1.31], [0.95, 1.29], [1.3, 1.19], [ZR, 1.0], [2.0, 0.99], [2.25, 0.985], [2.33, 0.96], [2.39, 0.9]]),
+        Wt: tbl([[-2.37, 0.4], [-0.9, 0.5], [ZW, 0.58], [-0.3, 0.64], [0.3, 0.66], [1.2, 0.66], [ZR, 0.6], [2.0, 0.55], [2.39, 0.5]]),
+        mat: (b, z) => {
+          if (b <= 3) return 2;                                                 // black skirts, splitter, diffuser sides
+          if (z > ZW && z < ZR && b >= 11) {
+            if (b >= 15 && z > 0.12 && z < 1.2) return 2;                        // black roof
+            if (b <= 14 && z > 0.5 && z < 0.6) return 2;                         // B-pillar
+            return 1;                                                            // glass
+          }
+          if (z < ZW && b >= 11) return 2;                                      // the black hood
+          return 0;
+        },
+      });
+      add(body, g, [M.paint, M.tint, M.carbon], 0, 0, 0);
+      // Liberty Walk overfenders: riveted lips round every arch
+      for (const sx of [-1, 1]) for (const [z, r] of [[zF, RF], [zR, RR]]) {
+        const xo = W(z);
+        add(body, arcGeo(z, r, 0.43, 0.47, 0.12, Math.PI - 0.12, 0.09), M.paint, sx > 0 ? xo - 0.07 : -xo - 0.02, 0, 0);
+        for (let k = 0; k < 9; k++) { const a = 0.25 + k * (Math.PI - 0.5) / 8; add(body, new THREE.SphereGeometry(0.011, 8, 6), M.chrome, sx * (xo + 0.022), r + Math.sin(a) * 0.45, z + Math.cos(a) * 0.45); }
+      }
+      // front: grille, bumper intakes, the carbon splitter, the swept lamps
+      add(body, new THREE.PlaneGeometry(0.9, 0.2), M.mesh, 0, 0.42, -2.375, 0, Math.PI, 0, false);
+      for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(0.26, 0.12), M.mesh, sx * 0.6, 0.3, -2.33, 0, Math.PI + sx * 0.4, 0, false);
+      add(body, rbox(1.84, 0.022, 0.14, 0.008), M.carbon, 0, 0.15, -2.33);
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.4, 0.06, 0.22, 0.025), M.gloss, sx * 0.63, 0.715, -2.13, -0.32, sx * 0.3, 0);
+        for (const [dx, dz] of [[-0.08, 0.02], [0.06, -0.04]]) { const l = add(body, new THREE.SphereGeometry(0.03, 14, 10), M.head, sx * (0.63 + dx), 0.74, -2.13 + dz); l.scale.set(1.5, 0.6, 1); l.castShadow = false; }
+        const led = add(body, rbox(0.34, 0.012, 0.02, 0.004), M.head, sx * 0.64, 0.7, -2.23, -0.32, sx * 0.3, 0); led.castShadow = false;
+        add(body, rbox(0.38, 0.01, 0.05, 0.004), M.amber, sx * 0.64, 0.685, -2.2, -0.32, sx * 0.3, 0);
+        // mirrors, fender vents
+        add(body, rbox(0.05, 0.08, 0.17, 0.02), M.carbon, sx * 1.0, 1.0, -0.5);
+        tubeAB(body, V3(sx * 0.88, 0.95, -0.54), V3(sx * 0.99, 0.98, -0.5), 0.012, M.carbon);
+        add(body, new THREE.PlaneGeometry(0.2, 0.08), M.mesh, sx * (W(-0.95) + 0.003), 0.62, -0.95, 0, sx * Math.PI / 2, 0, false);
+      }
+      spots(0.63, 0.7, -2.2);
+      // rear: the four round lamps, the diffuser, four titanium tips, the GT wing on tall struts
+      for (const sx of [-1, 1]) for (const x of [0.34, 0.6]) {
+        add(body, new THREE.TorusGeometry(0.072, 0.013, 10, 28), M.chrome, sx * x, 0.8, 2.392);
+        const l = add(body, new THREE.CircleGeometry(0.068, 28), M.tail, sx * x, 0.8, 2.395, 0, 0, 0, false); l.castShadow = false;
+      }
+      add(body, rbox(1.5, 0.12, 0.16, 0.02), M.carbon, 0, 0.3, 2.34);
+      add(body, rbox(1.84, 0.1, 0.08, 0.02), M.carbon, 0, 0.44, 2.37);                       // the black lower valance
+      add(body, rbox(0.52, 0.13, 0.012, 0.006), M.white, 0, 0.6, 2.393);                     // plate
+      for (const x of [-0.95, 0.95]) add(body, rbox(0.04, 0.3, 0.12, 0.01), M.carbon, x * 0.98, 0.42, 2.3);
+      for (const x of [-0.52, -0.4, 0.4, 0.52]) { add(body, cylZ(0.045, 0.05, 0.12, 18, true), M.ti, x, 0.33, 2.4); P.tips.push(toRoot(V3(x, 0.33, 2.47))); }
+      for (const sx of [-1, 1]) { tubeAB(body, V3(sx * 0.52, 0.99, 2.0), V3(sx * 0.52, 1.4, 2.18), 0.018, M.carbon); add(body, rbox(0.04, 0.02, 0.16, 0.008), M.carbon, sx * 0.52, 0.995, 2.0); }
+      add(body, rbox(1.9, 0.035, 0.36, 0.015), M.carbon, 0, 1.42, 2.22, 0.1, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.02, 0.22, 0.44, 0.01), M.carbon, sx * 0.95, 1.42, 2.24);
+      // inside: two seats, the dash, the wheel on the left (a US car)
+      for (const sx of [-1, 1]) { add(body, rbox(0.46, 0.1, 0.46, 0.04), M.seat, sx * 0.38, 0.36, 0.28); add(body, rbox(0.46, 0.62, 0.1, 0.04), M.seat, sx * 0.38, 0.7, 0.5, 0.2, 0, 0); }
+      add(body, rbox(1.64, 0.14, 0.34, 0.05), M.black, 0, 0.84, -0.48);
+      add(body, rbox(0.26, 0.48, 0.4, 0.05), M.black, 0, 0.54, -0.2);
+      SW = steering(V3(-0.38, 0.8, -0.24), 0.4, 0.18);
+      cluster = { parent: body, pos: V3(-0.38, 0.93, -0.4), rot: -0.35, w: 0.26, h: 0.1 };
+      driver = person({ hip: V3(-0.38, 0.42, 0.28), lean: 0.3, hands: [V3(-0.52, 0.82, -0.22), V3(-0.24, 0.82, -0.22)],
+        knee: { dx: 0.1, y: 0.56, z: -0.2 }, foot: { dx: 0.13, y: 0.22, z: -0.72 }, helmet: false });
+      P.hideCockpit.push(driver);
+    };
+
+    // ---------------------------------------------------------------- Mini Dookie
+    B.mini = () => {
+      WF = 0.145; WR = 0.145;
+      wheelStyle = { rim: 'alloy5', rimR: 0.19, tread: 'road' };
+      M.orange = new THREE.MeshStandardMaterial({ color: 0xc8501c, roughness: 0.7 });
+      const flare = (z) => { let f = 0; for (const zc of [zF, zR]) { const d = Math.abs(z - zc); if (d < 0.5) f = Math.max(f, 0.035 * Math.pow(1 - (d / 0.5) ** 2, 0.6)); } return f; };
+      const Wb0 = tbl([[-1.28, 0.58], [-1.18, 0.68], [-1.0, 0.71], [1.0, 0.71], [1.15, 0.69], [1.22, 0.63]]);
+      const W = (z) => Wb0(z) + flare(z);
+      const g = carBody({
+        stations: stationsOf(-1.28, 1.22, 0.05, [-1.18, -0.45, 0.12, 0.24, 0.8, 1.06, zF - 0.34, zF + 0.34, zR - 0.34, zR + 0.34]),
+        W, bulge: () => 0.01,
+        yB: archY(tbl([[-1.28, 0.32], [-1.15, 0.2], [1.1, 0.2], [1.22, 0.3]]), [zF, zR], RF, 0.34),
+        ySh: tbl([[-1.28, 0.56], [-1.18, 0.68], [-1.0, 0.78], [-0.6, 0.84], [1.22, 0.84]]),
+        yBelt: tbl([[-1.28, 0.6], [-1.18, 0.73], [-1.0, 0.8], [-0.62, 0.93], [1.0, 0.95], [1.22, 0.9]]),
+        Wb: (z) => W(z) - 0.05 - flare(z),
+        yT: tbl([[-1.28, 0.62], [-1.2, 0.76], [-1.0, 1.02], [-0.8, 1.26], [-0.6, 1.46], [-0.4, 1.57], [0, 1.62], [0.8, 1.6], [1.05, 1.52], [1.18, 1.36], [1.22, 1.18]]),
+        Wt: tbl([[-1.28, 0.45], [-1.0, 0.58], [-0.6, 0.63], [0.8, 0.64], [1.22, 0.56]]),
+        mat: (b, z) => {
+          if (b <= 3) return 2;
+          if (b >= 11 && b <= 14 && z > -1.18 && z < 1.1 && !(z > 0.12 && z < 0.24)) return 1;   // windscreen, side and rear windows
+          if (b >= 15 && (z < -0.45 || (z < 0.8 && z > -0.45))) return 1;                       // the screen's top and the glass roof
+          return 0;
+        },
+      });
+      add(body, g, [M.paint, M.glass, M.black], 0, 0, 0);
+      for (const sx of [-1, 1]) {
+        add(body, cylZ(0.06, 0.06, 0.03, 20), M.head, sx * 0.44, 0.52, -1.285);
+        const t = add(body, rbox(0.1, 0.14, 0.03, 0.02), M.tail, sx * 0.48, 0.75, 1.225); t.castShadow = false;
+        add(body, rbox(0.03, 0.07, 0.1, 0.01), M.black, sx * 0.76, 1.02, -0.62);   // mirror
+      }
+      add(body, rbox(1.1, 0.06, 0.1, 0.02), M.black, 0, 0.3, -1.29);     // bumper strips
+      add(body, rbox(1.1, 0.06, 0.1, 0.02), M.black, 0, 0.32, 1.23);
+      spots(0.44, 0.52, -1.3);
+      // inside: the orange seat, a little dash, the wheel - all in the middle
+      add(body, rbox(0.5, 0.12, 0.5, 0.05), M.orange, 0, 0.5, 0.15); add(body, rbox(0.5, 0.7, 0.12, 0.05), M.orange, 0, 0.92, 0.42, 0.18, 0, 0);
+      add(body, rbox(1.1, 0.1, 0.3, 0.04), M.black, 0, 0.78, -0.82, -0.3, 0, 0);
+      SW = steering(V3(0, 0.95, -0.52), 0.5, 0.17);
+      cluster = { parent: body, pos: V3(0, 0.84, -0.78), rot: -0.5, w: 0.2, h: 0.08 };
+      driver = person({ hip: V3(0, 0.56, 0.16), lean: 0.12, hands: [V3(-0.14, 0.97, -0.5), V3(0.14, 0.97, -0.5)],
+        knee: { dx: 0.11, y: 0.72, z: -0.25 }, foot: { dx: 0.14, y: 0.26, z: -0.62 }, helmet: false });
+      P.hideCockpit.push(driver);
+    };
+
+    // ---------------------------------------------------------------- Porta Potty
+    B.potty = () => {
+      WF = 0.076; WR = 0.076;
+      wheelStyle = { rim: 'hub', rimR: 0.07, tread: 'truck' };
+      M.potty2 = new THREE.MeshStandardMaterial({ color: 0x5b95d8, roughness: 0.45 });
+      const hw = 0.56, hd = 0.595, y0 = 0.36, y1 = 2.26;
+      // the black base tray, walls with their moulded panels and ribs, the white door frame and roof
+      add(body, rbox(1.14, 0.1, 1.21, 0.02), M.black, 0, 0.31, 0);
+      add(body, new THREE.BoxGeometry(2 * hw, y1 - y0, 0.04), M.paint, 0, (y0 + y1) / 2, hd - 0.02);
+      for (const sx of [-1, 1]) {
+        add(body, new THREE.BoxGeometry(0.04, y1 - y0, 2 * hd), M.paint, sx * (hw - 0.02), (y0 + y1) / 2, 0);
+        add(body, rbox(0.012, 0.2, 0.9, 0.01), M.potty2, sx * hw, 1.95, 0);
+        add(body, rbox(0.012, 0.36, 0.64, 0.01), M.potty2, sx * hw, 1.45, 0);
+        for (let k = 0; k < 7; k++) add(body, new THREE.BoxGeometry(0.014, 0.62, 0.035), M.potty2, sx * hw, 0.78, -0.39 + k * 0.13);
+      }
+      add(body, rbox(0.64, 0.36, 0.012, 0.01), M.potty2, 0, 1.45, hd);
+      for (const sx of [-1, 1]) add(body, new THREE.BoxGeometry(0.1, y1 - y0, 0.05), M.white, sx * 0.49, (y0 + y1) / 2, -hd);
+      add(body, new THREE.BoxGeometry(2 * hw, 0.2, 0.05), M.white, 0, y1 - 0.1, -hd);
+      { const sh = new THREE.Shape(); sh.moveTo(-0.62, 0); sh.quadraticCurveTo(0, 0.3, 0.62, 0); sh.lineTo(0.62, -0.04); sh.lineTo(-0.62, -0.04); sh.lineTo(-0.62, 0);
+        const rg = new THREE.ExtrudeGeometry(sh, { depth: 1.28, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 3, curveSegments: 16 }); rg.translate(0, 0, -0.64);
+        add(body, rg, M.white, 0, y1 + 0.04, 0); }
+      add(body, new THREE.BoxGeometry(1.22, 0.06, 1.3), M.white, 0, y1 + 0.01, 0);
+      add(body, new THREE.CylinderGeometry(0.05, 0.05, 0.26, 14), M.black, 0.28, y1 + 0.26, 0.4);     // the vent stack - the exhaust
+      P.tips.push(toRoot(V3(0.28, y1 + 0.4, 0.4)));
+      // the door, swung open on its left hinges
+      const door = new THREE.Group(); door.position.set(-0.45, y0 + 0.02, -hd - 0.02); door.rotation.y = 1.75; body.add(door);
+      add(door, new THREE.BoxGeometry(0.9, 1.78, 0.04), M.paint, 0.45, 0.89, 0);
+      add(door, rbox(0.7, 0.5, 0.012, 0.01), M.potty2, 0.45, 1.3, -0.026);
+      for (let k = 0; k < 5; k++) add(door, new THREE.BoxGeometry(0.035, 0.6, 0.014), M.potty2, 0.2 + k * 0.125, 0.5, -0.026);
+      add(door, new THREE.BoxGeometry(0.04, 0.1, 0.03), M.white, 0.84, 1.0, -0.03);
+      add(door, new THREE.BoxGeometry(0.1, 0.04, 0.015), new THREE.MeshStandardMaterial({ color: 0x2a9a3a, roughness: 0.4 }), 0.72, 1.12, -0.03);   // VACANT
+      // inside: the floor, the throne (the engine's under it), a paper roll, the steering column
+      add(body, new THREE.BoxGeometry(1.06, 0.03, 1.12), M.grey, 0, 0.37, 0);
+      add(body, rbox(1.04, 0.46, 0.46, 0.02), M.potty2, 0, 0.6, 0.33);
+      add(body, new THREE.TorusGeometry(0.15, 0.035, 10, 28), M.black, 0, 0.84, 0.3, Math.PI / 2, 0, 0);
+      add(body, rbox(0.36, 0.42, 0.03, 0.02), M.black, 0, 1.06, 0.53, 0.2, 0, 0);
+      add(body, cylX(0.06, 0.06, 0.1, 18), M.white, 0.48, 1.0, 0.1);
+      pipe(body, [V3(0, 0.38, -0.3), V3(0, 0.7, -0.3), V3(0, 1.0, -0.2)], 0.018, M.grey);
+      SW = steering(V3(0, 1.02, -0.18), 0.9, 0.14);
+      cluster = { parent: body, pos: V3(0, 0.95, -0.28), rot: -0.9, w: 0.1, h: 0.05 };
+      driver = person({ hip: V3(0, 0.88, 0.3), lean: 0.08, hands: [V3(-0.12, 1.04, -0.16), V3(0.12, 1.04, -0.16)],
+        knee: { dx: 0.12, y: 0.95, z: -0.08 }, foot: { dx: 0.15, y: 0.42, z: -0.2 }, helmet: true });
+    };
+
+    // ---------------------------------------------------------------- Turbo Scooter 3000
+    B.scooter = () => {
+      WF = 0.08; WR = 0.09;
+      wheelStyle = { rim: 'alloy5', rimR: 0.075, tread: 'truck' };
+      // front fairing with the lamp, the tiller rising from it, the low deck, the rear shell, the seat post and seat
+      add(body, loft([{ z: -0.86, w: 0.12, yb: 0.12, yt: 0.34, n: 2.4 }, { z: -0.8, w: 0.24, yb: 0.08, yt: 0.44, n: 3 }, { z: -0.62, w: 0.3, yb: 0.1, yt: 0.48, n: 3.5, tw: 0.7 },
+        { z: -0.44, w: 0.26, yb: 0.12, yt: 0.44, n: 3.5, tw: 0.6 }, { z: -0.38, w: 0.18, yb: 0.14, yt: 0.3, n: 3 }], { seg: 32 }), M.paint, 0, 0, 0);
+      add(body, cylZ(0.04, 0.04, 0.02, 18), M.head, 0, 0.28, -0.86);
+      add(body, rbox(0.44, 0.06, 0.1, 0.03), M.black, 0, 0.1, -0.86);    // bumper
+      add(body, rbox(0.44, 0.05, 0.62, 0.02), M.black, 0, 0.16, -0.12);  // the deck
+      add(body, loft([{ z: 0.12, w: 0.24, yb: 0.12, yt: 0.34, n: 3 }, { z: 0.2, w: 0.32, yb: 0.1, yt: 0.44, n: 3.5, tw: 0.75 }, { z: 0.6, w: 0.34, yb: 0.12, yt: 0.46, n: 3.5, tw: 0.75 },
+        { z: 0.76, w: 0.3, yb: 0.14, yt: 0.4, n: 3 }, { z: 0.82, w: 0.2, yb: 0.18, yt: 0.32, n: 2.5 }], { seg: 32 }), M.paint, 0, 0, 0);
+      for (const sx of [-1, 1]) { const t = add(body, rbox(0.08, 0.05, 0.02, 0.01), M.tail, sx * 0.2, 0.36, 0.8); t.castShadow = false; }
+      add(body, new THREE.CylinderGeometry(0.035, 0.035, 0.2, 14), M.alu, 0, 0.56, 0.36);
+      add(body, rbox(0.5, 0.12, 0.48, 0.05), M.seat, 0, 0.7, 0.34);
+      add(body, rbox(0.48, 0.62, 0.12, 0.05), M.seat, 0, 1.06, 0.58, 0.12, 0, 0);
+      add(body, rbox(0.3, 0.18, 0.1, 0.04), M.seat, 0, 1.46, 0.63, 0.12, 0, 0);
+      for (const sx of [-1, 1]) { add(body, rbox(0.07, 0.05, 0.38, 0.02), M.seat, sx * 0.29, 0.92, 0.28); tubeAB(body, V3(sx * 0.27, 0.72, 0.45), V3(sx * 0.29, 0.9, 0.45), 0.014, M.black); }
+      // tiller, console, handlebar, mirrors
+      tubeAB(body, V3(0, 0.44, -0.56), V3(0, 0.92, -0.4), 0.04, M.paint);
+      add(body, rbox(0.22, 0.12, 0.14, 0.04), M.paint, 0, 0.96, -0.38, -0.5, 0, 0);
+      for (const sx of [-1, 1]) {
+        tubeAB(body, V3(sx * 0.1, 0.98, -0.34), V3(sx * 0.2, 1.0, -0.28), 0.014, M.black);
+        tubeAB(body, V3(sx * 0.08, 1.02, -0.4), V3(sx * 0.2, 1.18, -0.44), 0.008, M.black);
+        add(body, rbox(0.08, 0.1, 0.02, 0.01), M.chrome, sx * 0.21, 1.2, -0.44);
+      }
+      // the basket
+      const bk = new THREE.Group(); bk.position.set(0, 0.62, -0.9); body.add(bk);
+      add(bk, new THREE.BoxGeometry(0.4, 0.02, 0.3), M.black, 0, -0.13, 0);
+      for (const sx of [-1, 1]) add(bk, new THREE.BoxGeometry(0.015, 0.26, 0.3), M.mesh, sx * 0.2, 0, 0);
+      for (const sz of [-1, 1]) add(bk, new THREE.BoxGeometry(0.4, 0.26, 0.015), M.mesh, 0, 0, sz * 0.15);
+      tubeAB(body, V3(0, 0.46, -0.72), V3(0, 0.5, -0.82), 0.02, M.black);
+      // the anti-tip wheels at the back
+      for (const sx of [-1, 1]) { tubeAB(body, V3(sx * 0.16, 0.2, 0.7), V3(sx * 0.18, 0.1, 0.87), 0.012, M.black); add(body, cylX(0.04, 0.04, 0.03, 14), M.rubber, sx * 0.18, 0.08, 0.87); }
+      SW = { colG: new THREE.Group(), sw: new THREE.Group() }; model.add(SW.colG); SW.colG.add(SW.sw);
+      cluster = { parent: body, pos: V3(0, 1.0, -0.36), rot: -1.1, w: 0.12, h: 0.06 };
+      P.tips.push(toRoot(V3(0, 0.2, 0.85)));
+      spots(0.05, 0.28, -0.9);
+      driver = person({ hip: V3(0, 0.78, 0.33), lean: 0.1, hands: [V3(-0.2, 1.0, -0.28), V3(0.2, 1.0, -0.28)],
+        knee: { dx: 0.12, y: 0.84, z: -0.08 }, foot: { dx: 0.14, y: 0.22, z: -0.26 } });
+    };
+
+    // ---------------------------------------------------------------- Razors Edge
+    B.razor = () => {
+      WF = 0.215; WR = 0.215;
+      wheelStyle = { rim: 'cart', rimR: 0.1, tread: 'road' };
+      // the faceted wedge: nose low at the front, the ridge peaking just ahead of the middle, the tail up high
+      const v = [[0, 0.42, -2.36], [0, 1.36, -0.55], [0, 1.08, 2.36], [0, 0.46, 2.32],          // 0 nose, 1 ridge, 2 tail top, 3 tail bottom
+        [-0.86, 0.62, -0.45], [0.86, 0.62, -0.45], [-0.84, 0.66, 1.35], [0.84, 0.66, 1.35],      // 4-7 flanks
+        [-0.66, 0.16, -1.45], [0.66, 0.16, -1.45], [-0.66, 0.16, 1.7], [0.66, 0.16, 1.7]];       // 8-11 floor
+      const F = [[0, 1, 4], [0, 5, 1], [1, 6, 4], [1, 5, 7], [1, 2, 6], [1, 7, 2],           // upper faces
+        [0, 4, 8], [0, 9, 5], [0, 8, 9], [4, 6, 10, 8], [5, 9, 11, 7],                      // nose underside, flanks
+        [8, 10, 11, 9], [6, 2, 3], [7, 3, 2], [6, 3, 10], [7, 11, 3], [3, 11, 10]];          // floor, tail
+      M.smoke = new THREE.MeshPhysicalMaterial({ color: 0x12161b, roughness: 0.06, metalness: 0.5, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.5 });
+      const shell = add(body, facesGeo(v, F), M.smoke, 0, 0, 0); shell.castShadow = true;
+      // the graveyard on the flanks: tombstones, crosses and dead trees against the glass
+      const gy = canvasTex(1024, 256, (g, w, h) => {
+        g.clearRect(0, 0, w, h); g.fillStyle = '#050505';
+        g.beginPath(); g.moveTo(0, h); for (let x = 0; x <= w; x += 16) g.lineTo(x, h * 0.72 + Math.sin(x * 0.02) * 10); g.lineTo(w, h); g.fill();
+        const rnd = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+        for (let k = 0; k < 26; k++) {
+          const x = rnd() * w, bh = 20 + rnd() * 26, y0 = h * 0.74;
+          if (rnd() < 0.5) { g.fillRect(x - 8, y0 - bh, 16, bh); g.beginPath(); g.arc(x, y0 - bh, 8, Math.PI, 0); g.fill(); }
+          else { g.fillRect(x - 2, y0 - bh - 8, 4, bh + 8); g.fillRect(x - 9, y0 - bh, 18, 4); }
+        }
+        g.strokeStyle = '#050505';
+        for (const tx of [150, 520, 860]) {
+          g.lineWidth = 7; g.beginPath(); g.moveTo(tx, h * 0.74); g.lineTo(tx + 6, h * 0.3); g.stroke();
+          g.lineWidth = 3; for (let b = 0; b < 6; b++) { const y = h * (0.35 + b * 0.06), d = (b & 1 ? 1 : -1) * (30 + rnd() * 30); g.beginPath(); g.moveTo(tx + 5, y); g.quadraticCurveTo(tx + d * 0.5, y - 20, tx + d, y - 30 - rnd() * 20); g.stroke(); }
+        }
+      });
+      const dec = new THREE.MeshBasicMaterial({ map: gy, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      for (const sx of [-1, 1]) {
+        // the lower flank quad (4-6-10-8), a hair outside it, mapped by z / y
+        const q = [v[sx < 0 ? 4 : 5], v[sx < 0 ? 6 : 7], v[sx < 0 ? 10 : 11], v[sx < 0 ? 8 : 9]].map((p) => [p[0] + sx * 0.004, p[1], p[2]]);
+        const pos = [], uv = [];
+        for (const t of [[0, 1, 2], [0, 2, 3]]) for (const i of t) { pos.push(...q[i]); uv.push((q[i][2] + 1.5) / 3.3, (q[i][1] - 0.1) / 0.62); }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        const m = add(body, g, dec, 0, 0, 0, 0, 0, 0, false); m.renderOrder = 2;
+      }
+      // neon on every edge: a bright core and a soft additive halo (the paint colour)
+      M.halo = new THREE.MeshBasicMaterial({ color: paintHex, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
+      const E = new Set(); for (const f of F) for (let i = 0; i < f.length; i++) { const a = f[i], b = f[(i + 1) % f.length]; E.add(a < b ? a + '-' + b : b + '-' + a); }
+      for (const e of E) {
+        const [a, b] = e.split('-').map(Number);
+        if ((a >= 8 && b >= 8) || (a === 3 && b >= 10)) continue;           // (not along the floor)
+        const A = V3(...v[a]), Bv = V3(...v[b]);
+        tubeAB(body, A, Bv, 0.012, M.paint, 6).castShadow = false;
+        const h = tubeAB(body, A, Bv, 0.045, M.halo, 8); h.castShadow = false; h.renderOrder = 3;
+      }
+      // inside: the cart frame, a bench for two, the wheel on the left
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.42, 0.3, -1.6), V3(sx * 0.42, 0.3, 1.7), 0.03, M.black);
+      add(body, rbox(1.0, 0.1, 0.45, 0.04), M.seat, 0, 0.5, 0.35); add(body, rbox(1.0, 0.5, 0.1, 0.04), M.seat, 0, 0.78, 0.6, 0.2, 0, 0);
+      add(body, rbox(0.9, 0.1, 0.25, 0.03), M.black, 0, 0.7, -0.62, -0.4, 0, 0);
+      SW = steering(V3(-0.26, 0.8, -0.35), 0.7, 0.16);
+      cluster = { parent: body, pos: V3(-0.26, 0.74, -0.62), rot: -0.9, w: 0.14, h: 0.07 };
+      for (const sx of [-1, 1]) { const t = add(body, rbox(0.14, 0.03, 0.02, 0.01), M.tail, sx * 0.1, 0.86, 2.33); t.castShadow = false; add(body, rbox(0.16, 0.02, 0.02, 0.01), M.head, sx * 0.14, 0.47, -2.2); }
+      spots(0.14, 0.47, -2.3);
+      P.tips.push(toRoot(V3(0, 0.3, 2.3)));
+      driver = person({ hip: V3(-0.26, 0.56, 0.36), lean: 0.22, hands: [V3(-0.38, 0.82, -0.33), V3(-0.14, 0.82, -0.33)],
+        knee: { dx: 0.11, y: 0.66, z: -0.18 }, foot: { dx: 0.14, y: 0.24, z: -0.66 }, helmet: false });
+    };
+
+    (B[CAR] || B.couch)();
+    model.add(driver);
+    const eye = driver.userData.eye;
+
+    // ---------------------------------------------------------------- the display on the dash
+    if (cluster) add(cluster.parent, new THREE.PlaneGeometry(cluster.w, cluster.h), M_cluster, cluster.pos.x, cluster.pos.y, cluster.pos.z + 0.002, cluster.rot, 0, 0, false);
+    const EV = CAR === 'mini' || CAR === 'scooter' || CAR === 'razor';
+
+    // ---------------------------------------------------------------- wheels
+    function carcass(R, W, rim) {
+      const h = W / 2, c = R - 0.004, sh = Math.min(0.05, W * 0.2);
+      return latheX([[rim, -h + 0.01], [rim + 0.015, -h], [rim + (R - rim) * 0.6, -h + 0.002], [c - sh * 0.5, -h + sh * 0.16], [c - sh * 0.12, -h + sh * 0.56], [c, -h + sh],
+        [c, h - sh], [c - sh * 0.12, h - sh * 0.56], [c - sh * 0.5, h - sh * 0.16], [rim + (R - rim) * 0.6, h - 0.002], [rim + 0.015, h], [rim, h - 0.01]], 48);
+    }
+    function tread(R, W, kind) {
+      if (kind === 'slick' || kind === 'road') return null;     // (road tyres read best smooth - sipes showed as saw teeth)
+      const list = [], h = W / 2, c = R - 0.004;
+      if (kind === 'knob') {
+        const N = Math.round(2 * Math.PI * c / 0.05);
+        for (let k = 0; k < N; k++) for (const f of (k & 1 ? [-0.55, 0.55] : [-0.85, 0, 0.85])) { const b = new THREE.BoxGeometry(W * 0.24, 0.018, 0.03); b.translate(f * h, c + 0.007, 0); b.rotateX(k * 2 * Math.PI / N); list.push(b); }
+      } else {
+        const N = Math.round(2 * Math.PI * c / 0.035);
+        for (let k = 0; k < N; k++) for (const f of (k & 1 ? [-0.5, 0.5] : [-0.8, 0, 0.8])) { const b = new THREE.BoxGeometry(W * 0.2, 0.006, 0.018); b.translate(f * h, c + 0.002, 0); b.rotateX(k * 2 * Math.PI / N); list.push(b); }
+      }
+      return mergeGeos(list);
+    }
+    const RIM = {
+      steel: new THREE.MeshStandardMaterial({ color: 0x2a2b2e, roughness: 0.45, metalness: 0.6 }),
+      steel5: new THREE.MeshStandardMaterial({ color: 0x9a9da2, roughness: 0.35, metalness: 0.7 }),
+      copper: new THREE.MeshStandardMaterial({ color: 0xd4884c, roughness: 0.25, metalness: 0.9 }),
+      disc: new THREE.MeshStandardMaterial({ color: 0xf0f0ec, roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide }),
+      deepdish: new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.3, metalness: 0.6 }),
+      alloy5: new THREE.MeshStandardMaterial({ color: 0xc4c8ce, roughness: 0.22, metalness: 0.9 }),
+      hub: new THREE.MeshStandardMaterial({ color: 0x8a8d92, roughness: 0.4, metalness: 0.6 }),
+      cart: new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.3, metalness: 0.85 }),
+    };
+    function rim(g, R, W, rimR, style) {
+      const mat = RIM[style] || RIM.steel;
+      const barrel = new THREE.CylinderGeometry(rimR, rimR, W * 0.92, 32, 1, true); barrel.rotateZ(Math.PI / 2); add(g, barrel, style === 'deepdish' ? M.black : mat, 0, 0, 0);
+      const fx = W * 0.3;
+      if (style === 'disc') {
+        // a flat white disc, domed a little, with a small hubcap
+        add(g, latheX([[0.001, fx + 0.03], [rimR * 0.4, fx + 0.025], [rimR * 0.95, fx + 0.004], [rimR, fx]], 36), mat, 0, 0, 0);
+        add(g, cylX(0.05, 0.06, 0.04, 20), M.chrome, fx + 0.04, 0, 0);
+        return;
+      }
+      if (style === 'copper') {
+        add(g, cylX(rimR * 0.98, rimR * 0.98, 0.012, 32), mat, fx - 0.03, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.98, 0.012, 8, 36), mat, fx, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.55, rimR * 0.6, 0.03, 28), mat, fx - 0.01, 0, 0);
+        add(g, cylX(0.04, 0.05, 0.05, 16), mat, fx + 0.01, 0, 0);
+        return;
+      }
+      if (style === 'deepdish') {
+        // a polished lip, then black spokes set deep, and the centre cap
+        add(g, new THREE.TorusGeometry(rimR, 0.018, 10, 44), M.chrome, fx + 0.02, 0, 0, 0, Math.PI / 2, 0);
+        add(g, latheX([[rimR, fx + 0.02], [rimR * 0.9, fx - 0.04], [rimR * 0.86, fx - 0.08]], 44), M.chromeD || (M.chromeD = Object.assign(M.chrome.clone(), { side: THREE.DoubleSide })), 0, 0, 0);
+        for (let k = 0; k < 10; k++) { const s = add(g, new THREE.BoxGeometry(0.02, rimR * 0.86, 0.022), mat, fx - 0.08, 0, 0); s.rotation.x = k * Math.PI / 5; s.geometry.translate(0, rimR * 0.43, 0); }
+        add(g, cylX(0.05, 0.06, 0.05, 20), mat, fx - 0.06, 0, 0);
+        return;
+      }
+      add(g, cylX(rimR, rimR, 0.012, 32), style === 'steel' ? RIM.steel : M.black, fx - 0.02, 0, 0);
+      const nSp = style === 'alloy5' || style === 'steel5' ? 5 : style === 'cart' ? 8 : style === 'hub' ? 6 : 0;
+      for (let k = 0; k < nSp; k++) { const s = add(g, new THREE.BoxGeometry(0.014, rimR * 0.9, style === 'alloy5' ? rimR * 0.34 : rimR * 0.2), mat, fx - 0.005, 0, 0); s.rotation.x = k * 2 * Math.PI / nSp; s.geometry.translate(0, rimR * 0.45, 0); }
+      add(g, new THREE.TorusGeometry(rimR * 0.99, 0.008, 6, 36), mat, fx - 0.005, 0, 0, 0, Math.PI / 2, 0);
+      add(g, cylX(rimR * 0.28, rimR * 0.3, 0.035, 20), style === 'steel' ? M.chrome : mat, fx + 0.005, 0, 0);
+    }
+    const geo = {};
+    for (const front of [true, false]) {
+      const R = front ? RF : RR, W = front ? WF : WR, rimR = Math.min(R - 0.03, (!front && wheelStyle.rimRR) || wheelStyle.rimR || R * 0.6);
+      geo[front] = { R, W, rimR, carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread), kn: tread(R + 0.01, W, 'knob') };
+    }
+    const wheels = [];
+    for (let i = 0; i < 4; i++) {
+      const frontW = i < 2, left = (i & 1) === 0, side = left ? -1 : 1, G = geo[frontW];
+      const corner = new THREE.Group();
+      corner.position.set(side * (frontW ? trackF : trackR) / 2, (frontW ? RF : RR) - cgH, (frontW ? -cgToFront : cgToRear));
+      rootG.add(corner);
+      const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
+      const spin = new THREE.Group(); flip.add(spin);
+      add(spin, G.carc, M.rubber, 0, 0, 0);
+      const stock = G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : [];
+      const pkg = [add(spin, G.kn, M.rubber, 0, 0, 0)]; pkg[0].visible = false;
+      rim(spin, G.R, G.W, G.rimR, wheelStyle.rim);
+      if (frontW) add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      wheels.push({ corner, flip, spin, left, front: frontW, side, stock, pkg });
+    }
+    // the Blue Bird ran twin wheels at the back: a second one inboard of each rear
+    if (CAR === 'bluebird') for (const w of wheels) if (!w.front) {
+      const s2 = new THREE.Group(); s2.position.x = -0.2; w.spin.add(s2);
+      add(s2, geo[false].carc, M.rubber, 0, 0, 0); rim(s2, geo[false].R, geo[false].W, geo[false].rimR, 'disc');
+    }
+
+    // ---------------------------------------------------------------- the display
+    const cgx = clusterCanvas.getContext('2d');
+    function drawCluster(t) {
+      const g = cgx, w = 512, h = 256;
+      g.fillStyle = '#07090b'; g.fillRect(0, 0, w, h);
+      const r = clamp(t.rpm / (t.redline || 7000), 0, 1.1);
+      for (let k = 0; k < 10; k++) { g.fillStyle = r > (EV ? k * 0.1 : 0.55 + k * 0.045) ? (EV ? '#35c6ff' : k < 5 ? '#29ff5a' : k < 8 ? '#ffd21a' : '#ff2a1a') : '#1b1f22'; g.fillRect(16 + k * 48, 12, 40, 22); }
+      g.fillStyle = '#e8f0f4'; g.font = 'bold 120px Arial'; g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(String(Math.round(t.speedMph)), 16, 128);
+      g.font = 'bold 36px Arial'; g.fillStyle = '#8fb2c6'; g.fillText('MPH', 20, 214);
+      g.fillStyle = '#ffffff'; g.font = 'bold 90px Arial'; g.textAlign = 'right'; g.fillText(t.gear.replace(/^[DM](?=\d)/, '') || 'D', 496, 140);
+      g.font = 'bold 30px Arial'; g.fillStyle = '#8fb2c6'; g.fillText(EV ? Math.round(clamp(t.rpm / (t.redline || 1), 0, 1) * 100) + '% MOTOR' : Math.round(t.rpm) + ' RPM', 496, 214);
+      clusterTex.needsUpdate = true;
+    }
+    function drawScreen() {}
+    function setPaint(name) {
+      const c = PAINTS[name]; if (c === undefined) return;
+      if (CAR === 'razor') { M.paint.emissive.setHex(c); M.halo.color.setHex(c); } else M.paint.color.setHex(c);
+    }
+    function setLights(o) {
+      M.tail.emissiveIntensity = o.brake ? 4 : (o.headlights ? 1.4 : 0.4);
+      M.head.emissiveIntensity = o.headlights ? 3.5 : 0; M.amber.emissiveIntensity = o.headlights ? 1.2 : 0.25;
+      for (const s of P.spots) { s.visible = !!o.headlights; s.intensity = o.headlights ? 220 : 0; }
+    }
+    // cockpit view: the driver goes (the camera sits in their head) and the glass clears, as it does from inside
+    function setInteriorVisible(v, cockpit) {
+      driver.visible = !cockpit;
+      M.tint.opacity = cockpit ? 0.14 : 0.62; M.glass.opacity = cockpit ? 0.1 : 0.32;
+      if (M.smoke) M.smoke.opacity = cockpit ? 0.3 : 0.8;
+    }
+    function setTransmission() {}
+    function setTires(front, rear) {
+      for (const w of wheels) {
+        const on = (w.front ? front : rear) === 'ccKnob' || (w.front ? front : rear) === 'offroad';
+        for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
+      }
+    }
+    function setChute() {}
+
+    rootG.traverse((o) => { if (o.isMesh && o.material && (o.material.transparent || (Array.isArray(o.material) && false))) o.castShadow = false; });
+    return {
+      root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW.sw, eye: toRoot(eye),
+      exhaustTips: P.tips, materials: M, headlights: P.spots, tailLens: [], mirrors: [],
+      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, variant: 'cc', cls: CAR,
+    };
+  }
+
+  root.HCCrushers = { build };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
 <script>/* src/worldrender.js */
 /* Hellcat Drive — world rendering: streamed LOD terrain chunks (roads drawn per-pixel in the terrain shader),
    instanced vegetation / rocks, farm buildings, power lines, signs, water, sky and lighting presets. */
@@ -10694,7 +12010,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -10740,20 +12056,71 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
+  // The Car Crushers 2 cars: listed with the Challengers (a button each). Per car: its button, paint, the traction-control
+  // mode it starts on (tc) and home map (map) where it has them, chase-camera scale [distance, height], the start hint,
+  // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND)
+  const CC_CARS = {
+    couch: { btn: 'COUCH CAR', sub: '850 hp turbo triple · 190 mph sofa', paint: 'Saddle', tc: 2, cam: [0.75, 0.85],
+      hint: 'Couch Car: shift up (E) for DRIVE and floor it - an 850 hp turbo triple under the cushions and a 5-speed sequential (E / Q or the paddles). The turbo needs a moment to spool: hold SPACE, floor it and let go for a launch-control start. Traction control is on Track - and on its short wheelbase it is twitchy at speed.',
+      info: 'A three-seat leather sofa on a hidden tube chassis · 1.6 L turbo triple built like a drag engine, ~850 hp on 40 psi and E85, its three pipes out of the right arm · 5-speed sequential with a quickshifter, locked diff · 13 in R-compound tyres · 520 kg with the driver · 0-60 ~3.2 s, ~190 mph',
+      trans: '5-speed sequential · quickshifter', tyres: 'R-compound 13 in',
+      snd: { nEng: 1, cyl: 3, fmul: 1.3, deep: 0.15, loud: 0.5, open: 1, whK: 0.42, whPure: 1, whine: 1.4, rpmRef: 8300, race: 1, rough: 0.15, surge: 1 } },
+    eggrod: { btn: 'EGG ROD', sub: '350 small-block hot rod · 142 mph', paint: 'White Knuckle', cam: [0.95, 0.95],
+      hint: 'Egg Rod: shift up (E) for DRIVE and floor it - a 350 small-block behind the egg, a 3-speed automatic, fat rear tyres and a big wing. No stability control on a hot rod: ease into the throttle out of a turn.',
+      info: 'The Mork & Mindy egg car as a hot rod · 350 cu in small-block V8, ~360 hp · TH350 3-speed automatic, posi rear · street tyres on copper wheels, a rear wing · 1,450 kg · 0-60 ~4.4 s, ~142 mph',
+      trans: '3-speed automatic', tyres: 'Street tyres',
+      snd: { nEng: 1, cyl: 8, fmul: 1.02, deep: 0.2, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.7, rough: 0.25 } },
+    banana: { btn: 'BANANA CAR', sub: 'F-150 5.0 V8 · floats · 85 mph', paint: 'Buttercup', cam: [1.25, 1.1],
+      hint: 'Banana Car: shift up (E) for DRIVE - a 1993 F-150 under the fibreglass: 185 hp, four speeds, 85 mph. And it floats: drive into a lake and the rear tyres paddle it along while the fronts steer like rudders.',
+      info: 'The Big Banana Car · a fibreglass banana on a 1993 Ford F-150 frame · 5.0 L V8, 185 hp · 4-speed automatic · five seats · 1,730 kg · governed to 85 mph · amphibious, as in the game: the sealed hull floats with ~0.4 m of draft and the spinning rear tyres paddle it at ~6 mph',
+      trans: '4-speed automatic', tyres: 'All-season tyres',
+      snd: { nEng: 1, cyl: 8, fmul: 1.0, deep: 0.1, loud: 0, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 4500, race: 0, rough: 0.05 } },
+    bluebird: { btn: 'BLUE BIRD', sub: '2,350 hp Rolls-Royce V12 · 300 mph', paint: 'Bluebird', tc: 2, map: 'straight', cam: [1.35, 0.95],
+      hint: 'Blue Bird: shift up (E) for DRIVE - a 36.7 L supercharged Rolls-Royce V12, 2,350 hp, three gears. In 1935 it needed Bonneville\'s whole course to reach 301 mph: give it miles, keep the wheel still (it steers like a ship) and brake early.',
+      info: 'Campbell\'s 1935 Campbell-Napier-Railton Blue Bird · 36.7 L supercharged Rolls-Royce R V12, 2,350 hp at 3,200 rpm · 3-speed gearbox, twin rear wheels · Dunlop 37 x 7 tyres · ~4.9 t · 301.129 mph at Bonneville on 3 September 1935, the first car over 300',
+      trans: '3-speed · multi-plate clutch', tyres: 'Dunlop 37 x 7',
+      snd: { nEng: 1, cyl: 12, fmul: 0.55, deep: 0.9, loud: 1, open: 1, whK: 0.9, whPure: 1, whine: 1.0, rpmRef: 3300, race: 0.8, rough: 0.2 } },
+    gtr: { btn: 'NISSAN GTR', sub: '565 hp twin-turbo V6 · AWD · 196 mph', paint: 'Bay Blue', cam: [1.0, 1.0],
+      hint: 'Nissan GTR: shift up (E) for DRIVE - a 565 hp twin-turbo V6, a 6-speed dual-clutch (E / Q or the paddles to shift yourself) and all-wheel drive. Launch control: hold SPACE, floor it, let go.',
+      info: 'Nissan GT-R (R35) in a Liberty Walk widebody · VR38DETT 3.8 L twin-turbo V6, 565 hp at 6,800, 467 lb-ft · GR6 6-speed dual-clutch · ATTESA E-TS all-wheel drive, rear-biased · 1,752 kg · 0-60 ~3.5 s floored, ~196 mph',
+      trans: '6-speed dual-clutch · AWD', tyres: 'Summer tyres',
+      snd: { nEng: 1, cyl: 6, fmul: 1.2, deep: 0, loud: 0.15, open: 0, whK: 0.55, whPure: 1, whine: 0.7, rpmRef: 7000, race: 0.35, rough: 0.05 } },
+    mini: { btn: 'MINI DOOKIE', sub: '15 kW electric city pod · 55 mph', paint: 'Bronze Yellow', cam: [0.8, 1.0],
+      hint: 'Mini Dookie: shift up (E) for DRIVE - an electric one-seat city pod: 20 hp, one gear, 55 mph and in no hurry getting there. Silent at a standstill; lift off and it regenerates.',
+      info: 'The game\'s Pamingo Mini (the Fiat Pongo concept) · 15 kW / 60 Nm electric motor, a single 9:1 reduction · 145/70R15 eco tyres · 670 kg · ~55 mph',
+      trans: 'Electric · single speed', tyres: 'Eco tyres',
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.067, whPure: 0, whine: 3.2, rpmRef: 8000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
+    potty: { btn: 'PORTA POTTY', sub: '22 hp V-twin toilet · 45 mph', paint: 'Potty Blue', cam: [0.75, 1.25],
+      hint: 'Porta Potty: shift up (E) for DRIVE and floor it - a 22 hp V-twin under the throne, 45 mph flat out. The centre of gravity is at hip height on a 1 m track: take a turn quickly and over it goes (once it has stopped, steer left or right to flip it back).',
+      info: 'A portable toilet (PolyJohn PJP3-type, 2.3 m tall) on a go-kart frame, the door open · 670 cc V-twin, 22 hp, under the seat · torque-converter drive · 10 in wheels · 290 kg with the driver · ~45 mph · tips over at ~0.75 g',
+      trans: 'Torque converter', tyres: '10 in tyres',
+      snd: { nEng: 1, cyl: 2, vt: 90, fmul: 1.25, deep: 0.05, loud: 0.2, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 4000, race: 0.5, rough: 0.35 } },
+    scooter: { btn: 'TURBO SCOOTER 3000', sub: '100 kW mobility scooter · 119 mph', paint: 'Crimson', tc: 2, cam: [0.6, 0.95],
+      hint: 'Turbo Scooter 3000: shift up (E) for DRIVE - a mobility scooter with a 100 kW motor, ~119 mph. Wheelie control and the anti-tip wheels stop it looping over on the launch; nothing keeps it upright in a fast turn - it tips at 0.4 g. Straight lines!',
+      info: 'A four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor swapped for a 100 kW axial-flux motor and a lithium pack · 220 Nm through a 2.42:1 belt · soft 10 in tyres · 215 kg with the rider · 0-60 ~4.4 s, ~119 mph · wheelie control (off with TC Off) and anti-tip wheels',
+      trans: 'Electric · direct drive', tyres: 'Soft 10 in tyres',
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.167, whPure: 1, whine: 3.5, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+    razor: { btn: 'RAZORS EDGE', sub: '110 kW electric glass wedge · 142 mph', paint: 'Go Mango', cam: [1.0, 0.95],
+      hint: 'Razors Edge: shift up (E) for DRIVE - a golf cart under a wedge of smoked glass, 110 kW electric, ~142 mph. The paint colour is its neon (Esc → Drive → Paint).',
+      info: 'The game\'s Halloween special after the Lo Res Car: a golf-cart chassis under a faceted body of smoked glass edged in neon, a graveyard on its flanks · 110 kW / 250 Nm electric motor, a single 4.95:1 reduction · 18 x 8.50-8 cart tyres · 530 kg · 0-60 ~4.4 s, ~142 mph',
+      trans: 'Electric · single speed', tyres: 'Cart tyres',
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.1, whPure: 0, whine: 3.4, rpmRef: 12000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
+  };
+  const CC = !!CC_CARS[S.car], CCD = CC ? CC_CARS[S.car] : null;
   const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart', MOWER = S.car === 'mower';
-  const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER;     // race engines: their own sound set-up, rumble and shake
+  const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;     // race engines: their own sound set-up, rumble and shake
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
     : KART ? VEH.CARS.kart.make(S.kartClass) : MOWER ? VEH.CARS.mower.make(S.mowerClass)
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
   const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
-  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER || KART || MOWER;   // factory-fixed driveline and tyres
+  const FIXED = DEMON || DRAGPAK || PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;   // factory-fixed driveline and tyres
   // chase camera: distance / height scale (the tractor is 7 m long and 2.4 m tall; a dragster is 9 m long with its
   // wing 2.2 m up, so the camera sits further back and higher to see over it)
   // (the monster truck is 12 ft tall and 12.5 ft wide: further back and well up)
   // (a kart is 6 ft long and sits a foot off the ground: in close and low)
   // (a racing mower is 7 ft long with its driver sitting up 4 ft off the ground)
-  const CAMK = PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : MOWER ? 0.68 : 1, CAMH = PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : MOWER ? 0.8 : 1;
+  const CAMK = CC ? CCD.cam[0] : PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : MOWER ? 0.68 : 1, CAMH = CC ? CCD.cam[1] : PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : MOWER ? 0.8 : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
@@ -10770,6 +12137,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : CC ? ['Knobbies', 'Knobby tyres', 'Knobby off-road tyres in the car\'s own size and a touch of lift: far more bite on dirt, gravel and grass, a lot less on pavement, where the knobs squirm']
     : MOWER ? ['Bar lugs', 'Bar-lug tyres', 'Ag bar-lug tyres (the chevron tread of a garden tractor that pulls a plough) in place of the race tyres: they dig into dirt and mud, '
       + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
     : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
@@ -10861,7 +12229,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
   const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
     : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
-    : MOWER ? MOW.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls, wheelRadiusF: sp.wheelRadiusF, wheelRadiusR: sp.wheelRadiusR })) : CAR.build(THREE, carOpts);
+    : MOWER ? MOW.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls, wheelRadiusF: sp.wheelRadiusF, wheelRadiusR: sp.wheelRadiusR }))
+    : CC ? CRU.build(THREE, Object.assign(carOpts, { car: S.car, wheelRadiusF: sp.wheelRadiusF || sp.wheelRadius, wheelRadiusR: sp.wheelRadiusR || sp.wheelRadius })) : CAR.build(THREE, carOpts);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -10872,6 +12241,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const flames = new FX.Flames(THREE, car.root, car.exhaustTips);
   const audio = new AUD.CarAudio();
   const input = new INP.Input();
+  // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
+  if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
@@ -10947,6 +12318,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
       + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
         : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : 'Its home is the Mower Track map (Esc → Drive → Map).'), 11), 1600);
+    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map ? ' Its home is the Straightaway map (Esc → Drive → Map).' : ''), 11), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
@@ -11029,18 +12401,22 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
       btn: 'MONSTER TRUCK', tc: 3 },
   ];
-  const MORE_IDS = MORE_CARS.map((m) => m.id);
+  // (everything that brings its own paint / traction-control mode / home map when picked: the More cars and the Car
+  // Crushers 2 cars)
+  const PICK = MORE_CARS.concat(Object.entries(CC_CARS).map(([id, c]) => ({ id, paint: c.paint, tc: c.tc, map: c.map })));
+  const MORE_IDS = PICK.map((m) => m.id);
   function pickCar(id, opt) {
-    const m = MORE_CARS.find((x) => x.id === id);
+    const m = PICK.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
     if (m && ((id !== S.car && m.paint) || (o && o[3] && S[m.optKey] !== opt))) S.paint = (o && o[3]) || m.paint;
     // the tractor and the dragsters start on Track traction control (on the road, throttle in a turn would otherwise
     // just swap ends - the real ones have none: switch it Off for the raw thing); the car you came from gets its setting back
-    const wasMore = MORE_IDS.includes(S.car);
+    // (a car that sets its own mode keeps the one you had in tcModePrev, and a car that doesn't gets it back)
+    const fromM = PICK.find((x) => x.id === S.car), fromTc = !!(fromM && fromM.tc !== undefined);
     if (id !== S.car) {
-      if (m && m.tc !== undefined) { if (!wasMore) S.tcModePrev = S.tcMode; S.tcMode = m.tc; }
-      else if (!m && wasMore && S.tcModePrev !== undefined) S.tcMode = S.tcModePrev;
+      if (m && m.tc !== undefined) { if (!fromTc) S.tcModePrev = S.tcMode; S.tcMode = m.tc; }
+      else if (fromTc && S.tcModePrev !== undefined) S.tcMode = S.tcModePrev;
     }
     // (an option can start on its own traction-control mode; switching away from it goes back to the vehicle's)
     if (m && o && (id !== S.car || S[m.optKey] !== opt)) S.tcMode = o[4] !== undefined ? o[4] : m.tc !== undefined ? m.tc : S.tcMode;
@@ -11048,7 +12424,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // own home - 6th entry - e.g. the record mower's is the Straightaway, not the mowers' dirt oval)
     {
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
-      const from = MORE_CARS.find((x) => x.id === S.car);
+      const from = PICK.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
@@ -11089,6 +12465,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     $('moreCars').classList.remove('hidden');
   }
   $('moreClose').addEventListener('click', () => $('moreCars').classList.add('hidden'));
+  // the Car Crushers 2 cars join the car list: a row of their own under the Challengers
+  for (const pick of [$('carPick'), $('carPickTitle')]) {
+    pick.appendChild(el('<div class="ccbreak"></div>'));
+    for (const [id, c] of Object.entries(CC_CARS)) pick.appendChild(el(`<button class="carbtn cc" data-car="${id}"><b>${c.btn}</b><span>${c.sub}</span></button>`));
+  }
   wireCarPick($('carPick')); wireCarPick($('carPickTitle'));
   void MORE_IDS;
   $('mReset').addEventListener('click', () => { resetCar(); openMenu(false); });
@@ -11232,6 +12613,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => { if (v !== CARDEF.cls) pickCar('mower', v); })));
         add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
+      if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
@@ -11711,7 +13093,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if (BIG && veh.running) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if (BIG && veh.running && !ENG_SND.ev) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -11728,7 +13110,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (the supercharged kart: a 4-into-1 superbike four, and the centrifugal blower's whistle - its impeller turns ~9.3x
   // crank, ~2.2 kHz at the limiter - with the surge chirp when you lift at boost)
   // (mowers: a 90 deg V-twin on open pipes, a big single, a superbike four through its end can)
-  const ENG_SND = MOWER ? (CARDEF.cls === 'bp' ? { nEng: 1, cyl: 2, vt: 90, fmul: 1.15, deep: 0.15, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.9, rough: 0.3 }
+  const ENG_SND = CC ? CCD.snd : MOWER ? (CARDEF.cls === 'bp' ? { nEng: 1, cyl: 2, vt: 90, fmul: 1.15, deep: 0.15, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.9, rough: 0.3 }
       : CARDEF.cls === 'fx' ? { nEng: 1, cyl: 1, fmul: 1.3, deep: 0.05, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 7700, race: 1, rough: 0.3 }
         : { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13000, race: 0.9, rough: 0.06 })
     : KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
@@ -11761,7 +13143,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
-      vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0,
+      vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
     });
   }
   function processEvents() {
@@ -11786,7 +13168,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     if (veh.fuelCut) strong = Math.max(strong, 0.45);
     weak += clamp(veh.rpm() / 6200, 0, 1) * 0.08 * (veh.running ? 1 : 0);
-    if (BIG && veh.running) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
+    if (BIG && veh.running && !ENG_SND.ev) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
     if (strong > 0.02 || weak > 0.05) input.rumble(strong, weak, 120);
   }
   function hudUpdate(dt) {
@@ -11814,10 +13196,10 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     hud.setInputs(veh.input.throttle, veh.input.brake, input.state.clutch, input.source === 'wheel' ? input.raw.steer : input.state.steer);
     const chips = [
       { html: `<b>${TC_NAMES[veh.tcMode]}</b> mode` },
-      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
-      { html: MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
+      { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER || CC ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
+      { html: CC ? CCD.trans : MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
         : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? PKG_UI[0] : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? PKG_UI[0] : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });

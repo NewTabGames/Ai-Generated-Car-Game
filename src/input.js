@@ -31,9 +31,12 @@
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   // fraction of full lock (31.3 deg) that demands aLat m/s^2 at speed v (bicycle model) plus a slip allowance
-  function physSteerLimit(v, aLat, slip) {
+  // (the game can hand it another vehicle's geometry - kb: { wb, maxSteer, aLat } - so a scooter that tips over at 0.4 g
+  // isn't steered into 1 g by the keyboard; unset, it's the Challenger's)
+  function physSteerLimit(v, aLat, slip, kb) {
     v = Math.abs(v);
     if (v < 1) return 1;
+    if (kb) return clamp((Math.atan(kb.wb * kb.aLat / (v * v)) + slip * Math.min(1, Math.max(0, (kb.aLat - 3) / 7)) * kb.wb / 2.946) / kb.maxSteer, 0, 1);
     return clamp((Math.atan(2.946 * aLat / (v * v)) + slip) / 0.545, 0, 1);
   }
 
@@ -222,7 +225,7 @@
       } else {
         let ks = this.kbSteer;
         // keyboard: limit lock at speed, optional gentle countersteer help
-        ks *= physSteerLimit(speed, 10, 0.02);
+        ks *= physSteerLimit(speed, 10, 0.02, this.kbGeom);
         if (st.kbCountersteer && vehicleYawHint !== undefined && tgt === 0) ks = clamp(ks + vehicleYawHint * 0.5, -1, 1);
         steer = ks; thr = Math.max(kbThr, padThr); brk = Math.max(kbBrk, padBrk); clu = this.kb('clutch') ? 1 : padClu;
       }

@@ -39,7 +39,20 @@ Open `HellcatDrive.html` directly in any modern WebGL-supported browser (Chrome,
 
 - **Racing Mowers: B-Prepared, FX & Record**: lawn mower racing, built to the US association's classes - blades out, the deck still hung underneath, numbers on all four sides. The B-Prepared is a real garden tractor on its factory frame with the 810 cc V-twin built inside (~38 hp), the mower's own 5-speed transaxle re-geared, turf tyres and no suspension (~80 mph, 0.6 g on pavement, it slides on grass); the FX is a tube chassis under a tractor hood with a 459 cc single on pump gas, a centrifugal clutch, a 3-speed box and kart dirt tyres (~88 mph); the record mower is built like the 150 mph land-speed holders - a 189 hp superbike four with a quickshifter on racing slicks, 0-100 mph in ~6.3 s (its home is the Straightaway). The race mowers take you to the **Mower Track** map: a 1/5-mile dirt oval in a freshly striped, mown field, straw bales for walls, a start / finish arch, bleachers and a lap timer that keeps your best lap per mower. New synth sounds for the V-twin (the potato-potato), the big single and the superbike four.
 
-**Off-road package** (Esc → Drive, every vehicle): the Challengers get BFGoodrich KO2 all-terrains + a 2 in lift; the pulling tractor R-2 deep-lug rears and lugged fronts; the dragsters a sand-drag setup (paddle tyres + ribbed fronts - try the Dirt Drag map); the monster truck full-depth (uncut) lugs; the karts knobbies with a matching sprocket; the mowers ag bar-lug tyres. Each trades pavement grip for bite in the dirt, grass and mud.
+- **From Car Crushers 2** (in the car list, a row under the Challengers): nine of the Roblox game's vehicles, each built the way it would have to be for real to do what it does in the game (its top speed there), and left to the real physics:
+  - **Couch Car** - a three-seat leather sofa on hidden 13 in wheels with a 1.6 L turbo triple built like a drag engine (~850 hp) under the cushions, its three pipes out of the right arm: 0-60 ~3.2 s, ~190 mph, and twitchy on its short wheelbase.
+  - **Egg Rod** - the Mork & Mindy egg car as a hot rod: a 350 small-block behind the egg, a 3-speed automatic, a big wing, ~142 mph.
+  - **Banana Car** - the Big Banana Car on its 1993 F-150 (5.0 V8, 4-speed auto, 85 mph). As in the game it floats: drive into a lake and the rear tyres paddle it along.
+  - **Blue Bird** - Campbell's 1935 streamliner: a 36.7 L supercharged Rolls-Royce V12 (2,350 hp), 3 gears, twin rear wheels - ~301 mph if you give it miles (it lives on the Straightaway).
+  - **Nissan GTR** - an R35 in a Liberty Walk widebody: the real 565 hp twin-turbo V6, 6-speed dual-clutch and rear-biased all-wheel drive, 0-60 ~3.5 s floored, ~196 mph.
+  - **Mini Dookie** - the game's Pamingo Mini: a one-seat electric city pod, 15 kW, ~55 mph.
+  - **Porta Potty** - a portable toilet on a go-kart frame, a 22 hp V-twin under the throne, the door open, ~45 mph - and it tips over if you take a turn quickly.
+  - **Turbo Scooter 3000** - a mobility scooter with a 100 kW motor: 0-60 ~4.4 s, ~119 mph, wheelie control and anti-tip wheels - and it tips over at 0.4 g, so straight lines only.
+  - **Razors Edge** - a golf cart under a faceted wedge of smoked glass edged in neon (the paint colour), a graveyard on its flanks: 110 kW electric, ~142 mph.
+
+  New physics for them: electric motors (full torque from standstill, no idle or stall, regen, a speed limit that fades the torque), turbo lag, a rear-biased AWD split, a floating hull; new synth sounds: an inline triple, an even-fire V6, and electric-motor whine.
+
+**Off-road package** (Esc → Drive, every vehicle): the Challengers get BFGoodrich KO2 all-terrains + a 2 in lift; the pulling tractor R-2 deep-lug rears and lugged fronts; the dragsters a sand-drag setup (paddle tyres + ribbed fronts - try the Dirt Drag map); the monster truck full-depth (uncut) lugs; the karts knobbies with a matching sprocket; the mowers ag bar-lug tyres; the Car Crushers cars knobbies in their own sizes. Each trades pavement grip for bite in the dirt, grass and mud.
 
 Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side and nearly stopped, steer left or right and it rolls back onto its wheels.
 
@@ -93,6 +106,7 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── puller.js           # Procedural pulling-tractor models (4× HEMI / 2× Allison V12, weight bar)
 │   ├── kart.js             # Procedural go-karts (rental with wraparound bumper, TaG 125, KZ shifter and the supercharged kart)
 │   ├── mower.js            # Procedural racing mowers (garden tractor, FX tube chassis, record mower; driver, deck, tyres)
+│   ├── crushers.js         # Procedural Car Crushers 2 cars (couch, egg, banana, Blue Bird, GT-R widebody, microcar, porta potty, scooter, glass wedge)
 │   ├── monster.js          # Procedural monster truck (tube chassis, 4-links and shocks that follow the suspension, 66 in tyres, see-through cab, livery)
 │   ├── fx.js               # Smoke, dust, skidmarks and flames (smoke/dust drawn to a screen-fill budget)
 │   ├── game.js             # Core game loop, scene management, cameras, and menus
@@ -130,6 +144,7 @@ node test/dragster-test.js
 node test/monster-test.js
 node test/kart-test.js
 node test/mower-test.js
+node test/cc-test.js
 node test/puller-test.js
 node test/sim-test.js
 node test/audio-test.js
