@@ -1038,8 +1038,11 @@
       const fzMin = 0.2 * s.mass * GRAV * (1 - s.frontWeight) / 2;
       const okL = W[2].contact && W[2].Fz > fzMin, okR = W[3].contact && W[3].Fz > fzMin;
       const vL = W[2].omega * W[2].radius, vR = W[3].omega * W[3].radius;
-      const vRear = okL && okR ? Math.max(vL, vR) : okL ? vL : vR;
-      const vRearMin = okL && okR ? Math.min(vL, vR) : okL ? vL : vR;
+      let vRear = okL && okR ? Math.max(vL, vR) : okL ? vL : vR;
+      let vRearMin = okL && okR ? Math.min(vL, vR) : okL ? vL : vR;
+      // (tcAxleMean - karts: a solid rear axle turns both wheels together, so in a turn the outside one always reads
+      // fast. The axle's mean speed against the chassis' own speed is exact however hard it's turning or sliding)
+      if (s.tcAxleMean && okL && okR) vRear = vRearMin = 0.5 * (vL + vR);
       const tcOn = this.tcMode < 3 && !this.lineLockActive && this.gear !== 0;
       if (tcOn && !okL && !okR) { /* both rears unloaded: hold */ }
       else if (tcOn) {
@@ -1952,6 +1955,10 @@
     noABS: true, noESC: true, maxSteer: 0.42, steerRate: 4.5, steerRatio: 5.5, ackermann: 0.7, rearToe: 0,
     // (the axle coupling stays gentle: with wheels this light a stiff one chatters at 1 kHz and scrubs the fronts away)
     lsdPreload: 8, lsdRamp: 0.02, driveEff: 0.95, noLockup: true, noCoastBlip: true, blipMax: 0.2, boostMax: 0,
+    // traction control (not on a real kart - a game aid): slip from the rear axle's mean speed against the chassis' speed.
+    // The steered fronts scrub and slide on grass and read slow, and the outside rear always reads fast in a turn -
+    // measured against those it saw wheelspin in every corner and cut the power to nothing
+    tcRefBody: true, tcAxleMean: true,
     handbrakeTorque: 150, bodyHalfW: 0.7, bodyFront: -1.02, bodyRear: 0.84, bodyBottom: -0.27, bodyTop: 0.66,
     bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
   } };

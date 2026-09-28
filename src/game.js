@@ -180,7 +180,7 @@
 
   // ------------------------------------------------------------------ state
   const G = { started: false, paused: true, menu: false, lightsOn: false, horn: false, arcadeT: 0, time: 0, rearMan: 0, flipHintT: 0, lastEv: { shift: 0, backfire: 0, grind: 0 }, emitAcc: [0, 0, 0, 0], rumbleT: 0, loadDone: false, shake: 0 };
-  const cam = { mode: S.camMode | 0, fwd: new THREE.Vector3(0, 0, -1), off: new THREE.Vector3(), yS: 0, orbitYaw: 0, orbitPitch: 0, orbitT: 0, dragging: false, headYaw: 0, head: new THREE.Vector3(), zoom: 1, init: false };
+  const cam = { mode: S.camMode | 0, fwd: new THREE.Vector3(0, 0, -1), off: new THREE.Vector3(), yS: 0, vyS: 0, orbitYaw: 0, orbitPitch: 0, orbitT: 0, dragging: false, headYaw: 0, head: new THREE.Vector3(), zoom: 1, init: false };
   const TC_NAMES = ['STREET', 'SPORT', 'TRACK', 'OFF'];
   const RS_NAMES = { auto: 'AUTO (counter-steer)', crab: 'CRAB', manual: 'MANUAL (, and .)', front: 'FRONT ONLY' };
   const VIEW_NAMES = ['CHASE CAM', 'FAR CHASE CAM', 'COCKPIT'];
@@ -965,10 +965,14 @@
       // heading smoothing (flat forward)
       let fx = a.fx, fz = a.fz; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
       if (speed < -3) { fx = -fx; fz = -fz; }
-      if (!cam.init) { cam.fwd.set(fx, 0, fz); cam.yS = veh.py; cam.init = true; }
+      if (!cam.init) { cam.fwd.set(fx, 0, fz); cam.yS = veh.py; cam.vyS = veh.vy; cam.init = true; }
       const k = 1 - Math.exp(-dt * (3.5 + Math.min(4, Math.abs(speed) * 0.08)));
       cam.fwd.x += (fx - cam.fwd.x) * k; cam.fwd.z += (fz - cam.fwd.z) * k; cam.fwd.y = 0; cam.fwd.normalize();
-      cam.yS += (veh.py - cam.yS) * (1 - Math.exp(-dt * 7));
+      // height: follow the car's climb rate (low-passed, so bumps don't shake it) and close what's left gently. A plain
+      // lag hung the camera 20-50 cm above / below the car over every crest and dip at speed - with a kart's camera only
+      // a metre up, the whole view bobbed
+      cam.vyS += (veh.vy - cam.vyS) * (1 - Math.exp(-dt * 9.4));
+      cam.yS += cam.vyS * dt + (veh.py - cam.yS) * (1 - Math.exp(-dt * 4));
       const dir = _v2.copy(cam.fwd);
       if (G.lookBack) dir.negate();
       dir.applyAxisAngle(Y, cam.orbitYaw);
