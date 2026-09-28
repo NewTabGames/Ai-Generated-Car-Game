@@ -239,13 +239,14 @@ for (const surf of [3, 0]) {
     const v = new Vehicle(WG, Object.assign({}, CARS.monster.spec));
     v.setTires('monster', 'monster'); v.reset(x, WG.ground(x, z, {}).h, z, 0, tz);
     v.running = true; v.eOmega = 115; v.park = false; v.gear = 1; v.tcMode = 3; v.input.airAssist = aa;
-    let flew = 0, landT = null, minUp = 1;
+    let flew = 0, landT = null, minUp = 1, tdP = 0;
     for (let t = 0; t < 9; t += 1 / 240) {
-      if (v.airborne) { flew += 1 / 240; v.input.throttle = 1; } else if (flew > 0.3) { if (landT === null) landT = t; v.input.throttle = 1; } else v.input.throttle = v.forwardSpeed * MPH < mph ? 1 : 0.25;
+      if (v.airborne) { flew += 1 / 240; v.input.throttle = 1; } else if (flew > 0.3) { if (landT === null) { landT = t; tdP = Math.asin(-2 * (v.qy * v.qz - v.qx * v.qw)) * 57.3; } v.input.throttle = 1; } else v.input.throttle = v.forwardSpeed * MPH < mph ? 1 : 0.25;
       v.step(1 / 240);
       if (landT !== null) { minUp = Math.min(minUp, upY(v)); if (t - landT > 1.5) break; }
     }
-    return landT === null ? 'no jump' : minUp < 0.3 ? 'FLIPPED' : 'landed';
+    // (on: also the pitch it touched down at - it aims a few degrees nose up of the landing slope)
+    return landT === null ? 'no jump' : minUp < 0.3 ? 'FLIPPED' : aa ? `landed ${tdP > 0 ? '+' : ''}${tdP.toFixed(0)} deg` : 'landed';
   };
   for (const [name, x, z, tz, sp] of [['gap jump', 0, 34, -1, [28, 34, 40]], ['tabletop', TB.x0, 52, -1, [28, 34, 40]], ['step-up', -28, -16, -1, [24, 30]]]) {
     console.log(`air assist, gas held over the ${name} @ ${sp.join(' / ')} mph: off ${sp.map((m) => held(x, z, tz, m, false)).join(' / ')} · on ${sp.map((m) => held(x, z, tz, m, true)).join(' / ')}`);

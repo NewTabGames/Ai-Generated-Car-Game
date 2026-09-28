@@ -1798,21 +1798,62 @@
     // road speed kick it on over backwards. So: fade whichever pedal would rotate it past a landable attitude (looking a
     // few tenths of a second ahead), catch a nose that's way off, and feather the gas on touchdown until the rears
     // match the ground. Short of that the pedals are all yours (off: do your own flips)
+    // It aims for the ground it's going to land on (the flight path traced ahead to where the tyres meet the dirt:
+    // the far side of a gap jump or a tabletop slopes away, so it wants the nose down to match), a touch rear-first.
+    // On top of the pedals a spotter's hand (a game aid, like traction control): a gentle, capped nudge in pitch and
+    // roll towards that landing attitude while it's in the air (_aaTorque) - it steadies a truck that left a ramp
+    // crooked or twisting, but can't save one that's way over (half a turn past level it lets go)
     _airAssist(dt) {
       const inp = this.input, { qx, qy, qz, qw } = this;
       const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
       const rx = 1 - 2 * (qy * qy + qz * qz), ry = 2 * (qx * qy + qz * qw), rz = 2 * (qx * qz - qy * qw);
       const rate = (this.wx * rx + this.wy * ry + this.wz * rz) * 57.2958, ahead = pitch + 0.35 * rate;
       if (this.airborne) {
-        this.aaGnd = 0;
-        if (inp.throttle > 0) inp.throttle *= clamp((20 - ahead) / 15, 0, 1);
-        if (inp.brake > 0) inp.brake *= clamp((ahead + 15) / 12, 0, 1);
-        if (ahead > 32) inp.brake = Math.max(inp.brake, clamp((ahead - 32) / 25, 0, 0.8));
-        if (ahead < -25) inp.throttle = Math.max(inp.throttle, clamp((-25 - ahead) / 20, 0, 1));
-      } else if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 0.8) {
-        const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
-        if (pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+        this.aaGnd = 0; this.aaAir = (this.aaAir || 0) + dt;
+        // where it comes down: the ballistic path against the ground, CG ~ ride height + droop above it at touchdown
+        const s = this.spec, g = GRAV * (s.gravScale || 1), gnd = this._aaG || (this._aaG = {}), clear = s.cgHeight + 0.6 * s.travelDown;
+        let tl = 3, nx = 0, ny = 1, nz = 0;
+        for (let t = 0.05; t <= 3; t += 0.05) {
+          const x = this.px + this.vx * t, z = this.pz + this.vz * t, y = this.py + this.vy * t - 0.5 * g * t * t;
+          this.world.ground(x, z, gnd);
+          if (y - gnd.h < clear) { tl = t; nx = gnd.nx; ny = gnd.ny; nz = gnd.nz; break; }
+        }
+        // the landing surface's slope along the truck's heading and across it -> target pitch (nose up +) and roll
+        // (right side up +), with the nose 4 deg up of the slope so the rears touch first
+        const fl = Math.hypot(rx, rz) || 1, fx = rz / fl, fz = -rx / fl;   // (forward, level: up x right)
+        const ny1 = Math.max(0.3, ny);
+        const tgtP = Math.atan(-(nx * fx + nz * fz) / ny1) * 57.2958 + 4, tgtR = Math.atan(-(nx * rx + nz * rz) / (ny1 * fl)) * 57.2958;
+        this.aaTgtP = tgtP / 57.2958; this.aaTgtR = tgtR / 57.2958; this.aaTL = tl;
+        const e = ahead - tgtP;
+        if (inp.throttle > 0) inp.throttle *= clamp((16 - e) / 14, 0, 1);
+        if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
+        if (e > 20) inp.brake = Math.max(inp.brake, clamp((e - 20) / 18, 0, 1));
+        if (e < -18) inp.throttle = Math.max(inp.throttle, clamp((-18 - e) / 15, 0, 1));
+      } else {
+        this.aaAir = 0;
+        if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
+          // touchdown: feather the gas until the rears match the ground, and don't let it rear up over backwards off the
+          // landing (a wheelie on the way out is fine; one still climbing past 25 deg isn't)
+          const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
+          if (this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+          if (ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
+        }
       }
+    }
+    // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 1.3 rad/s^2 in
+    // pitch and 2 in roll - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
+    // past ~85 deg: a truck that rolled over on the ramp's edge before it left the ground is beyond saving)
+    _aaTorque(m00, m10, m20, m02, m12, m22, m11) {
+      const s = this.spec, fade = clamp(((this.aaAir || 0) - 0.08) / 0.2, 0, 1);
+      if (fade <= 0 || m11 < 0.1 || this.aaTgtP === undefined) return null;
+      const pitch = Math.asin(clamp(-m12, -1, 1)), roll = Math.asin(clamp(m10, -1, 1));
+      const wP = this.wx * m00 + this.wy * m10 + this.wz * m20, wR = this.wx * m02 + this.wy * m12 + this.wz * m22;
+      const A = 1.3 * fade, AR = 2 * fade, kp = 5, kd = 4.2;
+      const aP = clamp(kp * (this.aaTgtP - pitch) - kd * wP, -A, A), aR = clamp(kp * (this.aaTgtR - roll) - kd * wR, -AR, AR);
+      const tP = aP * s.Ipitch, tR = aR * s.Iroll;
+      const T = this._aaT || (this._aaT = [0, 0, 0]);
+      T[0] = m00 * tP + m02 * tR; T[1] = m10 * tP + m12 * tR; T[2] = m20 * tP + m22 * tR;
+      return T;
     }
     step(dt) {
       this.acc += Math.min(dt, 0.1);
@@ -2173,6 +2214,9 @@
           Ty -= wy * s.Iyaw * 3; Tx -= m00 * wP * s.Ipitch * 3; Ty -= m10 * wP * s.Ipitch * 3; Tz -= m20 * wP * s.Ipitch * 3;
         }
       }
+
+      // ---------------- air assist's nudge (see _airAssist)
+      if (inp.airAssist && this.airborne) { const T = this._aaTorque(m00, m10, m20, m02, m12, m22, m11); if (T) { Tx += T[0]; Ty += T[1]; Tz += T[2]; } }
 
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
@@ -2866,16 +2910,21 @@
       // positional correction
       this.px -= nx * pen * 0.9; this.pz -= nz * pen * 0.9;
       if (vn <= 0) return;
-      // effective mass (yaw dominated)
+      // effective mass (yaw dominated). The impulse turns the body about the world's vertical, and that's its yaw axis
+      // only while it's upright: on its side or its roof the same push turns it about its roll or pitch axis, and
+      // counting on the (bigger) yaw inertia there made every wall contact hand back more spin than it took - a truck
+      // tumbling against the arena wall spun itself up to 80 rad/s and was flung away at 300 mph
+      const m10 = 2 * (this.qx * this.qy + this.qz * this.qw), m11 = 1 - 2 * (this.qx * this.qx + this.qz * this.qz), m12 = 2 * (this.qy * this.qz - this.qx * this.qw);
+      const iIy = m10 * m10 / s.Ipitch + m11 * m11 / s.Iyaw + m12 * m12 / s.Iroll;
       const rxn = rx * nz - rz * nx;
-      const k = 1 / s.mass + rxn * rxn / s.Iyaw;
+      const k = 1 / s.mass + rxn * rxn * iIy;
       const j = (1 + 0.15) * vn / k;
       let jx = -nx * j, jz = -nz * j;
       // friction along tangent
       const tx = -nz, tz = nx;
       const vt = cvx * tx + cvz * tz;
       const rxt = rx * tz - rz * tx;
-      const kt = 1 / s.mass + rxt * rxt / s.Iyaw;
+      const kt = 1 / s.mass + rxt * rxt * iIy;
       const jt = clamp(-vt / kt, -0.45 * j, 0.45 * j);
       jx += tx * jt; jz += tz * jt;
       this._applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22);
@@ -6964,7 +7013,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
    butterfly hat stick up out of the bed, zoomie headers out of the bed sides), a 4-link on each solid axle with two
    nitrogen coil-over shocks and a bypass shock per corner - the axles, links and shocks follow the physics' 30 in of
    wheel travel every frame - planetary axles, 66x43.00-25 hand-cut tyres on beadlock rims, and a fiberglass pickup body
-   (fenders arching over the tyres, cab, open bed) in a livery drawn for the current paint.
+   (fenders arching over the tyres under black flares, a cab with real window openings - the driver sits in the cage
+   behind the glass - a scooped hood, a chrome grille and sealed-beam headlights, an open bed with rails, a tailgate)
+   in a livery drawn for the current paint.
    Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
    Returns the same interface as HCCarModel.build, plus afterWheels() (the game calls it once the wheels are placed). */
 (function (root) {
@@ -7065,9 +7116,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     M.suit = new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.8 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: 0xf2f2f2, roughness: 0.25, clearcoat: 1 });
     M.visor = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.05, metalness: 0.8 });
-    M.glass = new THREE.MeshPhysicalMaterial({ color: 0x0c1116, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.45, clearcoat: 1, depthWrite: false });
+    // (the windows are real openings: the glass is tinted and reflects the arena, and you see the driver through it)
+    M.glass = new THREE.MeshPhysicalMaterial({ color: 0x06090c, roughness: 0.02, metalness: 0.2, transparent: true, opacity: 0.58, envMapIntensity: 2.2, clearcoat: 1, clearcoatRoughness: 0.02, side: THREE.DoubleSide, depthWrite: false });
+    M.lens = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.22, envMapIntensity: 2.5, clearcoat: 1, depthWrite: false });
+    M.amber = new THREE.MeshStandardMaterial({ color: 0x8a4a06, emissive: 0xff8a10, emissiveIntensity: 0.25, roughness: 0.25 });
     M.inner = new THREE.MeshStandardMaterial({ color: 0x0d0d0e, roughness: 0.85, side: THREE.BackSide });
-    M.head = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, emissive: 0xf4f8ff, emissiveIntensity: 0, roughness: 0.15, metalness: 0.5 });
+    M.head = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, emissive: 0xf4f8ff, emissiveIntensity: 0, roughness: 0.12, metalness: 0.85, side: THREE.DoubleSide });
     M.tail = new THREE.MeshStandardMaterial({ color: 0x3a0306, emissive: 0xff1010, emissiveIntensity: 0.4, roughness: 0.25 });
     const headerTex = canvasTex(256, 16, (g, w, h) => {
       const gr = g.createLinearGradient(0, 0, w, 0);
@@ -7082,9 +7136,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     const liveryTex = canvasTex(2048, 1024, () => {});
     const cabTex = canvasTex(1024, 1024, () => {});
-    const hoodTex = canvasTex(1024, 1024, () => {});
+    const hoodTex = canvasTex(1024, 632, () => {});
+    const gateTex = canvasTex(1024, 144, () => {});
+    // the hood decal's extent (it lies on the hood's slope, see hoodY) and width
+    const HOOD_W = 3.0, HOOD_Z0 = -2.45, HOOD_Z1 = -0.6;
     // side profile extents (the livery is mapped over these)
-    const BZ0 = -2.8, BZ1 = 2.66, BY0 = 1.5, BY1 = 2.5, CZ0 = -0.5, CZ1 = 1.0, CY0 = 2.44, CY1 = 3.48;
+    const BZ0 = -2.8, BZ1 = 2.66, BY0 = 1.5, BY1 = 2.58, CZ0 = -0.5, CZ1 = 1.0, CY0 = 2.44, CY1 = 3.48;
     function claw(g, x, y, s, flip) {          // three torn claw slashes
       g.save(); g.translate(x, y); g.scale(flip ? -s : s, s);
       for (let k = 0; k < 3; k++) {
@@ -7096,6 +7153,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     function drawLivery(paint) {
       const P = hex(paint), cv = liveryTex.userData.canvas, g = cv.getContext('2d'), W = cv.width, H = cv.height / 2;
+      // (truck z / y -> this side's picture; the right side is drawn mirrored)
+      const zx = (z) => (z - BZ0) / (BZ1 - BZ0) * W, yy = (y) => (1 - (y - BY0) / (BY1 - BY0)) * H;
       for (let side = 0; side < 2; side++) {
         g.save(); g.translate(0, side * H);
         // (right side: flip the artwork so the front of the truck is at the right of the picture)
@@ -7107,7 +7166,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         g.beginPath(); g.moveTo(0, H * 0.62);
         for (let k = 0; k <= 14; k++) { const x = k * W / 14, y = H * (0.62 + 0.18 * Math.sin(k * 1.9) * (k % 2 ? 1 : -0.6)); g.lineTo(x, y); }
         g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill(); g.stroke();
-        claw(g, W * 0.12, H * 0.45, 0.9, false);
+        // the door's shut line (the cab sits on it), and a claw slash across it between the wheel arches
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 5;
+        g.beginPath(); g.moveTo(zx(-0.32), yy(1.5)); g.lineTo(zx(-0.32), yy(2.46)); g.quadraticCurveTo(zx(-0.32), yy(2.53), zx(-0.25), yy(2.53));
+        g.lineTo(zx(0.85), yy(2.53)); g.quadraticCurveTo(zx(0.92), yy(2.53), zx(0.92), yy(2.46)); g.lineTo(zx(0.92), yy(1.5)); g.stroke();
+        g.fillStyle = '#0b0b0c'; g.strokeStyle = '#a6ff1c'; g.lineWidth = 10;
+        claw(g, zx(-0.12), yy(1.92), 0.62, false);
         // arena dirt: flung up by the tyres - thickest low down and round the wheel arches, streaks and spots higher up
         let sd = 1234 + side * 77; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
         for (let k = 0; k < 900; k++) {
@@ -7123,14 +7187,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         g.restore();
         // the name, reading left to right on both sides
         g.save(); g.translate(0, side * H);
-        // (between the wheel arches and ahead of the bed, which drops the body's top edge)
-        const nx = side ? W * 0.62 : W * 0.38;
-        g.font = 'italic 900 215px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.lineJoin = 'round'; g.lineWidth = 30; g.strokeStyle = '#0b0b0c'; g.strokeText(NAME, nx, H * 0.46, W * 0.6);
-        g.lineWidth = 11; g.strokeStyle = '#a6ff1c'; g.strokeText(NAME, nx, H * 0.46, W * 0.6);
-        g.fillStyle = '#ffffff'; g.fillText(NAME, nx, H * 0.46, W * 0.6);
-        g.font = 'bold 48px Arial'; g.fillStyle = '#0b0b0c';
-        g.fillText('HELLCAT DRIVE  ·  540 BLOWN  ·  METHANOL', nx, H * 0.7, W * 0.5);
+        // (along the beltline above the wheel arches, where the flares don't cover it; decals on the bed side behind)
+        const X = (z) => (side ? W - zx(z) : zx(z));
+        g.font = 'italic 900 138px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.lineJoin = 'round'; g.lineWidth = 24; g.strokeStyle = '#0b0b0c'; g.strokeText(NAME, X(-0.72), yy(2.41), zx(1.0) - zx(-2.45));
+        g.lineWidth = 9; g.strokeStyle = '#a6ff1c'; g.strokeText(NAME, X(-0.72), yy(2.41), zx(1.0) - zx(-2.45));
+        g.fillStyle = '#ffffff'; g.fillText(NAME, X(-0.72), yy(2.41), zx(1.0) - zx(-2.45));
         g.restore();
       }
       liveryTex.needsUpdate = true;
@@ -7140,6 +7202,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         g2.save(); g2.translate(0, side * H2);
         if (side === 1) { g2.translate(W2, 0); g2.scale(-1, 1); }
         g2.fillStyle = P; g2.fillRect(0, 0, W2, H2);
+        g2.fillStyle = '#0d0d0e'; g2.fillRect(0, H2 * 0.955, W2, H2 * 0.045);
         // side window: the cab's profile (windshield raked forward at the left of the picture), inset
         const zt = (z) => (z - CZ0) / (CZ1 - CZ0) * W2, yt = (y) => (1 - (y - CY0) / (CY1 - CY0)) * H2;
         g2.fillStyle = '#07090b'; g2.beginPath();
@@ -7152,19 +7215,45 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         g2.restore();
       }
       cabTex.needsUpdate = true;
-      // hood: a big claw mark and the name
-      const c3 = hoodTex.userData.canvas, g3 = c3.getContext('2d');
-      g3.clearRect(0, 0, c3.width, c3.height);
-      g3.fillStyle = '#0b0b0c'; g3.strokeStyle = '#a6ff1c'; g3.lineWidth = 14;
-      claw(g3, 330, 470, 1.35, false);
-      g3.save(); g3.translate(512, 870); g3.font = 'italic 900 150px Impact, "Arial Black", Arial'; g3.textAlign = 'center';
-      g3.lineWidth = 22; g3.strokeStyle = '#0b0b0c'; g3.strokeText(NAME, 0, 0); g3.fillStyle = '#ffffff'; g3.fillText(NAME, 0, 0); g3.restore();
+      // hood (seen from above, front at the top): the panel gaps, twin stripes either side of the scoop, claw slashes
+      // outboard of them, road dirt near the front edge
+      const c3 = hoodTex.userData.canvas, g3 = c3.getContext('2d'), HWc = c3.width, HHc = c3.height;
+      const hx = (x) => (x + HOOD_W / 2) / HOOD_W * HWc, hz = (z) => (z - HOOD_Z0) / (HOOD_Z1 - HOOD_Z0) * HHc;
+      g3.clearRect(0, 0, HWc, HHc);
+      g3.strokeStyle = 'rgba(0,0,0,0.6)'; g3.lineWidth = 4;
+      g3.beginPath(); g3.moveTo(hx(-1.32), hz(-0.62)); g3.lineTo(hx(-1.32), hz(-2.36)); g3.quadraticCurveTo(hx(-1.32), hz(-2.42), hx(-1.24), hz(-2.42));
+      g3.lineTo(hx(1.24), hz(-2.42)); g3.quadraticCurveTo(hx(1.32), hz(-2.42), hx(1.32), hz(-2.36)); g3.lineTo(hx(1.32), hz(-0.62)); g3.lineTo(hx(-1.32), hz(-0.62)); g3.stroke();
+      for (const sx of [-1, 1]) {
+        const x0 = hx(sx < 0 ? -0.86 : 0.64), x1 = hx(sx < 0 ? -0.64 : 0.86);
+        g3.fillStyle = '#0b0b0c'; g3.fillRect(x0 - 6, hz(-2.4), x1 - x0 + 12, hz(-0.64) - hz(-2.4));
+        g3.fillStyle = '#a6ff1c'; g3.fillRect(x0, hz(-2.4), x1 - x0, hz(-0.64) - hz(-2.4));
+        g3.fillStyle = '#0b0b0c'; g3.fillRect((x0 + x1) / 2 - 3, hz(-2.4), 6, hz(-0.64) - hz(-2.4));
+      }
+      g3.fillStyle = '#0b0b0c'; g3.strokeStyle = '#a6ff1c'; g3.lineWidth = 10;
+      claw(g3, hx(-1.2), hz(-1.2), 0.62, false); claw(g3, hx(1.2), hz(-1.2), 0.62, true);
+      let sd3 = 4321; const r3 = () => ((sd3 = (sd3 * 16807) % 2147483647) / 2147483647);
+      for (let k = 0; k < 160; k++) {
+        const x = r3() * HWc, y = hz(-2.42) + Math.pow(r3(), 2.2) * 0.35 * HHc, r = 2 + r3() * r3() * 10;
+        g3.fillStyle = `rgba(${62 + r3() * 20 | 0},${40 + r3() * 12 | 0},${24 + r3() * 8 | 0},${0.6 + r3() * 0.4})`;
+        g3.beginPath(); g3.ellipse(x, y, r * (1 + r3()), r, r3() * 3, 0, 7); g3.fill();
+      }
       hoodTex.needsUpdate = true;
+      // tailgate: the name, big, between claw slashes
+      const c4 = gateTex.userData.canvas, g4 = c4.getContext('2d'), W4 = c4.width, H4 = c4.height;
+      g4.clearRect(0, 0, W4, H4);
+      g4.fillStyle = '#0b0b0c'; g4.strokeStyle = '#a6ff1c'; g4.lineWidth = 8;
+      claw(g4, 70, H4 / 2, 0.42, false); claw(g4, W4 - 70, H4 / 2, 0.42, true);
+      g4.font = 'italic 900 118px Impact, "Arial Black", Arial'; g4.textAlign = 'center'; g4.textBaseline = 'middle'; g4.lineJoin = 'round';
+      g4.lineWidth = 20; g4.strokeStyle = '#0b0b0c'; g4.strokeText(NAME, W4 / 2, H4 / 2 + 4, W4 * 0.72);
+      g4.lineWidth = 7; g4.strokeStyle = '#a6ff1c'; g4.strokeText(NAME, W4 / 2, H4 / 2 + 4, W4 * 0.72);
+      g4.fillStyle = '#ffffff'; g4.fillText(NAME, W4 / 2, H4 / 2 + 4, W4 * 0.72);
+      gateTex.needsUpdate = true;
     }
     function shade(c, k) { const r = ((c >> 16) & 255) * k, g = ((c >> 8) & 255) * k, b = (c & 255) * k; return `rgb(${r | 0},${g | 0},${b | 0})`; }
     M.livery = new THREE.MeshPhysicalMaterial({ map: liveryTex, metalness: 0.1, roughness: 0.4, clearcoat: 0.7, clearcoatRoughness: 0.12 });
     M.cabSide = new THREE.MeshPhysicalMaterial({ map: cabTex, metalness: 0.1, roughness: 0.4, clearcoat: 0.7, clearcoatRoughness: 0.12 });
-    M.hoodDecal = new THREE.MeshPhysicalMaterial({ map: hoodTex, transparent: true, alphaTest: 0.5, metalness: 0.2, roughness: 0.35, clearcoat: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    M.hoodDecal = new THREE.MeshPhysicalMaterial({ map: hoodTex, transparent: true, alphaTest: 0.35, metalness: 0.2, roughness: 0.35, clearcoat: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    M.gateDecal = new THREE.MeshPhysicalMaterial({ map: gateTex, transparent: true, alphaTest: 0.35, metalness: 0.2, roughness: 0.35, clearcoat: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     drawLivery(PAINTS[opts.paint] || 0xf2570f);
 
     // ---------------------------------------------------------------- body shell (fiberglass)
@@ -7185,11 +7274,13 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     // livery UVs on the flat sides (normals along +-x): u along the length, v up; left side in the top half of the
     // canvas, right side in the bottom half
-    function sideUVs(g, z0, z1, y0, y1) {
+    // (side: a single panel on that side - its inner face goes onto the cab canvas' dark strip)
+    function sideUVs(g, z0, z1, y0, y1, side) {
       const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
       for (let i = 0; i < p.count; i++) {
         const nx = n.getX(i);
         if (Math.abs(nx) < 0.7) continue;
+        if (side && nx * side < 0) { uv.setXY(i, 0.5, 0.505); continue; }
         const u = (p.getZ(i) - z0) / (z1 - z0), v = (p.getY(i) - y0) / (y1 - y0);
         if (nx < 0) uv.setXY(i, u, 0.5 + 0.5 * clamp(v, 0, 1));                 // left side: top half of the canvas
         else uv.setXY(i, 1 - u, 0.5 * clamp(v, 0, 1));                           // right side: bottom half, mirrored
@@ -7215,70 +7306,192 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       // the inside of the shell (seen from under the truck / from the bed)
       const inner = new THREE.Mesh(g, M.inner); inner.scale.set(0.985, 1, 0.99); bodyG.add(inner);
     }
-    // cab: windshield raked back, roof, back window; narrower than the fenders
-    {
-      const s = new THREE.Shape(), CHW = 1.46;
-      s.moveTo(-0.5, 2.44); s.lineTo(-0.05, 3.36); s.quadraticCurveTo(0.02, 3.48, 0.18, 3.48); s.lineTo(0.84, 3.48);
-      s.quadraticCurveTo(0.96, 3.48, 0.97, 3.36); s.lineTo(1.0, 2.44); s.lineTo(-0.5, 2.44);
-      const g = new THREE.ExtrudeGeometry(s, { depth: 2 * CHW - 0.16, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 3, curveSegments: 8 });
-      g.rotateY(Math.PI / 2); g.translate(-(CHW - 0.08), 0, 0); g.scale(1, 1, -1);
-      const idx = g.index ? g.index.array : null;
-      if (!idx) { const p = g.attributes.position, u = g.attributes.uv; for (let k = 0; k < p.count; k += 3) for (const a of [p, u]) { const sz = a.itemSize; for (let c = 0; c < sz; c++) { const t = a.array[(k + 1) * sz + c]; a.array[(k + 1) * sz + c] = a.array[(k + 2) * sz + c]; a.array[(k + 2) * sz + c] = t; } } }
-      else for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
+    // a (z, y) profile extruded across the truck: from x0, depth + 2 bevels thick
+    function alongX(shape, opt, x0) {
+      const g = new THREE.ExtrudeGeometry(shape, opt);
+      g.rotateY(Math.PI / 2); g.scale(1, 1, -1);
+      const idx = g.index ? g.index.array : null;                  // (the mirror turned the faces inside out)
+      if (idx) for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
+      else { const p = g.attributes.position, u = g.attributes.uv; for (let k = 0; k < p.count; k += 3) for (const a of [p, u]) { const sz = a.itemSize; for (let c = 0; c < sz; c++) { const t = a.array[(k + 1) * sz + c]; a.array[(k + 1) * sz + c] = a.array[(k + 2) * sz + c]; a.array[(k + 2) * sz + c] = t; } } }
+      g.translate(x0 + (opt.bevelEnabled ? opt.bevelThickness : 0), 0, 0);
       g.computeVertexNormals();
-      sideUVs(g, CZ0, CZ1, CY0, CY1);
-      smoothNormals(g, 32);
-      const cab = new THREE.Mesh(g, [M.cabSide, M.paint]); cab.castShadow = true; cab.receiveShadow = true; bodyG.add(cab);
-      // windshield and back glass (a hair proud of the cab)
-      const ws = new THREE.PlaneGeometry(2 * CHW - 0.34, 0.86);
-      // (the windshield face runs (-0.5, 2.44) -> (-0.05, 3.36) in (z, y); its outward normal is (y 0.439, z -0.898))
-      const wsm = add(bodyG, ws, M.glass, 0, 2.935, -0.35, Math.asin(0.439), Math.PI, 0, false);
+      return g;
+    }
+    function rrect(sh, x0, y0, x1, y1, r) {
+      sh.moveTo(x0 + r, y0); sh.lineTo(x1 - r, y0); sh.quadraticCurveTo(x1, y0, x1, y0 + r); sh.lineTo(x1, y1 - r); sh.quadraticCurveTo(x1, y1, x1 - r, y1);
+      sh.lineTo(x0 + r, y1); sh.quadraticCurveTo(x0, y1, x0, y1 - r); sh.lineTo(x0, y0 + r); sh.quadraticCurveTo(x0, y0, x0 + r, y0); return sh;
+    }
+    // cab: a fiberglass shell with real openings (windshield, side windows, back glass) - the driver in the cage shows
+    // through them. Side panels (the profile with the window cut out), the roof, the back wall and a frame round the
+    // raked windshield; dark inside
+    const cabG = new THREE.Group(); bodyG.add(cabG);
+    const CHW = 1.46;
+    {
+      const side = new THREE.Shape();
+      side.moveTo(-0.5, 2.44); side.lineTo(-0.05, 3.36); side.quadraticCurveTo(0.02, 3.48, 0.18, 3.48); side.lineTo(0.84, 3.48);
+      side.quadraticCurveTo(0.96, 3.48, 0.97, 3.36); side.lineTo(1.0, 2.44); side.lineTo(-0.5, 2.44);
+      const win = new THREE.Path(); win.moveTo(-0.2, 2.62); win.lineTo(0.84, 2.62); win.lineTo(0.8, 3.32); win.lineTo(0.12, 3.3); win.lineTo(-0.2, 2.62);
+      side.holes.push(win);
+      for (const sx of [-1, 1]) {
+        const g = alongX(side, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.04, bevelSegments: 3, curveSegments: 8 }, sx < 0 ? -CHW : CHW - 0.07);
+        sideUVs(g, CZ0, CZ1, CY0, CY1, sx);
+        smoothNormals(g, 32);
+        const m = new THREE.Mesh(g, [M.cabSide, M.paint]); m.castShadow = true; m.receiveShadow = true; cabG.add(m);
+      }
+      // roof: a shell following the cab's top line from the windshield header back
+      const roof = new THREE.Shape();
+      roof.moveTo(-0.05, 3.36); roof.quadraticCurveTo(0.02, 3.48, 0.18, 3.48); roof.lineTo(0.84, 3.48); roof.quadraticCurveTo(0.96, 3.48, 0.97, 3.36);
+      roof.lineTo(0.9, 3.36); roof.quadraticCurveTo(0.89, 3.43, 0.8, 3.43); roof.lineTo(0.2, 3.43); roof.quadraticCurveTo(0.07, 3.43, 0.02, 3.36); roof.lineTo(-0.05, 3.36);
+      const rg = alongX(roof, { depth: 2 * CHW - 0.1, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3, curveSegments: 8 }, -CHW);
+      smoothNormals(rg, 32);
+      add(cabG, rg, M.paint, 0, 0, 0);
+      // back wall with the back glass (leaning forward a touch at the top), a dark liner on its inside
+      const bwG = new THREE.Group(); bwG.position.set(0, 2.44, 0.955); bwG.rotation.x = -0.033; cabG.add(bwG);
+      const bw = new THREE.Shape(); bw.moveTo(-CHW, 0); bw.lineTo(CHW, 0); bw.lineTo(CHW, 0.8); bw.quadraticCurveTo(CHW, 0.92, CHW - 0.12, 0.92);
+      bw.lineTo(-CHW + 0.12, 0.92); bw.quadraticCurveTo(-CHW, 0.92, -CHW, 0.8); bw.lineTo(-CHW, 0);
+      const bwin = new THREE.Path(); rrect(bwin, -1.1, 0.36, 1.1, 0.82, 0.07); bw.holes.push(bwin);
+      add(bwG, new THREE.ExtrudeGeometry(bw, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.03, bevelSegments: 3, curveSegments: 6 }), M.paint, 0, 0, 0);
+      add(bwG, new THREE.ShapeGeometry(bw), M.black, 0, 0, -0.025, 0, Math.PI, 0, false);
+      add(bwG, new THREE.PlaneGeometry(2.24, 0.5), M.glass, 0, 0.59, 0.015, 0, 0, 0, false);
+      // windshield: the frame (body colour) and a black gasket round the glass, and the wipers parked at its foot.
+      // (its face runs (z -0.5, y 2.44) -> (-0.05, 3.36): 1.02 m long, raked back 26 deg; local y up the glass, z inwards)
+      const wsG = new THREE.Group(); wsG.position.set(0, 2.9 + 0.439 * 0.03, -0.275 - 0.898 * 0.03); wsG.rotation.x = 0.4545; cabG.add(wsG);
+      const fr = rrect(new THREE.Shape(), -CHW - 0.01, -0.53, CHW + 0.01, 0.53, 0.07); fr.holes.push(rrect(new THREE.Path(), -1.31, -0.44, 1.31, 0.44, 0.06));
+      add(wsG, new THREE.ExtrudeGeometry(fr, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2, curveSegments: 6 }), M.paint, 0, 0, -0.02);
+      const gk = rrect(new THREE.Shape(), -1.31, -0.44, 1.31, 0.44, 0.06); gk.holes.push(rrect(new THREE.Path(), -1.28, -0.415, 1.28, 0.415, 0.05));
+      add(wsG, new THREE.ExtrudeGeometry(gk, { depth: 0.02, bevelEnabled: false }), M.black, 0, 0, -0.03, 0, 0, 0, false);
+      const wsm = add(wsG, new THREE.PlaneGeometry(2.6, 0.86), M.glass, 0, 0, -0.012, 0, 0, 0, false);
       wsm.userData.ws = true;
-      // back window
-      add(bodyG, new THREE.PlaneGeometry(2 * CHW - 0.6, 0.55), new THREE.MeshStandardMaterial({ color: 0x07090b, roughness: 0.08, metalness: 0.3 }), 0, 3.02, 1.075, 0, 0, 0, false);
+      // (the sun strip: the truck's name across the top of the glass)
+      const stripTex = canvasTex(1024, 64, (g, w, h) => {
+        g.fillStyle = '#0b0b0c'; g.fillRect(0, 0, w, h); g.fillStyle = '#a6ff1c';
+        g.font = 'italic 900 50px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(NAME, w / 2, h / 2 + 2);
+      });
+      add(wsG, new THREE.PlaneGeometry(2.56, 0.15), new THREE.MeshStandardMaterial({ map: stripTex, roughness: 0.3, side: THREE.DoubleSide }), 0, 0.33, -0.016, 0, Math.PI, 0, false);
+      for (const [x, a] of [[-0.62, 0.12], [0.34, 0.12]]) {
+        const w = add(wsG, new THREE.BoxGeometry(0.78, 0.018, 0.015), M.black, x, -0.36, -0.045, 0, 0, a, false);
+        add(w, new THREE.BoxGeometry(0.74, 0.03, 0.008), M.black, 0.01, 0.005, -0.008, 0, 0, 0, false);
+      }
+      // inside: dash along the windshield's foot, headliner, the floor (hides the body's top under the cab)
+      add(cabG, rbox(2.6, 0.12, 0.2, 0.03), M.black, 0, 2.66, -0.25);
+      add(cabG, new THREE.PlaneGeometry(2 * CHW - 0.12, 0.92), M.black, 0, 3.37, 0.44, Math.PI / 2, 0, 0, false);
+      add(bodyG, new THREE.PlaneGeometry(2 * CHW - 0.08, 1.46), M.black, 0, 2.575, 0.25, -Math.PI / 2, 0, 0, false);
     }
-    // bed walls and tailgate (the bed is open: the blower and headers stand up out of it)
-    for (const sx of [-1, 1]) add(bodyG, rbox(0.1, 0.46, 1.74, 0.03), M.paint, sx * (HW - 0.06), 2.33, 1.84);
-    add(bodyG, rbox(2 * HW - 0.04, 0.46, 0.1, 0.03), M.paint, 0, 2.33, 2.71);
-    add(bodyG, new THREE.BoxGeometry(2 * HW - 0.2, 0.02, 1.62), M.black, 0, 2.02 + BV + 0.008, 1.84, 0, 0, 0, false);
-    // hood decal
-    { const d = add(bodyG, new THREE.PlaneGeometry(2.8, 2.1), M.hoodDecal, 0, 2.43 + BV, -1.45, -Math.PI / 2 + 0.039, 0, 0, false); d.receiveShadow = true; }
-    // grille, headlights, bumper face, tail lights
-    const grilleTex = canvasTex(1024, 256, (g, w, h) => {
-      g.fillStyle = '#0b0b0c'; g.fillRect(0, 0, w, h);
-      g.fillStyle = '#1d1e20'; for (let k = 0; k < 9; k++) g.fillRect(250 + k * 58, 60, 40, 150);
-      g.strokeStyle = '#8f9399'; g.lineWidth = 10; g.strokeRect(236, 46, 552, 178);
-      g.fillStyle = '#a6ff1c'; g.font = 'italic 900 64px Impact, Arial'; g.textAlign = 'center'; g.fillText(NUM, w / 2, 150);
-    });
-    add(bodyG, new THREE.PlaneGeometry(2.9, 0.36), new THREE.MeshStandardMaterial({ map: grilleTex, roughness: 0.45, metalness: 0.4, polygonOffset: true, polygonOffsetFactor: -2 }), 0, 1.99, -2.82 - BV - 0.005, 0, Math.PI, 0, false);
-    const heads = [];
+    // bed walls, the tailgate between the bed's rear pillars (tail lamps in them), bed rails; the blower and headers
+    // stand up out of the open bed; aluminium tread plate on the floor
     for (const sx of [-1, 1]) {
-      const h = add(bodyG, new THREE.CylinderGeometry(0.15, 0.15, 0.05, 24), M.head, sx * 1.36, 1.99, -2.82 - BV - 0.01, Math.PI / 2, 0, 0, false); heads.push(h);
-      add(bodyG, new THREE.TorusGeometry(0.155, 0.02, 8, 24), M.chrome, sx * 1.36, 1.99, -2.82 - BV - 0.03, 0, 0, 0, false);
-      add(bodyG, rbox(0.34, 0.16, 0.03, 0.02), M.tail, sx * 1.4, 1.95, 2.66 + BV + 0.01, 0, 0, 0, false);
+      add(bodyG, rbox(0.1, 0.46, 1.74, 0.03), M.paint, sx * (HW - 0.06), 2.33, 1.84);
+      add(bodyG, rbox(0.18, 0.46, 0.1, 0.03), M.paint, sx * (HW - 0.09), 2.33, 2.71);
+      add(bodyG, rbox(0.15, 0.38, 0.02, 0.01), M.black, sx * (HW - 0.09), 2.33, 2.765, 0, 0, 0, false);
+      add(bodyG, rbox(0.12, 0.34, 0.03, 0.012), M.tail, sx * (HW - 0.09), 2.33, 2.775, 0, 0, 0, false);
+      const R = (a, b, r) => tubeAB(bodyG, a, b, r, M.chassis, 10);
+      R(V3(sx * (HW - 0.06), 2.64, 1.0), V3(sx * (HW - 0.06), 2.64, 2.68), 0.026);
+      for (const z of [1.05, 1.84, 2.62]) R(V3(sx * (HW - 0.06), 2.555, z), V3(sx * (HW - 0.06), 2.64, z), 0.018);
     }
-    // fender flares: a thick black lip round each wheel arch, standing out from the body sides
+    add(bodyG, rbox(2 * HW - 0.36, 0.46, 0.1, 0.03), M.paint, 0, 2.33, 2.71);
+    {
+      const decTex = canvasTex(1024, 128, (g, w, h) => {
+        g.clearRect(0, 0, w, h); g.textAlign = 'center'; g.textBaseline = 'middle';
+        [['METHANOL', '#ffd21a', '#111'], ['NITRO SHOCKS', '#d81e1e', '#fff'], ['540 BLOWN', '#f4f4f0', '#111']].forEach(([t, bg, fg], k) => {
+          const x = 12 + k * 340, bw = 316;
+          g.fillStyle = '#0b0b0c'; g.fillRect(x - 6, 14, bw + 12, h - 28); g.fillStyle = bg; g.fillRect(x, 20, bw, h - 40);
+          g.fillStyle = fg; g.font = 'italic 900 58px Impact, "Arial Black", Arial'; g.fillText(t, x + bw / 2, h / 2 + 2, bw - 24);
+        });
+      });
+      const decMat = new THREE.MeshStandardMaterial({ map: decTex, transparent: true, alphaTest: 0.3, roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -2 });
+      for (const sx of [-1, 1]) add(bodyG, new THREE.PlaneGeometry(1.5, 0.19), decMat, sx * (HW + 0.002), 2.36, 1.86, 0, sx * Math.PI / 2, 0, false);
+    }
+    add(bodyG, new THREE.PlaneGeometry(2.9, 0.41), M.gateDecal, 0, 2.33, 2.768, 0, 0, 0, false);
+    {
+      const plateTex = canvasTex(128, 128, (g, w, h) => {
+        g.fillStyle = '#8d9197'; g.fillRect(0, 0, w, h);
+        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+          const cx = x * 32 + (y & 1) * 16 + 8, cy = y * 32 + 16, a = (y & 1) ? 0.6 : -0.6;
+          g.save(); g.translate(cx, cy); g.rotate(a);
+          g.fillStyle = '#c9ccd1'; g.fillRect(-11, -3, 22, 4); g.fillStyle = '#5b5f65'; g.fillRect(-11, 1, 22, 2); g.restore();
+        }
+      });
+      plateTex.wrapS = plateTex.wrapT = THREE.RepeatWrapping; plateTex.repeat.set(10, 5);
+      M.plate = new THREE.MeshStandardMaterial({ map: plateTex, metalness: 0.8, roughness: 0.35 });
+      add(bodyG, new THREE.BoxGeometry(2 * HW - 0.2, 0.02, 1.62), M.plate, 0, 2.02 + BV + 0.008, 1.84, 0, 0, 0, false);
+    }
+    // hood: the decal lies on the hood's slope; a raised scoop down the middle with a dark mesh mouth
+    const hoodY = (z) => 2.49 + (z + 2.3) * 0.0389;
+    { const d = add(bodyG, new THREE.PlaneGeometry(HOOD_W, HOOD_Z1 - HOOD_Z0), M.hoodDecal, 0, hoodY((HOOD_Z0 + HOOD_Z1) / 2) + 0.005, (HOOD_Z0 + HOOD_Z1) / 2, -Math.PI / 2 - 0.0389, 0, 0, false); d.receiveShadow = true; }
+    const meshTex = canvasTex(256, 64, (g, w, h) => {
+      g.fillStyle = '#050506'; g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#2a2c30'; g.lineWidth = 2;
+      for (let y = 0; y < 5; y++) for (let x = 0; x < 18; x++) {
+        const cx = x * 15 + (y & 1) * 7.5, cy = y * 13 + 6; g.beginPath();
+        for (let k = 0; k <= 6; k++) { const a = k * Math.PI / 3 + Math.PI / 6; g.lineTo(cx + Math.cos(a) * 7, cy + Math.sin(a) * 7); } g.stroke();
+      }
+    });
+    M.mesh = new THREE.MeshStandardMaterial({ map: meshTex, roughness: 0.6, metalness: 0.5 });
+    {
+      const P = [[-2.0, -0.03], [-2.0, 0.12], [-1.93, 0.16], [-0.8, 0.14], [-0.64, 0.06], [-0.58, -0.03]];
+      const sc = new THREE.Shape(); sc.moveTo(P[0][0], hoodY(P[0][0]) + P[0][1]);
+      for (let i = 1; i < P.length; i++) sc.lineTo(P[i][0], hoodY(P[i][0]) + P[i][1]);
+      sc.lineTo(P[0][0], hoodY(P[0][0]) + P[0][1]);
+      const g = alongX(sc, { depth: 1.0, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.03, bevelSegments: 3, curveSegments: 4 }, -0.56);
+      smoothNormals(g, 35);
+      add(bodyG, g, M.gloss, 0, 0, 0);
+      add(bodyG, new THREE.PlaneGeometry(0.94, 0.1), M.mesh, 0, hoodY(-2.0) + 0.055, -2.0 - 0.034, 0, Math.PI, 0, false);
+    }
+    // front: a chrome-framed grille with bars and the number badge, sealed-beam headlights in square chrome bezels
+    // (they stand proud of the fiberglass), amber signals and red tow hooks on the bumper
+    const FZ = -2.915, GY = 1.95;
+    {
+      add(bodyG, new THREE.PlaneGeometry(2.08, 0.24), M.mesh, 0, GY, FZ - 0.004, 0, Math.PI, 0, false);
+      const gs = rrect(new THREE.Shape(), -1.1, -0.155, 1.1, 0.155, 0.05); gs.holes.push(rrect(new THREE.Path(), -1.03, -0.11, 1.03, 0.11, 0.03));
+      add(bodyG, new THREE.ExtrudeGeometry(gs, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2, curveSegments: 6 }), M.chrome, 0, GY, FZ - 0.042);
+      for (const y of [-0.055, 0, 0.055]) add(bodyG, new THREE.BoxGeometry(2.06, 0.02, 0.025), M.chrome, 0, GY + y, FZ - 0.03, 0, 0, 0, false);
+      const badgeTex = canvasTex(128, 48, (g, w, h) => {
+        g.fillStyle = '#a6ff1c'; g.fillRect(0, 0, w, h); g.fillStyle = '#0b0b0c';
+        g.font = 'italic 900 40px Impact, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(NUM, w / 2, h / 2 + 2);
+      });
+      add(bodyG, rbox(0.3, 0.12, 0.03, 0.012), M.black, 0, GY, FZ - 0.05, 0, 0, 0, false);
+      add(bodyG, new THREE.PlaneGeometry(0.27, 0.1), new THREE.MeshStandardMaterial({ map: badgeTex, roughness: 0.35, metalness: 0.2 }), 0, GY, FZ - 0.0665, 0, Math.PI, 0, false);
+      // headlights: reflector cup (glows), bulb, domed lens, bezel
+      const cup = new THREE.LatheGeometry([[0.02, 0.058], [0.05, 0.05], [0.085, 0.032], [0.112, 0.012], [0.124, 0]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+      cup.rotateX(Math.PI / 2);
+      const bz = rrect(new THREE.Shape(), -0.165, -0.155, 0.165, 0.155, 0.05); { const h = new THREE.Path(); h.absarc(0, 0, 0.127, 0, Math.PI * 2, false); bz.holes.push(h); }
+      const bezelGeo = new THREE.ExtrudeGeometry(bz, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 2, curveSegments: 20 });
+      const lensGeo = new THREE.SphereGeometry(0.3, 28, 6, 0, Math.PI * 2, 0, Math.asin(0.127 / 0.3)); lensGeo.rotateX(-Math.PI / 2);
+      for (const sx of [-1, 1]) {
+        const x = sx * 1.32;
+        add(bodyG, bezelGeo, M.chrome, x, GY, FZ - 0.06);
+        add(bodyG, cup, M.head, x, GY, FZ - 0.068, 0, 0, 0, false);
+        add(bodyG, new THREE.SphereGeometry(0.02, 12, 8), M.chrome, x, GY, FZ - 0.03, 0, 0, 0, false);
+        add(bodyG, lensGeo, M.lens, x, GY, FZ - 0.07 + 0.3 * Math.cos(Math.asin(0.127 / 0.3)), 0, 0, 0, false);
+        add(bodyG, rbox(0.22, 0.07, 0.03, 0.015), M.amber, sx * 1.4, 1.64, -3.105, 0, 0, 0, false);
+        const hook = new THREE.TorusGeometry(0.055, 0.017, 8, 16, Math.PI); hook.rotateX(-Math.PI / 2); hook.rotateZ(Math.PI / 2);
+        add(bodyG, hook, M.red, sx * 0.86, 1.55, -3.07);
+      }
+      // (the rear: the old lamps low on the body become brake / reverse lights)
+      for (const sx of [-1, 1]) add(bodyG, rbox(0.34, 0.16, 0.03, 0.02), M.tail, sx * 1.4, 1.95, 2.66 + BV + 0.01, 0, 0, 0, false);
+    }
+    // fender flares: a flat black band round each wheel arch, standing proud of the body side (trimmed to the body's length)
     M.flare = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.62, metalness: 0.1 });
     for (const za of [zF, zR]) for (const sx of [-1, 1]) {
-      const pts = [], R = 1.27 - BV + 0.02;
-      for (let k = 0; k <= 24; k++) {
-        const ph = 0.5 + (Math.PI - 1.0) * k / 24, z = za - R * Math.cos(ph), y = 0.95 + R * Math.sin(ph);
-        if (z < BZ0 - 0.05 || z > BZ1 + 0.05) continue;
-        pts.push(V3(sx * (HW + 0.02), y, z));
-      }
-      const f = add(bodyG, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.085, 10, false), M.flare, 0, 0, 0);
-      f.scale.set(1, 1, 1);
+      const Ri = 1.16, Ro = 1.33, cy = 0.95, lim = (zEnd) => Math.acos(clamp(Math.abs(zEnd - za) / Ro, 0, 1));
+      const t0 = Math.max(0.42, za > 0 ? lim(BZ1 + BV - 0.03) : 0), t1 = Math.PI - Math.max(0.42, za < 0 ? lim(BZ0 - BV + 0.03) : 0);
+      const sh = new THREE.Shape(); sh.absarc(za, cy, Ro, t0, t1, false); sh.absarc(za, cy, Ri, t1, t0, true);
+      const g = alongX(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.022, bevelSegments: 3, curveSegments: 40 }, sx < 0 ? -HW - 0.09 : HW - 0.02);
+      smoothNormals(g, 40);
+      add(bodyG, g, M.flare, 0, 0, 0);
     }
     // molded bumpers, front and back
-    add(bodyG, rbox(2 * HW + 0.1, 0.26, 0.3, 0.08), M.flare, 0, 1.72, -2.92 - BV + 0.08);
-    add(bodyG, rbox(2 * HW + 0.1, 0.24, 0.26, 0.08), M.flare, 0, 1.78, 2.72 + BV - 0.06);
+    add(bodyG, rbox(2 * HW + 0.1, 0.26, 0.3, 0.08), M.flare, 0, 1.64, -2.92 - BV + 0.08);
+    add(bodyG, rbox(2 * HW + 0.1, 0.24, 0.26, 0.08), M.flare, 0, 1.72, 2.72 + BV - 0.06);
+    // door handles
+    for (const sx of [-1, 1]) add(bodyG, rbox(0.03, 0.045, 0.17, 0.012), M.chrome, sx * (HW + 0.004), 2.37, 0.74, 0, 0, 0, false);
     // roof light bar and mirrors
     add(bodyG, rbox(2.1, 0.13, 0.22, 0.04), M.flare, 0, 3.62, 0.02);
     for (let k = 0; k < 6; k++) add(bodyG, rbox(0.24, 0.09, 0.03, 0.02), M.head, -0.8 + k * 0.32, 3.62, -0.1, 0, 0, 0, false);
     for (const sx of [-1, 1]) {
       tubeAB(bodyG, V3(sx * 1.5, 2.72, -0.32), V3(sx * 1.78, 2.86, -0.4), 0.018, M.flare);
-      add(bodyG, rbox(0.1, 0.24, 0.3, 0.03), M.flare, sx * 1.84, 2.9, -0.42, 0, sx * 0.12, 0);
-      add(bodyG, new THREE.PlaneGeometry(0.22, 0.18), M.chrome, sx * 1.84, 2.9, -0.265, 0, 0, 0, false);
+      add(bodyG, rbox(0.08, 0.28, 0.19, 0.03), M.flare, sx * 1.84, 2.92, -0.42, 0, sx * 0.12, 0);
+      add(bodyG, new THREE.PlaneGeometry(0.15, 0.24), M.chrome, sx * 1.84, 2.92, -0.322, 0, sx * 0.12, 0, false);
     }
 
     // ---------------------------------------------------------------- chassis (chromoly tube frame)
@@ -7508,7 +7721,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const headlights = [];
     for (const sx of [-1, 1]) {
       const sl = new THREE.SpotLight(0xf2f6ff, 0, 110, 0.5, 0.45, 1.4);
-      sl.position.set(sx * 1.36, 1.99 - cgH, -2.9 + zOff);
+      sl.position.set(sx * 1.32, 1.95 - cgH, -3.0 + zOff);
       sl.target.position.set(sx * 1.6, -cgH, -45 + zOff);
       rootG.add(sl); rootG.add(sl.target); sl.visible = false; headlights.push(sl);
     }
@@ -7546,16 +7759,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     function setPaint(name) { const c = PAINTS[name]; if (c === undefined) return; M.paint.color.setHex(c); drawLivery(c); }
     function setLights(o) {
       M.tail.emissiveIntensity = o.brake ? 5 : (o.night ? 1.2 : 0.4);
-      M.head.emissiveIntensity = o.headlights ? 4 : 0;
+      M.head.emissiveIntensity = o.headlights ? 4 : 0; M.amber.emissiveIntensity = o.headlights ? 1.2 : 0.25;
       for (const hl of headlights) { hl.visible = !!o.headlights; hl.intensity = o.headlights ? 260 : 0; }
     }
-    // cockpit view: hide the driver and the cab shell around your head (you look out through where the glass is)
-    const cabMeshes = bodyG.children.filter((m) => m.geometry && m.geometry.type === 'ExtrudeGeometry' && m.material && Array.isArray(m.material) && m.material[0] === M.cabSide);
-    const wsMesh = bodyG.children.find((m) => m.userData.ws);
+    // cockpit view: hide the driver and the cab shell around your head (the cockpit has its own pillars and dash)
     function setInteriorVisible(v, cockpit) {
-      driver.visible = !cockpit; inside.visible = !!cockpit; hoops.visible = !cockpit;
-      for (const m of cabMeshes) m.visible = !cockpit;
-      if (wsMesh) wsMesh.visible = !cockpit;
+      driver.visible = !cockpit; inside.visible = !!cockpit; hoops.visible = !cockpit; cabG.visible = !cockpit;
     }
     function setTransmission() {}
     function setTires(front, rear) {
@@ -10194,7 +10403,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
           seg([['auto', 'Auto'], ['crab', 'Crab'], ['manual', 'Manual'], ['front', 'Front only']], S.rsMode, (v) => { S.rsMode = v; G.rearMan = 0; })));
         add(row('In the air', 'The tyres weigh 645 lb each: spin them up with the GAS and the truck rocks back (nose up); stab the BRAKE and it pitches nose down. Lift off the gas to fly level. Land on the down slopes.', el('<span></span>')));
-        add(row('Air assist', 'On: like a seasoned driver’s feet - it eases off the gas (or brake) before the truck rotates past a landable attitude, catches a nose that’s way off, and feathers the gas as you touch down while the rear tyres are still spinning hard (they’d kick it over backwards). Holding the gas over a jump no longer flips it. Off: all yours - backflips, front flips and crashes',
+        add(row('Air assist', 'On: like a seasoned driver’s feet plus a spotter - it looks ahead to the slope you’ll land on, eases off the gas (or brake) before the truck rotates past it, catches a nose that’s way off, gently levels the truck in pitch and roll while it flies, and feathers the gas as you touch down (spinning rears would kick it over backwards). Holding the gas over a jump no longer flips it; a truck that rolled over on a ramp’s edge before it took off is still a crash. Off: all yours - backflips, front flips and crashes',
           seg([[true, 'On'], [false, 'Off (do your own flips)']], S.airAssist !== false, (v) => { S.airAssist = v; })));
       }
       if (ARENAMAP) {

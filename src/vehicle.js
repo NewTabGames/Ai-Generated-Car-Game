@@ -550,21 +550,62 @@
     // road speed kick it on over backwards. So: fade whichever pedal would rotate it past a landable attitude (looking a
     // few tenths of a second ahead), catch a nose that's way off, and feather the gas on touchdown until the rears
     // match the ground. Short of that the pedals are all yours (off: do your own flips)
+    // It aims for the ground it's going to land on (the flight path traced ahead to where the tyres meet the dirt:
+    // the far side of a gap jump or a tabletop slopes away, so it wants the nose down to match), a touch rear-first.
+    // On top of the pedals a spotter's hand (a game aid, like traction control): a gentle, capped nudge in pitch and
+    // roll towards that landing attitude while it's in the air (_aaTorque) - it steadies a truck that left a ramp
+    // crooked or twisting, but can't save one that's way over (half a turn past level it lets go)
     _airAssist(dt) {
       const inp = this.input, { qx, qy, qz, qw } = this;
       const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
       const rx = 1 - 2 * (qy * qy + qz * qz), ry = 2 * (qx * qy + qz * qw), rz = 2 * (qx * qz - qy * qw);
       const rate = (this.wx * rx + this.wy * ry + this.wz * rz) * 57.2958, ahead = pitch + 0.35 * rate;
       if (this.airborne) {
-        this.aaGnd = 0;
-        if (inp.throttle > 0) inp.throttle *= clamp((20 - ahead) / 15, 0, 1);
-        if (inp.brake > 0) inp.brake *= clamp((ahead + 15) / 12, 0, 1);
-        if (ahead > 32) inp.brake = Math.max(inp.brake, clamp((ahead - 32) / 25, 0, 0.8));
-        if (ahead < -25) inp.throttle = Math.max(inp.throttle, clamp((-25 - ahead) / 20, 0, 1));
-      } else if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 0.8) {
-        const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
-        if (pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+        this.aaGnd = 0; this.aaAir = (this.aaAir || 0) + dt;
+        // where it comes down: the ballistic path against the ground, CG ~ ride height + droop above it at touchdown
+        const s = this.spec, g = GRAV * (s.gravScale || 1), gnd = this._aaG || (this._aaG = {}), clear = s.cgHeight + 0.6 * s.travelDown;
+        let tl = 3, nx = 0, ny = 1, nz = 0;
+        for (let t = 0.05; t <= 3; t += 0.05) {
+          const x = this.px + this.vx * t, z = this.pz + this.vz * t, y = this.py + this.vy * t - 0.5 * g * t * t;
+          this.world.ground(x, z, gnd);
+          if (y - gnd.h < clear) { tl = t; nx = gnd.nx; ny = gnd.ny; nz = gnd.nz; break; }
+        }
+        // the landing surface's slope along the truck's heading and across it -> target pitch (nose up +) and roll
+        // (right side up +), with the nose 4 deg up of the slope so the rears touch first
+        const fl = Math.hypot(rx, rz) || 1, fx = rz / fl, fz = -rx / fl;   // (forward, level: up x right)
+        const ny1 = Math.max(0.3, ny);
+        const tgtP = Math.atan(-(nx * fx + nz * fz) / ny1) * 57.2958 + 4, tgtR = Math.atan(-(nx * rx + nz * rz) / (ny1 * fl)) * 57.2958;
+        this.aaTgtP = tgtP / 57.2958; this.aaTgtR = tgtR / 57.2958; this.aaTL = tl;
+        const e = ahead - tgtP;
+        if (inp.throttle > 0) inp.throttle *= clamp((16 - e) / 14, 0, 1);
+        if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
+        if (e > 20) inp.brake = Math.max(inp.brake, clamp((e - 20) / 18, 0, 1));
+        if (e < -18) inp.throttle = Math.max(inp.throttle, clamp((-18 - e) / 15, 0, 1));
+      } else {
+        this.aaAir = 0;
+        if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
+          // touchdown: feather the gas until the rears match the ground, and don't let it rear up over backwards off the
+          // landing (a wheelie on the way out is fine; one still climbing past 25 deg isn't)
+          const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
+          if (this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+          if (ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
+        }
       }
+    }
+    // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 1.3 rad/s^2 in
+    // pitch and 2 in roll - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
+    // past ~85 deg: a truck that rolled over on the ramp's edge before it left the ground is beyond saving)
+    _aaTorque(m00, m10, m20, m02, m12, m22, m11) {
+      const s = this.spec, fade = clamp(((this.aaAir || 0) - 0.08) / 0.2, 0, 1);
+      if (fade <= 0 || m11 < 0.1 || this.aaTgtP === undefined) return null;
+      const pitch = Math.asin(clamp(-m12, -1, 1)), roll = Math.asin(clamp(m10, -1, 1));
+      const wP = this.wx * m00 + this.wy * m10 + this.wz * m20, wR = this.wx * m02 + this.wy * m12 + this.wz * m22;
+      const A = 1.3 * fade, AR = 2 * fade, kp = 5, kd = 4.2;
+      const aP = clamp(kp * (this.aaTgtP - pitch) - kd * wP, -A, A), aR = clamp(kp * (this.aaTgtR - roll) - kd * wR, -AR, AR);
+      const tP = aP * s.Ipitch, tR = aR * s.Iroll;
+      const T = this._aaT || (this._aaT = [0, 0, 0]);
+      T[0] = m00 * tP + m02 * tR; T[1] = m10 * tP + m12 * tR; T[2] = m20 * tP + m22 * tR;
+      return T;
     }
     step(dt) {
       this.acc += Math.min(dt, 0.1);
@@ -925,6 +966,9 @@
           Ty -= wy * s.Iyaw * 3; Tx -= m00 * wP * s.Ipitch * 3; Ty -= m10 * wP * s.Ipitch * 3; Tz -= m20 * wP * s.Ipitch * 3;
         }
       }
+
+      // ---------------- air assist's nudge (see _airAssist)
+      if (inp.airAssist && this.airborne) { const T = this._aaTorque(m00, m10, m20, m02, m12, m22, m11); if (T) { Tx += T[0]; Ty += T[1]; Tz += T[2]; } }
 
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
@@ -1618,16 +1662,21 @@
       // positional correction
       this.px -= nx * pen * 0.9; this.pz -= nz * pen * 0.9;
       if (vn <= 0) return;
-      // effective mass (yaw dominated)
+      // effective mass (yaw dominated). The impulse turns the body about the world's vertical, and that's its yaw axis
+      // only while it's upright: on its side or its roof the same push turns it about its roll or pitch axis, and
+      // counting on the (bigger) yaw inertia there made every wall contact hand back more spin than it took - a truck
+      // tumbling against the arena wall spun itself up to 80 rad/s and was flung away at 300 mph
+      const m10 = 2 * (this.qx * this.qy + this.qz * this.qw), m11 = 1 - 2 * (this.qx * this.qx + this.qz * this.qz), m12 = 2 * (this.qy * this.qz - this.qx * this.qw);
+      const iIy = m10 * m10 / s.Ipitch + m11 * m11 / s.Iyaw + m12 * m12 / s.Iroll;
       const rxn = rx * nz - rz * nx;
-      const k = 1 / s.mass + rxn * rxn / s.Iyaw;
+      const k = 1 / s.mass + rxn * rxn * iIy;
       const j = (1 + 0.15) * vn / k;
       let jx = -nx * j, jz = -nz * j;
       // friction along tangent
       const tx = -nz, tz = nx;
       const vt = cvx * tx + cvz * tz;
       const rxt = rx * tz - rz * tx;
-      const kt = 1 / s.mass + rxt * rxt / s.Iyaw;
+      const kt = 1 / s.mass + rxt * rxt * iIy;
       const jt = clamp(-vt / kt, -0.45 * j, 0.45 * j);
       jx += tx * jt; jz += tz * jt;
       this._applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22);
