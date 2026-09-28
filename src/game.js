@@ -48,7 +48,7 @@
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
-  // The Car Crushers 2 cars: listed with the Challengers (a button each). Per car: its button, paint, the traction-control
+  // The Car Crushers 2 cars: a More Cars card each. Per car: its card title / button, paint, the traction-control
   // mode it starts on (tc) and home map (map) where it has them, chase-camera scale [distance, height], the start hint,
   // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND)
   const CC_CARS = {
@@ -392,20 +392,19 @@
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
       desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
       btn: 'MONSTER TRUCK', tc: 3 },
+    // (the Car Crushers 2 cars, a card each - see CC_CARS)
+    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info })),
   ];
-  // (everything that brings its own paint / traction-control mode / home map when picked: the More cars and the Car
-  // Crushers 2 cars)
-  const PICK = MORE_CARS.concat(Object.entries(CC_CARS).map(([id, c]) => ({ id, paint: c.paint, tc: c.tc, map: c.map })));
-  const MORE_IDS = PICK.map((m) => m.id);
+  const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
-    const m = PICK.find((x) => x.id === id);
+    const m = MORE_CARS.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
     if (m && ((id !== S.car && m.paint) || (o && o[3] && S[m.optKey] !== opt))) S.paint = (o && o[3]) || m.paint;
     // the tractor and the dragsters start on Track traction control (on the road, throttle in a turn would otherwise
     // just swap ends - the real ones have none: switch it Off for the raw thing); the car you came from gets its setting back
     // (a car that sets its own mode keeps the one you had in tcModePrev, and a car that doesn't gets it back)
-    const fromM = PICK.find((x) => x.id === S.car), fromTc = !!(fromM && fromM.tc !== undefined);
+    const fromM = MORE_CARS.find((x) => x.id === S.car), fromTc = !!(fromM && fromM.tc !== undefined);
     if (id !== S.car) {
       if (m && m.tc !== undefined) { if (!fromTc) S.tcModePrev = S.tcMode; S.tcMode = m.tc; }
       else if (fromTc && S.tcModePrev !== undefined) S.tcMode = S.tcModePrev;
@@ -416,7 +415,7 @@
     // own home - 6th entry - e.g. the record mower's is the Straightaway, not the mowers' dirt oval)
     {
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
-      const from = PICK.find((x) => x.id === S.car);
+      const from = MORE_CARS.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
@@ -457,11 +456,6 @@
     $('moreCars').classList.remove('hidden');
   }
   $('moreClose').addEventListener('click', () => $('moreCars').classList.add('hidden'));
-  // the Car Crushers 2 cars join the car list: a row of their own under the Challengers
-  for (const pick of [$('carPick'), $('carPickTitle')]) {
-    pick.appendChild(el('<div class="ccbreak"></div>'));
-    for (const [id, c] of Object.entries(CC_CARS)) pick.appendChild(el(`<button class="carbtn cc" data-car="${id}"><b>${c.btn}</b><span>${c.sub}</span></button>`));
-  }
   wireCarPick($('carPick')); wireCarPick($('carPickTitle'));
   void MORE_IDS;
   $('mReset').addEventListener('click', () => { resetCar(); openMenu(false); });

@@ -38,7 +38,7 @@
   #cockpitSpeed { position: absolute; left: 50%; bottom: 100px; background: var(--bg); padding: 3px 10px; border-radius: 4px; transform: translateX(-50%); font-size: 13px; color: var(--dim); }
   /* overlays */
   .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(20,20,24,0.55), rgba(0,0,0,0.88)); z-index: 10; }
-  #title .box { text-align: center; max-width: 800px; padding: 30px; }
+  #title .box { text-align: center; max-width: 720px; padding: 30px; }
   #title h1 { font-size: 64px; margin: 0; letter-spacing: 0.04em; font-style: italic; font-weight: 900; }
   #title h1 span { color: var(--red); }
   #title p { color: var(--dim); line-height: 1.5; }
@@ -93,19 +93,14 @@
   #wizard .sub { color: var(--dim); font-size: 14px; min-height: 40px; }
   #wizard .detect { margin: 14px auto; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; font-size: 14px; min-height: 42px; color: #bfe6c3; }
   #wizard .actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
-  #carPick, #carPickTitle { display: flex; gap: 8px; flex-wrap: wrap; }
+  #carPick, #carPickTitle { display: flex; gap: 8px; }
   #carPick { padding: 12px 18px 0; }
   #carPickTitle { justify-content: center; margin: 0 0 12px; }
   .carbtn { flex: 1; pointer-events: auto; background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--txt); padding: 10px 14px; border-radius: 6px; cursor: pointer; text-align: left; }
-  #carPickTitle .carbtn { flex: 0 0 180px; }
+  #carPickTitle .carbtn { flex: 0 0 200px; }
   .carbtn.more { flex: 0 0 150px; background: rgba(255,255,255,0.02); border-style: dashed; }
-  #carPickTitle .carbtn.more { flex: 0 0 150px; }
+  #carPickTitle .carbtn.more { flex: 0 0 170px; }
   .carbtn.more.on { border-style: solid; }
-  .ccbreak { flex-basis: 100%; height: 0; }
-  .carbtn.cc { flex: 0 0 calc(20% - 6.4px); padding: 6px 10px; }
-  #carPickTitle .carbtn.cc { flex: 0 0 calc(20% - 6.4px); }
-  .carbtn.cc b { font-size: 12.5px; }
-  .carbtn.cc span { font-size: 11px; }
   #moreCars { z-index: 30; }
   #moreCars .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); pointer-events: auto; }
   #moreCars header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -190,7 +185,7 @@
       <button class="carbtn" data-car="hellcat"><b>SRT HELLCAT</b><span>717 hp · 656 lb-ft · P Zero street tyres</span></button>
       <button class="carbtn" data-car="demon"><b>SRT DEMON 170</b><span>1,025 hp · 945 lb-ft · drag radials · TransBrake</span></button>
       <button class="carbtn" data-car="dragpak"><b>MOPAR DRAG PAK</b><span>supercharged 354 HEMI · race car · wheelie bars · chute</span></button>
-      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · dragsters…</span></button>
+      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
       <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="mowtrack">Map: Mower Track</button>
@@ -209,7 +204,7 @@
       <button class="carbtn" data-car="hellcat"><b>CHALLENGER SRT HELLCAT</b><span>717 hp · 656 lb-ft · 3.6 s 0-60 · 11.8 s ¼ mile</span></button>
       <button class="carbtn" data-car="demon"><b>CHALLENGER SRT DEMON 170</b><span>1,025 hp E85 · 945 lb-ft · 1.66 s 0-60 · 8.91 s @ 151 mph</span></button>
       <button class="carbtn" data-car="dragpak"><b>CHALLENGER MOPAR DRAG PAK</b><span>354 cu in Whipple HEMI · NHRA Factory Stock · 7.5 s @ 180 mph</span></button>
-      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · dragsters…</span></button>
+      <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="tabs"></div>
     <div id="tabbody"></div>
@@ -12056,7 +12051,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ vehicle
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
-  // The Car Crushers 2 cars: listed with the Challengers (a button each). Per car: its button, paint, the traction-control
+  // The Car Crushers 2 cars: a More Cars card each. Per car: its card title / button, paint, the traction-control
   // mode it starts on (tc) and home map (map) where it has them, chase-camera scale [distance, height], the start hint,
   // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND)
   const CC_CARS = {
@@ -12400,20 +12395,19 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
       desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
       btn: 'MONSTER TRUCK', tc: 3 },
+    // (the Car Crushers 2 cars, a card each - see CC_CARS)
+    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info })),
   ];
-  // (everything that brings its own paint / traction-control mode / home map when picked: the More cars and the Car
-  // Crushers 2 cars)
-  const PICK = MORE_CARS.concat(Object.entries(CC_CARS).map(([id, c]) => ({ id, paint: c.paint, tc: c.tc, map: c.map })));
-  const MORE_IDS = PICK.map((m) => m.id);
+  const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
-    const m = PICK.find((x) => x.id === id);
+    const m = MORE_CARS.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
     if (m && ((id !== S.car && m.paint) || (o && o[3] && S[m.optKey] !== opt))) S.paint = (o && o[3]) || m.paint;
     // the tractor and the dragsters start on Track traction control (on the road, throttle in a turn would otherwise
     // just swap ends - the real ones have none: switch it Off for the raw thing); the car you came from gets its setting back
     // (a car that sets its own mode keeps the one you had in tcModePrev, and a car that doesn't gets it back)
-    const fromM = PICK.find((x) => x.id === S.car), fromTc = !!(fromM && fromM.tc !== undefined);
+    const fromM = MORE_CARS.find((x) => x.id === S.car), fromTc = !!(fromM && fromM.tc !== undefined);
     if (id !== S.car) {
       if (m && m.tc !== undefined) { if (!fromTc) S.tcModePrev = S.tcMode; S.tcMode = m.tc; }
       else if (fromTc && S.tcModePrev !== undefined) S.tcMode = S.tcModePrev;
@@ -12424,7 +12418,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // own home - 6th entry - e.g. the record mower's is the Straightaway, not the mowers' dirt oval)
     {
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
-      const from = PICK.find((x) => x.id === S.car);
+      const from = MORE_CARS.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
@@ -12465,11 +12459,6 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     $('moreCars').classList.remove('hidden');
   }
   $('moreClose').addEventListener('click', () => $('moreCars').classList.add('hidden'));
-  // the Car Crushers 2 cars join the car list: a row of their own under the Challengers
-  for (const pick of [$('carPick'), $('carPickTitle')]) {
-    pick.appendChild(el('<div class="ccbreak"></div>'));
-    for (const [id, c] of Object.entries(CC_CARS)) pick.appendChild(el(`<button class="carbtn cc" data-car="${id}"><b>${c.btn}</b><span>${c.sub}</span></button>`));
-  }
   wireCarPick($('carPick')); wireCarPick($('carPickTitle'));
   void MORE_IDS;
   $('mReset').addEventListener('click', () => { resetCar(); openMenu(false); });
