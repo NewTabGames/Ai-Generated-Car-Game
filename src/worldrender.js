@@ -29,7 +29,7 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
@@ -82,7 +82,27 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 3.5) {
+    if (uMap > 4.5) {
+      // ---- mower track: a mown field (the mower's passes leave light and dark stripes), a dirt oval worn darker along
+      // the racing line just inside its centre, looser lighter dirt up the outside, ragged grassy edges, and a chalk
+      // start / finish line across the front straight
+      float aaz = max(fwidth(P.y), 0.003);
+      float zc = clamp(P.y, -${W.MOWT.SL.toFixed(1)}, ${W.MOWT.SL.toFixed(1)});
+      float td = length(vec2(P.x, P.y - zc)) - ${W.MOWT.R.toFixed(1)};
+      float n1 = vnoise(P * 0.35), n2 = vnoise(P * 2.2), n3 = vnoise(P * 9.0);
+      float sf = fract(P.x / 10.0 + 0.25), stripe = smoothstep(0.47, 0.53, sf) * (1.0 - smoothstep(0.97, 1.0, sf)) + (1.0 - smoothstep(0.0, 0.03, sf));
+      vec3 g = mix(vec3(0.15, 0.26, 0.065), vec3(0.19, 0.31, 0.085), n1) * (0.9 + 0.1 * n2 + 0.08 * n3) * mix(0.92, 1.06, stripe);
+      vec3 d = mix(vec3(0.26, 0.155, 0.08), vec3(0.34, 0.21, 0.11), n1) * (0.85 + 0.12 * n2 + 0.06 * n3);
+      d *= 1.0 - 0.3 * exp(-pow((td + 1.8) / 2.2, 2.0));
+      d = mix(d, vec3(0.4, 0.27, 0.15) * (0.9 + 0.1 * n3), 0.35 * smoothstep(2.0, 5.0, td));
+      float edge = ${(W.MOWT.W / 2).toFixed(1)} + (vnoise(P * 1.3) - 0.5) * 0.9 + (n3 - 0.5) * 0.3;
+      float onTrack = 1.0 - smoothstep(edge - 0.25, edge + 0.25, abs(td));
+      vec3 c = mix(g, d, onTrack);
+      float line = (1.0 - smoothstep(0.18 - aaz, 0.18 + aaz, abs(P.y))) * step(0.0, P.x) * onTrack;
+      c = mix(c, vec3(0.88, 0.87, 0.82) * (0.8 + 0.2 * n3), line * step(0.25, n2 + 0.2));
+      col = c;
+      rough = 0.97;
+    } else if (uMap > 3.5) {
       // ---- monster truck arena: packed, watered clay (the jumps are meshed from the same ground and painted by this
       // too), wetter patches, tyre tracks wandering all over it and donut rings in the middle; concrete outside the wall
       float px = max(length(fwidth(P)), 1e-4);
@@ -943,6 +963,55 @@ void main(){
         },
         setBoard: drawBoard,
       };
+    }
+
+    // ---------------------------------------------------------------- mower track (built once): straw bales round both
+    // edges of the oval, the start / finish arch over the front straight, bleachers beyond it
+    if (W.map === 'mowtrack') {
+      const M = W.MOWT, mg = new THREE.Group(); scene.add(mg);
+      const strawC = document.createElement('canvas'); strawC.width = 128; strawC.height = 64;
+      { const g = strawC.getContext('2d'); g.fillStyle = '#c29a45'; g.fillRect(0, 0, 128, 64);
+        for (let i = 0; i < 420; i++) { g.strokeStyle = Math.random() < 0.5 ? 'rgba(236,205,120,0.7)' : 'rgba(120,88,34,0.5)'; g.lineWidth = 1; const x = Math.random() * 128, y = Math.random() * 64; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 6 + Math.random() * 14, y + (Math.random() - 0.5) * 3); g.stroke(); }
+        g.fillStyle = 'rgba(40,30,20,0.8)'; g.fillRect(34, 0, 3, 64); g.fillRect(90, 0, 3, 64); }
+      const strawT = new THREE.CanvasTexture(strawC); strawT.colorSpace = THREE.SRGBColorSpace;
+      const baleMat = new THREE.MeshStandardMaterial({ map: strawT, roughness: 0.95 });
+      const bales = W.mowtrackBales();
+      const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.18, 0.46, 0.48), baleMat, bales.length);
+      im.castShadow = true; im.receiveShadow = true;
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+      bales.forEach((b, i) => {
+        const j = W.hash01(i, 7, 91) - 0.5;
+        e.set(0, b.rot + Math.PI / 2 + j * 0.08, 0); q.setFromEuler(e); pv.set(b.x, 0.23, b.z); m4.compose(pv, q, one); im.setMatrixAt(i, m4);
+      });
+      mg.add(im);
+      // start / finish arch: two legs either side of the front straight and a checkered banner across
+      const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
+      const xa = M.R - M.W / 2 - 1.3, xb = M.R + M.W / 2 + 1.3;
+      for (const x of [xa, xb]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.4, 12), dark); leg.position.set(x, 2.2, 0); leg.castShadow = true; mg.add(leg); }
+      const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
+      { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
+        g.fillStyle = '#f4f4f0'; g.fillRect(0, 32, 1024, 32); g.fillStyle = '#111'; g.font = 'italic 900 30px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('START  ·  FINISH  ·  HELLCAT DRIVE MOWER TRACK', 512, 49); }
+      const banT = new THREE.CanvasTexture(banC); banT.colorSpace = THREE.SRGBColorSpace;
+      const banner = new THREE.Mesh(new THREE.BoxGeometry(xb - xa + 0.4, 0.8, 0.06), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 }), new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 })]);
+      banner.position.set((xa + xb) / 2, 4.0, 0); banner.castShadow = true; mg.add(banner);
+      // bleachers beyond the outside of the front straight, climbing away from the track, a crowd on every row
+      const ST = M.STANDS, concrete = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.95 });
+      const crowdC = document.createElement('canvas'); crowdC.width = 256; crowdC.height = 64;
+      { const g = crowdC.getContext('2d'); g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, 256, 64); const cols = ['#c33', '#36c', '#eee', '#222', '#eb3', '#3a3', '#a5c', '#f80'];
+        for (let i = 0; i < 520; i++) { g.fillStyle = cols[i % cols.length]; g.fillRect(Math.random() * 256, 10 + Math.random() * 50, 3, 6); } }
+      const crowdT = new THREE.CanvasTexture(crowdC); crowdT.colorSpace = THREE.SRGBColorSpace; crowdT.wrapS = THREE.RepeatWrapping; crowdT.repeat.set(6, 1);
+      const crowdM = new THREE.MeshStandardMaterial({ map: crowdT, roughness: 0.95 });
+      const len = ST.z1 - ST.z0, n = 5, dx = ST.d / n;
+      for (let k = 0; k < n; k++) {
+        const h = 0.45 * (k + 1), step = new THREE.Mesh(new THREE.BoxGeometry(dx, h, len), concrete);
+        step.position.set(ST.x + dx * (k + 0.5), h / 2, (ST.z0 + ST.z1) / 2); step.castShadow = true; step.receiveShadow = true; mg.add(step);
+        const people = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.55), crowdM);
+        people.rotation.y = -Math.PI / 2; people.position.set(ST.x + dx * (k + 0.5) - 0.05, h + 0.27, (ST.z0 + ST.z1) / 2); mg.add(people);
+      }
+      // a rail along the front of the stands
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ST.x - 0.2, 1.0, (ST.z0 + ST.z1) / 2); mg.add(rail);
+      for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ST.x - 0.2, 0.5, ST.z0 + k * len / 8); mg.add(post); }
     }
 
     // ---------------------------------------------------------------- monster truck arena (built once)

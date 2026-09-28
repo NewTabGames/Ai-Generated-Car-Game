@@ -96,6 +96,35 @@
   // avenues every AV metres (lanes 3.6 m, edge lines at 7.2 m, avenue paving to 8.4 m), street lights down both sides,
   // and every block between them a different lot (painted by the terrain shader). Physics: asphalt everywhere.
   const TARMAC = { AV: 240, EDGE: 7.2, PAVE: 8.4, LAMP: 48, LAMP_OFF: 9.6, LAMP_REACH: 3.4, SPAWN_X: 1.8, SPAWN_Z: 40 };
+  // 'mowtrack' (Mower Track): a lawn mower race track - a mown field, dead flat, with a dirt oval of ~1/5 mile at the
+  // centre line: two 80 m straights along z joined by 28 m-radius turns, 12 m wide, run anticlockwise seen from above
+  // (left turns: the front straight is x = +R, heading -z). Straw bales line both edges and make the walls, with a gap in
+  // the outside of the front straight into the pits; the start / finish line crosses the front straight at z = 0,
+  // bleachers stand beyond it. Gentle country rises well back from the field. Physics: dirt on the track, grass off it
+  const MOWT = { SL: 40, R: 28, W: 12, BALE: 1.25, PIT: [18, 30], SPAWN_X: 28, SPAWN_Z: 12, STANDS: { x: 47, z0: -26, z1: 26, d: 9 } };
+  // signed distance from the track's centre line (- towards the infield)
+  function mowtD(x, z) { const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z; return Math.hypot(x, z - zc) - MOWT.R; }
+  // the bales: one every ~1.25 m round both edges, each with its heading along the edge
+  let mowtBaleList = null;
+  function mowtrackBales() {
+    if (mowtBaleList) return mowtBaleList;
+    const M = MOWT, list = [];
+    for (const off of [-M.W / 2 - 0.55, M.W / 2 + 0.55]) {
+      const r = M.R + off, Lp = 4 * M.SL + 2 * Math.PI * r, n = Math.round(Lp / M.BALE);
+      for (let k = 0; k < n; k++) {
+        let t = k * Lp / n, x, z, rot;
+        // front straight (x = r, z from +SL to -SL), top turn round (0, -SL), back straight, bottom turn round (0, +SL)
+        if (t < 2 * M.SL) { x = r; z = M.SL - t; rot = 0; }
+        else if ((t -= 2 * M.SL) < Math.PI * r) { const a = t / r; x = r * Math.cos(a); z = -M.SL - r * Math.sin(a); rot = a; }
+        else if ((t -= Math.PI * r) < 2 * M.SL) { x = -r; z = -M.SL + t; rot = Math.PI; }
+        else { t -= 2 * M.SL; const a = Math.PI + t / r; x = r * Math.cos(a); z = M.SL - r * Math.sin(a); rot = a; }
+        if (off > 0 && x > 0 && z > M.PIT[0] && z < M.PIT[1] && Math.abs(z) <= M.SL) continue;   // the pit gap
+        list.push({ x, z, rot });
+      }
+    }
+    mowtBaleList = list;
+    return list;
+  }
 
   // ---------------------------------------------------------------- road network
   // NS road i:  x = base + A1 sin(k1 z + p1) + A2 sin(k2 z + p2) + A3 sin(k3 z + p3)
@@ -141,7 +170,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -573,7 +602,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack') return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -589,6 +618,12 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'mowtrack') {
+      // dead flat round the field, rolling country well back from it
+      const d = Math.hypot(x, z * 0.8);
+      if (d < 200) return 0;
+      return smooth(200, 800, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 24 + nDet(x * 0.02, z * 0.02) * 1.2);
+    }
     if (STRAIGHT()) {
       // dead flat around the strip, gentle hills far off for scenery
       const d = Math.abs(x);
@@ -656,6 +691,7 @@
     const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
     out.h = h; out.nx = -dx * il; out.ny = il; out.nz = -dz * il;
     if (MAP === 'tarmac') { out.roadD = 0; out.surface = 0; return out; }   // All Road: it's all asphalt
+    if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     // surface
     const ri = roadInfo(x, z, _gri);
@@ -671,6 +707,7 @@
   // ---------------------------------------------------------------- vegetation / props
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
     if (STRAIGHT()) { const d = Math.abs(x) - (DRAGMAP() ? 25 : 0); return d < 40 ? 0 : 0.45 * smooth(40, 200, d) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3); }
     const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
     return smooth(0.02, 0.55, f);
@@ -691,6 +728,26 @@
       for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
+      return cp;
+    }
+    if (MAP === 'mowtrack') {
+      // the bales (their colliders overlap into a wall), the start arch's legs, the bleachers, and woods well back
+      for (const b of mowtrackBales()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) circles.push({ x: b.x, z: b.z, r: 0.6 });
+      for (const px of [MOWT.R - MOWT.W / 2 - 1.3, MOWT.R + MOWT.W / 2 + 1.3]) if (px >= x0 && px < x0 + CH && 0 >= z0 && 0 < z0 + CH) circles.push({ x: px, z: 0, r: 0.22 });
+      const ST = MOWT.STANDS, sx = ST.x + ST.d / 2, sz = (ST.z0 + ST.z1) / 2;
+      if (sx >= x0 && sx < x0 + CH && sz >= z0 && sz < z0 + CH) boxes.push({ x: sx, z: sz, hx: ST.d / 2, hz: (ST.z1 - ST.z0) / 2, c: 1, s: 0 });
+      const tr = [], cell = 8, nc = CH / cell | 0;
+      for (let a = 0; a < nc; a++) for (let b = 0; b < nc; b++) {
+        const gx = cx * nc + a, gz = cz * nc + b, r1 = hash01(gx, gz, 1);
+        const x = (a + 0.1 + 0.8 * hash01(gx, gz, 2)) * cell + x0, z = (b + 0.1 + 0.8 * hash01(gx, gz, 3)) * cell + z0;
+        if (r1 > forestDensity(x, z)) continue;
+        const kn = nKind(x * 0.004, z * 0.004), kind = kn > 0.25 ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1, sc = 0.75 + hash01(gx, gz, 6) * 0.65;
+        tr.push(x, terrainHeight(x, z), z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
+        circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
+      }
+      cp = { trees: new Float32Array(tr), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
+      propCache.set(key, cp);
+      if (propCache.size > 400) propCache.delete(propCache.keys().next().value);
       return cp;
     }
     if (MAP === 'tarmac') {
@@ -959,6 +1016,18 @@
 
   /** Spawn / reset point on the nearest road near (x,z), facing heading closest to `hint` (tx,tz). */
   function nearestRoadSpot(x, z, hintX, hintZ) {
+    if (MAP === 'mowtrack') {
+      // back on its wheels where it is, facing the hint - pulled off the bales onto the middle of the track if it's near them
+      let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
+      const l = Math.hypot(tx, tz);
+      if (l < 0.05) { tx = 0; tz = -1; } else { tx /= l; tz /= l; }
+      const d = mowtD(x, z), edge = MOWT.W / 2 + 0.55;
+      if (Math.abs(Math.abs(d) - edge) < 2.2) {
+        const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z, rr = Math.hypot(x, z - zc) || 1, k = MOWT.R / rr;
+        if (Math.abs(d) < edge + 2.2) { x = x * k; z = zc + (z - zc) * k; }
+      }
+      return { x, z, y: 0, tx, tz };
+    }
     if (MAP === 'arena') {
       // the stadium: back on its wheels right where it is, pulled in off the wall, facing the hint
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
@@ -996,11 +1065,11 @@
   }
 
   function setMap(m) {
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' ? m : 'country';
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC,
+    setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,

@@ -86,9 +86,10 @@
   const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
-  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena';
+  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
+    : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : S.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -211,7 +212,8 @@
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
-    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : 'Car reset');
+    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : MOWTRACK ? 'Back on the track' : 'Car reset');
+    if (MOWTRACK) LAP.armed = false;                      // (a reset doesn't count as a lap)
     if (DRAGMAP) dragReset();
   }
   function applyVehicleSettings() {
@@ -250,11 +252,13 @@
     else if (MOWER) setTimeout(() => hud.hint('Racing mower: shift up (E) for DRIVE and floor it - blades out, racing number on. '
       + (CARDEF.cls === 'bp' ? 'A real garden tractor on turf tyres: turn in gently and let it slide. '
         : CARDEF.cls === 'fx' ? 'Tube chassis, 34 hp single, kart dirt tyres: it digs in on grass and dirt. '
-          : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass. ')
-      + 'Lawn mower races run on grass and dirt ovals.', 10), 1600);
+          : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
+      + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
+        : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : 'Its home is the Mower Track map (Esc → Drive → Map).'), 11), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
+    else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump straight ahead with a step-up (left) and a whoops lane (right) either side of it, the car crush and the tabletop halfway down the sides, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
@@ -319,13 +323,14 @@
         // (5th: the traction-control mode it starts on - 200 hp on kart slicks spins them at any real throttle)
         ['sc', 'Supercharged', '998 cc supercharged superbike four · ~200 hp · 6-speed + quickshifter · wheelie bar · 0-60 in ~2.4 s · ~132 mph', 'Plum Crazy', 2],
       ] },
-    { id: 'mower', name: 'RACING MOWERS', paint: 'Sublime',
+    { id: 'mower', name: 'RACING MOWERS', paint: 'Sublime', map: 'mowtrack',
       sub: 'B-Prepared garden tractor, FX single and a 150 mph land-speed record mower · blades out, deck on · turf, kart dirt and slick tyres',
       desc: 'Lawn mower racing, built to the US association\'s classes. The B-Prepared is a real garden tractor on its factory frame and body with the V-twin built inside to ~38 hp, the mower\'s own 5-speed transaxle re-geared, turf tyres and the deck still hung underneath - ~80 mph, sliding on turf tyres. The FX is a tube chassis under a tractor hood: a 459 cc single on pump gas, a centrifugal clutch and kart dirt tyres, ~88 mph. The record mower is built like the 150 mph land-speed holders: a superbike four, a quickshifter and racing slicks - 0-100 mph in ~6.3 s.',
       btn: 'RACING MOWER', tc: 3, optKey: 'mowerClass', options: [
         ['bp', 'B-Prepared', 'Garden tractor · built 810 cc V-twin · ~38 hp · 5-speed transaxle · turf tyres · 265 kg · ~80 mph', 'Sublime'],
         ['fx', 'FX single', 'Tube chassis · 459 cc single · ~34 hp · centrifugal clutch, 3-speed · kart dirt tyres · 205 kg · ~88 mph', 'B5 Blue'],
-        ['rec', 'Record mower', '999 cc superbike four · 189 hp · 6-speed + quickshifter · racing slicks · 0-100 mph in ~6.3 s · ~150 mph', 'TorRed', 2],
+        // (5th: its traction-control mode; 6th: its home map - a record run wants a long straight, and slicks hate dirt)
+        ['rec', 'Record mower', '999 cc superbike four · 189 hp · 6-speed + quickshifter · racing slicks · 0-100 mph in ~6.3 s · ~150 mph', 'TorRed', 2, 'straight'],
       ] },
     { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
@@ -347,11 +352,14 @@
     }
     // (an option can start on its own traction-control mode; switching away from it goes back to the vehicle's)
     if (m && o && (id !== S.car || S[m.optKey] !== opt)) S.tcMode = o[4] !== undefined ? o[4] : m.tc !== undefined ? m.tc : S.tcMode;
-    // (a car with a home map takes you there; the map you came from comes back when you leave it)
-    if (id !== S.car) {
+    // (a car with a home map takes you there; the map you came from comes back when you leave it. An option can have its
+    // own home - 6th entry - e.g. the record mower's is the Straightaway, not the mowers' dirt oval)
+    {
+      const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
       const from = MORE_CARS.find((x) => x.id === S.car);
-      if (m && m.map && S.map !== m.map) { S.mapPrev = S.map; S.map = m.map; }
-      else if (from && from.map && S.map === from.map && S.mapPrev) S.map = S.mapPrev;
+      const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
+      if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
+      else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
     if (m && opt) S[m.optKey] = opt;
@@ -521,14 +529,7 @@
           : CARDEF.cls === 'tag' ? 'Water-cooled 125 cc 2-stroke single, ~30 hp at 13,000, 19.5 Nm, 16,000 limiter · centrifugal clutch straight to the axle · rear brake only · 158 kg with the driver · slicks'
           : '390 cc 4-stroke single, ~13 hp, governed · centrifugal clutch · one rear disc · hard long-life tyres · 235 kg with the driver', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
-          seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
-            if (v !== CARDEF.cls) {
-              const m = MORE_CARS.find((x) => x.id === 'kart'), o = m.options.find((x) => x[0] === v);
-              if (o && o[3]) S.paint = o[3];
-              if (o) S.tcMode = o[4] !== undefined ? o[4] : m.tc;
-              S.kartClass = v; saveS(); location.reload();
-            }
-          })));
+          seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => { if (v !== CARDEF.cls) pickCar('kart', v); })));
         add(row('Driving a kart', 'No suspension, no differential: the tyres and the flexing frame do everything. Brake in a straight line (the rear-braked karts lock up easily), turn in smoothly and carry the speed - scrubbing the fronts or sliding the rear costs time. Slicks need a lap to warm up.', el('<span></span>')));
       }
       if (MOWER) {
@@ -536,14 +537,7 @@
           : CARDEF.cls === 'fx' ? '459 cc OHV single built on pump gas, ~34 hp at 7,400 · centrifugal clutch, 3-speed box, chain to a solid axle · go-kart dirt tyres · no suspension, pinned front axle · hydraulic brakes · 205 kg with the driver'
             : 'Garden tractor, stamped-steel frame · 810 cc OHV V-twin built inside, ~38 hp at 6,000 · the mower\'s 5-speed transaxle re-geared · foot clutch (worked for you) · turf tyres · no suspension · 265 kg with the driver', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
-          seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
-            if (v !== CARDEF.cls) {
-              const m = MORE_CARS.find((x) => x.id === 'mower'), o = m.options.find((x) => x[0] === v);
-              if (o && o[3]) S.paint = o[3];
-              if (o) S.tcMode = o[4] !== undefined ? o[4] : m.tc;
-              S.mowerClass = v; saveS(); location.reload();
-            }
-          })));
+          seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => { if (v !== CARDEF.cls) pickCar('mower', v); })));
         add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
       if (MONSTER) {
@@ -580,7 +574,7 @@
       }
       add(row('Paint', S.paint, sw));
       add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -1136,6 +1130,7 @@
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
     if (ARENAMAP) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
+    if (MOWTRACK && LAP.armed) chips.push({ html: 'LAP ' + (LAP.n + 1) + ' <b>' + (veh.time - LAP.t0).toFixed(1) + '</b>' + (S.mowBest && S.mowBest[TKEY] ? ' · best ' + S.mowBest[TKEY].toFixed(2) : '') });
     if (veh.flipping) chips.push({ html: 'FLIPPING OVER', cls: 'alert' });
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
     if (veh.escActive) chips.push({ html: 'ESC', cls: 'warn' });
@@ -1276,6 +1271,27 @@
     world.arena.setScreen({ title: CARDEF.car || CARDEF.short.toUpperCase(), big: Math.round(FS.score).toLocaleString(), color: text ? '#a6ff1c' : '#ffffff',
       sub: text ? text + '  +' + Math.round(pts).toLocaleString() : FS.last || 'FREESTYLE', foot: mph + '  ·  ' + (FS.pend ? 'IN THE AIR' : 'SCORE') });
   }
+  // ------------------------------------------------------------------ Mower Track lap timer
+  // A lap counts when the car crosses the start / finish line (z = 0 on the front straight) heading up the straight, having
+  // been round the far turn since the last time; the first crossing starts the clock. Best laps are kept per vehicle / class
+  const LAP = { armed: false, far: false, t0: 0, n: 0, last: 0, prevZ: null };
+  function lapUpdate() {
+    if (!MOWTRACK || !G.started) return;
+    const M = W.MOWT, z = veh.pz, onStraight = Math.abs(veh.px - M.R) < M.W / 2 + 1;
+    if (z < -M.SL - M.R * 0.6) LAP.far = true;
+    if (LAP.prevZ !== null && LAP.prevZ > 0 && z <= 0 && onStraight && veh.vz < 0) {
+      const now = veh.time;                                 // (physics time: the menu doesn't run the clock)
+      if (LAP.armed && LAP.far) {
+        const t = now - LAP.t0; LAP.n++; LAP.last = t;
+        S.mowBest = S.mowBest || {};
+        const best = S.mowBest[TKEY], pb = !best || t < best;
+        if (pb) { S.mowBest[TKEY] = t; saveS(); }
+        hud.toast(`Lap ${LAP.n}: ${t.toFixed(2)} s${pb ? (best ? ' · NEW BEST' : '') : ' · best ' + best.toFixed(2)}`, 3);
+      } else if (!LAP.armed) hud.toast('Lap timing on - go!', 1.6);
+      LAP.armed = true; LAP.far = false; LAP.t0 = now;
+    }
+    LAP.prevZ = z;
+  }
   function arenaUpdate(dt) {
     if (!ARENAMAP) return;
     const Wh = veh.wheels;
@@ -1381,6 +1397,7 @@
       processEvents();
       dragUpdate(dt);
       arenaUpdate(dt);
+      lapUpdate();
       flipHint(dt);
       effects(dt);
       rumble(dt);

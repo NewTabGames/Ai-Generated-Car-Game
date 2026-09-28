@@ -188,7 +188,7 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · dragsters…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="mowtrack">Map: Mower Track</button>
     </div>
     <button class="btn" id="startBtn">Start engine</button>
     <div id="loadbar"><i></i></div>
@@ -328,6 +328,35 @@
   // avenues every AV metres (lanes 3.6 m, edge lines at 7.2 m, avenue paving to 8.4 m), street lights down both sides,
   // and every block between them a different lot (painted by the terrain shader). Physics: asphalt everywhere.
   const TARMAC = { AV: 240, EDGE: 7.2, PAVE: 8.4, LAMP: 48, LAMP_OFF: 9.6, LAMP_REACH: 3.4, SPAWN_X: 1.8, SPAWN_Z: 40 };
+  // 'mowtrack' (Mower Track): a lawn mower race track - a mown field, dead flat, with a dirt oval of ~1/5 mile at the
+  // centre line: two 80 m straights along z joined by 28 m-radius turns, 12 m wide, run anticlockwise seen from above
+  // (left turns: the front straight is x = +R, heading -z). Straw bales line both edges and make the walls, with a gap in
+  // the outside of the front straight into the pits; the start / finish line crosses the front straight at z = 0,
+  // bleachers stand beyond it. Gentle country rises well back from the field. Physics: dirt on the track, grass off it
+  const MOWT = { SL: 40, R: 28, W: 12, BALE: 1.25, PIT: [18, 30], SPAWN_X: 28, SPAWN_Z: 12, STANDS: { x: 47, z0: -26, z1: 26, d: 9 } };
+  // signed distance from the track's centre line (- towards the infield)
+  function mowtD(x, z) { const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z; return Math.hypot(x, z - zc) - MOWT.R; }
+  // the bales: one every ~1.25 m round both edges, each with its heading along the edge
+  let mowtBaleList = null;
+  function mowtrackBales() {
+    if (mowtBaleList) return mowtBaleList;
+    const M = MOWT, list = [];
+    for (const off of [-M.W / 2 - 0.55, M.W / 2 + 0.55]) {
+      const r = M.R + off, Lp = 4 * M.SL + 2 * Math.PI * r, n = Math.round(Lp / M.BALE);
+      for (let k = 0; k < n; k++) {
+        let t = k * Lp / n, x, z, rot;
+        // front straight (x = r, z from +SL to -SL), top turn round (0, -SL), back straight, bottom turn round (0, +SL)
+        if (t < 2 * M.SL) { x = r; z = M.SL - t; rot = 0; }
+        else if ((t -= 2 * M.SL) < Math.PI * r) { const a = t / r; x = r * Math.cos(a); z = -M.SL - r * Math.sin(a); rot = a; }
+        else if ((t -= Math.PI * r) < 2 * M.SL) { x = -r; z = -M.SL + t; rot = Math.PI; }
+        else { t -= 2 * M.SL; const a = Math.PI + t / r; x = r * Math.cos(a); z = M.SL - r * Math.sin(a); rot = a; }
+        if (off > 0 && x > 0 && z > M.PIT[0] && z < M.PIT[1] && Math.abs(z) <= M.SL) continue;   // the pit gap
+        list.push({ x, z, rot });
+      }
+    }
+    mowtBaleList = list;
+    return list;
+  }
 
   // ---------------------------------------------------------------- road network
   // NS road i:  x = base + A1 sin(k1 z + p1) + A2 sin(k2 z + p2) + A3 sin(k3 z + p3)
@@ -373,7 +402,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -805,7 +834,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack') return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -821,6 +850,12 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'mowtrack') {
+      // dead flat round the field, rolling country well back from it
+      const d = Math.hypot(x, z * 0.8);
+      if (d < 200) return 0;
+      return smooth(200, 800, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 24 + nDet(x * 0.02, z * 0.02) * 1.2);
+    }
     if (STRAIGHT()) {
       // dead flat around the strip, gentle hills far off for scenery
       const d = Math.abs(x);
@@ -888,6 +923,7 @@
     const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
     out.h = h; out.nx = -dx * il; out.ny = il; out.nz = -dz * il;
     if (MAP === 'tarmac') { out.roadD = 0; out.surface = 0; return out; }   // All Road: it's all asphalt
+    if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     // surface
     const ri = roadInfo(x, z, _gri);
@@ -903,6 +939,7 @@
   // ---------------------------------------------------------------- vegetation / props
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
     if (STRAIGHT()) { const d = Math.abs(x) - (DRAGMAP() ? 25 : 0); return d < 40 ? 0 : 0.45 * smooth(40, 200, d) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3); }
     const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
     return smooth(0.02, 0.55, f);
@@ -923,6 +960,26 @@
       for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
+      return cp;
+    }
+    if (MAP === 'mowtrack') {
+      // the bales (their colliders overlap into a wall), the start arch's legs, the bleachers, and woods well back
+      for (const b of mowtrackBales()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) circles.push({ x: b.x, z: b.z, r: 0.6 });
+      for (const px of [MOWT.R - MOWT.W / 2 - 1.3, MOWT.R + MOWT.W / 2 + 1.3]) if (px >= x0 && px < x0 + CH && 0 >= z0 && 0 < z0 + CH) circles.push({ x: px, z: 0, r: 0.22 });
+      const ST = MOWT.STANDS, sx = ST.x + ST.d / 2, sz = (ST.z0 + ST.z1) / 2;
+      if (sx >= x0 && sx < x0 + CH && sz >= z0 && sz < z0 + CH) boxes.push({ x: sx, z: sz, hx: ST.d / 2, hz: (ST.z1 - ST.z0) / 2, c: 1, s: 0 });
+      const tr = [], cell = 8, nc = CH / cell | 0;
+      for (let a = 0; a < nc; a++) for (let b = 0; b < nc; b++) {
+        const gx = cx * nc + a, gz = cz * nc + b, r1 = hash01(gx, gz, 1);
+        const x = (a + 0.1 + 0.8 * hash01(gx, gz, 2)) * cell + x0, z = (b + 0.1 + 0.8 * hash01(gx, gz, 3)) * cell + z0;
+        if (r1 > forestDensity(x, z)) continue;
+        const kn = nKind(x * 0.004, z * 0.004), kind = kn > 0.25 ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1, sc = 0.75 + hash01(gx, gz, 6) * 0.65;
+        tr.push(x, terrainHeight(x, z), z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
+        circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
+      }
+      cp = { trees: new Float32Array(tr), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
+      propCache.set(key, cp);
+      if (propCache.size > 400) propCache.delete(propCache.keys().next().value);
       return cp;
     }
     if (MAP === 'tarmac') {
@@ -1191,6 +1248,18 @@
 
   /** Spawn / reset point on the nearest road near (x,z), facing heading closest to `hint` (tx,tz). */
   function nearestRoadSpot(x, z, hintX, hintZ) {
+    if (MAP === 'mowtrack') {
+      // back on its wheels where it is, facing the hint - pulled off the bales onto the middle of the track if it's near them
+      let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
+      const l = Math.hypot(tx, tz);
+      if (l < 0.05) { tx = 0; tz = -1; } else { tx /= l; tz /= l; }
+      const d = mowtD(x, z), edge = MOWT.W / 2 + 0.55;
+      if (Math.abs(Math.abs(d) - edge) < 2.2) {
+        const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z, rr = Math.hypot(x, z - zc) || 1, k = MOWT.R / rr;
+        if (Math.abs(d) < edge + 2.2) { x = x * k; z = zc + (z - zc) * k; }
+      }
+      return { x, z, y: 0, tx, tz };
+    }
     if (MAP === 'arena') {
       // the stadium: back on its wheels right where it is, pulled in off the wall, facing the hint
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
@@ -1228,11 +1297,11 @@
   }
 
   function setMap(m) {
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' ? m : 'country';
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC,
+    setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
@@ -8810,7 +8879,7 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
@@ -8863,7 +8932,27 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 3.5) {
+    if (uMap > 4.5) {
+      // ---- mower track: a mown field (the mower's passes leave light and dark stripes), a dirt oval worn darker along
+      // the racing line just inside its centre, looser lighter dirt up the outside, ragged grassy edges, and a chalk
+      // start / finish line across the front straight
+      float aaz = max(fwidth(P.y), 0.003);
+      float zc = clamp(P.y, -${W.MOWT.SL.toFixed(1)}, ${W.MOWT.SL.toFixed(1)});
+      float td = length(vec2(P.x, P.y - zc)) - ${W.MOWT.R.toFixed(1)};
+      float n1 = vnoise(P * 0.35), n2 = vnoise(P * 2.2), n3 = vnoise(P * 9.0);
+      float sf = fract(P.x / 10.0 + 0.25), stripe = smoothstep(0.47, 0.53, sf) * (1.0 - smoothstep(0.97, 1.0, sf)) + (1.0 - smoothstep(0.0, 0.03, sf));
+      vec3 g = mix(vec3(0.15, 0.26, 0.065), vec3(0.19, 0.31, 0.085), n1) * (0.9 + 0.1 * n2 + 0.08 * n3) * mix(0.92, 1.06, stripe);
+      vec3 d = mix(vec3(0.26, 0.155, 0.08), vec3(0.34, 0.21, 0.11), n1) * (0.85 + 0.12 * n2 + 0.06 * n3);
+      d *= 1.0 - 0.3 * exp(-pow((td + 1.8) / 2.2, 2.0));
+      d = mix(d, vec3(0.4, 0.27, 0.15) * (0.9 + 0.1 * n3), 0.35 * smoothstep(2.0, 5.0, td));
+      float edge = ${(W.MOWT.W / 2).toFixed(1)} + (vnoise(P * 1.3) - 0.5) * 0.9 + (n3 - 0.5) * 0.3;
+      float onTrack = 1.0 - smoothstep(edge - 0.25, edge + 0.25, abs(td));
+      vec3 c = mix(g, d, onTrack);
+      float line = (1.0 - smoothstep(0.18 - aaz, 0.18 + aaz, abs(P.y))) * step(0.0, P.x) * onTrack;
+      c = mix(c, vec3(0.88, 0.87, 0.82) * (0.8 + 0.2 * n3), line * step(0.25, n2 + 0.2));
+      col = c;
+      rough = 0.97;
+    } else if (uMap > 3.5) {
       // ---- monster truck arena: packed, watered clay (the jumps are meshed from the same ground and painted by this
       // too), wetter patches, tyre tracks wandering all over it and donut rings in the middle; concrete outside the wall
       float px = max(length(fwidth(P)), 1e-4);
@@ -9724,6 +9813,55 @@ void main(){
         },
         setBoard: drawBoard,
       };
+    }
+
+    // ---------------------------------------------------------------- mower track (built once): straw bales round both
+    // edges of the oval, the start / finish arch over the front straight, bleachers beyond it
+    if (W.map === 'mowtrack') {
+      const M = W.MOWT, mg = new THREE.Group(); scene.add(mg);
+      const strawC = document.createElement('canvas'); strawC.width = 128; strawC.height = 64;
+      { const g = strawC.getContext('2d'); g.fillStyle = '#c29a45'; g.fillRect(0, 0, 128, 64);
+        for (let i = 0; i < 420; i++) { g.strokeStyle = Math.random() < 0.5 ? 'rgba(236,205,120,0.7)' : 'rgba(120,88,34,0.5)'; g.lineWidth = 1; const x = Math.random() * 128, y = Math.random() * 64; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 6 + Math.random() * 14, y + (Math.random() - 0.5) * 3); g.stroke(); }
+        g.fillStyle = 'rgba(40,30,20,0.8)'; g.fillRect(34, 0, 3, 64); g.fillRect(90, 0, 3, 64); }
+      const strawT = new THREE.CanvasTexture(strawC); strawT.colorSpace = THREE.SRGBColorSpace;
+      const baleMat = new THREE.MeshStandardMaterial({ map: strawT, roughness: 0.95 });
+      const bales = W.mowtrackBales();
+      const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.18, 0.46, 0.48), baleMat, bales.length);
+      im.castShadow = true; im.receiveShadow = true;
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+      bales.forEach((b, i) => {
+        const j = W.hash01(i, 7, 91) - 0.5;
+        e.set(0, b.rot + Math.PI / 2 + j * 0.08, 0); q.setFromEuler(e); pv.set(b.x, 0.23, b.z); m4.compose(pv, q, one); im.setMatrixAt(i, m4);
+      });
+      mg.add(im);
+      // start / finish arch: two legs either side of the front straight and a checkered banner across
+      const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
+      const xa = M.R - M.W / 2 - 1.3, xb = M.R + M.W / 2 + 1.3;
+      for (const x of [xa, xb]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 4.4, 12), dark); leg.position.set(x, 2.2, 0); leg.castShadow = true; mg.add(leg); }
+      const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
+      { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
+        g.fillStyle = '#f4f4f0'; g.fillRect(0, 32, 1024, 32); g.fillStyle = '#111'; g.font = 'italic 900 30px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('START  ·  FINISH  ·  HELLCAT DRIVE MOWER TRACK', 512, 49); }
+      const banT = new THREE.CanvasTexture(banC); banT.colorSpace = THREE.SRGBColorSpace;
+      const banner = new THREE.Mesh(new THREE.BoxGeometry(xb - xa + 0.4, 0.8, 0.06), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 }), new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 })]);
+      banner.position.set((xa + xb) / 2, 4.0, 0); banner.castShadow = true; mg.add(banner);
+      // bleachers beyond the outside of the front straight, climbing away from the track, a crowd on every row
+      const ST = M.STANDS, concrete = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.95 });
+      const crowdC = document.createElement('canvas'); crowdC.width = 256; crowdC.height = 64;
+      { const g = crowdC.getContext('2d'); g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, 256, 64); const cols = ['#c33', '#36c', '#eee', '#222', '#eb3', '#3a3', '#a5c', '#f80'];
+        for (let i = 0; i < 520; i++) { g.fillStyle = cols[i % cols.length]; g.fillRect(Math.random() * 256, 10 + Math.random() * 50, 3, 6); } }
+      const crowdT = new THREE.CanvasTexture(crowdC); crowdT.colorSpace = THREE.SRGBColorSpace; crowdT.wrapS = THREE.RepeatWrapping; crowdT.repeat.set(6, 1);
+      const crowdM = new THREE.MeshStandardMaterial({ map: crowdT, roughness: 0.95 });
+      const len = ST.z1 - ST.z0, n = 5, dx = ST.d / n;
+      for (let k = 0; k < n; k++) {
+        const h = 0.45 * (k + 1), step = new THREE.Mesh(new THREE.BoxGeometry(dx, h, len), concrete);
+        step.position.set(ST.x + dx * (k + 0.5), h / 2, (ST.z0 + ST.z1) / 2); step.castShadow = true; step.receiveShadow = true; mg.add(step);
+        const people = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.55), crowdM);
+        people.rotation.y = -Math.PI / 2; people.position.set(ST.x + dx * (k + 0.5) - 0.05, h + 0.27, (ST.z0 + ST.z1) / 2); mg.add(people);
+      }
+      // a rail along the front of the stands
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ST.x - 0.2, 1.0, (ST.z0 + ST.z1) / 2); mg.add(rail);
+      for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ST.x - 0.2, 0.5, ST.z0 + k * len / 8); mg.add(post); }
     }
 
     // ---------------------------------------------------------------- monster truck arena (built once)
@@ -10640,9 +10778,10 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
-  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena';
+  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
+    : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : S.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -10765,7 +10904,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
-    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : 'Car reset');
+    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : MOWTRACK ? 'Back on the track' : 'Car reset');
+    if (MOWTRACK) LAP.armed = false;                      // (a reset doesn't count as a lap)
     if (DRAGMAP) dragReset();
   }
   function applyVehicleSettings() {
@@ -10804,11 +10944,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     else if (MOWER) setTimeout(() => hud.hint('Racing mower: shift up (E) for DRIVE and floor it - blades out, racing number on. '
       + (CARDEF.cls === 'bp' ? 'A real garden tractor on turf tyres: turn in gently and let it slide. '
         : CARDEF.cls === 'fx' ? 'Tube chassis, 34 hp single, kart dirt tyres: it digs in on grass and dirt. '
-          : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass. ')
-      + 'Lawn mower races run on grass and dirt ovals.', 10), 1600);
+          : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
+      + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
+        : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : 'Its home is the Mower Track map (Esc → Drive → Map).'), 11), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
+    else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump straight ahead with a step-up (left) and a whoops lane (right) either side of it, the car crush and the tabletop halfway down the sides, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
@@ -10873,13 +11015,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         // (5th: the traction-control mode it starts on - 200 hp on kart slicks spins them at any real throttle)
         ['sc', 'Supercharged', '998 cc supercharged superbike four · ~200 hp · 6-speed + quickshifter · wheelie bar · 0-60 in ~2.4 s · ~132 mph', 'Plum Crazy', 2],
       ] },
-    { id: 'mower', name: 'RACING MOWERS', paint: 'Sublime',
+    { id: 'mower', name: 'RACING MOWERS', paint: 'Sublime', map: 'mowtrack',
       sub: 'B-Prepared garden tractor, FX single and a 150 mph land-speed record mower · blades out, deck on · turf, kart dirt and slick tyres',
       desc: 'Lawn mower racing, built to the US association\'s classes. The B-Prepared is a real garden tractor on its factory frame and body with the V-twin built inside to ~38 hp, the mower\'s own 5-speed transaxle re-geared, turf tyres and the deck still hung underneath - ~80 mph, sliding on turf tyres. The FX is a tube chassis under a tractor hood: a 459 cc single on pump gas, a centrifugal clutch and kart dirt tyres, ~88 mph. The record mower is built like the 150 mph land-speed holders: a superbike four, a quickshifter and racing slicks - 0-100 mph in ~6.3 s.',
       btn: 'RACING MOWER', tc: 3, optKey: 'mowerClass', options: [
         ['bp', 'B-Prepared', 'Garden tractor · built 810 cc V-twin · ~38 hp · 5-speed transaxle · turf tyres · 265 kg · ~80 mph', 'Sublime'],
         ['fx', 'FX single', 'Tube chassis · 459 cc single · ~34 hp · centrifugal clutch, 3-speed · kart dirt tyres · 205 kg · ~88 mph', 'B5 Blue'],
-        ['rec', 'Record mower', '999 cc superbike four · 189 hp · 6-speed + quickshifter · racing slicks · 0-100 mph in ~6.3 s · ~150 mph', 'TorRed', 2],
+        // (5th: its traction-control mode; 6th: its home map - a record run wants a long straight, and slicks hate dirt)
+        ['rec', 'Record mower', '999 cc superbike four · 189 hp · 6-speed + quickshifter · racing slicks · 0-100 mph in ~6.3 s · ~150 mph', 'TorRed', 2, 'straight'],
       ] },
     { id: 'monster', name: 'MONSTER TRUCK', paint: 'Go Mango', map: 'arena',
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
@@ -10901,11 +11044,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     // (an option can start on its own traction-control mode; switching away from it goes back to the vehicle's)
     if (m && o && (id !== S.car || S[m.optKey] !== opt)) S.tcMode = o[4] !== undefined ? o[4] : m.tc !== undefined ? m.tc : S.tcMode;
-    // (a car with a home map takes you there; the map you came from comes back when you leave it)
-    if (id !== S.car) {
+    // (a car with a home map takes you there; the map you came from comes back when you leave it. An option can have its
+    // own home - 6th entry - e.g. the record mower's is the Straightaway, not the mowers' dirt oval)
+    {
+      const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
       const from = MORE_CARS.find((x) => x.id === S.car);
-      if (m && m.map && S.map !== m.map) { S.mapPrev = S.map; S.map = m.map; }
-      else if (from && from.map && S.map === from.map && S.mapPrev) S.map = S.mapPrev;
+      const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
+      if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
+      else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
     if (m && opt) S[m.optKey] = opt;
@@ -11075,14 +11221,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           : CARDEF.cls === 'tag' ? 'Water-cooled 125 cc 2-stroke single, ~30 hp at 13,000, 19.5 Nm, 16,000 limiter · centrifugal clutch straight to the axle · rear brake only · 158 kg with the driver · slicks'
           : '390 cc 4-stroke single, ~13 hp, governed · centrifugal clutch · one rear disc · hard long-life tyres · 235 kg with the driver', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
-          seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
-            if (v !== CARDEF.cls) {
-              const m = MORE_CARS.find((x) => x.id === 'kart'), o = m.options.find((x) => x[0] === v);
-              if (o && o[3]) S.paint = o[3];
-              if (o) S.tcMode = o[4] !== undefined ? o[4] : m.tc;
-              S.kartClass = v; saveS(); location.reload();
-            }
-          })));
+          seg(Object.entries(VEH.CARS.kart.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => { if (v !== CARDEF.cls) pickCar('kart', v); })));
         add(row('Driving a kart', 'No suspension, no differential: the tyres and the flexing frame do everything. Brake in a straight line (the rear-braked karts lock up easily), turn in smoothly and carry the speed - scrubbing the fronts or sliding the rear costs time. Slicks need a lap to warm up.', el('<span></span>')));
       }
       if (MOWER) {
@@ -11090,14 +11229,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           : CARDEF.cls === 'fx' ? '459 cc OHV single built on pump gas, ~34 hp at 7,400 · centrifugal clutch, 3-speed box, chain to a solid axle · go-kart dirt tyres · no suspension, pinned front axle · hydraulic brakes · 205 kg with the driver'
             : 'Garden tractor, stamped-steel frame · 810 cc OHV V-twin built inside, ~38 hp at 6,000 · the mower\'s 5-speed transaxle re-geared · foot clutch (worked for you) · turf tyres · no suspension · 265 kg with the driver', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
-          seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
-            if (v !== CARDEF.cls) {
-              const m = MORE_CARS.find((x) => x.id === 'mower'), o = m.options.find((x) => x[0] === v);
-              if (o && o[3]) S.paint = o[3];
-              if (o) S.tcMode = o[4] !== undefined ? o[4] : m.tc;
-              S.mowerClass = v; saveS(); location.reload();
-            }
-          })));
+          seg(Object.entries(VEH.CARS.mower.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => { if (v !== CARDEF.cls) pickCar('mower', v); })));
         add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
       if (MONSTER) {
@@ -11134,7 +11266,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       add(row('Paint', S.paint, sw));
       add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -11690,6 +11822,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
     if (ARENAMAP) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
+    if (MOWTRACK && LAP.armed) chips.push({ html: 'LAP ' + (LAP.n + 1) + ' <b>' + (veh.time - LAP.t0).toFixed(1) + '</b>' + (S.mowBest && S.mowBest[TKEY] ? ' · best ' + S.mowBest[TKEY].toFixed(2) : '') });
     if (veh.flipping) chips.push({ html: 'FLIPPING OVER', cls: 'alert' });
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
     if (veh.escActive) chips.push({ html: 'ESC', cls: 'warn' });
@@ -11830,6 +11963,27 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     world.arena.setScreen({ title: CARDEF.car || CARDEF.short.toUpperCase(), big: Math.round(FS.score).toLocaleString(), color: text ? '#a6ff1c' : '#ffffff',
       sub: text ? text + '  +' + Math.round(pts).toLocaleString() : FS.last || 'FREESTYLE', foot: mph + '  ·  ' + (FS.pend ? 'IN THE AIR' : 'SCORE') });
   }
+  // ------------------------------------------------------------------ Mower Track lap timer
+  // A lap counts when the car crosses the start / finish line (z = 0 on the front straight) heading up the straight, having
+  // been round the far turn since the last time; the first crossing starts the clock. Best laps are kept per vehicle / class
+  const LAP = { armed: false, far: false, t0: 0, n: 0, last: 0, prevZ: null };
+  function lapUpdate() {
+    if (!MOWTRACK || !G.started) return;
+    const M = W.MOWT, z = veh.pz, onStraight = Math.abs(veh.px - M.R) < M.W / 2 + 1;
+    if (z < -M.SL - M.R * 0.6) LAP.far = true;
+    if (LAP.prevZ !== null && LAP.prevZ > 0 && z <= 0 && onStraight && veh.vz < 0) {
+      const now = veh.time;                                 // (physics time: the menu doesn't run the clock)
+      if (LAP.armed && LAP.far) {
+        const t = now - LAP.t0; LAP.n++; LAP.last = t;
+        S.mowBest = S.mowBest || {};
+        const best = S.mowBest[TKEY], pb = !best || t < best;
+        if (pb) { S.mowBest[TKEY] = t; saveS(); }
+        hud.toast(`Lap ${LAP.n}: ${t.toFixed(2)} s${pb ? (best ? ' · NEW BEST' : '') : ' · best ' + best.toFixed(2)}`, 3);
+      } else if (!LAP.armed) hud.toast('Lap timing on - go!', 1.6);
+      LAP.armed = true; LAP.far = false; LAP.t0 = now;
+    }
+    LAP.prevZ = z;
+  }
   function arenaUpdate(dt) {
     if (!ARENAMAP) return;
     const Wh = veh.wheels;
@@ -11935,6 +12089,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       processEvents();
       dragUpdate(dt);
       arenaUpdate(dt);
+      lapUpdate();
       flipHint(dt);
       effects(dt);
       rumble(dt);
