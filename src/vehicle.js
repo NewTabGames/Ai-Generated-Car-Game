@@ -1254,8 +1254,10 @@
       this.nosActive = !!(inp.nos && s.nosHp > 0 && this.running && !this.fuelCut && thr > 0.6 && rpm > 1500 && this.gear !== 0 && !this.launchHold);
       if (this.nosActive) Te += s.nosHp * 745.7 / Math.max(this.eOmega, 260) * this.tcCut * this.escCut * shiftCut;
       this.Te = Te;
-      // supercharger boost (for gauge & whine)
-      const bTgt = s.boostMax * this.thrEff * Math.pow(clamp((rpm - 900) / 3600, 0, 1), 0.65) * (this.running ? 1 : 0);
+      // supercharger boost (for gauge & whine). A roots / screw blower moves a fixed volume per turn - near full boost
+      // from low revs; a centrifugal one (centrifugal: the supercharged kart's) builds it with the square of its speed
+      const bShape = s.centrifugal ? Math.pow(clamp(rpm / s.redlineRpm, 0, 1), 2) : Math.pow(clamp((rpm - 900) / 3600, 0, 1), 0.65);
+      const bTgt = s.boostMax * this.thrEff * bShape * (this.running ? 1 : 0);
       this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
       // overrun pops & crackles
       const dThr = this.lastThr - inp.throttle;
@@ -1302,7 +1304,9 @@
       let cap = e * e * (3 - 2 * e) * (curveAt(c.base, this.dcT) + c.kc * we * we);
       if (c.muSlip) cap *= 1 + c.muSlip * Math.tanh(Math.abs(slip) / c.slipRef);
       if (this.gear < 0) cap = Math.min(cap, c.rev || 400);          // backing up on the reverser: just a nudge
-      return cap * this.tcCut;
+      // (engineTc: traction control is the engine ECU's - it trims the torque and leaves the clutch alone. Backing the
+      // clutch off too bogged the supercharged kart down at 5,000 rpm, below the blower's boost)
+      return this.spec.engineTc ? cap : cap * this.tcCut;
     }
 
     _transLogic(h, wc) {
@@ -2054,7 +2058,33 @@
       dragClutch: { rpm0: 6000, rpm1: 9000, kc: 0.00003, rev: 10, base: [[0, 14]], muSlip: 0.25, slipRef: 220 },
       CdA: 0.45, bodyPts: kartPts(0.3, 0.42),
     } },
+    // Supercharged: a 998 cc supercharged superbike four (H2-type: a centrifugal blower spun ~9x crank, up to ~2.4 bar
+    // absolute) behind the seat of a stretched sprint chassis, the bike's 6-speed dog box on a quickshifter, a chain to
+    // the axle, big brakes all round. ~200 hp without the bike's ram air, 245 kg with the driver: it's traction-limited
+    // in the first three gears. Geared for ~135 mph (14,000 rpm in top)
+    sc: { name: 'Supercharged Kart', short: 'Supercharged', car: 'H2 998', hp: 200, tq: 100, spec: {
+      mass: 245, Ipitch: 52, Iyaw: 64, Iroll: 16, cgHeight: 0.3, wheelbase: 1.25, frontWeight: 0.42,
+      trackF: 1.18, trackR: 1.42, wheelRadius: 0.14, wheelRadiusF: 0.127, wheelRadiusR: 0.14, wheelInertiaF: 0.022, wheelInertiaR: 0.055,
+      frontTire: 'kartF', rearTire: 'kartR', brakeTorqueF: 170, brakeTorqueR: 230,
+      idleRpm: 1200, limiterRpm: 14000, redlineRpm: 13600, shiftRpm: 13400, engineInertia: 0.03, fricA: 3, fricB: 1.6, starterTorque: 25,
+      // (lb-ft: 100 lb-ft / 136 Nm at 10,500, ~200 hp from 10,500 to 12,500 - the blower keeps it pulling to the limiter)
+      torqueCurve: [[0, 30], [2000, 40], [4000, 52], [6000, 70], [8000, 87], [9500, 97], [10500, 100], [11500, 92], [12500, 82],
+        [13500, 72], [14500, 60], [15500, 40]],
+      boostMax: 20, centrifugal: true, engineTc: true, thrExp: 1.3,
+      // (the bike's gearbox and 1.551 primary, then a 1.61 chain: 2.5 overall before the box)
+      autoRatios: [3.188, 2.526, 2.045, 1.727, 1.524, 1.36], autoRev: 3.188, autoFinal: 2.5, shiftTimeWOT: 0.05, shiftTimePart: 0.09, shiftCutDepth: 0.4,
+      launchRpm: 7000,
+      // (the bike's wet clutch, worked by an automatic clutch: it bites from 3,500 and holds 136 Nm from ~6,000)
+      dragClutch: { rpm0: 3500, rpm1: 6500, kc: 0.00025, rev: 30, base: [[0, 60]], muSlip: 0.25, slipRef: 220 },
+      // (the engine sits low, tight behind the seat on a superkart-length 1.25 m wheelbase, and the driver well forward:
+      // 42 % on the front. Even so 200 hp pulls ~1.5 g, close to where the front lifts, so like the drag karts it has
+      // a short wheelie bar with two small wheels behind the axle to catch it)
+      wheelieBar: { len: 0.72, clr: 0.065, halfW: 0.24, r: 0.03, k: 150000, damp: 3500, Fmax: 6000 },
+      CdA: 0.5, bodyRear: 1.02,
+    } },
   };
+  // (the supercharged kart's longer frame and the engine hanging out behind the seat)
+  CARS.kart.classes.sc.spec.bodyPts = kartPts(0.3, 0.42).concat([[-0.32, 0.22 - 0.3, 1.02 - 0.08], [0.32, 0.22 - 0.3, 1.02 - 0.08], [0, 0.66 - 0.3, 0.62 - 0.08]]);
   CARS.kart.make = function (key) {
     const k = key in CARS.kart.classes ? key : 'tag', c = CARS.kart.classes[k];
     return { name: c.name, short: c.short, cls: k, car: c.car, hp: c.hp, tq: c.tq,

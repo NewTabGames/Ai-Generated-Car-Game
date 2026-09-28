@@ -2,8 +2,10 @@
    Rental: a steel frame inside a full wraparound rubber bumper, a boxy 4-stroke single (fuel tank on top, pull
    starter), a big plastic seat. TaG 125: a race chassis with nose cone, front fairing and number panel, sidepods and rear
    bumper, a water-cooled 125 cc 2-stroke beside the seat with its expansion chamber curling back, radiator on the left.
-   KZ shifter: the same with a bigger engine and gearbox, a gear lever by the wheel and front brakes. 5 in wheels,
-   solid rear axle with the sprocket, chain and brake disc, the driver sitting up in the seat.
+   KZ shifter: the same with a bigger engine and gearbox, a gear lever by the wheel and front brakes. Supercharged: a
+   stretched chassis with a 998 cc supercharged superbike four sitting low behind the seat - the polished blower
+   volute and its pod filter on the left, a 4-into-1 up to a silencer on the right, a big radiator, a wheelie bar.
+   5 in wheels, solid rear axle with the sprocket, chain and brake disc, the driver sitting up in the seat.
    Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
    Returns the same interface as HCCarModel.build. */
 (function (root) {
@@ -12,15 +14,16 @@
 
   function build(THREE, opts) {
     opts = opts || {};
-    const CLS = opts.cls === 'rental' ? 'rental' : opts.cls === 'kz' ? 'kz' : 'tag';
-    const RENT = CLS === 'rental', KZ = CLS === 'kz';
+    const CLS = opts.cls === 'rental' ? 'rental' : opts.cls === 'kz' ? 'kz' : opts.cls === 'sc' ? 'sc' : 'tag';
+    const RENT = CLS === 'rental', KZ = CLS === 'kz', SC = CLS === 'sc';
+    const DZ = SC ? -0.05 : 0;                       // (the supercharged kart's seat and driver sit a little further forward)
     const cgH = opts.cgHeight || 0.3, zOff = opts.zOff || 0;
     const cgToFront = opts.cgToFront || 0.6, cgToRear = opts.cgToRear || 0.44;
     const L = cgToFront + cgToRear, zF = -L / 2, zR = L / 2;
     const RR = 0.14, RF = 0.127, WR = 0.18, WF = 0.115;
     const trackF = opts.trackF || 1.12, trackR = opts.trackR || 1.38;
     const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || { 'B5 Blue': 0x1e6fc4 };
-    const NUM = RENT ? '42' : KZ ? '1' : '23';
+    const NUM = RENT ? '42' : KZ ? '1' : SC ? '9' : '23';
     const rootG = new THREE.Group(); rootG.name = 'kart';
     const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -66,7 +69,9 @@
     // ---------------------------------------------------------------- materials
     const M = {};
     M.paint = new THREE.MeshPhysicalMaterial({ color: PAINTS[opts.paint] || 0x1e6fc4, metalness: 0.05, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.1 });
-    M.frame = new THREE.MeshStandardMaterial({ color: RENT ? 0xf2c200 : KZ ? 0x303236 : 0xd9dbde, roughness: RENT ? 0.45 : 0.18, metalness: RENT ? 0.2 : 0.9 });
+    M.frame = new THREE.MeshStandardMaterial({ color: RENT ? 0xf2c200 : KZ ? 0x303236 : SC ? 0x1b1c1f : 0xd9dbde, roughness: RENT ? 0.45 : SC ? 0.25 : 0.18, metalness: RENT ? 0.2 : 0.9 });
+    M.polish = new THREE.MeshStandardMaterial({ color: 0xe4e6ea, roughness: 0.12, metalness: 1 });
+    M.carbon = new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.3, metalness: 0.4 });
     M.black = new THREE.MeshStandardMaterial({ color: 0x141415, roughness: 0.6, metalness: 0.1 });
     M.plastic = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55, metalness: 0.05 });
     M.rubber = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
@@ -93,7 +98,7 @@
     // ---------------------------------------------------------------- chassis (30 mm tube)
     const chassis = new THREE.Group(); model.add(chassis);
     const T = (a, b, r) => tubeAB(chassis, a, b, r || 0.015, M.frame, 10);
-    const y0 = 0.05, zNose = -0.98, zTail = zR + 0.22;
+    const y0 = 0.05, zNose = -0.98, zTail = zR + (SC ? 0.42 : 0.22);
     for (const sx of [-1, 1]) {
       // main rails: narrow at the front axle, out round the seat, back to the rear axle bearings
       T(V3(sx * 0.2, y0, zNose + 0.12), V3(sx * 0.27, y0, zF - 0.02)); T(V3(sx * 0.27, y0, zF - 0.02), V3(sx * 0.33, y0, -0.1));
@@ -103,7 +108,7 @@
       T(V3(sx * 0.33, y0, -0.35), V3(sx * 0.62, y0 + 0.03, -0.3)); T(V3(sx * 0.62, y0 + 0.03, -0.3), V3(sx * 0.62, y0 + 0.03, 0.25));
       T(V3(sx * 0.62, y0 + 0.03, 0.25), V3(sx * 0.36, y0, 0.3));
       // seat stays up to the seat's upper edge
-      T(V3(sx * 0.33, y0, 0.3), V3(sx * 0.16, 0.36, 0.38), 0.011);
+      T(V3(sx * 0.33, y0, 0.3 + DZ), V3(sx * 0.16, 0.36, 0.38 + DZ), 0.011);
     }
     for (const z of [zNose + 0.12, zF - 0.02, -0.1, zR - 0.02]) { const hw = z < zF ? 0.2 : z < -0.05 ? 0.3 : 0.35; T(V3(-hw, y0, z), V3(hw, y0, z), 0.013); }
     // floor tray under the driver's legs
@@ -146,12 +151,12 @@
         add(body, rbox(0.2, 0.02, 0.6, 0.01), M.plastic, sx * 0.56, 0.215, -0.03);
       }
       // rear bumper: a moulded plastic bar across the back
-      add(body, rbox(1.46, 0.16, 0.12, 0.05), M.plastic, 0, 0.15, zTail + 0.08);
-      for (const sx of [-1, 1]) T(V3(sx * 0.28, y0 + 0.02, zTail - 0.05), V3(sx * 0.5, 0.13, zTail + 0.06), 0.013);
+      add(body, rbox(1.46, 0.16, 0.12, 0.05), M.plastic, 0, SC ? 0.21 : 0.15, zTail + 0.08);
+      for (const sx of [-1, 1]) T(V3(sx * 0.28, y0 + 0.02, zTail - 0.05), V3(sx * 0.5, SC ? 0.19 : 0.13, zTail + 0.06), 0.013);
       // race seat: a narrow fiberglass shell
-      add(body, rbox(0.36, 0.06, 0.34, 0.03), M.black, -0.03, 0.08, 0.18);
-      add(body, rbox(0.38, 0.46, 0.06, 0.03), M.black, -0.03, 0.32, 0.4, -0.35, 0, 0);
-      for (const sx of [-1, 1]) add(body, rbox(0.04, 0.2, 0.36, 0.02), M.black, sx * 0.19 - 0.03, 0.16, 0.2);
+      add(body, rbox(0.36, 0.06, 0.34, 0.03), M.black, -0.03, 0.08, 0.18 + DZ);
+      add(body, rbox(0.38, 0.46, 0.06, 0.03), M.black, -0.03, 0.32, 0.4 + DZ, -0.35, 0, 0);
+      for (const sx of [-1, 1]) add(body, rbox(0.04, 0.2, 0.36, 0.02), M.black, sx * 0.19 - 0.03, 0.16, 0.2 + DZ);
       // fuel tank between the legs
       add(body, rbox(0.16, 0.12, 0.2, 0.05), M.tank, 0, 0.11, -0.38, 0, 0, 0, false);
     }
@@ -169,6 +174,46 @@
       const st = add(eng, cylX(0.1, 0.1, 0.04, 24), M.black, ex + 0.16, 0.26, ez); st.castShadow = true;
       add(eng, rbox(0.12, 0.12, 0.26, 0.04), M.cast, ex + 0.08, 0.2, ez + 0.28);
       const mf = V3(ex + 0.08, 0.2, ez + 0.42); tips.push(toRoot(mf));
+    } else if (SC) {
+      // 998 cc supercharged four, crank across the kart, low behind the seat: crankcase and gearbox, the block and head
+      // leaning forward towards the seat back, coil packs and the intake chamber on top. Behind the block the blower:
+      // a polished volute (the impeller spins ~9x crank) fed through a pod filter on the left, its outlet up into the
+      // chamber. 4 headers out of the block's front, down and round to a collector and a silencer on the right
+      const ez2 = zR + 0.1;
+      add(eng, rbox(0.52, 0.2, 0.4, 0.04), M.cast, 0, 0.29, ez2);
+      add(eng, rbox(0.3, 0.12, 0.2, 0.03), M.cast, -0.06, 0.24, ez2 + 0.24);
+      add(eng, rbox(0.46, 0.2, 0.2, 0.03), M.alu, 0, 0.47, ez2 - 0.1, -0.3, 0, 0);
+      add(eng, rbox(0.48, 0.09, 0.22, 0.03), M.black, 0, 0.6, ez2 - 0.14, -0.3, 0, 0);
+      for (let k = 0; k < 4; k++) add(eng, new THREE.CylinderGeometry(0.018, 0.018, 0.04, 10), M.red, -0.18 + k * 0.12, 0.655, ez2 - 0.16, -0.3, 0, 0);
+      add(eng, rbox(0.4, 0.08, 0.16, 0.03), M.polish, 0.02, 0.7, ez2 - 0.05, -0.3, 0, 0);
+      // blower
+      const vol = new THREE.TorusGeometry(0.085, 0.042, 14, 32); vol.rotateY(Math.PI / 2);
+      add(eng, vol, M.polish, -0.13, 0.46, ez2 + 0.16);
+      add(eng, cylX(0.07, 0.07, 0.09, 24), M.polish, -0.13, 0.46, ez2 + 0.16);
+      add(eng, cylX(0.11, 0.07, 0.1, 24, true), M.polish, -0.23, 0.46, ez2 + 0.16);
+      add(eng, cylX(0.095, 0.095, 0.13, 20), M.black, -0.34, 0.46, ez2 + 0.16);
+      add(eng, cylX(0.1, 0.1, 0.02, 20), M.red, -0.41, 0.46, ez2 + 0.16);
+      tubeAB(eng, V3(-0.13, 0.54, ez2 + 0.14), V3(-0.08, 0.66, ez2 + 0.02), 0.042, M.polish, 16);
+      tubeAB(eng, V3(-0.08, 0.66, ez2 + 0.02), V3(0.0, 0.7, ez2 - 0.03), 0.042, M.polish, 16);
+      // exhaust: four primaries, a collector, the silencer up and out the back on the right
+      for (let k = 0; k < 4; k++) {
+        const x = -0.18 + k * 0.12;
+        pipe(eng, [V3(x, 0.44, ez2 - 0.2), V3(x * 0.9, 0.32, ez2 - 0.25), V3(x * 0.45 + 0.17, 0.22, ez2 - 0.2), V3(0.34, 0.22, ez2 - 0.02)], 0.019, M.pipe);
+      }
+      const c0 = V3(0.34, 0.22, ez2 - 0.02), c1 = V3(0.37, 0.25, ez2 + 0.12), sil1 = V3(0.34, 0.36, zTail + 0.06);
+      tubeAB(eng, c0, c1, 0.035, M.pipe, 14);
+      tubeAB(eng, c1, sil1, 0.052, M.carbon, 18);
+      add(eng, new THREE.CylinderGeometry(0.03, 0.03, 0.03, 14, 1, true), M.polish, sil1.x, sil1.y, sil1.z).quaternion.setFromUnitVectors(V3(0, 1, 0), sil1.clone().sub(c1).normalize());
+      tips.push(toRoot(sil1.clone().add(sil1.clone().sub(c1).normalize().multiplyScalar(0.03))));
+      // radiator in the left sidepod's airflow, hoses across; the wheelie bar behind the axle
+      add(eng, rbox(0.05, 0.3, 0.42, 0.012), M.rad, -0.44, 0.3, 0.12);
+      tubeAB(eng, V3(-0.42, 0.24, 0.3), V3(-0.2, 0.3, ez2 - 0.1), 0.014, M.black);
+      tubeAB(eng, V3(-0.42, 0.4, 0.3), V3(-0.12, 0.5, ez2 - 0.16), 0.014, M.black);
+      for (const sx of [-1, 1]) {
+        tubeAB(chassis, V3(sx * 0.2, 0.16, zR + 0.04), V3(sx * 0.24, 0.075, zR + 0.7), 0.012, M.frame, 8);
+        add(chassis, cylX(0.03, 0.03, 0.025, 16), M.rubber, sx * 0.24 + sx * 0.02, 0.065, zR + 0.72);
+      }
+      tubeAB(chassis, V3(-0.24, 0.075, zR + 0.7), V3(0.24, 0.075, zR + 0.7), 0.012, M.frame, 8);
     } else {
       // 2-stroke single: crankcase (and the 6-speed box for the KZ), finned-looking head, carb + airbox, water pump
       add(eng, rbox(KZ ? 0.24 : 0.2, 0.18, KZ ? 0.3 : 0.22, 0.03), M.cast, ex, 0.17, ez);
@@ -190,15 +235,16 @@
       add(eng, rbox(0.04, 0.28, KZ ? 0.34 : 0.28, 0.01), M.rad, -0.4, 0.28, 0.08);
       tubeAB(eng, V3(-0.38, 0.22, 0.2), V3(ex - 0.08, 0.2, ez + 0.02), 0.012, M.black);
     }
-    // chain from the engine sprocket back to the axle sprocket
-    const csy = RENT ? 0.2 : 0.16;
-    tubeAB(eng, V3(0.26, csy + 0.03, ez + 0.02), V3(0.26, RR + 0.072, zR), 0.006, M.black, 6);
-    tubeAB(eng, V3(0.26, csy - 0.03, ez + 0.02), V3(0.26, RR - 0.072, zR), 0.006, M.black, 6);
-    add(eng, cylX(0.03, 0.03, 0.012, 16), M.cast, 0.26, csy, ez + 0.02);
+    // chain from the engine sprocket back to the axle sprocket (the supercharged four's gearbox sprocket sits behind and
+    // above the axle)
+    const csy = RENT ? 0.2 : SC ? 0.3 : 0.16, csz = SC ? zR + 0.3 : ez + 0.02;
+    tubeAB(eng, V3(0.26, csy + 0.03, csz), V3(0.26, RR + 0.072, zR), 0.006, M.black, 6);
+    tubeAB(eng, V3(0.26, csy - 0.03, csz), V3(0.26, RR - 0.072, zR), 0.006, M.black, 6);
+    add(eng, cylX(0.03, 0.03, 0.012, 16), M.cast, 0.26, csy, csz);
 
     // ---------------------------------------------------------------- driver
     const driver = new THREE.Group(); model.add(driver);
-    const sY = 0.12, sZ = 0.26;
+    const sY = 0.12, sZ = 0.26 + DZ;
     add(driver, rbox(0.36, 0.48, 0.24, 0.1), M.suit, -0.03, sY + 0.3, sZ + 0.02, -0.3, 0, 0);
     for (const sx of [-1, 1]) {
       tubeAB(driver, V3(sx * 0.16 - 0.03, sY + 0.46, sZ - 0.02), V3(sx * 0.14, sY + 0.34, sZ - 0.38), 0.042, M.suit);
@@ -276,7 +322,7 @@
         // spindle and kingpin (steers, doesn't spin), a brake disc on the KZ
         add(flip, cylX(0.012, 0.012, 0.12, 8), M.chrome, -0.07, 0, 0);
         add(flip, new THREE.CylinderGeometry(0.014, 0.014, 0.11, 8), M.frame, -0.13, 0.01, 0);
-        if (KZ) { add(flip, cylX(0.075, 0.075, 0.005, 24), M.cast, -0.06, 0, 0); add(flip, rbox(0.03, 0.05, 0.06, 0.008), M.red, -0.06, 0.06, 0); }
+        if (KZ || SC) { add(flip, cylX(0.075, 0.075, 0.005, 24), M.cast, -0.06, 0, 0); add(flip, rbox(0.03, 0.05, 0.06, 0.008), M.red, -0.06, 0.06, 0); }
       } else rim(spin, WR);
       wheels.push({ corner, flip, spin, left, front: frontW, side, stock, knob });
     }
@@ -300,7 +346,7 @@
       g.font = 'bold 44px Arial'; g.fillStyle = '#8fb2c6'; g.fillText('RPM', 400, 96);
       g.fillStyle = '#ffffff'; g.font = 'bold 80px Arial'; g.textAlign = 'right'; g.fillText(t.gear.replace(/^[DM]/, '') || 'D', 500, 150);
       g.textAlign = 'left'; g.font = 'bold 50px Arial'; g.fillStyle = '#e8f0f4'; g.fillText(Math.round(t.speedMph) + ' MPH', 16, 212);
-      g.fillStyle = '#8fb2c6'; g.font = '30px Arial'; g.fillText(Math.round(t.water) + '°F', 320, 212);
+      g.fillStyle = '#8fb2c6'; g.font = '30px Arial'; g.fillText(SC ? Math.max(0, t.boost || 0).toFixed(0) + ' PSI' : Math.round(t.water) + '°F', 320, 212);
       clusterTex.needsUpdate = true;
     }
     function drawScreen() {}
