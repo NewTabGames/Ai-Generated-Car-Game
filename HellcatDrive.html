@@ -9347,6 +9347,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
           cy = q ? (pos[t[3] * 3 + 1] + pos[t[4] * 3 + 1]) / 2 : (pos[t[0] * 3 + 1] + pos[t[1] * 3 + 1] + pos[t[2] * 3 + 1]) / 3,
           cz = q ? (pos[t[3] * 3 + 2] + pos[t[4] * 3 + 2]) / 2 : (pos[t[0] * 3 + 2] + pos[t[1] * 3 + 2] + pos[t[2] * 3 + 2]) / 3;
         const m = o.mat ? o.mat(cx, cy, cz, q ? t[5] : -1, q ? t[6] : -1) : 0;
+        if (m < 0) continue;
         (buckets[m] || (buckets[m] = [])).push(t[0], t[2], t[1]);
       }
       const g = new THREE.BufferGeometry();
@@ -9437,7 +9438,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const DEF_PAINT = { couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0x1f4fd1, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
-    M.paint = CAR === 'couch' ? new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.62, metalness: 0.02 })
+    M.paint = CAR === 'bluebird' ? new THREE.MeshPhysicalMaterial({ color: paintHex, roughness: 0.4, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.25, envMapIntensity: 0.6 })
+      : CAR === 'couch' ? new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.62, metalness: 0.02 })
       : CAR === 'banana' ? new THREE.MeshPhysicalMaterial({ color: paintHex, roughness: 0.42, metalness: 0, clearcoat: 0.5, clearcoatRoughness: 0.3, flatShading: true })
         : CAR === 'potty' ? new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.55, metalness: 0 })
           : CAR === 'razor' ? new THREE.MeshStandardMaterial({ color: 0x000000, emissive: paintHex, emissiveIntensity: 2.4, toneMapped: false })
@@ -9706,7 +9708,20 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       wheelStyle = { rim: 'disc', rimR: 0.3, tread: 'slick' };
       const S = [[-4.35, 0.2, 0.44, 0.84], [-4.22, 0.36, 0.33, 0.96], [-3.95, 0.47, 0.27, 1.05], [-3.4, 0.53, 0.25, 1.1], [-2.4, 0.56, 0.24, 1.13], [-1.2, 0.58, 0.25, 1.16],
         [0.0, 0.6, 0.26, 1.18], [0.8, 0.6, 0.27, 1.17], [1.6, 0.58, 0.28, 1.14], [2.5, 0.53, 0.3, 1.08], [3.3, 0.43, 0.34, 1.0], [3.95, 0.3, 0.4, 0.93], [4.38, 0.1, 0.5, 0.86]];
-      add(body, loft(S.map(([z, w, yb, yt]) => ({ z, w, yb, yt, n: 2.6, tw: 0.82 })), { seg: 40 }), M.paint, 0, 0, 0);
+      // (the body's surface: its section at z, a point on it at ring position k, its half-width at height y)
+      const bbAt = (z) => { let i = 1; while (i < S.length - 1 && S[i][0] < z) i++; const a = S[i - 1], b = S[i], t = clamp((z - a[0]) / (b[0] - a[0]), 0, 1); return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t]; };
+      const ringPt = (z, k) => {
+        const [w, yb, yt] = bbAt(z), a = -Math.PI / 2 + k / 40 * 2 * Math.PI, c = Math.cos(a), sn = Math.sin(a), e = 2 / 2.6;
+        const sx = Math.sign(c) * Math.pow(Math.abs(c), e), sy = Math.sign(sn) * Math.pow(Math.abs(sn), e);
+        return V3(w * (sy > 0 ? 1 - 0.18 * sy : 1) * sx, (yb + yt) / 2 + (yt - yb) / 2 * sy, z);
+      };
+      const bbX = (z, y) => { const [w, yb, yt] = bbAt(z), yc = (yb + yt) / 2, hh = (yt - yb) / 2, sy = clamp((y - yc) / hh, -0.999, 0.999), sn = Math.pow(Math.abs(sy), 1.3);
+        return w * (sy > 0 ? 1 - 0.18 * sy : 1) * Math.pow(Math.sqrt(1 - sn * sn), 2 / 2.6); };
+      // (on the body at (z, y), a small part facing out along the surface: its position and outward normal)
+      const onSkin = (sx, z, y) => { const x = bbX(z, y), dxdy = (bbX(z, y + 0.01) - bbX(z, y - 0.01)) / 0.02, nn = V3(sx, -dxdy, 0).normalize(); return { p: V3(sx * x, y, z), n: nn }; };
+      // the cockpit is a real opening in the skin (ring bands 17-22 between the stations at 0.8 and 1.6 m)
+      const CK0 = 0.8, CK1 = 1.6;
+      add(body, loft(S.map(([z, w, yb, yt]) => ({ z, w, yb, yt, n: 2.6, tw: 0.82 })), { seg: 40, mat: (x, y, z, k) => (k >= 17 && k <= 22 && z > CK0 && z < CK1 ? -1 : 0) }), M.paint, 0, 0, 0);
       // wheel fairings flowing into the flanks: behind the front wheels, ahead of the rears
       for (const sx of [-1, 1]) {
         const xw = sx * trackF / 2, xb = sx * 0.5;
@@ -9723,27 +9738,64 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         };
         spat(zF, xw, 0.16, RF);
         spat(zR, sx * (trackR / 2 - 0.1), 0.22, RR);
-        // the side's ports and chrome strip
-        for (let k = 0; k < 4; k++) add(body, cylX(0.028, 0.028, 0.02, 14), M.black, sx * 0.575, 1.0, -1.1 + k * 0.13);
-        add(body, new THREE.BoxGeometry(0.012, 0.02, 1.6), M.chrome, sx * 0.605, 0.72, 0.2);
-        add(body, new THREE.SphereGeometry(0.05, 14, 10), M.paint, sx * 0.6, 0.72, 1.1);
-        // exhaust stubs along the top of the engine bay
-        for (let k = 0; k < 6; k++) { const z = -2.9 + k * 0.26; add(body, cylX(0.025, 0.025, 0.08, 10), M.steel, sx * 0.54, 1.02, z); P.tips.push(toRoot(V3(sx * 0.6, 1.02, z))); }
+        // the four small ports high on each flank, flush with the skin, and the chrome strip lower down
+        for (let k = 0; k < 4; k++) {
+          const q = onSkin(sx, 0.05 + k * 0.12, 0.98), d = add(body, new THREE.CircleGeometry(0.026, 16), M.black, q.p.x + q.n.x * 0.002, q.p.y + q.n.y * 0.002, q.p.z, 0, 0, 0, false);
+          d.quaternion.setFromUnitVectors(V3(0, 0, 1), q.n);
+        }
+        add(body, new THREE.BoxGeometry(0.012, 0.02, 1.6), M.chrome, sx * (bbX(0.2, 0.72) + 0.004), 0.72, 0.2);
+        // the V12's exhaust stubs: a row of short pipes out of each side of the bonnet, raked back
+        for (let k = 0; k < 6; k++) {
+          const z = -3.0 + k * 0.24, q = onSkin(sx, z, 0.9), dir = q.n.clone().add(V3(0, 0.15, 0.55)).normalize();
+          const a = q.p.clone().addScaledVector(q.n, -0.02), b = q.p.clone().addScaledVector(dir, 0.07);
+          tubeAB(body, a, b, 0.022, M.steel, 10);
+          P.tips.push(toRoot(b));
+        }
       }
       // the nose intake
       add(body, new THREE.CircleGeometry(0.22, 28), M.black, 0, 0.66, -4.33, 0, Math.PI, 0, false).scale.set(0.9, 1.25, 1);
       // tail fin
       const fin = profile([[3.0, 1.05], [3.4, 1.35], [4.15, 1.85], [4.4, 1.85], [4.42, 0.9], [3.0, 1.0]], 0.06, 0.02);
       add(body, fin, M.paint, 0, 0, 0);
-      // cockpit well, the little screen, the driver's head and shoulders above the rim
-      add(body, rbox(0.56, 0.03, 0.84, 0.2), M.black, 0, 1.175, 1.15);
-      const rim = add(body, new THREE.TorusGeometry(0.3, 0.035, 10, 32), new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.7 }), 0, 1.19, 1.15, Math.PI / 2, 0, 0); rim.scale.set(1, 1.45, 1);
-      const ws = add(body, new THREE.PlaneGeometry(0.46, 0.2), M.glass, 0, 1.28, 0.62, -0.6, 0, 0, false); ws.castShadow = false;
-      add(body, new THREE.BoxGeometry(0.48, 0.02, 0.02), M.chrome, 0, 1.19, 0.66);
-      add(body, loft([{ z: 1.5, w: 0.05, yb: 1.12, yt: 1.2 }, { z: 1.62, w: 0.15, yb: 1.1, yt: 1.36 }, { z: 1.9, w: 0.15, yb: 1.08, yt: 1.34 }, { z: 2.6, w: 0.08, yb: 1.04, yt: 1.12 }, { z: 3.0, w: 0.02, yb: 1.0, yt: 1.02 }].map((q) => Object.assign(q, { n: 2.2 })), { seg: 24 }), M.paint, 0, 0, 0);   // headrest fairing
-      SW = steering(V3(0, 1.05, 0.82), 0.25, 0.2, 'wood');
-      cluster = { parent: body, pos: V3(0, 1.1, 0.7), rot: -0.3, w: 0.16, h: 0.08 };
-      driver = person({ hip: V3(0, 0.6, 1.3), lean: 0.22, hands: [V3(-0.16, 1.07, 0.86), V3(0.16, 1.07, 0.86)],
+      // the cockpit: a padded leather roll round the opening, a tub inside it (walls, floor, a leather seat), the dash with
+      // its dials, a wood-rimmed wheel and a little aero screen in front
+      M.leather = new THREE.MeshStandardMaterial({ color: 0x5a3219, roughness: 0.65 });
+      M.tub = new THREE.MeshStandardMaterial({ color: 0x24201c, roughness: 0.9, side: THREE.DoubleSide });
+      {
+        const edge = [];
+        for (let k = 17; k <= 23; k++) edge.push(ringPt(CK0, k));
+        for (let k = 23; k >= 17; k--) edge.push(ringPt(CK1, k));
+        const roll = new THREE.CatmullRomCurve3(edge.map((v) => v.clone().add(V3(0, 0.012, 0))), true, 'centripetal');
+        add(body, new THREE.TubeGeometry(roll, 90, 0.024, 10, true), M.leather, 0, 0, 0);
+        const floorY = 0.4, xR = ringPt(CK0, 17).x, xR1 = ringPt(CK1, 17).x;
+        // side walls (their tops on the opening's edges), the front and back walls following the body's crown, the floor
+        for (const sx of [-1, 1]) {
+          const a = ringPt(CK0, sx > 0 ? 17 : 23), b = ringPt(CK1, sx > 0 ? 17 : 23);
+          add(body, facesGeo([[a.x, floorY, CK0], [b.x, floorY, CK1], [b.x, b.y, CK1], [a.x, a.y, CK0]], [[0, 1, 2, 3]]), M.tub, 0, 0, 0, 0, 0, 0, false);
+        }
+        for (const z of [CK0, CK1]) {
+          const top = []; for (let k = 17; k <= 23; k++) { const q = ringPt(z, k); top.push([q.x, q.y, z]); }
+          const v = [[top[0][0], floorY, z]].concat(top).concat([[top[top.length - 1][0], floorY, z]]);
+          add(body, facesGeo(v, [v.map((_, i) => i)]), M.tub, 0, 0, 0, 0, 0, 0, false);
+        }
+        add(body, facesGeo([[-xR, floorY, CK0], [xR, floorY, CK0], [xR1, floorY, CK1], [-xR1, floorY, CK1]], [[0, 1, 2, 3]]), M.tub, 0, 0, 0, 0, 0, 0, false);
+        add(body, rbox(0.44, 0.1, 0.4, 0.04), M.leather, 0, 0.5, 1.36);
+        add(body, rbox(0.44, 0.5, 0.08, 0.04), M.leather, 0, 0.78, 1.55, 0.2, 0, 0);
+        // the dash: a black panel across the front wall with two round dials either side of the display
+        add(body, rbox(0.5, 0.16, 0.03, 0.02), M.black, 0, 1.02, CK0 + 0.03, -0.2, 0, 0);
+        for (const sx of [-1, 1]) {
+          add(body, new THREE.TorusGeometry(0.036, 0.007, 8, 24), M.chrome, sx * 0.17, 1.03, CK0 + 0.05, -0.2, 0, 0);
+          add(body, new THREE.CircleGeometry(0.034, 24), M.white, sx * 0.17, 1.03, CK0 + 0.047, -0.2, 0, 0, false);
+        }
+      }
+      // (an aero screen: low, so the driver looks over it, not through a frame at eye level)
+      const ws = add(body, new THREE.PlaneGeometry(0.46, 0.13), M.glass, 0, 1.235, CK0 - 0.02, -0.4, 0, 0, false); ws.castShadow = false;
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.23, 1.16, CK0 - 0.045), V3(sx * 0.23, 1.29, CK0 + 0.005), 0.007, M.chrome);
+      add(body, loft([{ z: 1.62, w: 0.05, yb: 1.12, yt: 1.2 }, { z: 1.7, w: 0.15, yb: 1.1, yt: 1.36 }, { z: 1.95, w: 0.15, yb: 1.08, yt: 1.34 }, { z: 2.6, w: 0.08, yb: 1.04, yt: 1.12 }, { z: 3.0, w: 0.02, yb: 1.0, yt: 1.02 }].map((q) => Object.assign(q, { n: 2.2 })), { seg: 24 }), M.paint, 0, 0, 0);   // headrest fairing
+      SW = steering(V3(0, 1.02, 0.98), 0.45, 0.17, 'wood');
+      tubeAB(body, V3(0, 0.96, CK0 + 0.03), V3(0, 1.0, 0.95), 0.016, M.black);
+      cluster = { parent: body, pos: V3(0, 1.03, CK0 + 0.05), rot: -0.2, w: 0.14, h: 0.07 };
+      driver = person({ hip: V3(0, 0.6, 1.3), lean: 0.22, hands: [V3(-0.14, 1.06, 1.0), V3(0.14, 1.06, 1.0)],
         knee: { dx: 0.11, y: 0.72, z: 0.85 }, foot: { dx: 0.14, y: 0.42, z: 0.35 }, goggles: true });
     };
 
