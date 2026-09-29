@@ -67,6 +67,8 @@
     return c[c.length - 1][1];
   }
   // Tyre compounds. B/C/E shape a normalised combined-slip magic formula with its peak at rho = 1.
+  // (looseKx / looseKy: per-surface factors on that, forwards / sideways - what a tread is built for: a gravel tyre's
+  // small tight blocks bite best in gravel, a mud tyre's big open lugs in grass, dirt and mud)
   // loose: friction on gravel / grass / dirt / mud (x surfMu) in both directions. Loose ground shears before the rubber
   // lets go, so a sticky compound's extra grip is wasted there and the tread's bite decides: all-terrains dig in, slicks skate.
   const TIRES = {
@@ -319,10 +321,17 @@
       B: 1.8, C: 1.4, E: -0.25, heatCap: 2000, cold: 0.97, coldT: 10, warmT: 40, hotT: 105, overheat: 0.003, prep: 1.0 },
     // rally cars: gravel tyres - a tall, soft sidewall and a deep block tread that cuts into loose stuff; less than a
     // road tyre on tarmac, a lot more on gravel, dirt and grass
+    // (on gravel - what they're made for - ~1.05 g round a corner; less in grass and mud, where the small tight blocks clog)
     rallyG: { name: '195/65R15 gravel rally', short: 'Gravel rally', width: 0.195,
-      muX: 1.08, muY: 0.98, loose: 1.3, looseKx: [1, 1.08, 1.0, 1.12, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.42,
+      muX: 1.08, muY: 0.98, loose: 1.55, looseKx: [1, 1.12, 0.95, 1.05, 0.8, 1], looseKy: [1, 1.08, 0.92, 1.0, 0.8, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.42,
       B: 1.6, C: 1.35, E: -0.1, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
+    // the rally cars' off-road package: mud tyres - big open lugs that bite in grass, dirt and mud (~1 g in the grass, twice
+    // the gravel tyre's grip in mud), about the same on gravel, a lot less on tarmac; heavier, and they bite at more slip
+    rallyKnob: { name: '205/70R15 rally mud tyre', short: 'Rally mud', width: 0.205,
+      muX: 0.9, muY: 0.85, loose: 1.7, looseKx: [1, 1.0, 1.15, 1.08, 1.3, 1], looseKy: [1, 0.95, 1.1, 1.02, 1.25, 1], kappaPeak: 0.15, alphaPeak: 0.16, relaxX: 0.22, relaxY: 0.45,
+      B: 1.5, C: 1.35, E: -0.05, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.3, 1.1, 1.1, 1.1, 1, 1.3], massAdd: 3, inertiaAdd: 0.15, lift: 0.02, tcTargets: [0.15, 0.18, 0.22] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -336,6 +345,7 @@
     if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
+    if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
     if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
@@ -1006,7 +1016,7 @@
         let Fxt = 0, Fyt = 0;
         if (rho > 1e-7) {
           const f = mu * Fzn * MF(rho, ty) / rho;
-          Fxt = (loose ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * f * sx; Fyt = -(loose ? (ty.looseY || ty.loose || ty.muY) : ty.muY) * f * sy;
+          Fxt = (loose ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * f * sx; Fyt = -(loose ? (ty.looseY || ty.loose || ty.muY) * (ty.looseKy ? ty.looseKy[w.surface] : 1) : ty.muY) * f * sy;
         }
         w.fx = Fxt; w.fy = Fyt;
         const tfx = fx * Fxt + lx * Fyt, tfy = fy * Fxt + ly * Fyt, tfz = fz * Fxt + lz * Fyt;

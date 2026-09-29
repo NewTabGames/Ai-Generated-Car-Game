@@ -1284,7 +1284,7 @@
     B.rally = () => {
       const V = ENGINE, R2 = V === 'r2', GB = V === 'gb';
       WF = 0.2; WR = GB ? 0.23 : 0.2;
-      wheelStyle = { rim: 'rally', rimR: 0.19, tread: 'truck' };
+      wheelStyle = { rim: 'rally', rimR: 0.19, tread: 'gravel', rimColor: R2 ? 0xc49a45 : 0xeeeee8 };     // (white; Rally2 in gold)
       const lv = (paintHex & 0xffffff) > 0xd0d0d0 || (((paintHex >> 16) & 255) + ((paintHex >> 8) & 255) + (paintHex & 255)) > 600 ? 0x1b2f63 : 0xf2f2ee;
       M.livery = new THREE.MeshPhysicalMaterial({ color: lv, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });
       const flareA = GB ? 0.07 : R2 ? 0.055 : 0.02;
@@ -1407,6 +1407,26 @@
       }
       return mergeGeos(list);
     }
+    // block treads (gravel: the rally car's gravel tyres; mud: every car's knobby package) - the blocks stand proud of a
+    // carcass built smaller by their depth, so their tops are the tyre's real rolling radius and they sit on the rubber
+    // instead of floating round it. Gravel: small tight blocks four and three across, staggered, shoulder blocks turned
+    // down the shoulder; mud: big staggered knobs with wide voids and lugs running down each sidewall
+    function blockTread(R, W, rimR, kind) {
+      const mud = kind === 'mud', depth = mud ? 0.02 : 0.012, rc = R - depth, h = W / 2, list = [];
+      const box = (w, ht, l, x, r, ang, tilt) => { const b = new THREE.BoxGeometry(w, ht, l); if (tilt) b.rotateZ(tilt); b.translate(x, r, 0); b.rotateX(ang); list.push(b); };
+      const pitch = mud ? 0.062 : 0.042, N = Math.round(2 * Math.PI * R / pitch), bl = pitch * (mud ? 0.55 : 0.6);
+      for (let k = 0; k < N; k++) {
+        const a = k * 2 * Math.PI / N, odd = k & 1;
+        if (mud) {
+          for (const f of odd ? [-0.5, 0.14] : [-0.14, 0.5]) box(W * 0.34, depth + 0.004, bl, f * h, rc + depth / 2 - 0.002, a);
+          for (const sx of [-1, 1]) { const lg = (k + (sx > 0 ? 1 : 0)) & 1; box(0.014, 0.026 + 0.018 * lg, bl * 0.85, sx * (h - 0.003), rc - 0.01 - 0.009 * lg, a); }
+        } else {
+          for (const f of odd ? [-0.44, 0, 0.44] : [-0.66, -0.22, 0.22, 0.66]) box(W * (odd ? 0.19 : 0.16), depth + 0.004, bl, f * h, rc + depth / 2 - 0.002, a);
+          for (const sx of [-1, 1]) box(W * 0.1, depth, bl * 0.85, sx * (h - W * 0.07), rc - 0.008 + depth / 2, a + (odd ? Math.PI / N : 0), -sx * 0.55);
+        }
+      }
+      return { carc: carcass(rc + 0.004, W, rimR), tr: mergeGeos(list) };
+    }
     const RIM = {
       steel: new THREE.MeshStandardMaterial({ color: 0x2a2b2e, roughness: 0.45, metalness: 0.6 }),
       steel5: new THREE.MeshStandardMaterial({ color: 0x9a9da2, roughness: 0.35, metalness: 0.7 }),
@@ -1434,6 +1454,26 @@
         add(g, new THREE.TorusGeometry(rimR * 0.98, 0.012, 8, 36), mat, fx, 0, 0, 0, Math.PI / 2, 0);
         add(g, cylX(rimR * 0.55, rimR * 0.6, 0.03, 28), mat, fx - 0.01, 0, 0);
         add(g, cylX(0.04, 0.05, 0.05, 16), mat, fx + 0.01, 0, 0);
+        return;
+      }
+      if (style === 'rally') {
+        // a flat-faced 15 in gravel wheel: six wide spokes cut from one face, a lip round it, a centre cap on five studs;
+        // dark behind the face (the brake disc shows through the windows)
+        const m = wheelStyle.rimColor !== undefined ? (M.rallyRim || (M.rallyRim = new THREE.MeshStandardMaterial({ color: wheelStyle.rimColor, roughness: 0.32, metalness: wheelStyle.rimColor === 0xeeeee8 ? 0.15 : 0.75 }))) : mat;
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.95, 0, Math.PI * 2, false);
+        for (let j = 0; j < 6; j++) {
+          const c = j * Math.PI / 3 + Math.PI / 6, hole = new THREE.Path();
+          hole.absarc(0, 0, rimR * 0.8, c - 0.34, c + 0.34, false); hole.absarc(0, 0, rimR * 0.36, c + 0.2, c - 0.2, true); hole.closePath();
+          face.holes.push(hole);
+        }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.014, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.005, bevelSegments: 2, curveSegments: 20 });
+        fg.rotateY(Math.PI / 2);
+        add(g, fg, m, fx - 0.03, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.975, 0.011, 8, 44), m, fx - 0.012, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.96, rimR * 0.96, 0.01, 36), M.black, fx - 0.1, 0, 0);
+        add(g, cylX(rimR * 0.2, rimR * 0.22, 0.03, 24), m, fx - 0.005, 0, 0);
+        for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5; add(g, cylX(0.009, 0.009, 0.022, 8), M.chrome, fx + 0.012, Math.cos(a) * rimR * 0.13, Math.sin(a) * rimR * 0.13); }
+        add(g, cylX(0.018, 0.018, 0.014, 14), M.black, fx + 0.014, 0, 0);
         return;
       }
       if (style === 'lb') {
@@ -1466,7 +1506,8 @@
     const geo = {};
     for (const front of [true, false]) {
       const R = front ? RF : RR, W = front ? WF : WR, rimR = Math.min(R - 0.03, (!front && wheelStyle.rimRR) || wheelStyle.rimR || R * 0.6);
-      geo[front] = { R, W, rimR, carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread), kn: tread(R + 0.01, W, 'knob') };
+      const st = wheelStyle.tread === 'gravel' ? blockTread(R, W, rimR, 'gravel') : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
+      geo[front] = { R, W, rimR, carc: st.carc, tr: st.tr, pk: blockTread(R + 0.006, W * 1.04, rimR, 'mud') };
     }
     const wheels = [];
     for (let i = 0; i < 4; i++) {
@@ -1476,11 +1517,16 @@
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
-      add(spin, G.carc, M.rubber, 0, 0, 0);
-      const stock = G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : [];
-      const pkg = [add(spin, G.kn, M.rubber, 0, 0, 0)]; pkg[0].visible = false;
+      const stock = [add(spin, G.carc, M.rubber, 0, 0, 0)].concat(G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : []);
+      const pkg = [add(spin, G.pk.carc, M.rubber, 0, 0, 0), add(spin, G.pk.tr, M.rubber, 0, 0, 0)]; for (const m of pkg) m.visible = false;
       rim(spin, G.R, G.W, G.rimR, wheelStyle.rim);
       if (frontW) add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      if (CAR === 'rally') {
+        add(spin, cylX(0.15, 0.15, 0.026, 36), M.steel, -0.03, 0, 0);
+        add(spin, cylX(0.075, 0.075, 0.03, 20), M.black, -0.03, 0, 0);
+        const ph = left ? Math.PI - 0.8 : 0.8, cal = add(flip, rbox(0.055, 0.13, 0.08, 0.018), M.caliper || (M.caliper = new THREE.MeshStandardMaterial({ color: 0xc01818, roughness: 0.4 })), -0.012, 0.12 * Math.sin(ph), 0.12 * Math.cos(ph));
+        cal.rotation.x = -ph;
+      }
       if (CAR === 'gtr') {
         // the big brakes behind the spokes: a drilled-look disc turning with the wheel, the caliper fixed at its trailing top
         add(spin, cylX(0.19, 0.19, 0.03, 40), M.steel, -0.02, 0, 0);
@@ -1532,7 +1578,7 @@
     function setTransmission() {}
     function setTires(front, rear) {
       for (const w of wheels) {
-        const on = (w.front ? front : rear) === 'ccKnob' || (w.front ? front : rear) === 'offroad';
+        const t = w.front ? front : rear, on = t === 'ccKnob' || t === 'rallyKnob' || t === 'offroad';
         for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
       }
     }

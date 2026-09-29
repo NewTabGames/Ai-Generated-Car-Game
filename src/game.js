@@ -204,6 +204,8 @@
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
+      + 'and nearly twice the grip in mud - about the same on gravel, where the gravel tyres are made for it, and a lot less on tarmac. Heavier, and a touch of lift']
     : CC ? ['Knobbies', 'Knobby tyres', 'Knobby off-road tyres in the car\'s own size and a touch of lift: far more bite on dirt, gravel and grass, a lot less on pavement, where the knobs squirm']
     : MOWER ? ['Bar lugs', 'Bar-lug tyres', 'Ag bar-lug tyres (the chevron tread of a garden tractor that pulls a plough) in place of the race tyres: they dig into dirt and mud, '
       + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
