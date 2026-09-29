@@ -34,7 +34,7 @@ class CarSynth {
       vt: 0,       // cyl 2 with vt > 0: a 4-stroke V-twin with that V angle instead of a 2-stroke single
       surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
       ev: 0,       // 1: an electric motor (whK = its whine Hz per rpm)
-      jet: 0, ab: 0,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1
+      jet: 0, ab: 0, jsz: 1,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1; jsz: its size
       nos: 0 };    // nitrous spraying, 0..1
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
@@ -238,9 +238,10 @@ class CarSynth {
     if (jet) {
       if (!this.jtB1) { this.jtB1 = this.bp(1300, 10); this.jtB2 = this.bp(1900, 6); this.jtCr = this.bp(700, 1.3); this.jtLP = 0; this.jtLP2 = 0; this.abLP = 0; this.abLP2 = 0; this.jPh1 = 0; this.jPh2 = 0; }
       const jN = Math.min(1.1, rpm / (c.rpmRef || 10000));
-      jF = 250 + 2900 * jN;
+      const jz = Math.max(0.5, c.jsz || 1);
+      jF = (250 + 2900 * jN) / Math.sqrt(jz);                         // (a bigger turbine turns slower)
       jWh = (0.03 + 0.07 * jN * jN) * (c.whine || 1) * c.engVol * (interior > 0.5 ? 1.2 : 1);
-      jRoar = (0.08 + 1.9 * Math.pow(load, 1.2)) * (0.3 + 0.7 * Math.min(1, jN)) * c.engVol;
+      jRoar = (0.08 + 1.9 * Math.pow(load, 1.2)) * (0.3 + 0.7 * Math.min(1, jN)) * c.engVol * Math.sqrt(jz);
       aJ = 1 - Math.exp(-2 * Math.PI * (220 + 2400 * load) / sr);
       this.setBP(this.jtB1, jF, 10); this.setBP(this.jtB2, jF * 1.47, 6);
     }

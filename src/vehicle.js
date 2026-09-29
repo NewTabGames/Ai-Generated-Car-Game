@@ -1103,6 +1103,16 @@
         Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
       }
 
+      // aerodynamic damping (aeroDamp: [roll, pitch, yaw], N m per rad/s per m/s): a flat-bottomed body rolling or pitching in
+      // a 90 m/s airstream meets the air at an angle on the side going down and lifts it back - the rotation is damped in
+      // proportion to speed. It's what lets the jet cart fly a crest level instead of drifting into a roll in the air
+      if (s.aeroDamp) {
+        const [kr, kp, ky] = s.aeroDamp;
+        const wxB = wx * m00 + wy * m10 + wz * m20, wyB = wx * m01 + wy * m11 + wz * m21, wzB = wx * m02 + wy * m12 + wz * m22;
+        const tbx = -kp * speed * wxB, tby = -ky * speed * wyB, tbz = -kr * speed * wzB;
+        Tx += m00 * tbx + m01 * tby + m02 * tbz; Ty += m10 * tbx + m11 * tby + m12 * tbz; Tz += m20 * tbx + m21 * tby + m22 * tbz;
+      }
+
       // ---------------- body / ground penalty contacts (roll-overs, bottoming out)
       this._bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, (fx, fy, fz, rx, ry, rz) => {
         Fx += fx; Fy += fy; Fz += fz;
@@ -1534,7 +1544,8 @@
       N += clamp(e * 5 * h, -rate * h, rate * h);
       this.jetN = N;
       const x = Math.pow(clamp((N - 0.2) / 0.8, 0, 1.05), 2.2);
-      const abOn = this.running && cmd > 0.97 && N > 0.96 ? 1 : 0, ab0 = this.jetAB || 0;
+      // (not while it's held on the brakes at the line: a big tune's afterburner out-pushes any tyres - it lights on the release)
+      const abOn = this.running && cmd > 0.97 && N > 0.96 && !this.launchHold ? 1 : 0, ab0 = this.jetAB || 0;
       this.jetAB = ab0 + (abOn - ab0) * Math.min(1, h / (abOn ? 0.35 : 0.1));
       this.jetF = J.thrust * (s.torqueScale || 1) * x * (1 + J.ab * this.jetAB) * Math.max(0.5, 1 - J.ram * Math.max(0, this.forwardSpeed));
       this.thrEff = clamp(x, 0, 1);
@@ -2837,7 +2848,7 @@
       autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
       dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
       jet: { thrust: 2600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.2, revTq: 22, revRpm: 4000 },
-      fin: { y: 0.2, z: 1.6, CyA: 0.3 },
+      fin: { y: 0.2, z: 1.6, CyA: 0.3 }, aeroDamp: [0.6, 2.4, 0],
       CdA: 0.66, ClA: 0.22,
       bodyHalfW: 0.64, bodyFront: -1.75, bodyRear: 1.95, bodyBottom: -0.28, bodyTop: 1.0,
       bodyPts: ccPts(0.44, 0.47, 2.3, ccBox(0.64, 0.12, 0.8, -1.75, 1.95).concat([[0, 1.45, 1.5], [0, 1.05, 0.9]])),
@@ -2925,7 +2936,8 @@
     s.springF = b.springF * t.stiff * mr; s.springR = b.springR * t.stiff * mr;
     s.arbF = b.arbF * t.stiff * mr; s.arbR = b.arbR * t.stiff * mr;
     s.dampBumpF = b.dampBumpF * dk; s.dampRebF = b.dampRebF * dk; s.dampBumpR = b.dampBumpR * dk; s.dampRebR = b.dampRebR * dk;
-    s.gripScale = t.grip; s.ClA = t.downforce * 4.448 / (0.5 * 1.225 * 67.06 * 67.06);   // lb of downforce at 150 mph
+    // (the tuned downforce - lb at 150 mph - on top of what the car is built with: rally cars, the jet cart)
+    s.gripScale = t.grip; s.ClA = (b.ClA || 0) + t.downforce * 4.448 / (0.5 * 1.225 * 67.06 * 67.06);
     s.CdA = b.CdA * t.drag;
     s.brakeTorqueF = b.brakeTorqueF * t.brakes; s.brakeTorqueR = b.brakeTorqueR * t.brakes; s.handbrakeTorque = b.handbrakeTorque * t.brakes;
     s.maxSteer = b.maxSteer * t.steer;

@@ -73,7 +73,7 @@
         hot: { hint: 'Golf cart (Hot Rod): shift up (E) for DRIVE - a 45 kW AC motor on a lithium pack in a lowered cart with the roof off: 0-60 in ~6 s and ~84 mph. Stability control is on (Sport).',
           info: 'A hot-rodded cart · 45 kW / 160 Nm AC motor, a lithium pack under the seats, a 5.8:1 axle · lowered, roof off, a chrome roll hoop, two racing buckets · fat tyres on 13 in deep-dish wheels, four-wheel discs · 440 kg · 0-60 ~6 s, ~84 mph',
           trans: 'Electric · single speed', tyres: 'Street tyres', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.09, whPure: 1, whine: 3.4, rpmRef: 8000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
-        jet: { hint: 'Jet golf cart: shift up (E) for DRIVE. The throttle spools a turbojet, and it takes ~3 s to wind up from idle - so at a stop hold SPACE (the brakes), floor it, and let go once it howls; past 96 % the afterburner lights. Nothing drives the wheels: it rolls free (brake early - it keeps pushing for a second after you lift), and in R the cart\'s old electric motor backs it up. Stability control is on (Sport).',
+        jet: { hint: 'Jet golf cart: shift up (E) for DRIVE. The throttle spools a turbojet, and it takes ~3 s to wind up from idle - so at a stop hold SPACE (the brakes), floor it, and let go once it howls - the afterburner lights as you go. Nothing drives the wheels: it rolls free (brake early - it keeps pushing for a second after you lift), and in R the cart\'s old electric motor backs it up. Stability control is on (Sport).',
           info: 'A jet-powered cart for the drag-strip shows: a surplus target-drone turbojet (~590 lbf of thrust dry, ~810 lbf with a homebuilt afterburner) slung low behind the seats so its thrust runs through the centre of gravity, a stretched, lowered and widened frame, 12 in wheels on low-profile radials (wider at the back), four-wheel discs with ABS, a nose cone and a tail fin · 480 kg · 0-60 ~4 s, ~185 mph',
           trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.6, race: 0 } },
         busa: { hint: 'Golf cart (Record): shift up (E) for DRIVE and floor it - a Hayabusa 1,340 cc four behind the seats, ~190 hp through the bike\'s 6-speed (E / Q or the paddles), a stretched, lowered frame and a wheelie bar. The real one did 118.76 mph. Stability control is on (Sport).',
@@ -304,6 +304,13 @@
       finalAuto: STOCK.autoFinal * 0.88, finalManual: STOCK.manualFinal * 0.88 }),     // taller gearing for all that power
     moon: () => Object.assign(tuneDefaults(), { gravity: 0.17, smoke: 2 }),
   };
+  // (the jet cart: thrust is all there is to turn up - Stage 2 a slightly bigger engine, Unhinged a much bigger one
+  // and the wings to keep 270 mph on the ground; the engine on the cart grows with the thrust setting)
+  if (JET) {
+    TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
+    TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
+  }
+  const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8);      // (engine diameter against stock: airflow ~ area)
   const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
   const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
     : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
@@ -1102,7 +1109,7 @@
       smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
     if (car.afterWheels) car.afterWheels();
-    if (car.setJet) car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt);
+    if (car.setJet) { car.setJetSize(jetSize()); car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt); }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
     car.setChute(veh.chuteOut, veh.chuteInfl || 0, veh.chuteT || 0);
@@ -1240,7 +1247,7 @@
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
-      jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0,
+      jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
     });
   }
   function processEvents() {
