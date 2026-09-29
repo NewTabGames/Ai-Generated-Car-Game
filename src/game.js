@@ -169,9 +169,11 @@
   const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
-  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = W.map === 'arena', MOWTRACK = S.map === 'mowtrack';   // (ARENAMAP: the Monster Arena or the Dirt Ramp Arena)
+  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
+  const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
+    : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
@@ -299,7 +301,7 @@
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
-    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : ARENAMAP ? 'Back on its wheels' : MOWTRACK ? 'Back on the track' : 'Car reset');
+    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : FREESTYLE ? 'Back on its wheels' : MOWTRACK ? 'Back on the track' : 'Car reset');
     if (MOWTRACK) LAP.armed = false;                      // (a reset doesn't count as a lap)
     if (DRAGMAP) dragReset();
   }
@@ -345,9 +347,9 @@
     else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map ? ' Its home is the Straightaway map (Esc → Drive → Map).' : ''), 11), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
-      + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); the Dirt Ramp Arena is all jumps.'), 12), 1600);
+      + (FREESTYLE ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); All Ramps is nothing but jumps.'), 12), 1600);
     else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
-    else if (ARENAMAP && W.ramps) setTimeout(() => hud.hint('Dirt Ramp Arena: nothing but dirt - three lanes of jumps end to end (gap jumps, tabletops, step-ups, moguls; the middle lane runs north from here, the side lanes the other way), whoops along both walls. Tricks score on the big screens.', 11), 1600);
+    else if (RAMPSMAP) setTimeout(() => hud.hint('All Ramps: the whole world is groomed dirt covered in jumps - gap jumps, tabletops, step-ups, kickers and whoops, big and small, every which way, for ever. The first gap jump is dead ahead. Big air, flips and wheelies score.', 11), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: two big gap jumps straight ahead up the middle and a giant tabletop across the far end; tabletops and step-ups either side, the car crush on the left, whoops lanes along the walls and behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
@@ -451,7 +453,7 @@
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
       const from = MORE_CARS.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
-      const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps');   // (the Dirt Ramp Arena is a monster truck's home too)
+      const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps');   // (All Ramps is a monster truck's home too)
       if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
@@ -649,10 +651,10 @@
         add(row('Air assist', 'On: like a seasoned driver’s feet plus a spotter - it looks ahead to the slope you’ll land on, eases off the gas (or brake) before the truck rotates past it, catches a nose that’s way off, gently levels the truck in pitch and roll while it flies, and feathers the gas as you touch down (spinning rears would kick it over backwards). Holding the gas over a jump no longer flips it; a truck that rolled over on a ramp’s edge before it took off is still a crash. Off: all yours - backflips, front flips and crashes',
           seg([[true, 'On'], [false, 'Off (do your own flips)']], S.airAssist !== false, (v) => { S.airAssist = v; })));
       }
-      if (ARENAMAP) {
+      if (FREESTYLE) {
         const clr = el('<button class="btn small ghost">New run (score to 0)</button>');
         clr.addEventListener('click', () => { FS.score = 0; FS.best = 0; FS.last = ''; arenaScreen(true); hud.toast('Freestyle score reset'); });
-        add(row('Freestyle', W.ramps ? 'Big air, flips, wheelies, nose wheelies and donuts all score on the big screens' : 'Big air, flips, wheelies, nose wheelies, donuts and crushed cars all score on the big screens · the junk cars are replaced once they\'re all flat', clr));
+        add(row('Freestyle', RAMPSMAP ? 'Big air, flips, wheelies, nose wheelies and donuts all score' : 'Big air, flips, wheelies, nose wheelies, donuts and crushed cars all score on the big screens · the junk cars are replaced once they\'re all flat', clr));
       }
       if (DRAGPAK) {
         add(row('Mopar Drag Pak (race car)', 'Supercharged 354 HEMI · race 3-speed auto, non-lockup converter · spool · wheelie bars · no ABS / ESC. Hold SPACE on the line (TransBrake), floor it, release SPACE to launch.', el('<span></span>')));
@@ -674,8 +676,8 @@
         sw.appendChild(b);
       }
       add(row('Paint', S.paint, sw));
-      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · Dirt Ramp Arena: the same stadium, all jumps (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['prepcountry', 'Prepped Countryside'], ['preptarmac', 'Prepped All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['ramps', 'Dirt Ramp Arena'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · All Ramps: the whole world is dirt covered in jumps (restarts)',
+        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['prepcountry', 'Prepped Countryside'], ['preptarmac', 'Prepped All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['ramps', 'All Ramps'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -1230,7 +1232,7 @@
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
-    if (ARENAMAP) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
+    if (FREESTYLE) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
     if (MOWTRACK && LAP.armed) chips.push({ html: 'LAP ' + (LAP.n + 1) + ' <b>' + (veh.time - LAP.t0).toFixed(1) + '</b>' + (S.mowBest && S.mowBest[TKEY] ? ' · best ' + S.mowBest[TKEY].toFixed(2) : '') });
     if (veh.flipping) chips.push({ html: 'FLIPPING OVER', cls: 'alert' });
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
@@ -1394,7 +1396,7 @@
     LAP.prevZ = z;
   }
   function arenaUpdate(dt) {
-    if (!ARENAMAP) return;
+    if (!FREESTYLE) return;
     const Wh = veh.wheels;
     // junk cars dent under the tyres - and under the chassis, which rides over the roofs between the tyre tracks
     const crushAt = (x, z, f) => {
@@ -1413,12 +1415,14 @@
       }
       if (!FS.crushed.has(k) && (c.cab > 0.4 || c.level > 0.2)) { FS.crushed.add(k); trick('CAR CRUSH', 150); G.shake = Math.max(G.shake, 0.15); }
     };
-    for (const w of Wh) if (w.contact) crushAt(w.cpx, w.cpz, w.Fz);
-    const bh = veh.bodyHits || [];
-    for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
+    if (ARENAMAP) {
+      for (const w of Wh) if (w.contact) crushAt(w.cpx, w.cpz, w.Fz);
+      const bh = veh.bodyHits || [];
+      for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
+    }
     if (world.arena) world.arena.update(dt);
     // fresh cars once they're all flat and the truck is well clear of the pile
-    if (W.ARENA_CARS.length && FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px - W.ARENA_CARS[0].x, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
+    if (ARENAMAP && FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px - W.ARENA_CARS[0].x, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
     // body axes
     const { qx, qy, qz, qw } = veh;
     const ax = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qz * qw), 2 * (qx * qz - qy * qw)];            // right

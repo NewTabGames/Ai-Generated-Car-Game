@@ -146,10 +146,25 @@
       g.clearRect(0, 0, S, S);
       g.save();
       g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.clip();
-      const TAR = W.map === 'tarmac';
-      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
+      const TAR = W.map === 'tarmac', RMP = W.map === 'ramps';
+      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : RMP ? 'rgba(70,48,30,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
       g.translate(c, c); g.rotate(heading); g.scale(sc, sc); g.translate(-px, -pz);
       g.lineCap = 'round'; g.lineJoin = 'round';
+      if (RMP) {
+        // All Ramps: every jump, lighter the taller it stands
+        const e = R * 1.5, CH = W.C.CHUNK, COL = { table: '#d9a766', gap: '#f0c080', step: '#c89058', kick: '#b8844e', mogul: '#a57a4c' };
+        for (let cx = Math.floor((px - e) / CH); cx <= Math.floor((px + e) / CH); cx++) {
+          for (let cz = Math.floor((pz - e) / CH); cz <= Math.floor((pz + e) / CH); cz++) {
+            for (const o of W.jumpsInChunk(cx, cz)) {
+              g.save(); g.translate(o.x0 + o.fx * o.len / 2, o.z0 + o.fz * o.len / 2); g.rotate(Math.atan2(o.fz, o.fx));
+              g.fillStyle = COL[o.kind] || '#c89058'; g.fillRect(-o.len / 2, -o.hw, o.len, o.hw * 2); g.restore();
+            }
+          }
+        }
+        g.restore();
+        this._mmOverlay(g, c, S, heading);
+        return;
+      }
       if (TAR) {
         // All Road: the avenue grid over the paving, and the jump ramps
         const A = W.TARMAC.AV, e = R * 1.5;

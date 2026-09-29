@@ -173,7 +173,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena' || MAP === 'mowtrack') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -382,12 +382,11 @@
     return h * side;
   }
 
-  // ---------------------------------------------------------------- monster truck arena ('arena', 'ramps')
+  // ---------------------------------------------------------------- monster truck arena ('arena')
   // A stadium floor covered in packed, watered clay: HW x HL (half sizes) with rounded corners (radius CR), a concrete
   // wall and debris fence all round (colliders), the stands beyond. Every obstacle is an exact height function (like the
   // jump ramps), added to the flat ground so the tyres, suspension and body feel it, and meshed from the same function.
-  // The floor is 192 x 368 m, wall to wall. Two layouts (LAYOUTS):
-  //  'arena' (the Monster Arena):
+  // The floor is 192 x 368 m, wall to wall:
   //   middle     - two big gap jumps in a row up the centre (a 30 deg kicker to a 3.6 m lip, a gap, a landing mound
   //                with a long downslope), and across the north end a tabletop half as big again
   //   east side  - a big tabletop (13 m faces up to a 4 m deck 16 m long: jump it, or land on the far face), a step-up
@@ -396,12 +395,8 @@
   //                load); a second tabletop in the south-west, a whoops lane along the wall, a step-up in the north-west
   //                (up a steep face onto a 2.8 m deck, off down a long ramp)
   //   south end  - moguls: three 1.2 m whoops across the floor
-  //  'ramps' (the Dirt Ramp Arena): the same stadium with no junk cars - just dirt: three lanes of jumps end to end
-  //   (gap jumps, tabletops, step-ups and moguls, some bigger, some smaller), whoops lanes along both walls, moguls across
-  //   the south end
   //   corners    - banked up to 2.4 m against the wall, for sliding round
   const ARENA = { HW: 96, HL: 184, CR: 48, SPAWN_X: 0, SPAWN_Z: 108 };
-  let RAMPS = false;                        // (the Dirt Ramp Arena: MAP 'arena' with its own layout)
   const CRUSH_X = -52;                      // the car-crush lane (x of the junk cars)
   const sstep = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const dsstep = (a, b, x) => { const t = (x - a) / (b - a); return t <= 0 || t >= 1 ? 0 : 6 * t * (1 - t) / (b - a); };
@@ -445,6 +440,11 @@
       if (u < L) { const s = u / L; o.d = H * p * Math.pow(s, p - 1) / L; return H * Math.pow(s, p); }
       if (u < L + T) { o.d = 0; return H; }
       const w = u - L - T; o.d = -H * dsstep(0, B, w); return H * (1 - sstep(0, B, w)); },
+    // a plain kicker (All Ramps): 9 m up to a 1.7 m lip, rounded off - land on the flat
+    kick(u, o) { const L = 9, H = 1.7, p = 1.6, D = 1.4;
+      if (u <= 0 || u >= L + D) { o.d = 0; return 0; }
+      if (u < L) { const s = u / L; o.d = H * p * Math.pow(s, p - 1) / L; return H * Math.pow(s, p); }
+      const s = (u - L) / D; o.d = -2 * H * s / D; return H * (1 - s * s); },
     // moguls: a row of whoops (three, or ob.n)
     mogul(u, o, ob) { const W = 7, H = 1.2, E = (ob.n || 3) * W;
       if (u <= 0 || u >= E) { o.d = 0; return 0; }
@@ -453,6 +453,7 @@
   // obstacles: centre-line start (x0, z0), direction (fx, fz), length (x sc, the scale: 1.3 = a third longer and higher),
   // half width (flat part + falloff `bev`). The first gap / table / step / mogul of each kind is the one the tests use
   const GAP = { kind: 'gap', len: 36.5, hw: 7.5, bev: 3.5 }, TABLE = { kind: 'table', len: 42, hw: 10.5, bev: 6 }, STEP = { kind: 'step', len: 32, hw: 8, bev: 3.5 };
+  const KICK = { kind: 'kick', len: 10.4, hw: 4.5, bev: 1.8 };
   const ob = (base, o) => Object.assign({}, base, o, { len: (o.len || base.len) * (o.sc || 1) });
   const LAYOUTS = {
     arena: [
@@ -468,37 +469,20 @@
       { kind: 'mogul', n: 5, x0: -82, z0: -40, fx: 0, fz: 1, len: 35, hw: 6, bev: 2.5 },   // west whoops lane
       ob(TABLE, { x0: -30, z0: -140, fx: 1, fz: 0, sc: 1.4, hw: 12 }),                     // the big tabletop across the north end
     ],
-    ramps: [
-      // centre lane, northbound: gap, tabletop, a bigger gap, step-up
-      ob(GAP, { x0: 0, z0: 96, fx: 0, fz: -1 }), ob(TABLE, { x0: 0, z0: 30, fx: 0, fz: -1 }), ob(GAP, { x0: 0, z0: -40, fx: 0, fz: -1, sc: 1.25 }), ob(STEP, { x0: 0, z0: -112, fx: 0, fz: -1 }),
-      { kind: 'mogul', x0: 0, z0: 136, fx: 0, fz: 1, len: 21, hw: 30, bev: 5 },
-      // west lane, southbound: a big tabletop, gap, moguls, tabletop
-      ob(TABLE, { x0: -48, z0: -130, fx: 0, fz: 1, sc: 1.2 }), ob(GAP, { x0: -48, z0: -58, fx: 0, fz: 1 }),
-      { kind: 'mogul', n: 4, x0: -48, z0: 2, fx: 0, fz: 1, len: 28, hw: 8, bev: 3 }, ob(TABLE, { x0: -48, z0: 52, fx: 0, fz: 1 }),
-      // east lane, northbound: moguls, a small gap, step-up, gap, a big tabletop
-      { kind: 'mogul', x0: 48, z0: 128, fx: 0, fz: -1, len: 21, hw: 8, bev: 3 }, ob(GAP, { x0: 48, z0: 86, fx: 0, fz: -1, sc: 0.8 }),
-      ob(STEP, { x0: 48, z0: 36, fx: 0, fz: -1 }), ob(GAP, { x0: 48, z0: -18, fx: 0, fz: -1 }), ob(TABLE, { x0: 48, z0: -76, fx: 0, fz: -1, sc: 1.3 }),
-      // whoops lanes along both walls
-      { kind: 'mogul', n: 6, x0: -82, z0: -60, fx: 0, fz: 1, len: 42, hw: 6, bev: 2.5 }, { kind: 'mogul', n: 6, x0: 82, z0: 18, fx: 0, fz: 1, len: 42, hw: 6, bev: 2.5 },
-    ],
   };
-  const ARENA_OBS = [];
-  function useLayout(name) {
-    ARENA_OBS.length = 0;
-    for (const o of LAYOUTS[name]) {
-      const b = Object.assign({}, o);           // bounding boxes for quick rejection (and for the renderer's meshes)
-      const ex = [b.x0, b.x0 + b.fx * b.len], ez = [b.z0, b.z0 + b.fz * b.len], rx = -b.fz, rz = b.fx;
-      b.minX = Math.min(...ex) - Math.abs(rx) * b.hw; b.maxX = Math.max(...ex) + Math.abs(rx) * b.hw;
-      b.minZ = Math.min(...ez) - Math.abs(rz) * b.hw; b.maxZ = Math.max(...ez) + Math.abs(rz) * b.hw;
-      ARENA_OBS.push(b);
-    }
+  // (bounding boxes for quick rejection, and for the renderer's meshes)
+  function bbox(o) {
+    const b = Object.assign({}, o), ex = [b.x0, b.x0 + b.fx * b.len], ez = [b.z0, b.z0 + b.fz * b.len], rx = -b.fz, rz = b.fx;
+    b.minX = Math.min(...ex) - Math.abs(rx) * b.hw; b.maxX = Math.max(...ex) + Math.abs(rx) * b.hw;
+    b.minZ = Math.min(...ez) - Math.abs(rz) * b.hw; b.maxZ = Math.max(...ez) + Math.abs(rz) * b.hw;
+    return b;
   }
-  useLayout('arena');
+  const ARENA_OBS = LAYOUTS.arena.map(bbox);
   // junk cars on the crush lane: long axis across the lane, side by side along it. Each car carries a grid of dent depths
   // (metres, CNA x CNB nodes over its length and width) that the tyres push in wherever they bear on it - the surface
   // is the car's shape minus the (smoothly interpolated) dents, so the tyres leave real tracks and dents
   const CAR_L = 2.35, CAR_W = 0.92, CNA = 25, CNB = 11;
-  const ARENA_CARS = [], ALL_CARS = [];   // (the Dirt Ramp Arena has none)
+  const ARENA_CARS = [];
   const _cb = { h0: 0, hb: 0 };
   // the undamaged car: h0 = its height, hb = the body alone (hood / trunk / sills up to the belt line, no cabin)
   function carBase(c, a, b, o) {
@@ -517,7 +501,7 @@
       carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
       c.h0[ia * CNB + ib] = _cb.h0; c.hb[ia * CNB + ib] = _cb.hb;
     }
-    ARENA_CARS.push(c); ALL_CARS.push(c);
+    ARENA_CARS.push(c);
   }
   function carDent(c, a, b) {                   // interpolated dent depth at (a, b) in the car's own frame
     const fa = Math.min(CNA - 1.0001, Math.max(0, (a + CAR_L) / (2 * CAR_L) * (CNA - 1)));
@@ -537,7 +521,19 @@
     }
     return h;
   }
-  const _ag = { x: 0, z: 0 }, _cg = { x: 0, z: 0 };
+  const _ag = { x: 0, z: 0 }, _cg = { x: 0, z: 0 }, _og = { x: 0, z: 0 };
+  // one obstacle's height at (x, z) (0 off it), its gradient in _og
+  function obHeight(ob, x, z) {
+    if (x < ob.minX || x > ob.maxX || z < ob.minZ || z > ob.maxZ) return 0;
+    const dx = x - ob.x0, dz = z - ob.z0, u = dx * ob.fx + dz * ob.fz, v = dx * -ob.fz + dz * ob.fx, av = Math.abs(v);
+    if (av >= ob.hw) return 0;
+    const sc = ob.sc || 1, p = PR[ob.kind](u / sc, _po, ob) * sc;
+    if (p <= 0) return 0;
+    const side = 1 - sstep(ob.hw - ob.bev, ob.hw, av), ds = -dsstep(ob.hw - ob.bev, ob.hw, av) * (v < 0 ? -1 : 1);
+    const du = _po.d * side, dv = p * ds;                                     // along u and across (v axis = (-fz, fx))
+    _og.x = du * ob.fx - dv * ob.fz; _og.z = du * ob.fz + dv * ob.fx;
+    return p * side;
+  }
   /** Height of the arena's obstacles above the flat floor at (x, z); gradient in _ag. (noCars: the dirt only - the
    *  renderer meshes the junk cars separately) */
   function arenaHeight(x, z, noCars) {
@@ -545,19 +541,8 @@
     let best = 0; _ag.x = 0; _ag.z = 0;
     if (Math.abs(x) > A.HW + 1 || Math.abs(z) > A.HL + 1) return 0;
     for (let i = 0; i < ARENA_OBS.length; i++) {
-      const ob = ARENA_OBS[i];
-      if (x < ob.minX || x > ob.maxX || z < ob.minZ || z > ob.maxZ) continue;
-      const dx = x - ob.x0, dz = z - ob.z0, u = dx * ob.fx + dz * ob.fz, v = dx * -ob.fz + dz * ob.fx, av = Math.abs(v);
-      if (av >= ob.hw) continue;
-      const sc = ob.sc || 1, p = PR[ob.kind](u / sc, _po, ob) * sc;
-      if (p <= 0) continue;
-      const side = 1 - sstep(ob.hw - ob.bev, ob.hw, av), ds = -dsstep(ob.hw - ob.bev, ob.hw, av) * (v < 0 ? -1 : 1);
-      const h = p * side;
-      if (h > best) {
-        best = h;
-        const du = _po.d * side, dv = p * ds;                                 // along u and across (v axis = (-fz, fx))
-        _ag.x = du * ob.fx - dv * ob.fz; _ag.z = du * ob.fz + dv * ob.fx;
-      }
+      const h = obHeight(ARENA_OBS[i], x, z);
+      if (h > best) { best = h; _ag.x = _og.x; _ag.z = _og.z; }
     }
     // banked corners: the floor curls up against the wall (2.4 m), fading in and out along each corner's arc
     const cx = Math.abs(x) - (A.HW - A.CR), cz = Math.abs(z) - (A.HL - A.CR);
@@ -638,11 +623,60 @@
     }
     return hit;
   }
+  // ---------------------------------------------------------------- All Ramps ('ramps')
+  // The whole world is groomed dirt, flat to the horizon and covered in jumps - no stadium, no walls. A 96 m grid of
+  // cells, each with one dirt obstacle: the arena's gap jumps, tabletops, step-ups and moguls, or a plain kicker, a bit
+  // bigger or smaller than the arena's (x0.75-1.3), pointing any of the four ways and jittered off the grid - every one
+  // fits inside its cell, so the ground only ever looks at one. The spawn's cell is empty, with a gap jump dead ahead
+  const RCELL = 96, RAMPS_SPAWN = { x: 48, z: 150 };
+  const jumpCache = new Map();
+  function jumpInCell(i, j) {
+    const key = i * 100003 + j;
+    let o = jumpCache.get(key);
+    if (o !== undefined) return o;
+    o = null;
+    const spawnCell = i === 0 && j === 1, ahead = i === 0 && j === 0;
+    if (!spawnCell && (ahead || hash01(i, j, 611) < 0.95)) {
+      const r = hash01(i, j, 612), d = ahead ? 0 : Math.floor(hash01(i, j, 613) * 4);
+      const base = ahead ? GAP : r < 0.27 ? TABLE : r < 0.5 ? GAP : r < 0.67 ? STEP : r < 0.84 ? KICK : null;
+      const sc = ahead ? 1 : 0.75 + 0.55 * hash01(i, j, 614);
+      let b;
+      if (base) b = Object.assign({}, base, { sc, len: base.len * sc });
+      else { const n = 3 + Math.floor(hash01(i, j, 615) * 3); b = { kind: 'mogul', n, len: n * 7, hw: 7 + 6 * hash01(i, j, 616), bev: 2.5 }; }
+      b.fx = [0, 1, 0, -1][d]; b.fz = [-1, 0, 1, 0][d];
+      const cx = (i + 0.5) * RCELL + (ahead ? 0 : (hash01(i, j, 617) - 0.5) * 10), cz = (j + 0.5) * RCELL + (ahead ? 0 : (hash01(i, j, 618) - 0.5) * 10);
+      b.x0 = cx - b.fx * b.len / 2; b.z0 = cz - b.fz * b.len / 2;
+      o = bbox(b);
+    }
+    jumpCache.set(key, o);
+    if (jumpCache.size > 6000) jumpCache.delete(jumpCache.keys().next().value);
+    return o;
+  }
+  /** The jumps whose middles lie in chunk (cx, cz) (for the renderer and the minimap). */
+  function jumpsInChunk(cx, cz) {
+    const CH = C.CHUNK, x0 = cx * CH, z0 = cz * CH, out = [];
+    if (MAP !== 'ramps') return out;
+    for (let i = Math.floor(x0 / RCELL); i <= Math.floor((x0 + CH - 1e-6) / RCELL); i++) {
+      for (let j = Math.floor(z0 / RCELL); j <= Math.floor((z0 + CH - 1e-6) / RCELL); j++) {
+        const o = jumpInCell(i, j); if (!o) continue;
+        const mx = o.x0 + o.fx * o.len / 2, mz = o.z0 + o.fz * o.len / 2;
+        if (mx >= x0 && mx < x0 + CH && mz >= z0 && mz < z0 + CH) out.push(o);
+      }
+    }
+    return out;
+  }
+  /** Height of the jump at (x, z) above the flat dirt; gradient in g (if given) */
+  function jumpHeight(x, z, g) {
+    const o = jumpInCell(Math.floor(x / RCELL), Math.floor(z / RCELL)), h = o ? obHeight(o, x, z) : 0;
+    if (g) { g.x = h > 0 ? _og.x : 0; g.z = h > 0 ? _og.z : 0; }
+    return h;
+  }
+
   function arenaResetCars() { for (const c of ARENA_CARS) { c.dent.fill(0); c.ver++; c.level = 0; c.cab = 0; c.dd = 0; c.glassEv = 0; c.glassN = 0; } }
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack') return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -657,7 +691,7 @@
   }
   const _ri = {};
   function terrainHeight(x, z, ri) {
-    if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
     if (MAP === 'mowtrack') {
       // dead flat round the field, rolling country well back from it
       const d = Math.hypot(x, z * 0.8);
@@ -727,12 +761,16 @@
     } else if (MAP === 'arena') {
       const ah = arenaHeight(x, z);
       if (ah > 0) { h += ah; dx += _ag.x; dz += _ag.z; }
+    } else if (MAP === 'ramps') {
+      const jh = jumpHeight(x, z, null);
+      if (jh > 0) { h += jh; dx += _og.x; dz += _og.z; }
     }
     const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
     out.h = h; out.nx = -dx * il; out.ny = il; out.nz = -dz * il;
     if (MAP === 'tarmac') { out.roadD = 0; out.surface = PREP ? 5 : 0; return out; }   // All Road: it's all asphalt (prepped)
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
+    if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
     // surface
     const ri = roadInfo(x, z, _gri);
     out.roadD = ri.d;
@@ -746,7 +784,7 @@
 
   // ---------------------------------------------------------------- vegetation / props
   function forestDensity(x, z) {
-    if (MAP === 'tarmac' || MAP === 'arena') return 0;
+    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
     if (STRAIGHT()) { const d = Math.abs(x) - (DRAGMAP() ? 25 : 0); return d < 40 ? 0 : 0.45 * smooth(40, 200, d) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3); }
     const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
@@ -764,8 +802,8 @@
     const trees = [], bushes = [], rocks = [], buildings = [], poles = [], signs = [], labels = [], lines = [], walls = [];
     const circles = [], boxes = [];
     const ri = {};
-    if (MAP === 'arena') {
-      for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
+    if (MAP === 'arena' || MAP === 'ramps') {
+      if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
       return cp;
@@ -1081,6 +1119,13 @@
       }
       return { x, z, y: ground(x, z, {}).h, tx, tz };
     }
+    if (MAP === 'ramps') {
+      // back on its wheels right where it is, facing the hint
+      let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
+      const l = Math.hypot(tx, tz);
+      if (l < 0.05) { tx = 0; tz = -1; } else { tx /= l; tz /= l; }
+      return { x, z, y: ground(x, z, {}).h, tx, tz };
+    }
     if (MAP === 'tarmac') {
       // it's all road: put the car back on its wheels right where it is (nudged off a light pole), facing the hint
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
@@ -1105,17 +1150,14 @@
   }
 
   function setMap(m) {
-    RAMPS = m === 'ramps';
-    if (RAMPS) m = 'arena';
-    useLayout(RAMPS ? 'ramps' : 'arena');
-    ARENA_CARS.length = 0; if (!RAMPS) ARENA_CARS.push(...ALL_CARS);
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' ? m : 'country';
+    jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, get ramps() { return RAMPS; }, DRAG_MARKS, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,

@@ -29,14 +29,14 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 } };
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
       sh.vertexShader = 'attribute vec2 aData;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\n' +
         sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
   vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vData = aData; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
+      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
         sh.fragmentShader
           .replace('#include <color_fragment>', `
   {
@@ -108,6 +108,7 @@ float lampLight(float lat, float al){
       float px = max(length(fwidth(P)), 1e-4);
       vec2 aq = abs(P) - vec2(${(W.ARENA.HW - W.ARENA.CR).toFixed(2)}, ${(W.ARENA.HL - W.ARENA.CR).toFixed(2)});
       float asd = length(max(aq, 0.0)) + min(max(aq.x, aq.y), 0.0) - ${W.ARENA.CR.toFixed(2)};          // < 0 on the floor
+      if (uRamps > 0.5) asd = -1.0;                              // (All Ramps: the clay goes on for ever)
       float n1 = vnoise(P * 0.18), n2 = vnoise(P * 1.3), n3 = vnoise(P * 7.0);
       vec3 c = mix(vec3(0.17, 0.095, 0.052), vec3(0.26, 0.155, 0.088), n1) * (0.82 + 0.16 * n2 + 0.08 * n3);
       c *= 1.0 - 0.22 * smoothstep(0.45, 0.8, fbm3(P * 0.035 + 3.0));
@@ -558,6 +559,29 @@ float lampLight(float lat, float al){
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
     })();
     const rampMat = new THREE.MeshStandardMaterial({ map: rampTex, roughness: 0.55, metalness: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    // All Ramps: a dirt jump meshed from worldgen's own height function (what the tyres feel) and painted by the terrain
+    // shader, so it's the same clay as the ground it rises out of
+    let jumpMat = null;
+    const _jg = { x: 0, z: 0 };
+    function buildJump(o, x0, z0) {
+      if (!jumpMat) { jumpMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }); jumpMat.onBeforeCompile = terrainMat.onBeforeCompile; }
+      const ax = o.minX - 0.5, bx = o.maxX + 0.5, az = o.minZ - 0.5, bz = o.maxZ + 0.5, step = 0.45;
+      const nx = Math.max(2, Math.ceil((bx - ax) / step)), nz = Math.max(2, Math.ceil((bz - az) / step)), N = (nx + 1) * (nz + 1);
+      const pos = new Float32Array(N * 3), nor = new Float32Array(N * 3), idx = [];
+      for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+        const k = j * (nx + 1) + i, x = ax + (bx - ax) * i / nx, z = az + (bz - az) * j / nz;
+        const h = W.jumpHeight(x, z, _jg), il = 1 / Math.sqrt(_jg.x * _jg.x + 1 + _jg.z * _jg.z);
+        pos[k * 3] = x - x0; pos[k * 3 + 1] = h + 0.004; pos[k * 3 + 2] = z - z0;
+        nor[k * 3] = -_jg.x * il; nor[k * 3 + 1] = il; nor[k * 3 + 2] = -_jg.z * il;
+      }
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      g.setAttribute('aData', new THREE.BufferAttribute(new Float32Array(N * 2), 2)); g.setIndex(idx);
+      g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, jumpMat); m.receiveShadow = true; m.castShadow = true;
+      return m;
+    }
     function buildRamp(r, x0, z0) {
       const R = W.RAMP, hw = R.W / 2, us = [], vs = [];
       for (let k = 0; k <= 6; k++) vs.push(-hw + R.BEVEL * k / 6);
@@ -680,6 +704,7 @@ float lampLight(float lat, float al){
         m.rotation.x = -Math.PI / 2; m.position.set(0 - x0, 0.02, ln.z - z0); m.receiveShadow = true; g.add(m);
       }
       for (const r of (W.rampsInChunk ? W.rampsInChunk(cx, cz) : [])) g.add(buildRamp(r, x0, z0));
+      for (const o of (W.jumpsInChunk ? W.jumpsInChunk(cx, cz) : [])) g.add(buildJump(o, x0, z0));
       for (const sgn of cp.signs) {
         const post = new THREE.Mesh(signPostGeo, MAT.rock); post.position.set(sgn.x - x0, sgn.y - 0.1, sgn.z - z0); post.rotation.y = sgn.rot;
         const plate = new THREE.Mesh(signPlateGeo, signMats[sgn.kind]); post.add(plate);
@@ -808,7 +833,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena';
+    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps';
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -1275,7 +1300,7 @@ void main(){
         g.fillStyle = '#888'; g.font = 'bold 34px Arial'; g.fillText(o.foot || '', w / 2, 520, w - 60);
         scrT.needsUpdate = true;
       }
-      drawScreen({ big: 'WELCOME', sub: W.ramps ? 'DIRT RAMPS · BIG AIR · TABLETOPS · STEP-UPS · WHOOPS' : 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
+      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
       arena = {
         update(dt) {
           for (const k of cars) if (k.ver !== k.c.ver) k.refresh();
