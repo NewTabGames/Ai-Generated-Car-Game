@@ -600,7 +600,10 @@
       M.carbon = cMat(weave); M.carbonP = cMat(weaveP);
       M.ti = new THREE.MeshStandardMaterial({ color: 0x8b7b9a, roughness: 0.25, metalness: 1 });
       M.redSeat = new THREE.MeshStandardMaterial({ color: 0xb0141c, roughness: 0.7 });
-      M.lampIn = new THREE.MeshPhysicalMaterial({ color: 0x2a2d33, roughness: 0.12, metalness: 1, clearcoat: 1, clearcoatRoughness: 0.03, side: THREE.DoubleSide });
+      // (panels laid on the skin draw in front of it: a depth bias, so the body's facets can't poke through them)
+      const onTop = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 };
+      M.lampIn = new THREE.MeshPhysicalMaterial(Object.assign({ color: 0x2a2d33, roughness: 0.12, metalness: 1, clearcoat: 1, clearcoatRoughness: 0.03, side: THREE.DoubleSide }, onTop));
+      M.vent = Object.assign(M.gloss.clone(), onTop);
       M.dchrome = new THREE.MeshStandardMaterial({ color: 0x5c6066, roughness: 0.18, metalness: 1 });
       M.drl = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xeef4ff, emissiveIntensity: 2, toneMapped: false });
       M.lensR = new THREE.MeshPhysicalMaterial({ color: 0x3a0306, roughness: 0.1, metalness: 0.2, clearcoat: 1 });
@@ -633,8 +636,9 @@
         return P;
       };
       const arch = (z) => Math.abs(z - zF) < 0.4 || Math.abs(z - zR) < 0.4;
+      const ST = stationsOf(-2.37, 2.39, 0.05, [ZW, ZRF, ZRR, ZR, 1.08, 1.22, 1.32, zF - 0.4, zF + 0.4, zR - 0.4, zR + 0.4, -2.2, 2.25]);
       const g = carBody({
-        stations: stationsOf(-2.37, 2.39, 0.05, [ZW, ZRF, ZRR, ZR, 1.08, 1.22, 1.32, zF - 0.4, zF + 0.4, zR - 0.4, zR + 0.4, -2.2, 2.25]),
+        stations: ST,
         section,
         mat: (b, z) => {
           if (b <= 3) return 2;                                                           // underbody
@@ -653,18 +657,30 @@
         for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getZ(i) * 6.25; uv[i * 2 + 1] = (Math.abs(p.getX(i)) + p.getY(i)) * 6.25; }
         g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
       add(body, g, [M.paint, M.tint, M.black, M.carbon], 0, 0, 0);
-      // a point on the skin at (z, t: position round the section) on side sx, and the outward normal there
-      const surf = (z, t, sx) => { const P = section(z), i = Math.max(0, Math.min(P.length - 2, Math.floor(t))), f = t - i; return V3(sx * (P[i][0] + (P[i + 1][0] - P[i][0]) * f), P[i][1] + (P[i + 1][1] - P[i][1]) * f, z); };
+      // a point on the skin at (z, t: position round the section) on side sx, and the outward normal there. On the mesh,
+      // not the ideal surface: straight between the stations, as the body's panels are (laid on the ideal curve, the
+      // headlamps sank under the facets between stations and the paint and carbon showed through them in patches)
+      const surf0 = (z, t, sx) => { const P = section(z), i = Math.max(0, Math.min(P.length - 2, Math.floor(t))), f = t - i; return V3(sx * (P[i][0] + (P[i + 1][0] - P[i][0]) * f), P[i][1] + (P[i + 1][1] - P[i][1]) * f, z); };
+      const surf = (z, t, sx) => {
+        let k = 1; while (k < ST.length - 1 && ST[k] < z) k++;
+        const za = ST[k - 1], zb = ST[k], f = clamp((z - za) / (zb - za), 0, 1);
+        return surf0(za, t, sx).lerp(surf0(zb, t, sx), f).setZ(z);
+      };
+      // (outward from the way the points run round the section - right side: up the flank and in over the top; a guess
+      // from the centre got the inner face of the fender peak backwards and sank the lamps' upper edge into the body)
       const surfN = (z, t, sx) => {
-        const p = surf(z, t, sx), n = new THREE.Vector3().crossVectors(surf(z + 0.01, t, sx).sub(p), surf(z, t + 0.05, sx).sub(p)).normalize();
-        if (n.dot(V3(p.x, p.y - 0.55, 0)) < 0) n.negate(); return n;
+        const p = surf0(z, t, sx), dz = surf0(z + 0.01, t, sx).sub(p), dt = surf0(z, t + 0.05, sx).sub(p);
+        return (sx > 0 ? new THREE.Vector3().crossVectors(dt, dz) : new THREE.Vector3().crossVectors(dz, dt)).normalize();
       };
       // a panel laid on the skin (a lamp, a vent): z0..z1, and between tA(z) and tB(z) round the section
       const patch = (sx, z0, z1, tA, tB, off, mat, nz, nt) => {
         nz = nz || 18; nt = nt || 6;
         const pos = [], idx = [];
+        // (rows on every station inside it too, so it follows the panels' kinks)
+        const zs = [...new Set([...Array.from({ length: nz + 1 }, (_, i) => z0 + (z1 - z0) * i / nz), ...ST.filter((z) => z > z0 && z < z1)])].sort((p, q) => p - q);
+        nz = zs.length - 1;
         for (let i = 0; i <= nz; i++) {
-          const z = z0 + (z1 - z0) * i / nz, a = tA(z), b = tB(z);
+          const z = zs[i], a = tA(z), b = tB(z);
           for (let j = 0; j <= nt; j++) { const t = a + (b - a) * j / nt, p = surf(z, t, sx).addScaledVector(surfN(z, t, sx), off); pos.push(p.x, p.y, p.z); }
         }
         for (let i = 0; i < nz; i++) for (let j = 0; j < nt; j++) { const a = i * (nt + 1) + j, b = a + 1, c = a + nt + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
@@ -687,21 +703,21 @@
       for (const sx of [-1, 1]) {
         const s = (z) => Math.pow(clamp((z + 2.35) / 0.56, 0, 1), 1.25);
         const lo = (z) => 12.2 + 3.4 * s(z), hi = (z) => 17.3 - 1.25 * s(z);
-        patch(sx, -2.352, -1.79, lo, hi, 0.004, M.lampIn, 22, 8);
-        const pts = []; for (let i = 0; i <= 14; i++) { const z = -2.34 + i * 0.5 / 14; pts.push(surf(z, lo(z) + 0.35, sx).addScaledVector(surfN(z, lo(z) + 0.35, sx), 0.008)); }
+        patch(sx, -2.352, -1.79, lo, hi, 0.005, M.lampIn, 22, 8);
+        const pts = []; for (let i = 0; i <= 14; i++) { const z = -2.34 + i * 0.5 / 14; pts.push(surf(z, lo(z) + 0.35, sx).addScaledVector(surfN(z, lo(z) + 0.35, sx), 0.012)); }
         add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0055, 6, false), M.drl, 0, 0, 0, 0, 0, 0, false);
         const hook = [surf(-2.34, lo(-2.34) + 0.35, sx), surf(-2.348, 13.6, sx), surf(-2.345, 15.2, sx)].map((p, i) => p.addScaledVector(V3(0, 0, -1), 0.009));
         add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hook), 16, 0.0055, 6, false), M.drl, 0, 0, 0, 0, 0, 0, false);
         for (const [z, t] of [[-2.27, 15.4], [-2.17, 15.8], [-2.07, 16.05]]) {
           const p = surf(z, t, sx), n = surfN(z, t, sx);
-          const ring = add(body, new THREE.TorusGeometry(0.026, 0.005, 8, 20), M.chrome, p.x + n.x * 0.006, p.y + n.y * 0.006, p.z + n.z * 0.006, 0, 0, 0, false);
-          const l = add(body, new THREE.CircleGeometry(0.024, 18), M.head, p.x + n.x * 0.007, p.y + n.y * 0.007, p.z + n.z * 0.007, 0, 0, 0, false);
+          const ring = add(body, new THREE.TorusGeometry(0.026, 0.005, 8, 20), M.chrome, p.x + n.x * 0.014, p.y + n.y * 0.014, p.z + n.z * 0.014, 0, 0, 0, false);
+          const l = add(body, new THREE.CircleGeometry(0.024, 18), M.head, p.x + n.x * 0.016, p.y + n.y * 0.016, p.z + n.z * 0.016, 0, 0, 0, false);
           for (const o of [ring, l]) o.quaternion.setFromUnitVectors(V3(0, 0, 1), n);
         }
         // the carbon hood's vents, and the fender vent behind each front wheel
-        patch(sx, -1.95, -1.52, () => 18.3, () => 19.7, 0.004, M.gloss, 8, 4);
+        patch(sx, -1.95, -1.52, () => 18.3, () => 19.7, 0.005, M.vent, 8, 4);
         for (let k = 1; k < 5; k++) { const z = -1.95 + k * 0.086, a = surf(z, 18.35, sx), b = surf(z, 19.65, sx), n = surfN(z, 19, sx); tubeAB(body, a.addScaledVector(n, 0.008), b.addScaledVector(n, 0.008), 0.005, M.carbonP, 6); }
-        patch(sx, -0.98, -0.66, () => 11.3, () => 13.4, 0.004, M.gloss, 8, 4);
+        patch(sx, -0.98, -0.66, () => 11.3, () => 13.4, 0.005, M.vent, 8, 4);
         const bl = [surf(-0.98, 12.35, sx), surf(-0.66, 12.35, sx)].map((p) => p.addScaledVector(surfN(-0.8, 12.35, sx), 0.01));
         tubeAB(body, bl[0], bl[1], 0.006, M.chrome, 8);
         // mirrors on stalks, body colour
