@@ -247,6 +247,7 @@
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' ? 0 : 1 });
 
     const P = { tips: [], spots: [], hideCockpit: [], lampSlots: [] };
+    let jetFan = null, jetFx = null;                 // (the jet golf cart's compressor face and exhaust)
     const body = new THREE.Group(); model.add(body);
 
     // ---------------------------------------------------------------- a seated driver
@@ -1107,13 +1108,14 @@
     // the seat pod and the rear body over the back wheels, and (standard / LSV) a roof on four struts. Standard: a bag
     // rack with two golf bags; LSV: windscreen, lights, mirrors, bigger wheels; Hot Rod: no roof, a chrome roll hoop,
     // racing buckets, fat tyres on deep-dish wheels; Record: stretched and lowered, the Hayabusa bare behind the seat
-    // with its headers into a megaphone, a wheelie bar
+    // with its headers into a megaphone, a wheelie bar; Jet: stretched, lowered and widened, a turbojet on a cradle over
+    // the back axle (bellmouth, spinning compressor face, afterburner can, a flame out of it), a tail fin, a nose cone
     B.golf = () => {
-      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa';
-      WF = REC ? 0.22 : HOT ? 0.225 : 0.215; WR = REC ? 0.3 : HOT ? 0.27 : 0.215;
-      wheelStyle = STD ? { rim: 'cart', rimR: 0.1, tread: 'road' } : LSV ? { rim: 'alloy5', rimR: 0.152, tread: 'road' }
+      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa', JET = V === 'jet';
+      WF = REC ? 0.22 : HOT ? 0.225 : JET ? 0.205 : 0.215; WR = REC ? 0.3 : HOT ? 0.27 : JET ? 0.225 : 0.215;
+      wheelStyle = STD ? { rim: 'cart', rimR: 0.1, tread: 'road' } : LSV || JET ? { rim: 'alloy5', rimR: 0.152, tread: 'road' }
         : HOT ? { rim: 'deepdish', rimR: 0.165, tread: 'slick' } : { rim: 'steel5', rimR: 0.15, tread: 'slick' };
-      const low = REC ? 0.1 : HOT ? 0.06 : 0;                 // (dropped)
+      const low = REC || JET ? 0.1 : HOT ? 0.06 : 0;          // (dropped)
       const wyF = 2 * RF + 0.03, wyR = 2 * RR + 0.03;          // clearance over the tyres
       M.seatC = new THREE.MeshStandardMaterial({ color: STD ? 0xd8cdb4 : LSV ? 0x2a2a2c : 0x151517, roughness: 0.65 });
       M.mat = new THREE.MeshStandardMaterial({ color: 0x1b1b1c, roughness: 0.95 });
@@ -1123,18 +1125,18 @@
         { z: zF + 0.2, w: 0.64, yb: wyF, yt: 0.84 - low * 0.5, n: 4 }, { z: zF + 0.27, w: 0.6, yb: 0.32 - low, yt: 0.86 - low * 0.5, n: 4 }], { seg: 36 }), M.paint, 0, 0, 0);
       add(body, rbox(0.9, 0.1, 0.1, 0.04), M.black, 0, 0.3 - low, zF - 0.47);          // bumper
       // the dash, floorboard, seat pod, seat, the rear body over the back wheels
-      const zD = zF + 0.28, zS1 = REC ? zR - 0.45 : zR - 0.25, zS0 = zS1 - 0.58;
+      const zD = zF + 0.28, zS1 = REC ? zR - 0.45 : JET ? zR - 0.72 : zR - 0.25, zS0 = zS1 - 0.58;
       add(body, rbox(1.12, 0.14, 0.1, 0.03), M.black, 0, 0.8 - low * 0.5, zD);
       add(body, rbox(1.02, 0.05, zS0 - zD, 0.02), M.mat, 0, 0.3 - low, (zD + zS0) / 2);
       add(body, rbox(1.12, 0.32, zS1 - zS0, 0.05), M.paint, 0, 0.46 - low, (zS0 + zS1) / 2);
-      const seats = HOT || REC ? [-0.26, 0.26] : [0];
+      const seats = HOT || REC || JET ? [-0.26, 0.26] : [0];
       for (const x of seats) {
         const w = seats.length > 1 ? 0.46 : 1.06;
         add(body, rbox(w, 0.1, 0.48, 0.04), M.seatC, x, 0.67 - low, (zS0 + zS1) / 2);
         add(body, rbox(w, seats.length > 1 ? 0.6 : 0.42, 0.09, 0.04), M.seatC, x, (seats.length > 1 ? 1.0 : 0.95) - low, zS1 - 0.02, 0.18, 0, 0);
         if (seats.length > 1) for (const dx of [-0.2, 0.2]) add(body, rbox(0.07, 0.36, 0.14, 0.03), M.seatC, x + dx, 0.88 - low, zS1 - 0.08, 0.18, 0, 0);
       }
-      if (!REC) {
+      if (!REC && !JET) {
         add(body, rbox(0.72, 0.26, 0.7, 0.04), M.black, 0, 0.4 - low, zR + 0.05);
         add(body, rbox(1.22, 0.24, 0.76, 0.06), M.paint, 0, wyR + 0.1, zR + 0.05);
       } else for (const sx of [-1, 1]) add(body, arcGeo(zR, RR, RR + 0.03, RR + 0.07, 0.15, Math.PI - 0.1, WR + 0.04), M.paint, sx * trackR / 2 - (WR + 0.04) / 2, 0, 0);
@@ -1145,7 +1147,7 @@
       SW = steering(V3(-0.24, 0.93 - low, zD + 0.23), 0.95, 0.19);
       cluster = { parent: body, pos: V3(-0.24, 0.8 - low * 0.5, zD - 0.055), rot: -0.3, w: 0.14, h: 0.07 };
       driver = person({ hip: V3(-0.26, 0.72 - low, zS0 + 0.3), lean: 0.14, hands: [V3(-0.38, 0.97 - low, zD + 0.25), V3(-0.1, 0.97 - low, zD + 0.25)],
-        knee: { dx: 0.11, y: 0.8 - low, z: zD + 0.3 }, foot: { dx: 0.14, y: 0.34 - low, z: zD + 0.08 }, helmet: REC || HOT });
+        knee: { dx: 0.11, y: 0.8 - low, z: zD + 0.3 }, foot: { dx: 0.14, y: 0.34 - low, z: zD + 0.08 }, helmet: REC || HOT || JET });
       if (STD || LSV) {
         // the roof on its struts
         const yR = 1.88;
@@ -1176,7 +1178,7 @@
         }
         spots(0.34, 0.58, -0.4 + zF);
       }
-      if (HOT) {
+      if (HOT || JET) {
         // chrome roll hoop behind the buckets, a black stripe down the cowl
         const hp = [V3(-0.5, 0.62 - low, zS1 + 0.06), V3(-0.48, 1.3, zS1 + 0.1), V3(0.48, 1.3, zS1 + 0.1), V3(0.5, 0.62 - low, zS1 + 0.06)];
         add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hp, false, 'centripetal'), 30, 0.03, 10, false), M.chrome, 0, 0, 0);
@@ -1201,7 +1203,61 @@
         for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.3, 0.3, zR + 0.3), V3(sx * 0.3, 0.12, zR + 0.55 + 0.1), 0.018, M.steel);
         add(body, cylX(0.04, 0.04, 0.66, 14), M.rubber, 0, 0.08, zR + 0.65);
         spots(0.3, 0.45, zF - 0.5);
-      } else if (!HOT && !LSV) P.tips.push(toRoot(V3(0, 0.3, zR + 0.45)));
+      } else if (!HOT && !LSV && !JET) P.tips.push(toRoot(V3(0, 0.3, zR + 0.45)));
+      if (JET) {
+        // the turbojet on its cradle over the back axle: a bellmouth intake behind the buckets, the compressor face (it
+        // spins with the spool), a brushed case with its bands and fuel lines, the afterburner can and its nozzle
+        const ey = 0.6, er = 0.16, ez0 = zS1 + 0.12, eL = 0.9, abL = 0.55;
+        const aluD = M.alu.clone(); aluD.side = THREE.DoubleSide;
+        const heat = new THREE.MeshStandardMaterial({ color: 0x7a6a78, roughness: 0.3, metalness: 1 });
+        const bell = new THREE.LatheGeometry([[0.235, 0], [0.225, 0.02], [0.2, 0.05], [0.18, 0.1], [0.172, 0.16]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+        bell.rotateX(Math.PI / 2); add(body, bell, aluD, 0, ey, ez0);
+        jetFan = new THREE.Group(); jetFan.position.set(0, ey, ez0 + 0.15); body.add(jetFan);
+        add(jetFan, new THREE.CircleGeometry(0.165, 32), M.black, 0, 0, 0.005);
+        add(jetFan, cylZ(0.001, 0.05, 0.08, 18), M.alu, 0, 0, -0.035, Math.PI, 0, 0);
+        for (let k = 0; k < 13; k++) { const b = add(jetFan, new THREE.BoxGeometry(0.012, 0.13, 0.03), M.steel, 0, 0, 0); b.geometry.translate(0, 0.095, 0); b.rotation.set(0, 0.5, k * 2 * Math.PI / 13, 'ZYX'); }
+        add(body, cylZ(er, er, eL, 36), M.alu, 0, ey, ez0 + 0.16 + eL / 2);
+        for (const dz of [0.05, 0.32, 0.6, 0.86]) add(body, new THREE.TorusGeometry(er + 0.004, 0.009, 8, 36), M.steel, 0, ey, ez0 + 0.16 + dz);
+        for (const sx of [-1, 1]) pipe(body, [V3(sx * 0.12, ey - 0.1, ez0 + 0.3), V3(sx * 0.17, ey - 0.02, ez0 + 0.5), V3(sx * 0.17, ey + 0.02, ez0 + 0.9)], 0.008, M.steel, 6);
+        const zA = ez0 + 0.16 + eL;
+        add(body, cylZ(er - 0.012, er - 0.02, abL, 36), heat, 0, ey, zA + abL / 2);
+        const zN = zA + abL;
+        add(body, cylZ(0.14, 0.13, 0.1, 30, true), new THREE.MeshStandardMaterial({ color: 0x3a3436, roughness: 0.5, metalness: 0.8, side: THREE.DoubleSide }), 0, ey, zN + 0.05);
+        add(body, new THREE.CircleGeometry(0.12, 24), M.black, 0, ey, zN - 0.02, 0, Math.PI, 0);
+        // the cradle: four struts from the frame rails
+        for (const sx of [-1, 1]) for (const dz of [0.25, 0.8]) tubeAB(body, V3(sx * 0.3, 0.32, ez0 + dz), V3(sx * 0.1, ey - er + 0.02, ez0 + dz + 0.05), 0.016, M.steel);
+        // the tail fin on top of the afterburner can, swept back
+        const fs = new THREE.Shape(); fs.moveTo(0, 0); fs.lineTo(0.62, 0); fs.lineTo(0.78, 0.5); fs.lineTo(0.5, 0.52); fs.closePath();
+        const fin = new THREE.ExtrudeGeometry(fs, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 });
+        fin.rotateY(-Math.PI / 2); fin.translate(0.011, 0, 0);
+        add(body, fin, M.paint, 0, ey + er - 0.03, zA - 0.2);
+        // the nose cone on the front cowl
+        const cone = new THREE.LatheGeometry([[0.17, 0], [0.16, 0.08], [0.13, 0.18], [0.08, 0.29], [0.02, 0.37], [0.001, 0.38]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+        cone.rotateX(-Math.PI / 2); cone.scale(1.3, 0.8, 1);
+        add(body, cone, M.paint, 0, 0.42 - low, zF - 0.44);
+        // the exhaust: a hot core and the plume around it, both additive - barely there dry, a long orange flame with
+        // shock diamonds on the afterburner
+        const flameMat = (core) => new THREE.ShaderMaterial({
+          uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 } },
+          vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+          fragmentShader: `uniform float uAB; uniform float uThr; uniform float uT; uniform float uCore; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+            void main() {
+              float t = 1.0 - vUv.y;
+              float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
+              float dia = 0.6 + 0.4 * pow(abs(sin(t * 16.0 - uT * 2.0)), 3.0);
+              float flick = 0.85 + 0.15 * sin(uT * 53.0 + t * 9.0) * sin(uT * 31.0 + 1.3);
+              vec3 hot = mix(vec3(1.0, 0.93, 0.78), vec3(1.0, 0.52, 0.14), smoothstep(0.0, 0.45, t));
+              hot = mix(hot, vec3(0.85, 0.2, 0.06), smoothstep(0.45, 1.0, t));
+              float a = edge * (1.0 - smoothstep(0.15, 1.0, t)) * flick * (uCore > 0.5 ? dia * 1.7 : 0.8) * (uAB * 2.4 + uThr * 0.18);
+              gl_FragColor = vec4(hot * a, 1.0);
+              #include <colorspace_fragment>
+            }`,
+          transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+        });
+        const plumeGeo = (r0, r1) => { const g = new THREE.CylinderGeometry(r0, r1, 1, 24, 6, true); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; };
+        jetFx = { outer: add(body, plumeGeo(0.14, 0.07), flameMat(false), 0, ey, zN + 0.1, 0, 0, 0, false), core: add(body, plumeGeo(0.1, 0.015), flameMat(true), 0, ey, zN + 0.1, 0, 0, 0, false), t: 0 };
+        jetFx.outer.renderOrder = 5; jetFx.core.renderOrder = 6;
+      }
     };
 
     // ---------------------------------------------------------------- Rally Car (r4 / r2 / gb)
@@ -1315,7 +1371,8 @@
 
     // ---------------------------------------------------------------- the display on the dash
     if (cluster) add(cluster.parent, new THREE.PlaneGeometry(cluster.w, cluster.h), M_cluster, cluster.pos.x, cluster.pos.y, cluster.pos.z + 0.002, cluster.rot, 0, 0, false);
-    const EV = CAR === 'golf' ? ENGINE !== 'busa' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
+    const EV = CAR === 'golf' ? ENGINE !== 'busa' && ENGINE !== 'jet' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
+    const JETC = CAR === 'golf' && ENGINE === 'jet';
 
     // ---------------------------------------------------------------- wheels
     function carcass(R, W, rim) {
@@ -1435,7 +1492,7 @@
       g.fillText(String(Math.round(t.speedMph)), 16, 128);
       g.font = 'bold 36px Arial'; g.fillStyle = '#8fb2c6'; g.fillText('MPH', 20, 214);
       g.fillStyle = '#ffffff'; g.font = 'bold 90px Arial'; g.textAlign = 'right'; g.fillText(t.gear.replace(/^[DM](?=\d)/, '') || 'D', 496, 140);
-      g.font = 'bold 30px Arial'; g.fillStyle = '#8fb2c6'; g.fillText(EV ? Math.round(clamp(t.rpm / (t.redline || 1), 0, 1) * 100) + '% MOTOR' : Math.round(t.rpm) + ' RPM', 496, 214);
+      g.font = 'bold 30px Arial'; g.fillStyle = '#8fb2c6'; g.fillText(JETC ? Math.round(t.rpm / 100) + '% N1' : EV ? Math.round(clamp(t.rpm / (t.redline || 1), 0, 1) * 100) + '% MOTOR' : Math.round(t.rpm) + ' RPM', 496, 214);
       clusterTex.needsUpdate = true;
     }
     function drawScreen() {}
@@ -1465,12 +1522,23 @@
       }
     }
     function setChute() {}
+    // the jet golf cart: the compressor face spins with the spool, the flame follows the thrust and the afterburner
+    function setJet(N, ab, thr, dt) {
+      if (!jetFx) return;
+      jetFx.t += dt;
+      if (jetFan) jetFan.rotation.z += N * 45 * dt;
+      const on = ab > 0.02 || thr > 0.3;
+      jetFx.outer.visible = jetFx.core.visible = on;
+      if (!on) return;
+      jetFx.outer.scale.z = 0.35 + 1.9 * ab + 0.25 * thr; jetFx.core.scale.z = 0.2 + 0.95 * ab + 0.1 * thr;
+      for (const m of [jetFx.outer.material, jetFx.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = jetFx.t; }
+    }
 
     rootG.traverse((o) => { if (o.isMesh && o.material && (o.material.transparent || (Array.isArray(o.material) && false))) o.castShadow = false; });
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW.sw, eye: toRoot(eye),
       exhaustTips: P.tips, materials: M, headlights: P.spots, tailLens: [], mirrors: [],
-      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, variant: 'cc', cls: CAR,
+      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, setJet, variant: 'cc', cls: CAR,
     };
   }
 

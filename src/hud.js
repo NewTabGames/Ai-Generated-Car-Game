@@ -165,6 +165,23 @@
         this._mmOverlay(g, c, S, heading);
         return;
       }
+      if (W.track || W.map === 'mowtrack') {
+        // the tracks: the whole course (the start / finish line in red); the Mower Track: its oval
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        const path = () => {
+          g.beginPath();
+          if (W.track) { const T = W.track; g.moveTo(T.x[0], T.z[0]); for (let i = 1; i <= T.n; i++) g.lineTo(T.x[i % T.n], T.z[i % T.n]); }
+          else { const M = W.MOWT; g.moveTo(M.R, M.SL); g.lineTo(M.R, -M.SL); g.arc(0, -M.SL, M.R, 0, -Math.PI, true); g.lineTo(-M.R, M.SL); g.arc(0, M.SL, M.R, Math.PI, 0, true); }
+        };
+        const w = W.track ? W.track.W : W.MOWT.W, mow = !W.track || W.track.kind === 'mow';
+        path(); g.strokeStyle = '#111'; g.lineWidth = Math.max(22, w + 12); g.stroke();
+        path(); g.strokeStyle = mow ? '#a0784e' : '#b8ad98'; g.lineWidth = Math.max(12, w); g.stroke();
+        const sx = W.track ? W.track.x[0] : W.MOWT.R, sz = W.track ? W.track.z[0] : 0, tx = W.track ? W.track.tx[0] : 0, tz = W.track ? W.track.tz[0] : -1, hw = Math.max(9, w / 2 + 4);
+        g.strokeStyle = '#e22'; g.lineWidth = 6; g.lineCap = 'butt'; g.beginPath(); g.moveTo(sx + tz * hw, sz - tx * hw); g.lineTo(sx - tz * hw, sz + tx * hw); g.stroke();
+        g.restore();
+        this._mmOverlay(g, c, S, heading);
+        return;
+      }
       if (TAR) {
         // All Road: the avenue grid over the paving, and the jump ramps
         const A = W.TARMAC.AV, e = R * 1.5;

@@ -309,6 +309,14 @@
       muX: 0.95, muY: 0.86, loose: 1.05, kappaPeak: 0.11, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.26,
       B: 1.7, C: 1.38, E: -0.2, heatCap: 1600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
       crr: [1.1, 1.1, 1.05, 1.05, 1, 1.1] },
+    // the jet golf cart: low-profile radials on 12 in wheels, wider and grippier at the back (the rear axle has to let go
+    // after the front at 170 mph, or it would swap ends)
+    jetF: { name: '205/40R12 cart radial', short: 'Cart radials', width: 0.205,
+      muX: 1.1, muY: 0.98, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.28,
+      B: 1.8, C: 1.4, E: -0.25, heatCap: 1800, cold: 0.97, coldT: 10, warmT: 40, hotT: 105, overheat: 0.003, prep: 1.0 },
+    jetR: { name: '225/40R12 cart radial', short: 'Cart radials', width: 0.225,
+      muX: 1.12, muY: 1.1, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.28,
+      B: 1.8, C: 1.4, E: -0.25, heatCap: 2000, cold: 0.97, coldT: 10, warmT: 40, hotT: 105, overheat: 0.003, prep: 1.0 },
     // rally cars: gravel tyres - a tall, soft sidewall and a deep block tread that cuts into loose stuff; less than a
     // road tyre on tarmac, a lot more on gravel, dirt and grass
     rallyG: { name: '195/65R15 gravel rally', short: 'Gravel rally', width: 0.195,
@@ -457,7 +465,7 @@
       const x = clamp((p - a) / (0.9 - a), 0, 1), e = x * x * (3 - 2 * x);
       return this.shiftFromG + (G - this.shiftFromG) * e;
     }
-    rpm() { return this.eOmega * RAD2RPM; }
+    rpm() { return this.spec.jet ? (this.jetN || 0) * this.spec.jet.rpm100 : this.eOmega * RAD2RPM; }
 
     gearLabel() {
       if (this.revHoldActive) return 'N';
@@ -1074,6 +1082,27 @@
         }
       }
 
+      // jet thrust: along the car's own axis, on the turbine's centre line (above the CG - it leans on the nose a little,
+      // which is what keeps it from standing up on the rear axle like a wheelie car)
+      if (s.jet && this.jetF > 0) {
+        const T = this.jetF, ly = s.jet.y + (s.cgDrop || 0), lz = s.jet.z;
+        const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
+        const fx = -m02 * T, fy = -m12 * T, fz = -m22 * T;
+        Fx += fx; Fy += fy; Fz += fz;
+        Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
+      }
+      // a tail fin (fin: its height, how far behind the CG, side area x lift slope): the air hitting it side-on pushes it
+      // back in line - weathervane stability that grows with speed and holds the nose straight when the tyres go light
+      if (s.fin) {
+        const f = s.fin, ly = f.y + (s.cgDrop || 0), lz = f.z;
+        const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
+        const ax = vx + wy * rz - wz * ry, ay = vy + wz * rx - wx * rz, az = vz + wx * ry - wy * rx;
+        const F = -0.5 * s.rho * f.CyA * Math.sqrt(ax * ax + ay * ay + az * az) * (ax * m00 + ay * m10 + az * m20);
+        const fx = m00 * F, fy = m10 * F, fz = m20 * F;
+        Fx += fx; Fy += fy; Fz += fz;
+        Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
+      }
+
       // ---------------- body / ground penalty contacts (roll-overs, bottoming out)
       this._bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, (fx, fy, fz, rx, ry, rz) => {
         Fx += fx; Fy += fy; Fz += fz;
@@ -1300,7 +1329,10 @@
       // (bicycle model with ~1.4 deg/g understeer), capped at what the tyres can deliver; if the car rotates
       // more than asked (oversteer) cut torque and brake the outer front. Sideslip check catches slow drifts.
       W[0].escBrake = 0; W[1].escBrake = 0; this.escCut = 1; this.escActive = false;
-      if (this.tcMode <= 1 && !s.noESC && speed > 5 && !this.lineLockActive && vFwd > 3) {
+      // (with the car in the air - fewer than three wheels down - the module holds off, as the real ones do: braking a
+      // front wheel that's off the ground only lands it locked, and a crooked landing became a spin)
+      const nDown = (W[0].contact ? 1 : 0) + (W[1].contact ? 1 : 0) + (W[2].contact ? 1 : 0) + (W[3].contact ? 1 : 0);
+      if (this.tcMode <= 1 && !s.noESC && speed > 5 && !this.lineLockActive && vFwd > 3 && nDown >= 3) {
         const street = this.tcMode === 0;
         const yawRate = this.wx * upX + this.wy * upY + this.wz * upZ;          // + = rotating left
         const L = s.wheelbase, K = 0.0025;
@@ -1358,6 +1390,7 @@
     // ------------------------------------------------------------------ engine
     _engine(h) {
       const s = this.spec, inp = this.input;
+      if (s.jet) return this._jetEngine(h);
       let rpm = this.eOmega * RAD2RPM;
       // electric motor (electric): always live - no starter, no idle, no stall - with full torque from a standstill, and
       // the controller holds its top speed by fading the torque out instead of a fuel cut
@@ -1479,12 +1512,45 @@
       }
     }
 
+    // jet (the jet golf cart): a small turbojet behind the seats. The throttle sets the spool (N1: the compressor's speed as
+    // a fraction of its 100 %) and the turbine chases it - lazily off idle, where it has to get the air moving (~3 s idle to
+    // full), quicker coming down. Thrust climbs steeply with the spool (~3 % of full at idle, which the brakes hold) and
+    // falls off a little as the air rams in faster. Floored with the spool past 96 % the afterburner lights (jet.ab more
+    // thrust, a third of a second to catch). The starter spins it to ~20 % and it lights off. It drives no wheels: the cart
+    // rolls free. Reverse is the cart's old 48 V motor, clutched to the back axle in R only (the turbine idles in P and R).
+    // Stability control can pull the fuel back as well as brake a wheel (the thrust follows as it spools down)
+    _jetEngine(h) {
+      const s = this.spec, J = s.jet, inp = this.input;
+      let N = this.jetN || 0;
+      if (this.cranking) {
+        this.crankT += h;
+        if (this.crankT > 1.8 && N > 0.18) { this.cranking = false; this.running = true; }
+        else if (this.crankT > 5) this.cranking = false;
+      }
+      this.stalled = false; this.fuelCut = false; this.boost = 0; this.nosActive = false;
+      const cmd = this.running && this.gear > 0 && !this.park ? clamp(inp.throttle, 0, 1) * this.escCut : 0;
+      const tgt = this.cranking ? 0.22 : this.running ? J.idle + (1 - J.idle) * cmd : 0;
+      const e = tgt - N, rate = e > 0 ? (this.running ? 0.05 + 0.42 * N * N : 0.14) : this.running ? 0.5 : 0.09;
+      N += clamp(e * 5 * h, -rate * h, rate * h);
+      this.jetN = N;
+      const x = Math.pow(clamp((N - 0.2) / 0.8, 0, 1.05), 2.2);
+      const abOn = this.running && cmd > 0.97 && N > 0.96 ? 1 : 0, ab0 = this.jetAB || 0;
+      this.jetAB = ab0 + (abOn - ab0) * Math.min(1, h / (abOn ? 0.35 : 0.1));
+      this.jetF = J.thrust * (s.torqueScale || 1) * x * (1 + J.ab * this.jetAB) * Math.max(0.5, 1 - J.ram * Math.max(0, this.forwardSpeed));
+      this.thrEff = clamp(x, 0, 1);
+      if (this.gear < 0 && !this.park && this.running) {
+        const t = clamp(inp.throttle, 0, 1) * clamp((J.revRpm - Math.abs(this.eOmega) * RAD2RPM) / 250, 0, 1);
+        this.Te = t * J.revTq - 0.4 * Math.tanh(this.eOmega / 4);
+      } else { this.Te = 0; this.eOmega = 0; }
+    }
+
     // ------------------------------------------------------------------ driveline
     _coupling(slip) {
       // returns 0 none, 1 fluid (torque converter), 2 friction (clutch / lockup) with this._cap
       // (slip: engine speed minus the clutch's output side, rad/s)
       const s = this.spec;
       if (this.gear === 0 || this.park || this.revHoldActive || this.launchHold) return 0;
+      if (s.jet && this.gear > 0) return 0;                  // (the jet cart: nothing drives the wheels going forwards)
       if (s.dragClutch) { this._cap = this._dcCap(slip || 0); return this._cap > 1 ? 2 : 0; }
       if (this.transType === 'auto') {
         if (this.lockupEng > 0.02 && !s.noLockup) { this._cap = s.lockupTorque * this.lockupEng; return 2; }
@@ -2750,6 +2816,31 @@
       CdA: 0.7,
       bodyHalfW: 0.62, bodyFront: -1.5, bodyRear: 1.5, bodyBottom: -0.3, bodyTop: 0.8,
       bodyPts: ccPts(0.42, 0.4, 2.1, ccBox(0.62, 0.12, 0.7, -1.45, 1.5).concat([[0, 1.25, 0.6]])),
+    } },
+    // jet - a turbojet cart for the drag shows: a surplus target-drone turbojet (~2.6 kN / 590 lbf dry, ~3.6 kN / 810 lbf
+    // with its homebuilt afterburner) slung low behind the seats, a stretched, lowered, wider frame, low-profile radials,
+    // four-wheel discs with ABS, a nose cone and a tail fin. 480 kg with the driver and fuel. ~0-60 in 4 s, ~185 mph.
+    // Stable flat out: the thrust line runs only 8 cm above the CG (mounted high, 0.5 m up, full thrust levered ~700 N off
+    // the rear tyres - nothing pushes through the wheels to load them back up, as it does in a car - and a lane change at
+    // 60 mph swapped ends), the rear tyres are wider and grippier than the fronts, the brakes are biased 70 % to the front
+    // (a jet is still pushing for a second after you lift), and the fin keeps its nose in the wind
+    jet: { label: 'Jet', car: 'TURBOJET 810 LBF', hp: 0, tq: 0, kbLat: 4.5, spec: {
+      mass: 480, Ipitch: 380, Iyaw: 440, Iroll: 72, cgHeight: 0.44, wheelbase: 2.3, frontWeight: 0.47, trackF: 1.14, trackR: 1.22,
+      wheelRadius: 0.27, wheelRadiusF: 0.26, wheelRadiusR: 0.27, wheelInertiaF: 0.28, wheelInertiaR: 0.32,
+      frontTire: 'jetF', rearTire: 'jetR', Fz0: 1500,
+      springF: 30000, springR: 34000, dampBumpF: 1700, dampRebF: 2500, dampBumpR: 1900, dampRebR: 2800, travelUp: 0.05, travelDown: 0.05,
+      arbF: 14000, arbR: 5000, rearToe: 0.004,
+      brakeTorqueF: 1300, brakeTorqueR: 550, handbrakeTorque: 700, noABS: false, noESC: false,
+      maxSteer: 0.5, steerRate: 3, steerRatio: 14,
+      electric: false, idleRpm: 3600, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+      torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
+      autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
+      dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
+      jet: { thrust: 2600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.2, revTq: 22, revRpm: 4000 },
+      fin: { y: 0.2, z: 1.6, CyA: 0.3 },
+      CdA: 0.66, ClA: 0.22,
+      bodyHalfW: 0.64, bodyFront: -1.75, bodyRear: 1.95, bodyBottom: -0.28, bodyTop: 1.0,
+      bodyPts: ccPts(0.44, 0.47, 2.3, ccBox(0.64, 0.12, 0.8, -1.75, 1.95).concat([[0, 1.45, 1.5], [0, 1.05, 0.9]])),
     } },
   }, 'std', 'Standard');
   // ---------------------------------------------------------------- rally cars

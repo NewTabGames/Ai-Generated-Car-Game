@@ -9,6 +9,9 @@
    even-fire V6s (a bank each side, every 120 deg); a centrifugal blower's surge chirp on a lift (surge).
    Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
    load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
+   Turbojet (jet: the jet golf cart): no pistons - the compressor's whine (its blade-pass tone and a turbine tone above it,
+   rising with the spool), a broadband roar that deepens and swells with the thrust, and the afterburner's ragged,
+   crackling rumble. Nitrous (nos): the solenoids' hiss and a harder, louder engine while it sprays.
    Multi-engine mode (pulling tractor): up to 4 V8s or V12s geared onto one crankline, each with its own firing
    sequence and exhaust, fired a few degrees apart so they hit like one enormous engine; deeper, longer exhaust pulses,
    a sub-bass layer and a hotter output stage for sheer volume.
@@ -30,7 +33,9 @@ class CarSynth {
       pipe: 0,     // (2-strokes) 0 off the pipe .. 1 in the expansion chamber's tuned band
       vt: 0,       // cyl 2 with vt > 0: a 4-stroke V-twin with that V angle instead of a 2-stroke single
       surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
-      ev: 0 };     // 1: an electric motor (whK = its whine Hz per rpm)
+      ev: 0,       // 1: an electric motor (whK = its whine Hz per rpm)
+      jet: 0, ab: 0,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1
+      nos: 0 };    // nitrous spraying, 0..1
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -158,7 +163,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -177,15 +182,16 @@ class CarSynth {
     if (pp >= 0) { g[0] *= 1.3 - 0.5 * pp; g[1] *= 1.1 - 0.2 * pp; g[3] *= 0.65 + 0.95 * pp; g[4] *= 0.5 + 1.5 * pp; }
     const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 || c.cyl === 6 ? 3 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle; a triple / a V6 bank 3 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
-    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0);   // open headers crackle
+    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0) + 0.15 * c.nos;   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
-    const ev = c.ev > 0.5;
-    const bodyAmp = (c.run > 0.5 && !ev ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
-    const roarAmp = (c.run > 0.5 && !ev ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
+    const ev = c.ev > 0.5, jet = c.jet > 0.5;
+    const bodyAmp = (c.run > 0.5 && !ev && !jet ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
+    const roarAmp = (c.run > 0.5 && !ev && !jet ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
     const aRoar = 1 - Math.exp(-2 * Math.PI * (160 + rpm * 0.1) / sr);
     let engGain = (c.run > 0.5 ? 0.5 + 0.5 * load : 0.3) * (0.62 + 0.38 * rpmN) * c.engVol * 0.55 * (1 + 0.3 * race) * (1 + loud * (0.1 + 0.9 * load)) / Math.sqrt(nE);
     if (pp >= 0) engGain *= 0.82 + 0.4 * pp * (0.4 + 0.6 * load);
-    if (ev) engGain = 0;
+    if (ev || jet) engGain = 0;
+    engGain *= 1 + 0.35 * c.nos;                       // (nitrous: every firing hits harder)
     const interior = c.open ? 0 : c.interior;
     // open cockpit: you sit right behind the engines, nothing in between
     if (c.open && c.interior > 0.5) engGain *= 1.2;
@@ -205,12 +211,12 @@ class CarSynth {
     const flDecay = Math.exp(-1 / (sr * 0.28));
     // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
     // fades out towards a standstill)
-    const whAmp = ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+    const whAmp = jet ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
       : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
     this.setBP(this.intake, 280 + rpm * 0.09, 1.2);
-    const intakeAmp = ev ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
+    const intakeAmp = ev || jet ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
     // tyres
     this.sqDrift += (this.rnd() - 0.5) * 0.08; this.sqDrift *= 0.97;
     const sqF = 760 + 380 * c.sqPitch + 60 * this.sqDrift;
@@ -226,6 +232,19 @@ class CarSynth {
     if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
     const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1);
+    // turbojet: the compressor's blade-pass tone rises from ~1.3 kHz at idle to ~3.2 kHz flat out; the roar's band opens
+    // up and swells with the thrust (load); the afterburner is a deep rumble with crackle on top
+    let jF = 0, jWh = 0, jRoar = 0, aJ = 0;
+    if (jet) {
+      if (!this.jtB1) { this.jtB1 = this.bp(1300, 10); this.jtB2 = this.bp(1900, 6); this.jtCr = this.bp(700, 1.3); this.jtLP = 0; this.jtLP2 = 0; this.abLP = 0; this.abLP2 = 0; this.jPh1 = 0; this.jPh2 = 0; }
+      const jN = Math.min(1.1, rpm / (c.rpmRef || 10000));
+      jF = 250 + 2900 * jN;
+      jWh = (0.03 + 0.07 * jN * jN) * (c.whine || 1) * c.engVol * (interior > 0.5 ? 1.2 : 1);
+      jRoar = (0.08 + 1.9 * Math.pow(load, 1.2)) * (0.3 + 0.7 * Math.min(1, jN)) * c.engVol;
+      aJ = 1 - Math.exp(-2 * Math.PI * (220 + 2400 * load) / sr);
+      this.setBP(this.jtB1, jF, 10); this.setBP(this.jtB2, jF * 1.47, 6);
+    }
+    const aAB = 1 - Math.exp(-2 * Math.PI * 150 / sr);
     const aWind = 1 - Math.exp(-2 * Math.PI * (180 + spd * 22) / sr);
     // watchdog: if the game loop stops feeding us (tab hidden, hitch), fade out instead of droning on one note
     const aliveTgt = this.t - this.lastSet < 0.3 ? 1 : 0;
@@ -301,6 +320,25 @@ class CarSynth {
         if (!this.evHs) this.evHs = this.bp(6500, 1.5);
         const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
         oL += gm; oR += gm;
+      }
+      if (jet && (jWh > 1e-5 || jRoar > 1e-5)) {
+        this.jPh1 += 2 * Math.PI * jF / sr; if (this.jPh1 > 6.283185307) this.jPh1 -= 6.283185307;
+        this.jPh2 += 2 * Math.PI * jF * 1.47 / sr; if (this.jPh2 > 6.283185307) this.jPh2 -= 6.283185307;
+        const wh = (Math.sin(this.jPh1) * 0.6 + Math.sin(this.jPh2) * 0.22) * jWh + this.run(this.jtB1, w1) * jWh * 1.4 + this.run(this.jtB2, w2) * jWh * 0.9;
+        this.jtLP += aJ * (w1 - this.jtLP); this.jtLP2 += aJ * (this.jtLP - this.jtLP2);
+        let js = wh + this.jtLP2 * jRoar;
+        if (c.ab > 0.01) {
+          this.abLP += aAB * (w2 - this.abLP); this.abLP2 += aAB * (this.abLP - this.abLP2);
+          const tick = this.rnd() < 0.006 * c.ab ? (this.rnd() - 0.5) * 7 : 0;
+          js += (this.abLP2 * 11 + this.run(this.jtCr, tick) * 0.6) * c.ab * c.engVol;
+        }
+        oL += js; oR += js * 0.97;
+      }
+      // nitrous: the solenoids' hiss while it sprays
+      if (c.nos > 1e-3) {
+        if (!this.nosBP) this.nosBP = this.bp(5200, 0.9);
+        const hs = this.run(this.nosBP, w2) * 0.1 * c.nos * c.engVol;
+        oL += hs; oR += hs;
       }
       if (this.flut > 1e-3) {
         if (!this.flBP) { this.flBP = this.bp(1900, 2.2); this.flBP2 = this.bp(3400, 4); }

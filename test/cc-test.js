@@ -1,21 +1,22 @@
 // The Car Crushers 2 cars: ride height, launches and top speed against their targets (the game's top speeds; the
 // GT-R's and the Blue Bird's real figures), cornering on a skid pad (grip or tip-over), braking, keyboard lane
 // changes, and the Banana Car afloat on a lake. CC=couch,gtr,... picks which to run; id:engine runs an electric car
-// with one of its petrol alternatives (mini:twinair, scooter:busa, razor:ls).
+// with one of its petrol alternatives (mini:twinair, scooter:busa, razor:ls); golf:jet is the turbojet cart.
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694;
 const flat = (surf, water) => ({ C: { WATER_LEVEL: water === undefined ? -1e4 : water }, ground(x, z, o) { o.h = water === undefined ? 0 : -3; o.nx = 0; o.ny = 1; o.nz = 0; o.surface = water === undefined ? surf : 4; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } });
 // the traction-control mode each starts on in the game
 const TC = { couch: 2, bluebird: 2, scooter: 1 };
 const TARGET = { hellcat: 199, couch: 190, eggrod: 142, banana: 85, bluebird: 301, gtr: 196, mini: 55, potty: 45, scooter: 119, razor: 142,
-  'mini:twinair': 100, 'scooter:busa': 160, 'razor:ls': 165, golf: 19, 'golf:lsv': 35, 'golf:hot': 84, 'golf:busa': 119, rally: 116, 'rally:r2': 120, 'rally:gb': 140 };
-const ALL = 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor,mini:twinair,scooter:busa,razor:ls,golf,golf:lsv,golf:hot,golf:busa,rally,rally:r2,rally:gb';
+  'mini:twinair': 100, 'scooter:busa': 160, 'razor:ls': 165, golf: 19, 'golf:lsv': 35, 'golf:hot': 84, 'golf:busa': 119, 'golf:jet': 187, rally: 116, 'rally:r2': 120, 'rally:gb': 140 };
+const ALL = 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor,mini:twinair,scooter:busa,razor:ls,golf,golf:lsv,golf:hot,golf:busa,golf:jet,rally,rally:r2,rally:gb';
 const defOf = (key) => { const [id, eng] = key.split(':'); return eng ? CARS[id].make(eng) : CARS[id]; };
 function mk(key, surf, water) {
   const id = key.split(':')[0];
   const v = new Vehicle(flat(surf || 0, water), defOf(key).spec);
   v.setTires(v.spec.frontTire, v.spec.rearTire);
   v.reset(0, water === undefined ? 0 : -3, 0, 0, -1); v.running = true; v.eOmega = v.spec.idleRpm / 9.549; v.park = false; v.gear = 1;
+  if (v.spec.jet) v.jetN = v.spec.jet.idle;          // (a turbojet: lit and idling)
   v.tcMode = TC[id] !== undefined ? TC[id] : 1;
   for (const w of v.wheels) w.temp = 50;
   for (let i = 0; i < 120; i++) { v.input.brake = 1; v.step(1 / 120); }

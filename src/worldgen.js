@@ -129,6 +129,193 @@
     return list;
   }
 
+  // ---------------------------------------------------------------- closed-loop tracks: the two rally stages and the windy
+  // mower track. Each is a closed centre line through control points (a centripetal Catmull-Rom spline, resampled every
+  // 2 m), run in the order of its points; the start / finish line crosses it at the first point (0, 0), heading -z. A grid
+  // of 16 m cells lists the segments within 40 m of each, for fast distance queries (terrain, surfaces, trees, the shader's
+  // distance texture). Beyond 40 m from the road a query reports d = 1e4
+  const trkArc = (cx, cz, R, a0, a1) => { const o = []; for (let k = 0; k <= 4; k++) { const a = (a0 + (a1 - a0) * k / 4) * Math.PI / 180; o.push([cx + R * Math.cos(a), cz + R * Math.sin(a)]); } return o; };
+  const TRACK_DEFS = {
+    // Rally Stage: ~4 km of fast, flowing gravel over rolling hills - long sweepers, crests you get light over, a few
+    // tighter corners - through woods, with fields opening up here and there. 7.5 m wide
+    rally: { W: 7.5, kind: 'rally', steep: 0, pts: [[0, 0], [0, -150], [-30, -300], [20, -430], [120, -500], [160, -620], [120, -760], [180, -880], [320, -900],
+      [420, -820], [470, -700], [600, -660], [720, -720], [800, -640], [780, -500], [680, -420], [700, -300], [820, -240], [860, -100], [780, 0], [640, 20],
+      [560, 120], [580, 240], [480, 330], [340, 300], [260, 380], [140, 420], [40, 360], [-20, 240], [20, 130]] },
+    // Windy Rally Stage: ~2.4 km of narrow, twisting gravel through dense forest in steeper hills - esses, kinks and four
+    // hairpins (~12 m radius). 6.5 m wide
+    rallywind: { W: 6.5, kind: 'rally', steep: 1, pts: [[0, 0], [0, -60], [20, -110], [0, -160], [-25, -200], [-10, -250], [20, -275],
+      ...trkArc(34, -300, 13, 180, 360), [50, -240], [75, -190], [70, -130], [95, -80], [100, 20],
+      ...trkArc(114, 42, 13, 180, 0), [135, -40], [122, -100], [150, -160], [143, -230], [168, -300], [160, -365], [125, -420], [55, -440], [-20, -425],
+      [-80, -400], [-150, -392], ...trkArc(-172, -377, 13, 270, 90), ...trkArc(-98, -347, 13, 270, 450),
+      [-170, -333], [-200, -300], [-205, -240], [-180, -180], [-210, -120], [-185, -60], [-150, 0], [-110, 50], [-60, 80], [-20, 80], [0, 45]] },
+    // Windy Mower Track: a ~750 m twisting dirt road course cut into a mown field, 9 m wide, straw bales both sides
+    mowwind: { W: 9, kind: 'mow', steep: 0, pts: [[0, 0], [0, -45], [15, -75], [45, -80], [65, -60], [60, -35], [75, -10], [105, -5], [125, -25], [120, -60],
+      [135, -90], [110, -115], [70, -120], [30, -118], [-10, -115], [-35, -95], [-30, -65], [-50, -40], [-45, -10], [-55, 20], [-35, 45], [-10, 40], [0, 20]] },
+  };
+  const TRK_CELL = 16, TRK_REACH = 40;
+  function buildTrack(def) {
+    const C = def.pts, n0 = C.length, raw = [];
+    for (let i = 0; i < n0; i++) {
+      const p0 = C[(i - 1 + n0) % n0], p1 = C[i], p2 = C[(i + 1) % n0], p3 = C[(i + 2) % n0];
+      const tj = (a, b) => Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), 0.5) || 1e-3;
+      const t1 = tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+      const m = Math.max(4, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 0.5));
+      for (let k = 0; k < m; k++) {
+        const t = t1 + (t2 - t1) * k / m;
+        const L = (a, b, ta, tb) => [(a[0] * (tb - t) + b[0] * (t - ta)) / (tb - ta), (a[1] * (tb - t) + b[1] * (t - ta)) / (tb - ta)];
+        const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+        raw.push(L(L(A1, A2, 0, t2), L(A2, A3, t1, t3), t1, t2));
+      }
+    }
+    const cum = [0];
+    for (let i = 1; i <= raw.length; i++) { const a = raw[i - 1], b = raw[i % raw.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+    const Ltot = cum[raw.length], n = Math.round(Ltot / 2), T = { W: def.W, kind: def.kind, steep: def.steep, n, L: Ltot };
+    T.x = new Float64Array(n); T.z = new Float64Array(n); T.s = new Float64Array(n + 1); T.tx = new Float64Array(n); T.tz = new Float64Array(n); T.R = new Float64Array(n);
+    for (let k = 0, j = 0; k < n; k++) {
+      const t = k * Ltot / n;
+      while (cum[j + 1] < t) j++;
+      const a = raw[j], b = raw[(j + 1) % raw.length], f = (t - cum[j]) / (cum[j + 1] - cum[j] || 1);
+      T.x[k] = a[0] + (b[0] - a[0]) * f; T.z[k] = a[1] + (b[1] - a[1]) * f; T.s[k] = t;
+    }
+    T.s[n] = Ltot;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let k = 0; k < n; k++) {
+      const a = (k - 1 + n) % n, b = (k + 1) % n, dx = T.x[b] - T.x[a], dz = T.z[b] - T.z[a], l = Math.hypot(dx, dz) || 1;
+      T.tx[k] = dx / l; T.tz[k] = dz / l;
+      // signed radius of curvature over an 8 m chord (+ turning left, seen driving along it)
+      const p = (k - 4 + n) % n, q = (k + 4) % n, ax = T.x[p], az = T.z[p], bx = T.x[k], bz = T.z[k], cx = T.x[q], cz = T.z[q];
+      const cr = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+      const R = Math.hypot(bx - ax, bz - az) * Math.hypot(cx - bx, cz - bz) * Math.hypot(ax - cx, az - cz) / (2 * Math.abs(cr) + 1e-9);
+      T.R[k] = cr > 0 ? -R : R;     // (x right, z down the screen: a positive cross product turns right)
+      x0 = Math.min(x0, T.x[k]); x1 = Math.max(x1, T.x[k]); z0 = Math.min(z0, T.z[k]); z1 = Math.max(z1, T.z[k]);
+    }
+    T.box = [x0, z0, x1, z1]; T.cx = (x0 + x1) / 2; T.cz = (z0 + z1) / 2;
+    const cells = new Map();
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const ia = Math.floor((Math.min(T.x[i], T.x[j]) - TRK_REACH) / TRK_CELL), ib = Math.floor((Math.max(T.x[i], T.x[j]) + TRK_REACH) / TRK_CELL);
+      const ja = Math.floor((Math.min(T.z[i], T.z[j]) - TRK_REACH) / TRK_CELL), jb = Math.floor((Math.max(T.z[i], T.z[j]) + TRK_REACH) / TRK_CELL);
+      for (let a = ia; a <= ib; a++) for (let b = ja; b <= jb; b++) {
+        const key = (a + 32768) * 65536 + (b + 32768);
+        let l = cells.get(key); if (!l) cells.set(key, l = []); l.push(i);
+      }
+    }
+    T.grid = new Map();
+    for (const [k, l] of cells) T.grid.set(k, Int32Array.from(l));
+    // yumps: crests built into the straighter bits of a rally stage - you go light over them, and flat out you fly (~50 mph
+    // and up). Only where nothing else of the road is within 60 m (the raised bit needs room for its embankment)
+    T.yumps = [];
+    if (def.kind === 'rally') {
+      const need = def.steep ? 110 : 140, span = def.steep ? 14 : 18, gap = def.steep ? 350 : 520, maxN = def.steep ? 3 : 7;
+      for (let k = 0; k < n && T.yumps.length < maxN; k++) {
+        const s = T.s[k];
+        if (s < 150 || s > Ltot - 150 || (T.yumps.length && s - T.yumps[T.yumps.length - 1].s < gap)) continue;
+        let ok = true;
+        for (let j = -span; j <= span && ok; j++) if (Math.abs(T.R[(k + j + n) % n]) < need) ok = false;
+        for (let m = 0; m < n && ok; m++) { const ds = Math.abs(T.s[m] - s); if (Math.min(ds, Ltot - ds) > 100 && Math.hypot(T.x[m] - T.x[k], T.z[m] - T.z[k]) < 60) ok = false; }
+        if (ok) T.yumps.push({ s, A: def.steep ? 0.75 : 0.95 + 0.45 * ((T.yumps.length * 0.37) % 1), hl: def.steep ? 14 : 18 });
+      }
+    }
+    return T;
+  }
+  let TRK = null;          // the current map's track (setMap)
+  const trackCache = {};
+  /** Nearest point of the current track's centre line: d (unsigned distance), sd (signed: + to the right, driving it the
+   *  right way), s (distance along it from the start line), tx / tz (its direction there), i (segment) */
+  function trackQuery(x, z, out) {
+    out = out || {};
+    const T = TRK;
+    out.d = 1e4; out.sd = 1e4; out.s = 0; out.i = -1; out.tx = 0; out.tz = -1;
+    if (!T) return out;
+    const list = T.grid.get((Math.floor(x / TRK_CELL) + 32768) * 65536 + (Math.floor(z / TRK_CELL) + 32768));
+    if (!list) return out;
+    let best = 1e18, bi = -1, bt = 0;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k], j = i + 1 === T.n ? 0 : i + 1, ax = T.x[i], az = T.z[i], dx = T.x[j] - ax, dz = T.z[j] - az;
+      let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = x - ax - dx * t, ez = z - az - dz * t, d2 = ex * ex + ez * ez;
+      if (d2 < best) { best = d2; bi = i; bt = t; }
+    }
+    const i = bi, j = i + 1 === T.n ? 0 : i + 1;
+    let tx = T.tx[i] * (1 - bt) + T.tx[j] * bt, tz = T.tz[i] * (1 - bt) + T.tz[j] * bt;
+    const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const px = T.x[i] + (T.x[j] - T.x[i]) * bt, pz = T.z[i] + (T.z[j] - T.z[i]) * bt;
+    out.d = Math.sqrt(best); out.px = px; out.pz = pz; out.sd = (x - px) * -tz + (z - pz) * tx; out.s = T.s[i] + (T.s[i + 1] - T.s[i]) * bt; out.i = i; out.tx = tx; out.tz = tz;
+    return out;
+  }
+  /** The point s metres along the current track (wrapping), its direction and its centre-line radius */
+  function trackPoint(s, out) {
+    out = out || {};
+    const T = TRK, L = T.L;
+    s = ((s % L) + L) % L;
+    const f = s / L * T.n, i = Math.floor(f) % T.n, j = (i + 1) % T.n, u = f - Math.floor(f);
+    out.x = T.x[i] + (T.x[j] - T.x[i]) * u; out.z = T.z[i] + (T.z[j] - T.z[i]) * u;
+    const tx = T.tx[i] * (1 - u) + T.tx[j] * u, tz = T.tz[i] * (1 - u) + T.tz[j] * u, tl = Math.hypot(tx, tz) || 1;
+    out.tx = tx / tl; out.tz = tz / tl; out.R = T.R[i]; out.i = i;
+    return out;
+  }
+  // roadside furniture along the current track, placed once: straw bales (both edges of the mower course; the outside
+  // of the rally stages' hairpins), chevron boards on the outside of the rally stages' tighter corners, and the start arch
+  let trkPropList = null;
+  function trackProps() {
+    if (trkPropList) return trkPropList;
+    const T = TRK, hw = T.W / 2, bales = [], chevrons = [], q = {}, p = {};
+    const bale = (s, side, off) => {
+      trackPoint(s, p);
+      const x = p.x - p.tz * side * off, z = p.z + p.tx * side * off;
+      // (the inside of a tight turn folds the offset line back over the road - leave those out)
+      if (trackQuery(x, z, q).d < off - 0.35) return;
+      bales.push({ x, z, rot: Math.atan2(-p.tz, p.tx) - Math.PI / 2 });      // (the Mower Track's convention: box along rot + 90 deg)
+    };
+    if (T.kind === 'mow') {
+      const nB = Math.round(T.L / 1.25);
+      for (let k = 0; k < nB; k++) { const s = k * T.L / nB; for (const side of [-1, 1]) bale(s, side, hw + 0.55); }
+    } else {
+      // corners: runs of the centre line tighter than 45 m; boards from just before the tightest point, on the outside
+      const n = T.n, tight = (k) => Math.abs(T.R[k]) < 45;
+      let k0 = 0; while (tight(k0) && k0 < n) k0++;
+      for (let c = 0; c < n; c++) {
+        const k = (k0 + c) % n;
+        if (!tight(k) || tight((k - 1 + n) % n)) continue;
+        let e = k, m = k, len = 0;
+        while (tight(e) && len < n) { if (Math.abs(T.R[e]) < Math.abs(T.R[m])) m = e; e = (e + 1) % n; len++; }
+        const out = T.R[m] > 0 ? 1 : -1;            // turning left -> the outside is on the right
+        const sM = T.s[m], nC = Math.abs(T.R[m]) < 20 ? 4 : 3;
+        for (let b = 0; b < nC; b++) {
+          trackPoint(sM - 14 + b * 9, p);
+          const off = hw + 2.4, x = p.x - p.tz * out * off, z = p.z + p.tx * out * off;
+          if (trackQuery(x, z, q).d < off - 0.5) continue;
+          // (the board faces the traffic coming at it; its arrow points the way the road goes)
+          chevrons.push({ x, z, rot: Math.atan2(-p.tx, -p.tz), dir: -out });
+        }
+        if (Math.abs(T.R[m]) < 18) for (let s = sM - 16; s <= sM + 16; s += 1.3) bale(s, out, hw + 1.5);
+      }
+    }
+    trackPoint(0, p);
+    const aw = hw + (T.kind === 'mow' ? 1.3 : 2.2);
+    const arch = { x: p.x, z: p.z, tx: p.tx, tz: p.tz, legs: [[p.x - p.tz * aw, p.z + p.tx * aw], [p.x + p.tz * aw, p.z - p.tx * aw]], w: 2 * aw };
+    // (the mower course's bleachers: back from the outside of the start straight)
+    const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 } : null;
+    trkPropList = { bales, chevrons, arch, stands };
+    return trkPropList;
+  }
+  function trackYump(s) {
+    let h = 0;
+    for (const y of TRK.yumps) { let ds = Math.abs(s - y.s); ds = Math.min(ds, TRK.L - ds); if (ds < y.hl) h += y.A * 0.5 * (1 + Math.cos(Math.PI * ds / y.hl)); }
+    return h;
+  }
+  /** Where a run starts: on the centre line, 14 m behind the start / finish line, facing down the road */
+  function trackSpawn() { const p = trackPoint(-14, {}); return { x: p.x, y: 0, z: p.z, tx: p.tx, tz: p.tz }; }
+  // a rally stage's road runs over this smooth, big-scale ground (its grades and crests); the land either side has its
+  // own hills and knolls on top, blended in from the verge
+  function trackBase(x, z) {
+    const st = TRK.steep;
+    return nLow1(x * 0.001, z * 0.001) * (12 + 5 * st) + nLow2(x * 0.0042 + 11.3, z * 0.0042 - 7.1) * (2.1 + 0.6 * st)
+      + nDet(x * 0.012 + 3.3, z * 0.012 - 9.1) * 0.75;
+  }
+  const _ttq = {}, _ftq = {}, _gtq = {}, _ptq = {};
+
   // ---------------------------------------------------------------- road network
   // NS road i:  x = base + A1 sin(k1 z + p1) + A2 sin(k2 z + p2) + A3 sin(k3 z + p3)
   // EW road j:  z = (same form in x)
@@ -173,7 +360,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -676,7 +863,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -692,6 +879,26 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (TRK) {
+      if (TRK.kind === 'mow') {
+        // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
+        const d = Math.hypot(x - TRK.cx, (z - TRK.cz) * 0.8);
+        if (d < 200) return 0;
+        return smooth(200, 800, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 24 + nDet(x * 0.02, z * 0.02) * 1.2);
+      }
+      // a rally stage: the road rides the smooth big-scale ground (flat across, whatever the grade); off the verge a shallow
+      // ditch, then the land's own knolls and hills blend in over ~35 m - cuttings on one side, drops on the other
+      // (level across: on the road the height is the ground's at the centre line, easing back into the ground's own over
+      // 12 m of verge - a road cut along a slope instead of one tilted with it)
+      const q = trackQuery(x, z, _ttq), d = q.d, hw = TRK.W / 2;
+      let base = trackBase(x, z);
+      if (d < hw + 12) { const bc = trackBase(q.px, q.pz) + trackYump(q.s); base = bc + (base - bc) * smooth(hw + 0.5, hw + 12, d); }
+      if (d <= hw + 0.8) return base;
+      const m = smooth(hw + 0.8, 36, d);
+      const det = nDet(x * 0.028, z * 0.028) * 1.1 + nDet(x * 0.085 + 5.2, z * 0.085 - 3.3) * 0.28;
+      const hills = (nHill(x * 0.0031, z * 0.0031) + 0.5 * nHill(x * 0.0071 + 3.1, z * 0.0071 - 1.7)) * (14 + 8 * TRK.steep);
+      return base + m * (det + hills) - 0.3 * Math.exp(-Math.pow((d - hw - 2.3) / 1.2, 2));
+    }
     if (MAP === 'mowtrack') {
       // dead flat round the field, rolling country well back from it
       const d = Math.hypot(x, z * 0.8);
@@ -771,6 +978,13 @@
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
+    if (TRK) {
+      // rally stages: a gravel road (with a strip of loose stuff along its edges); the mower course: dirt. Grass or dirt off it
+      const d = trackQuery(x, z, _gtq).d;
+      out.roadD = d;
+      out.surface = TRK.kind === 'mow' ? (d < TRK.W / 2 ? 3 : 2) : d < TRK.W / 2 + 0.6 ? 1 : nDet(x * 0.05 + 40, z * 0.05) > 0.45 ? 3 : 2;
+      return out;
+    }
     // surface
     const ri = roadInfo(x, z, _gri);
     out.roadD = ri.d;
@@ -786,6 +1000,14 @@
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+    if (TRK) {
+      if (TRK.kind === 'mow') return 0.7 * smooth(150, 330, Math.hypot(x - TRK.cx, z - TRK.cz)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+      // rally stages: woods, with fields opening up on the fast one; the windy one is forest nearly all the way, right up
+      // to a few metres off the verge
+      const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
+      const base = TRK.steep ? 0.55 + 0.45 * smooth(-0.3, 0.3, f) : 0.15 + 0.85 * smooth(-0.3, 0.3, f);
+      return base * smooth(TRK.W / 2 + 2.5, TRK.W / 2 + 9, trackQuery(x, z, _ftq).d);
+    }
     if (STRAIGHT()) { const d = Math.abs(x) - (DRAGMAP() ? 25 : 0); return d < 40 ? 0 : 0.45 * smooth(40, 200, d) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3); }
     const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
     return smooth(0.02, 0.55, f);
@@ -806,6 +1028,49 @@
       if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
+      return cp;
+    }
+    if (TRK) {
+      // the tracks: trees (not on the road or its verges), bushes and rocks, and the furniture - bales, corner boards, the
+      // start arch's legs, the mower course's bleachers
+      const T = TRK, hw = T.W / 2, tq = _ptq, TP = trackProps(), inC = (x, z) => x >= x0 && x < x0 + CH && z >= z0 && z < z0 + CH;
+      const chevrons = [];
+      for (const b of TP.bales) if (inC(b.x, b.z)) circles.push({ x: b.x, z: b.z, r: 0.6 });
+      for (const c of TP.chevrons) if (inC(c.x, c.z)) { chevrons.push(c); circles.push({ x: c.x, z: c.z, r: 0.1 }); }
+      for (const [lx, lz] of TP.arch.legs) if (inC(lx, lz)) circles.push({ x: lx, z: lz, r: 0.22 });
+      if (TP.stands) { const ST = TP.stands, sx = ST.x + ST.d / 2, sz = (ST.z0 + ST.z1) / 2; if (inC(sx, sz)) boxes.push({ x: sx, z: sz, hx: ST.d / 2, hz: (ST.z1 - ST.z0) / 2, c: 1, s: 0 }); }
+      const tr = [], rk = [], bu = [], cell = T.kind === 'mow' ? 8 : 7, nc = CH / cell | 0;
+      for (let a = 0; a < nc; a++) for (let b = 0; b < nc; b++) {
+        const gx = cx * nc + a, gz = cz * nc + b, r1 = hash01(gx, gz, 1);
+        const x = (a + 0.1 + 0.8 * hash01(gx, gz, 2)) * cell + x0, z = (b + 0.1 + 0.8 * hash01(gx, gz, 3)) * cell + z0;
+        const dens = forestDensity(x, z);
+        if (r1 > dens) continue;
+        const d = trackQuery(x, z, tq).d;
+        if (d < hw + 3 || (d < hw + 7 && r1 > dens * 0.5)) continue;
+        const y = terrainHeight(x, z);
+        if (T.kind !== 'mow') { const sl = Math.max(Math.abs(terrainHeight(x + 2, z) - y), Math.abs(terrainHeight(x, z + 2) - y)) / 2; if (sl > 0.9) continue; }
+        const kn = nKind(x * 0.004, z * 0.004), kind = kn > 0.25 || (T.steep && kn > -0.1) ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1, sc = 0.75 + hash01(gx, gz, 6) * 0.65;
+        tr.push(x, y, z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
+        circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
+      }
+      if (T.kind !== 'mow') {
+        const bcell = 11, nb = CH / bcell | 0;
+        for (let a = 0; a < nb; a++) for (let b = 0; b < nb; b++) {
+          const gx = cx * nb + a, gz = cz * nb + b;
+          const x = (a + hash01(gx, gz, 21)) * bcell + x0, z = (b + hash01(gx, gz, 22)) * bcell + z0, r = hash01(gx, gz, 23);
+          const d = trackQuery(x, z, tq).d;
+          if (d < hw + 1.2) continue;
+          const y = terrainHeight(x, z);
+          if (r < 0.12 && d > hw + 4) {
+            const sz = 0.4 + hash01(gx, gz, 24) * 1.4;
+            rk.push(x, y, z, sz, hash01(gx, gz, 25) * 6.283, hash01(gx, gz, 26));
+            if (sz > 0.8) circles.push({ x, z, r: sz * 0.85 });
+          } else if (r < 0.4) bu.push(x, y, z, 0.6 + hash01(gx, gz, 27) * 0.9, hash01(gx, gz, 28) * 6.283, 0);
+        }
+      }
+      cp = { trees: new Float32Array(tr), bushes: new Float32Array(bu), rocks: new Float32Array(rk), buildings, poles, signs, labels, lines, walls, circles, boxes, chevrons };
+      propCache.set(key, cp);
+      if (propCache.size > 400) propCache.delete(propCache.keys().next().value);
       return cp;
     }
     if (MAP === 'mowtrack') {
@@ -1094,6 +1359,15 @@
 
   /** Spawn / reset point on the nearest road near (x,z), facing heading closest to `hint` (tx,tz). */
   function nearestRoadSpot(x, z, hintX, hintZ) {
+    if (TRK) {
+      // the tracks: back on the centre line at the nearest point, facing the way the course runs (off in the woods, more
+      // than 40 m from it: the nearest point of the whole line)
+      const q = trackQuery(x, z, {});
+      let s = q.s;
+      if (q.i < 0) { let best = 1e18; for (let i = 0; i < TRK.n; i++) { const d2 = (TRK.x[i] - x) ** 2 + (TRK.z[i] - z) ** 2; if (d2 < best) { best = d2; s = TRK.s[i]; } } }
+      const p = trackPoint(s, {});
+      return { x: p.x, z: p.z, y: ground(p.x, p.z, {}).h, tx: p.tx, tz: p.tz };
+    }
     if (MAP === 'mowtrack') {
       // back on its wheels where it is, facing the hint - pulled off the bales onto the middle of the track if it's near them
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
@@ -1152,12 +1426,14 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || TRACK_DEFS[m] ? m : 'country';
+    TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
+    trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,

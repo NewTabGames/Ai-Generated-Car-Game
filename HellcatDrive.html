@@ -188,7 +188,7 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button>
     </div>
     <button class="btn" id="startBtn">Start engine</button>
     <div id="loadbar"><i></i></div>
@@ -361,6 +361,193 @@
     return list;
   }
 
+  // ---------------------------------------------------------------- closed-loop tracks: the two rally stages and the windy
+  // mower track. Each is a closed centre line through control points (a centripetal Catmull-Rom spline, resampled every
+  // 2 m), run in the order of its points; the start / finish line crosses it at the first point (0, 0), heading -z. A grid
+  // of 16 m cells lists the segments within 40 m of each, for fast distance queries (terrain, surfaces, trees, the shader's
+  // distance texture). Beyond 40 m from the road a query reports d = 1e4
+  const trkArc = (cx, cz, R, a0, a1) => { const o = []; for (let k = 0; k <= 4; k++) { const a = (a0 + (a1 - a0) * k / 4) * Math.PI / 180; o.push([cx + R * Math.cos(a), cz + R * Math.sin(a)]); } return o; };
+  const TRACK_DEFS = {
+    // Rally Stage: ~4 km of fast, flowing gravel over rolling hills - long sweepers, crests you get light over, a few
+    // tighter corners - through woods, with fields opening up here and there. 7.5 m wide
+    rally: { W: 7.5, kind: 'rally', steep: 0, pts: [[0, 0], [0, -150], [-30, -300], [20, -430], [120, -500], [160, -620], [120, -760], [180, -880], [320, -900],
+      [420, -820], [470, -700], [600, -660], [720, -720], [800, -640], [780, -500], [680, -420], [700, -300], [820, -240], [860, -100], [780, 0], [640, 20],
+      [560, 120], [580, 240], [480, 330], [340, 300], [260, 380], [140, 420], [40, 360], [-20, 240], [20, 130]] },
+    // Windy Rally Stage: ~2.4 km of narrow, twisting gravel through dense forest in steeper hills - esses, kinks and four
+    // hairpins (~12 m radius). 6.5 m wide
+    rallywind: { W: 6.5, kind: 'rally', steep: 1, pts: [[0, 0], [0, -60], [20, -110], [0, -160], [-25, -200], [-10, -250], [20, -275],
+      ...trkArc(34, -300, 13, 180, 360), [50, -240], [75, -190], [70, -130], [95, -80], [100, 20],
+      ...trkArc(114, 42, 13, 180, 0), [135, -40], [122, -100], [150, -160], [143, -230], [168, -300], [160, -365], [125, -420], [55, -440], [-20, -425],
+      [-80, -400], [-150, -392], ...trkArc(-172, -377, 13, 270, 90), ...trkArc(-98, -347, 13, 270, 450),
+      [-170, -333], [-200, -300], [-205, -240], [-180, -180], [-210, -120], [-185, -60], [-150, 0], [-110, 50], [-60, 80], [-20, 80], [0, 45]] },
+    // Windy Mower Track: a ~750 m twisting dirt road course cut into a mown field, 9 m wide, straw bales both sides
+    mowwind: { W: 9, kind: 'mow', steep: 0, pts: [[0, 0], [0, -45], [15, -75], [45, -80], [65, -60], [60, -35], [75, -10], [105, -5], [125, -25], [120, -60],
+      [135, -90], [110, -115], [70, -120], [30, -118], [-10, -115], [-35, -95], [-30, -65], [-50, -40], [-45, -10], [-55, 20], [-35, 45], [-10, 40], [0, 20]] },
+  };
+  const TRK_CELL = 16, TRK_REACH = 40;
+  function buildTrack(def) {
+    const C = def.pts, n0 = C.length, raw = [];
+    for (let i = 0; i < n0; i++) {
+      const p0 = C[(i - 1 + n0) % n0], p1 = C[i], p2 = C[(i + 1) % n0], p3 = C[(i + 2) % n0];
+      const tj = (a, b) => Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), 0.5) || 1e-3;
+      const t1 = tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+      const m = Math.max(4, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 0.5));
+      for (let k = 0; k < m; k++) {
+        const t = t1 + (t2 - t1) * k / m;
+        const L = (a, b, ta, tb) => [(a[0] * (tb - t) + b[0] * (t - ta)) / (tb - ta), (a[1] * (tb - t) + b[1] * (t - ta)) / (tb - ta)];
+        const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+        raw.push(L(L(A1, A2, 0, t2), L(A2, A3, t1, t3), t1, t2));
+      }
+    }
+    const cum = [0];
+    for (let i = 1; i <= raw.length; i++) { const a = raw[i - 1], b = raw[i % raw.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+    const Ltot = cum[raw.length], n = Math.round(Ltot / 2), T = { W: def.W, kind: def.kind, steep: def.steep, n, L: Ltot };
+    T.x = new Float64Array(n); T.z = new Float64Array(n); T.s = new Float64Array(n + 1); T.tx = new Float64Array(n); T.tz = new Float64Array(n); T.R = new Float64Array(n);
+    for (let k = 0, j = 0; k < n; k++) {
+      const t = k * Ltot / n;
+      while (cum[j + 1] < t) j++;
+      const a = raw[j], b = raw[(j + 1) % raw.length], f = (t - cum[j]) / (cum[j + 1] - cum[j] || 1);
+      T.x[k] = a[0] + (b[0] - a[0]) * f; T.z[k] = a[1] + (b[1] - a[1]) * f; T.s[k] = t;
+    }
+    T.s[n] = Ltot;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let k = 0; k < n; k++) {
+      const a = (k - 1 + n) % n, b = (k + 1) % n, dx = T.x[b] - T.x[a], dz = T.z[b] - T.z[a], l = Math.hypot(dx, dz) || 1;
+      T.tx[k] = dx / l; T.tz[k] = dz / l;
+      // signed radius of curvature over an 8 m chord (+ turning left, seen driving along it)
+      const p = (k - 4 + n) % n, q = (k + 4) % n, ax = T.x[p], az = T.z[p], bx = T.x[k], bz = T.z[k], cx = T.x[q], cz = T.z[q];
+      const cr = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+      const R = Math.hypot(bx - ax, bz - az) * Math.hypot(cx - bx, cz - bz) * Math.hypot(ax - cx, az - cz) / (2 * Math.abs(cr) + 1e-9);
+      T.R[k] = cr > 0 ? -R : R;     // (x right, z down the screen: a positive cross product turns right)
+      x0 = Math.min(x0, T.x[k]); x1 = Math.max(x1, T.x[k]); z0 = Math.min(z0, T.z[k]); z1 = Math.max(z1, T.z[k]);
+    }
+    T.box = [x0, z0, x1, z1]; T.cx = (x0 + x1) / 2; T.cz = (z0 + z1) / 2;
+    const cells = new Map();
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const ia = Math.floor((Math.min(T.x[i], T.x[j]) - TRK_REACH) / TRK_CELL), ib = Math.floor((Math.max(T.x[i], T.x[j]) + TRK_REACH) / TRK_CELL);
+      const ja = Math.floor((Math.min(T.z[i], T.z[j]) - TRK_REACH) / TRK_CELL), jb = Math.floor((Math.max(T.z[i], T.z[j]) + TRK_REACH) / TRK_CELL);
+      for (let a = ia; a <= ib; a++) for (let b = ja; b <= jb; b++) {
+        const key = (a + 32768) * 65536 + (b + 32768);
+        let l = cells.get(key); if (!l) cells.set(key, l = []); l.push(i);
+      }
+    }
+    T.grid = new Map();
+    for (const [k, l] of cells) T.grid.set(k, Int32Array.from(l));
+    // yumps: crests built into the straighter bits of a rally stage - you go light over them, and flat out you fly (~50 mph
+    // and up). Only where nothing else of the road is within 60 m (the raised bit needs room for its embankment)
+    T.yumps = [];
+    if (def.kind === 'rally') {
+      const need = def.steep ? 110 : 140, span = def.steep ? 14 : 18, gap = def.steep ? 350 : 520, maxN = def.steep ? 3 : 7;
+      for (let k = 0; k < n && T.yumps.length < maxN; k++) {
+        const s = T.s[k];
+        if (s < 150 || s > Ltot - 150 || (T.yumps.length && s - T.yumps[T.yumps.length - 1].s < gap)) continue;
+        let ok = true;
+        for (let j = -span; j <= span && ok; j++) if (Math.abs(T.R[(k + j + n) % n]) < need) ok = false;
+        for (let m = 0; m < n && ok; m++) { const ds = Math.abs(T.s[m] - s); if (Math.min(ds, Ltot - ds) > 100 && Math.hypot(T.x[m] - T.x[k], T.z[m] - T.z[k]) < 60) ok = false; }
+        if (ok) T.yumps.push({ s, A: def.steep ? 0.75 : 0.95 + 0.45 * ((T.yumps.length * 0.37) % 1), hl: def.steep ? 14 : 18 });
+      }
+    }
+    return T;
+  }
+  let TRK = null;          // the current map's track (setMap)
+  const trackCache = {};
+  /** Nearest point of the current track's centre line: d (unsigned distance), sd (signed: + to the right, driving it the
+   *  right way), s (distance along it from the start line), tx / tz (its direction there), i (segment) */
+  function trackQuery(x, z, out) {
+    out = out || {};
+    const T = TRK;
+    out.d = 1e4; out.sd = 1e4; out.s = 0; out.i = -1; out.tx = 0; out.tz = -1;
+    if (!T) return out;
+    const list = T.grid.get((Math.floor(x / TRK_CELL) + 32768) * 65536 + (Math.floor(z / TRK_CELL) + 32768));
+    if (!list) return out;
+    let best = 1e18, bi = -1, bt = 0;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k], j = i + 1 === T.n ? 0 : i + 1, ax = T.x[i], az = T.z[i], dx = T.x[j] - ax, dz = T.z[j] - az;
+      let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = x - ax - dx * t, ez = z - az - dz * t, d2 = ex * ex + ez * ez;
+      if (d2 < best) { best = d2; bi = i; bt = t; }
+    }
+    const i = bi, j = i + 1 === T.n ? 0 : i + 1;
+    let tx = T.tx[i] * (1 - bt) + T.tx[j] * bt, tz = T.tz[i] * (1 - bt) + T.tz[j] * bt;
+    const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    const px = T.x[i] + (T.x[j] - T.x[i]) * bt, pz = T.z[i] + (T.z[j] - T.z[i]) * bt;
+    out.d = Math.sqrt(best); out.px = px; out.pz = pz; out.sd = (x - px) * -tz + (z - pz) * tx; out.s = T.s[i] + (T.s[i + 1] - T.s[i]) * bt; out.i = i; out.tx = tx; out.tz = tz;
+    return out;
+  }
+  /** The point s metres along the current track (wrapping), its direction and its centre-line radius */
+  function trackPoint(s, out) {
+    out = out || {};
+    const T = TRK, L = T.L;
+    s = ((s % L) + L) % L;
+    const f = s / L * T.n, i = Math.floor(f) % T.n, j = (i + 1) % T.n, u = f - Math.floor(f);
+    out.x = T.x[i] + (T.x[j] - T.x[i]) * u; out.z = T.z[i] + (T.z[j] - T.z[i]) * u;
+    const tx = T.tx[i] * (1 - u) + T.tx[j] * u, tz = T.tz[i] * (1 - u) + T.tz[j] * u, tl = Math.hypot(tx, tz) || 1;
+    out.tx = tx / tl; out.tz = tz / tl; out.R = T.R[i]; out.i = i;
+    return out;
+  }
+  // roadside furniture along the current track, placed once: straw bales (both edges of the mower course; the outside
+  // of the rally stages' hairpins), chevron boards on the outside of the rally stages' tighter corners, and the start arch
+  let trkPropList = null;
+  function trackProps() {
+    if (trkPropList) return trkPropList;
+    const T = TRK, hw = T.W / 2, bales = [], chevrons = [], q = {}, p = {};
+    const bale = (s, side, off) => {
+      trackPoint(s, p);
+      const x = p.x - p.tz * side * off, z = p.z + p.tx * side * off;
+      // (the inside of a tight turn folds the offset line back over the road - leave those out)
+      if (trackQuery(x, z, q).d < off - 0.35) return;
+      bales.push({ x, z, rot: Math.atan2(-p.tz, p.tx) - Math.PI / 2 });      // (the Mower Track's convention: box along rot + 90 deg)
+    };
+    if (T.kind === 'mow') {
+      const nB = Math.round(T.L / 1.25);
+      for (let k = 0; k < nB; k++) { const s = k * T.L / nB; for (const side of [-1, 1]) bale(s, side, hw + 0.55); }
+    } else {
+      // corners: runs of the centre line tighter than 45 m; boards from just before the tightest point, on the outside
+      const n = T.n, tight = (k) => Math.abs(T.R[k]) < 45;
+      let k0 = 0; while (tight(k0) && k0 < n) k0++;
+      for (let c = 0; c < n; c++) {
+        const k = (k0 + c) % n;
+        if (!tight(k) || tight((k - 1 + n) % n)) continue;
+        let e = k, m = k, len = 0;
+        while (tight(e) && len < n) { if (Math.abs(T.R[e]) < Math.abs(T.R[m])) m = e; e = (e + 1) % n; len++; }
+        const out = T.R[m] > 0 ? 1 : -1;            // turning left -> the outside is on the right
+        const sM = T.s[m], nC = Math.abs(T.R[m]) < 20 ? 4 : 3;
+        for (let b = 0; b < nC; b++) {
+          trackPoint(sM - 14 + b * 9, p);
+          const off = hw + 2.4, x = p.x - p.tz * out * off, z = p.z + p.tx * out * off;
+          if (trackQuery(x, z, q).d < off - 0.5) continue;
+          // (the board faces the traffic coming at it; its arrow points the way the road goes)
+          chevrons.push({ x, z, rot: Math.atan2(-p.tx, -p.tz), dir: -out });
+        }
+        if (Math.abs(T.R[m]) < 18) for (let s = sM - 16; s <= sM + 16; s += 1.3) bale(s, out, hw + 1.5);
+      }
+    }
+    trackPoint(0, p);
+    const aw = hw + (T.kind === 'mow' ? 1.3 : 2.2);
+    const arch = { x: p.x, z: p.z, tx: p.tx, tz: p.tz, legs: [[p.x - p.tz * aw, p.z + p.tx * aw], [p.x + p.tz * aw, p.z - p.tx * aw]], w: 2 * aw };
+    // (the mower course's bleachers: back from the outside of the start straight)
+    const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 } : null;
+    trkPropList = { bales, chevrons, arch, stands };
+    return trkPropList;
+  }
+  function trackYump(s) {
+    let h = 0;
+    for (const y of TRK.yumps) { let ds = Math.abs(s - y.s); ds = Math.min(ds, TRK.L - ds); if (ds < y.hl) h += y.A * 0.5 * (1 + Math.cos(Math.PI * ds / y.hl)); }
+    return h;
+  }
+  /** Where a run starts: on the centre line, 14 m behind the start / finish line, facing down the road */
+  function trackSpawn() { const p = trackPoint(-14, {}); return { x: p.x, y: 0, z: p.z, tx: p.tx, tz: p.tz }; }
+  // a rally stage's road runs over this smooth, big-scale ground (its grades and crests); the land either side has its
+  // own hills and knolls on top, blended in from the verge
+  function trackBase(x, z) {
+    const st = TRK.steep;
+    return nLow1(x * 0.001, z * 0.001) * (12 + 5 * st) + nLow2(x * 0.0042 + 11.3, z * 0.0042 - 7.1) * (2.1 + 0.6 * st)
+      + nDet(x * 0.012 + 3.3, z * 0.012 - 9.1) * 0.75;
+  }
+  const _ttq = {}, _ftq = {}, _gtq = {}, _ptq = {};
+
   // ---------------------------------------------------------------- road network
   // NS road i:  x = base + A1 sin(k1 z + p1) + A2 sin(k2 z + p2) + A3 sin(k3 z + p3)
   // EW road j:  z = (same form in x)
@@ -405,7 +592,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -908,7 +1095,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps') return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -924,6 +1111,26 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (TRK) {
+      if (TRK.kind === 'mow') {
+        // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
+        const d = Math.hypot(x - TRK.cx, (z - TRK.cz) * 0.8);
+        if (d < 200) return 0;
+        return smooth(200, 800, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 24 + nDet(x * 0.02, z * 0.02) * 1.2);
+      }
+      // a rally stage: the road rides the smooth big-scale ground (flat across, whatever the grade); off the verge a shallow
+      // ditch, then the land's own knolls and hills blend in over ~35 m - cuttings on one side, drops on the other
+      // (level across: on the road the height is the ground's at the centre line, easing back into the ground's own over
+      // 12 m of verge - a road cut along a slope instead of one tilted with it)
+      const q = trackQuery(x, z, _ttq), d = q.d, hw = TRK.W / 2;
+      let base = trackBase(x, z);
+      if (d < hw + 12) { const bc = trackBase(q.px, q.pz) + trackYump(q.s); base = bc + (base - bc) * smooth(hw + 0.5, hw + 12, d); }
+      if (d <= hw + 0.8) return base;
+      const m = smooth(hw + 0.8, 36, d);
+      const det = nDet(x * 0.028, z * 0.028) * 1.1 + nDet(x * 0.085 + 5.2, z * 0.085 - 3.3) * 0.28;
+      const hills = (nHill(x * 0.0031, z * 0.0031) + 0.5 * nHill(x * 0.0071 + 3.1, z * 0.0071 - 1.7)) * (14 + 8 * TRK.steep);
+      return base + m * (det + hills) - 0.3 * Math.exp(-Math.pow((d - hw - 2.3) / 1.2, 2));
+    }
     if (MAP === 'mowtrack') {
       // dead flat round the field, rolling country well back from it
       const d = Math.hypot(x, z * 0.8);
@@ -1003,6 +1210,13 @@
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
+    if (TRK) {
+      // rally stages: a gravel road (with a strip of loose stuff along its edges); the mower course: dirt. Grass or dirt off it
+      const d = trackQuery(x, z, _gtq).d;
+      out.roadD = d;
+      out.surface = TRK.kind === 'mow' ? (d < TRK.W / 2 ? 3 : 2) : d < TRK.W / 2 + 0.6 ? 1 : nDet(x * 0.05 + 40, z * 0.05) > 0.45 ? 3 : 2;
+      return out;
+    }
     // surface
     const ri = roadInfo(x, z, _gri);
     out.roadD = ri.d;
@@ -1018,6 +1232,14 @@
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+    if (TRK) {
+      if (TRK.kind === 'mow') return 0.7 * smooth(150, 330, Math.hypot(x - TRK.cx, z - TRK.cz)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+      // rally stages: woods, with fields opening up on the fast one; the windy one is forest nearly all the way, right up
+      // to a few metres off the verge
+      const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
+      const base = TRK.steep ? 0.55 + 0.45 * smooth(-0.3, 0.3, f) : 0.15 + 0.85 * smooth(-0.3, 0.3, f);
+      return base * smooth(TRK.W / 2 + 2.5, TRK.W / 2 + 9, trackQuery(x, z, _ftq).d);
+    }
     if (STRAIGHT()) { const d = Math.abs(x) - (DRAGMAP() ? 25 : 0); return d < 40 ? 0 : 0.45 * smooth(40, 200, d) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3); }
     const f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
     return smooth(0.02, 0.55, f);
@@ -1038,6 +1260,49 @@
       if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
+      return cp;
+    }
+    if (TRK) {
+      // the tracks: trees (not on the road or its verges), bushes and rocks, and the furniture - bales, corner boards, the
+      // start arch's legs, the mower course's bleachers
+      const T = TRK, hw = T.W / 2, tq = _ptq, TP = trackProps(), inC = (x, z) => x >= x0 && x < x0 + CH && z >= z0 && z < z0 + CH;
+      const chevrons = [];
+      for (const b of TP.bales) if (inC(b.x, b.z)) circles.push({ x: b.x, z: b.z, r: 0.6 });
+      for (const c of TP.chevrons) if (inC(c.x, c.z)) { chevrons.push(c); circles.push({ x: c.x, z: c.z, r: 0.1 }); }
+      for (const [lx, lz] of TP.arch.legs) if (inC(lx, lz)) circles.push({ x: lx, z: lz, r: 0.22 });
+      if (TP.stands) { const ST = TP.stands, sx = ST.x + ST.d / 2, sz = (ST.z0 + ST.z1) / 2; if (inC(sx, sz)) boxes.push({ x: sx, z: sz, hx: ST.d / 2, hz: (ST.z1 - ST.z0) / 2, c: 1, s: 0 }); }
+      const tr = [], rk = [], bu = [], cell = T.kind === 'mow' ? 8 : 7, nc = CH / cell | 0;
+      for (let a = 0; a < nc; a++) for (let b = 0; b < nc; b++) {
+        const gx = cx * nc + a, gz = cz * nc + b, r1 = hash01(gx, gz, 1);
+        const x = (a + 0.1 + 0.8 * hash01(gx, gz, 2)) * cell + x0, z = (b + 0.1 + 0.8 * hash01(gx, gz, 3)) * cell + z0;
+        const dens = forestDensity(x, z);
+        if (r1 > dens) continue;
+        const d = trackQuery(x, z, tq).d;
+        if (d < hw + 3 || (d < hw + 7 && r1 > dens * 0.5)) continue;
+        const y = terrainHeight(x, z);
+        if (T.kind !== 'mow') { const sl = Math.max(Math.abs(terrainHeight(x + 2, z) - y), Math.abs(terrainHeight(x, z + 2) - y)) / 2; if (sl > 0.9) continue; }
+        const kn = nKind(x * 0.004, z * 0.004), kind = kn > 0.25 || (T.steep && kn > -0.1) ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1, sc = 0.75 + hash01(gx, gz, 6) * 0.65;
+        tr.push(x, y, z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
+        circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
+      }
+      if (T.kind !== 'mow') {
+        const bcell = 11, nb = CH / bcell | 0;
+        for (let a = 0; a < nb; a++) for (let b = 0; b < nb; b++) {
+          const gx = cx * nb + a, gz = cz * nb + b;
+          const x = (a + hash01(gx, gz, 21)) * bcell + x0, z = (b + hash01(gx, gz, 22)) * bcell + z0, r = hash01(gx, gz, 23);
+          const d = trackQuery(x, z, tq).d;
+          if (d < hw + 1.2) continue;
+          const y = terrainHeight(x, z);
+          if (r < 0.12 && d > hw + 4) {
+            const sz = 0.4 + hash01(gx, gz, 24) * 1.4;
+            rk.push(x, y, z, sz, hash01(gx, gz, 25) * 6.283, hash01(gx, gz, 26));
+            if (sz > 0.8) circles.push({ x, z, r: sz * 0.85 });
+          } else if (r < 0.4) bu.push(x, y, z, 0.6 + hash01(gx, gz, 27) * 0.9, hash01(gx, gz, 28) * 6.283, 0);
+        }
+      }
+      cp = { trees: new Float32Array(tr), bushes: new Float32Array(bu), rocks: new Float32Array(rk), buildings, poles, signs, labels, lines, walls, circles, boxes, chevrons };
+      propCache.set(key, cp);
+      if (propCache.size > 400) propCache.delete(propCache.keys().next().value);
       return cp;
     }
     if (MAP === 'mowtrack') {
@@ -1326,6 +1591,15 @@
 
   /** Spawn / reset point on the nearest road near (x,z), facing heading closest to `hint` (tx,tz). */
   function nearestRoadSpot(x, z, hintX, hintZ) {
+    if (TRK) {
+      // the tracks: back on the centre line at the nearest point, facing the way the course runs (off in the woods, more
+      // than 40 m from it: the nearest point of the whole line)
+      const q = trackQuery(x, z, {});
+      let s = q.s;
+      if (q.i < 0) { let best = 1e18; for (let i = 0; i < TRK.n; i++) { const d2 = (TRK.x[i] - x) ** 2 + (TRK.z[i] - z) ** 2; if (d2 < best) { best = d2; s = TRK.s[i]; } } }
+      const p = trackPoint(s, {});
+      return { x: p.x, z: p.z, y: ground(p.x, p.z, {}).h, tx: p.tx, tz: p.tz };
+    }
     if (MAP === 'mowtrack') {
       // back on its wheels where it is, facing the hint - pulled off the bales onto the middle of the track if it's near them
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
@@ -1384,12 +1658,14 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || TRACK_DEFS[m] ? m : 'country';
+    TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
+    trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
@@ -1714,6 +1990,14 @@
       muX: 0.95, muY: 0.86, loose: 1.05, kappaPeak: 0.11, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.26,
       B: 1.7, C: 1.38, E: -0.2, heatCap: 1600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
       crr: [1.1, 1.1, 1.05, 1.05, 1, 1.1] },
+    // the jet golf cart: low-profile radials on 12 in wheels, wider and grippier at the back (the rear axle has to let go
+    // after the front at 170 mph, or it would swap ends)
+    jetF: { name: '205/40R12 cart radial', short: 'Cart radials', width: 0.205,
+      muX: 1.1, muY: 0.98, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.28,
+      B: 1.8, C: 1.4, E: -0.25, heatCap: 1800, cold: 0.97, coldT: 10, warmT: 40, hotT: 105, overheat: 0.003, prep: 1.0 },
+    jetR: { name: '225/40R12 cart radial', short: 'Cart radials', width: 0.225,
+      muX: 1.12, muY: 1.1, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.28,
+      B: 1.8, C: 1.4, E: -0.25, heatCap: 2000, cold: 0.97, coldT: 10, warmT: 40, hotT: 105, overheat: 0.003, prep: 1.0 },
     // rally cars: gravel tyres - a tall, soft sidewall and a deep block tread that cuts into loose stuff; less than a
     // road tyre on tarmac, a lot more on gravel, dirt and grass
     rallyG: { name: '195/65R15 gravel rally', short: 'Gravel rally', width: 0.195,
@@ -1862,7 +2146,7 @@
       const x = clamp((p - a) / (0.9 - a), 0, 1), e = x * x * (3 - 2 * x);
       return this.shiftFromG + (G - this.shiftFromG) * e;
     }
-    rpm() { return this.eOmega * RAD2RPM; }
+    rpm() { return this.spec.jet ? (this.jetN || 0) * this.spec.jet.rpm100 : this.eOmega * RAD2RPM; }
 
     gearLabel() {
       if (this.revHoldActive) return 'N';
@@ -2479,6 +2763,27 @@
         }
       }
 
+      // jet thrust: along the car's own axis, on the turbine's centre line (above the CG - it leans on the nose a little,
+      // which is what keeps it from standing up on the rear axle like a wheelie car)
+      if (s.jet && this.jetF > 0) {
+        const T = this.jetF, ly = s.jet.y + (s.cgDrop || 0), lz = s.jet.z;
+        const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
+        const fx = -m02 * T, fy = -m12 * T, fz = -m22 * T;
+        Fx += fx; Fy += fy; Fz += fz;
+        Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
+      }
+      // a tail fin (fin: its height, how far behind the CG, side area x lift slope): the air hitting it side-on pushes it
+      // back in line - weathervane stability that grows with speed and holds the nose straight when the tyres go light
+      if (s.fin) {
+        const f = s.fin, ly = f.y + (s.cgDrop || 0), lz = f.z;
+        const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
+        const ax = vx + wy * rz - wz * ry, ay = vy + wz * rx - wx * rz, az = vz + wx * ry - wy * rx;
+        const F = -0.5 * s.rho * f.CyA * Math.sqrt(ax * ax + ay * ay + az * az) * (ax * m00 + ay * m10 + az * m20);
+        const fx = m00 * F, fy = m10 * F, fz = m20 * F;
+        Fx += fx; Fy += fy; Fz += fz;
+        Tx += ry * fz - rz * fy; Ty += rz * fx - rx * fz; Tz += rx * fy - ry * fx;
+      }
+
       // ---------------- body / ground penalty contacts (roll-overs, bottoming out)
       this._bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, (fx, fy, fz, rx, ry, rz) => {
         Fx += fx; Fy += fy; Fz += fz;
@@ -2705,7 +3010,10 @@
       // (bicycle model with ~1.4 deg/g understeer), capped at what the tyres can deliver; if the car rotates
       // more than asked (oversteer) cut torque and brake the outer front. Sideslip check catches slow drifts.
       W[0].escBrake = 0; W[1].escBrake = 0; this.escCut = 1; this.escActive = false;
-      if (this.tcMode <= 1 && !s.noESC && speed > 5 && !this.lineLockActive && vFwd > 3) {
+      // (with the car in the air - fewer than three wheels down - the module holds off, as the real ones do: braking a
+      // front wheel that's off the ground only lands it locked, and a crooked landing became a spin)
+      const nDown = (W[0].contact ? 1 : 0) + (W[1].contact ? 1 : 0) + (W[2].contact ? 1 : 0) + (W[3].contact ? 1 : 0);
+      if (this.tcMode <= 1 && !s.noESC && speed > 5 && !this.lineLockActive && vFwd > 3 && nDown >= 3) {
         const street = this.tcMode === 0;
         const yawRate = this.wx * upX + this.wy * upY + this.wz * upZ;          // + = rotating left
         const L = s.wheelbase, K = 0.0025;
@@ -2763,6 +3071,7 @@
     // ------------------------------------------------------------------ engine
     _engine(h) {
       const s = this.spec, inp = this.input;
+      if (s.jet) return this._jetEngine(h);
       let rpm = this.eOmega * RAD2RPM;
       // electric motor (electric): always live - no starter, no idle, no stall - with full torque from a standstill, and
       // the controller holds its top speed by fading the torque out instead of a fuel cut
@@ -2884,12 +3193,45 @@
       }
     }
 
+    // jet (the jet golf cart): a small turbojet behind the seats. The throttle sets the spool (N1: the compressor's speed as
+    // a fraction of its 100 %) and the turbine chases it - lazily off idle, where it has to get the air moving (~3 s idle to
+    // full), quicker coming down. Thrust climbs steeply with the spool (~3 % of full at idle, which the brakes hold) and
+    // falls off a little as the air rams in faster. Floored with the spool past 96 % the afterburner lights (jet.ab more
+    // thrust, a third of a second to catch). The starter spins it to ~20 % and it lights off. It drives no wheels: the cart
+    // rolls free. Reverse is the cart's old 48 V motor, clutched to the back axle in R only (the turbine idles in P and R).
+    // Stability control can pull the fuel back as well as brake a wheel (the thrust follows as it spools down)
+    _jetEngine(h) {
+      const s = this.spec, J = s.jet, inp = this.input;
+      let N = this.jetN || 0;
+      if (this.cranking) {
+        this.crankT += h;
+        if (this.crankT > 1.8 && N > 0.18) { this.cranking = false; this.running = true; }
+        else if (this.crankT > 5) this.cranking = false;
+      }
+      this.stalled = false; this.fuelCut = false; this.boost = 0; this.nosActive = false;
+      const cmd = this.running && this.gear > 0 && !this.park ? clamp(inp.throttle, 0, 1) * this.escCut : 0;
+      const tgt = this.cranking ? 0.22 : this.running ? J.idle + (1 - J.idle) * cmd : 0;
+      const e = tgt - N, rate = e > 0 ? (this.running ? 0.05 + 0.42 * N * N : 0.14) : this.running ? 0.5 : 0.09;
+      N += clamp(e * 5 * h, -rate * h, rate * h);
+      this.jetN = N;
+      const x = Math.pow(clamp((N - 0.2) / 0.8, 0, 1.05), 2.2);
+      const abOn = this.running && cmd > 0.97 && N > 0.96 ? 1 : 0, ab0 = this.jetAB || 0;
+      this.jetAB = ab0 + (abOn - ab0) * Math.min(1, h / (abOn ? 0.35 : 0.1));
+      this.jetF = J.thrust * (s.torqueScale || 1) * x * (1 + J.ab * this.jetAB) * Math.max(0.5, 1 - J.ram * Math.max(0, this.forwardSpeed));
+      this.thrEff = clamp(x, 0, 1);
+      if (this.gear < 0 && !this.park && this.running) {
+        const t = clamp(inp.throttle, 0, 1) * clamp((J.revRpm - Math.abs(this.eOmega) * RAD2RPM) / 250, 0, 1);
+        this.Te = t * J.revTq - 0.4 * Math.tanh(this.eOmega / 4);
+      } else { this.Te = 0; this.eOmega = 0; }
+    }
+
     // ------------------------------------------------------------------ driveline
     _coupling(slip) {
       // returns 0 none, 1 fluid (torque converter), 2 friction (clutch / lockup) with this._cap
       // (slip: engine speed minus the clutch's output side, rad/s)
       const s = this.spec;
       if (this.gear === 0 || this.park || this.revHoldActive || this.launchHold) return 0;
+      if (s.jet && this.gear > 0) return 0;                  // (the jet cart: nothing drives the wheels going forwards)
       if (s.dragClutch) { this._cap = this._dcCap(slip || 0); return this._cap > 1 ? 2 : 0; }
       if (this.transType === 'auto') {
         if (this.lockupEng > 0.02 && !s.noLockup) { this._cap = s.lockupTorque * this.lockupEng; return 2; }
@@ -4156,6 +4498,31 @@
       bodyHalfW: 0.62, bodyFront: -1.5, bodyRear: 1.5, bodyBottom: -0.3, bodyTop: 0.8,
       bodyPts: ccPts(0.42, 0.4, 2.1, ccBox(0.62, 0.12, 0.7, -1.45, 1.5).concat([[0, 1.25, 0.6]])),
     } },
+    // jet - a turbojet cart for the drag shows: a surplus target-drone turbojet (~2.6 kN / 590 lbf dry, ~3.6 kN / 810 lbf
+    // with its homebuilt afterburner) slung low behind the seats, a stretched, lowered, wider frame, low-profile radials,
+    // four-wheel discs with ABS, a nose cone and a tail fin. 480 kg with the driver and fuel. ~0-60 in 4 s, ~185 mph.
+    // Stable flat out: the thrust line runs only 8 cm above the CG (mounted high, 0.5 m up, full thrust levered ~700 N off
+    // the rear tyres - nothing pushes through the wheels to load them back up, as it does in a car - and a lane change at
+    // 60 mph swapped ends), the rear tyres are wider and grippier than the fronts, the brakes are biased 70 % to the front
+    // (a jet is still pushing for a second after you lift), and the fin keeps its nose in the wind
+    jet: { label: 'Jet', car: 'TURBOJET 810 LBF', hp: 0, tq: 0, kbLat: 4.5, spec: {
+      mass: 480, Ipitch: 380, Iyaw: 440, Iroll: 72, cgHeight: 0.44, wheelbase: 2.3, frontWeight: 0.47, trackF: 1.14, trackR: 1.22,
+      wheelRadius: 0.27, wheelRadiusF: 0.26, wheelRadiusR: 0.27, wheelInertiaF: 0.28, wheelInertiaR: 0.32,
+      frontTire: 'jetF', rearTire: 'jetR', Fz0: 1500,
+      springF: 30000, springR: 34000, dampBumpF: 1700, dampRebF: 2500, dampBumpR: 1900, dampRebR: 2800, travelUp: 0.05, travelDown: 0.05,
+      arbF: 14000, arbR: 5000, rearToe: 0.004,
+      brakeTorqueF: 1300, brakeTorqueR: 550, handbrakeTorque: 700, noABS: false, noESC: false,
+      maxSteer: 0.5, steerRate: 3, steerRatio: 14,
+      electric: false, idleRpm: 3600, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+      torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
+      autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
+      dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
+      jet: { thrust: 2600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.2, revTq: 22, revRpm: 4000 },
+      fin: { y: 0.2, z: 1.6, CyA: 0.3 },
+      CdA: 0.66, ClA: 0.22,
+      bodyHalfW: 0.64, bodyFront: -1.75, bodyRear: 1.95, bodyBottom: -0.28, bodyTop: 1.0,
+      bodyPts: ccPts(0.44, 0.47, 2.3, ccBox(0.64, 0.12, 0.8, -1.75, 1.95).concat([[0, 1.45, 1.5], [0, 1.05, 0.9]])),
+    } },
   }, 'std', 'Standard');
   // ---------------------------------------------------------------- rally cars
   // Three power levels of a gravel rally hatch (roll cage, sequential dog box, hydraulic handbrake, gravel tyres, two up):
@@ -4289,6 +4656,9 @@
    even-fire V6s (a bank each side, every 120 deg); a centrifugal blower's surge chirp on a lift (surge).
    Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
    load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
+   Turbojet (jet: the jet golf cart): no pistons - the compressor's whine (its blade-pass tone and a turbine tone above it,
+   rising with the spool), a broadband roar that deepens and swells with the thrust, and the afterburner's ragged,
+   crackling rumble. Nitrous (nos): the solenoids' hiss and a harder, louder engine while it sprays.
    Multi-engine mode (pulling tractor): up to 4 V8s or V12s geared onto one crankline, each with its own firing
    sequence and exhaust, fired a few degrees apart so they hit like one enormous engine; deeper, longer exhaust pulses,
    a sub-bass layer and a hotter output stage for sheer volume.
@@ -4310,7 +4680,9 @@ class CarSynth {
       pipe: 0,     // (2-strokes) 0 off the pipe .. 1 in the expansion chamber's tuned band
       vt: 0,       // cyl 2 with vt > 0: a 4-stroke V-twin with that V angle instead of a 2-stroke single
       surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
-      ev: 0 };     // 1: an electric motor (whK = its whine Hz per rpm)
+      ev: 0,       // 1: an electric motor (whK = its whine Hz per rpm)
+      jet: 0, ab: 0,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1
+      nos: 0 };    // nitrous spraying, 0..1
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -4438,7 +4810,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -4457,15 +4829,16 @@ class CarSynth {
     if (pp >= 0) { g[0] *= 1.3 - 0.5 * pp; g[1] *= 1.1 - 0.2 * pp; g[3] *= 0.65 + 0.95 * pp; g[4] *= 0.5 + 1.5 * pp; }
     const bodyOrd = c.cyl === 12 ? 6 : c.cyl === 1 ? 1 : c.cyl === 2 ? 2 : c.cyl === 3 || c.cyl === 6 ? 3 : 4;   // firing order per bank (V8 bank: 2/rev, V12 bank: 3/rev; singles 1 or 2 per cycle; a triple / a V6 bank 3 per cycle)
     const aSub = 1 - Math.exp(-2 * Math.PI * 85 / sr);
-    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0);   // open headers crackle
+    const rasp = 0.12 + 0.4 * load * rpmN + race * (0.22 + 0.45 * load * rpmN) + (pp > 0 ? 0.25 * pp * load : 0) + 0.15 * c.nos;   // open headers crackle
     // tonal crank-order body (firing order 4, plus orders 2 and 1 for the cross-plane lope) and a load roar
-    const ev = c.ev > 0.5;
-    const bodyAmp = (c.run > 0.5 && !ev ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
-    const roarAmp = (c.run > 0.5 && !ev ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
+    const ev = c.ev > 0.5, jet = c.jet > 0.5;
+    const bodyAmp = (c.run > 0.5 && !ev && !jet ? 0.05 + 0.1 * load : 0) * c.engVol * (1 + 1.5 * deep);
+    const roarAmp = (c.run > 0.5 && !ev && !jet ? 0.02 + 0.16 * load * Math.pow(rpmN, 0.8) : 0) * c.engVol;
     const aRoar = 1 - Math.exp(-2 * Math.PI * (160 + rpm * 0.1) / sr);
     let engGain = (c.run > 0.5 ? 0.5 + 0.5 * load : 0.3) * (0.62 + 0.38 * rpmN) * c.engVol * 0.55 * (1 + 0.3 * race) * (1 + loud * (0.1 + 0.9 * load)) / Math.sqrt(nE);
     if (pp >= 0) engGain *= 0.82 + 0.4 * pp * (0.4 + 0.6 * load);
-    if (ev) engGain = 0;
+    if (ev || jet) engGain = 0;
+    engGain *= 1 + 0.35 * c.nos;                       // (nitrous: every firing hits harder)
     const interior = c.open ? 0 : c.interior;
     // open cockpit: you sit right behind the engines, nothing in between
     if (c.open && c.interior > 0.5) engGain *= 1.2;
@@ -4485,12 +4858,12 @@ class CarSynth {
     const flDecay = Math.exp(-1 / (sr * 0.28));
     // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
     // fades out towards a standstill)
-    const whAmp = ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+    const whAmp = jet ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
       : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
     this.setBP(this.intake, 280 + rpm * 0.09, 1.2);
-    const intakeAmp = ev ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
+    const intakeAmp = ev || jet ? 0 : (interior > 0.5 ? 0.16 : 0.07) * c.thr * rpmN * (c.run > 0.5 ? 1 : 0) * c.engVol;
     // tyres
     this.sqDrift += (this.rnd() - 0.5) * 0.08; this.sqDrift *= 0.97;
     const sqF = 760 + 380 * c.sqPitch + 60 * this.sqDrift;
@@ -4506,6 +4879,19 @@ class CarSynth {
     if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
     const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1);
+    // turbojet: the compressor's blade-pass tone rises from ~1.3 kHz at idle to ~3.2 kHz flat out; the roar's band opens
+    // up and swells with the thrust (load); the afterburner is a deep rumble with crackle on top
+    let jF = 0, jWh = 0, jRoar = 0, aJ = 0;
+    if (jet) {
+      if (!this.jtB1) { this.jtB1 = this.bp(1300, 10); this.jtB2 = this.bp(1900, 6); this.jtCr = this.bp(700, 1.3); this.jtLP = 0; this.jtLP2 = 0; this.abLP = 0; this.abLP2 = 0; this.jPh1 = 0; this.jPh2 = 0; }
+      const jN = Math.min(1.1, rpm / (c.rpmRef || 10000));
+      jF = 250 + 2900 * jN;
+      jWh = (0.03 + 0.07 * jN * jN) * (c.whine || 1) * c.engVol * (interior > 0.5 ? 1.2 : 1);
+      jRoar = (0.08 + 1.9 * Math.pow(load, 1.2)) * (0.3 + 0.7 * Math.min(1, jN)) * c.engVol;
+      aJ = 1 - Math.exp(-2 * Math.PI * (220 + 2400 * load) / sr);
+      this.setBP(this.jtB1, jF, 10); this.setBP(this.jtB2, jF * 1.47, 6);
+    }
+    const aAB = 1 - Math.exp(-2 * Math.PI * 150 / sr);
     const aWind = 1 - Math.exp(-2 * Math.PI * (180 + spd * 22) / sr);
     // watchdog: if the game loop stops feeding us (tab hidden, hitch), fade out instead of droning on one note
     const aliveTgt = this.t - this.lastSet < 0.3 ? 1 : 0;
@@ -4581,6 +4967,25 @@ class CarSynth {
         if (!this.evHs) this.evHs = this.bp(6500, 1.5);
         const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
         oL += gm; oR += gm;
+      }
+      if (jet && (jWh > 1e-5 || jRoar > 1e-5)) {
+        this.jPh1 += 2 * Math.PI * jF / sr; if (this.jPh1 > 6.283185307) this.jPh1 -= 6.283185307;
+        this.jPh2 += 2 * Math.PI * jF * 1.47 / sr; if (this.jPh2 > 6.283185307) this.jPh2 -= 6.283185307;
+        const wh = (Math.sin(this.jPh1) * 0.6 + Math.sin(this.jPh2) * 0.22) * jWh + this.run(this.jtB1, w1) * jWh * 1.4 + this.run(this.jtB2, w2) * jWh * 0.9;
+        this.jtLP += aJ * (w1 - this.jtLP); this.jtLP2 += aJ * (this.jtLP - this.jtLP2);
+        let js = wh + this.jtLP2 * jRoar;
+        if (c.ab > 0.01) {
+          this.abLP += aAB * (w2 - this.abLP); this.abLP2 += aAB * (this.abLP - this.abLP2);
+          const tick = this.rnd() < 0.006 * c.ab ? (this.rnd() - 0.5) * 7 : 0;
+          js += (this.abLP2 * 11 + this.run(this.jtCr, tick) * 0.6) * c.ab * c.engVol;
+        }
+        oL += js; oR += js * 0.97;
+      }
+      // nitrous: the solenoids' hiss while it sprays
+      if (c.nos > 1e-3) {
+        if (!this.nosBP) this.nosBP = this.bp(5200, 0.9);
+        const hs = this.run(this.nosBP, w2) * 0.1 * c.nos * c.engVol;
+        oL += hs; oR += hs;
       }
       if (this.flut > 1e-3) {
         if (!this.flBP) { this.flBP = this.bp(1900, 2.2); this.flBP2 = this.bp(3400, 4); }
@@ -9796,6 +10201,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' ? 0 : 1 });
 
     const P = { tips: [], spots: [], hideCockpit: [], lampSlots: [] };
+    let jetFan = null, jetFx = null;                 // (the jet golf cart's compressor face and exhaust)
     const body = new THREE.Group(); model.add(body);
 
     // ---------------------------------------------------------------- a seated driver
@@ -10656,13 +11062,14 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // the seat pod and the rear body over the back wheels, and (standard / LSV) a roof on four struts. Standard: a bag
     // rack with two golf bags; LSV: windscreen, lights, mirrors, bigger wheels; Hot Rod: no roof, a chrome roll hoop,
     // racing buckets, fat tyres on deep-dish wheels; Record: stretched and lowered, the Hayabusa bare behind the seat
-    // with its headers into a megaphone, a wheelie bar
+    // with its headers into a megaphone, a wheelie bar; Jet: stretched, lowered and widened, a turbojet on a cradle over
+    // the back axle (bellmouth, spinning compressor face, afterburner can, a flame out of it), a tail fin, a nose cone
     B.golf = () => {
-      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa';
-      WF = REC ? 0.22 : HOT ? 0.225 : 0.215; WR = REC ? 0.3 : HOT ? 0.27 : 0.215;
-      wheelStyle = STD ? { rim: 'cart', rimR: 0.1, tread: 'road' } : LSV ? { rim: 'alloy5', rimR: 0.152, tread: 'road' }
+      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa', JET = V === 'jet';
+      WF = REC ? 0.22 : HOT ? 0.225 : JET ? 0.205 : 0.215; WR = REC ? 0.3 : HOT ? 0.27 : JET ? 0.225 : 0.215;
+      wheelStyle = STD ? { rim: 'cart', rimR: 0.1, tread: 'road' } : LSV || JET ? { rim: 'alloy5', rimR: 0.152, tread: 'road' }
         : HOT ? { rim: 'deepdish', rimR: 0.165, tread: 'slick' } : { rim: 'steel5', rimR: 0.15, tread: 'slick' };
-      const low = REC ? 0.1 : HOT ? 0.06 : 0;                 // (dropped)
+      const low = REC || JET ? 0.1 : HOT ? 0.06 : 0;          // (dropped)
       const wyF = 2 * RF + 0.03, wyR = 2 * RR + 0.03;          // clearance over the tyres
       M.seatC = new THREE.MeshStandardMaterial({ color: STD ? 0xd8cdb4 : LSV ? 0x2a2a2c : 0x151517, roughness: 0.65 });
       M.mat = new THREE.MeshStandardMaterial({ color: 0x1b1b1c, roughness: 0.95 });
@@ -10672,18 +11079,18 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         { z: zF + 0.2, w: 0.64, yb: wyF, yt: 0.84 - low * 0.5, n: 4 }, { z: zF + 0.27, w: 0.6, yb: 0.32 - low, yt: 0.86 - low * 0.5, n: 4 }], { seg: 36 }), M.paint, 0, 0, 0);
       add(body, rbox(0.9, 0.1, 0.1, 0.04), M.black, 0, 0.3 - low, zF - 0.47);          // bumper
       // the dash, floorboard, seat pod, seat, the rear body over the back wheels
-      const zD = zF + 0.28, zS1 = REC ? zR - 0.45 : zR - 0.25, zS0 = zS1 - 0.58;
+      const zD = zF + 0.28, zS1 = REC ? zR - 0.45 : JET ? zR - 0.72 : zR - 0.25, zS0 = zS1 - 0.58;
       add(body, rbox(1.12, 0.14, 0.1, 0.03), M.black, 0, 0.8 - low * 0.5, zD);
       add(body, rbox(1.02, 0.05, zS0 - zD, 0.02), M.mat, 0, 0.3 - low, (zD + zS0) / 2);
       add(body, rbox(1.12, 0.32, zS1 - zS0, 0.05), M.paint, 0, 0.46 - low, (zS0 + zS1) / 2);
-      const seats = HOT || REC ? [-0.26, 0.26] : [0];
+      const seats = HOT || REC || JET ? [-0.26, 0.26] : [0];
       for (const x of seats) {
         const w = seats.length > 1 ? 0.46 : 1.06;
         add(body, rbox(w, 0.1, 0.48, 0.04), M.seatC, x, 0.67 - low, (zS0 + zS1) / 2);
         add(body, rbox(w, seats.length > 1 ? 0.6 : 0.42, 0.09, 0.04), M.seatC, x, (seats.length > 1 ? 1.0 : 0.95) - low, zS1 - 0.02, 0.18, 0, 0);
         if (seats.length > 1) for (const dx of [-0.2, 0.2]) add(body, rbox(0.07, 0.36, 0.14, 0.03), M.seatC, x + dx, 0.88 - low, zS1 - 0.08, 0.18, 0, 0);
       }
-      if (!REC) {
+      if (!REC && !JET) {
         add(body, rbox(0.72, 0.26, 0.7, 0.04), M.black, 0, 0.4 - low, zR + 0.05);
         add(body, rbox(1.22, 0.24, 0.76, 0.06), M.paint, 0, wyR + 0.1, zR + 0.05);
       } else for (const sx of [-1, 1]) add(body, arcGeo(zR, RR, RR + 0.03, RR + 0.07, 0.15, Math.PI - 0.1, WR + 0.04), M.paint, sx * trackR / 2 - (WR + 0.04) / 2, 0, 0);
@@ -10694,7 +11101,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       SW = steering(V3(-0.24, 0.93 - low, zD + 0.23), 0.95, 0.19);
       cluster = { parent: body, pos: V3(-0.24, 0.8 - low * 0.5, zD - 0.055), rot: -0.3, w: 0.14, h: 0.07 };
       driver = person({ hip: V3(-0.26, 0.72 - low, zS0 + 0.3), lean: 0.14, hands: [V3(-0.38, 0.97 - low, zD + 0.25), V3(-0.1, 0.97 - low, zD + 0.25)],
-        knee: { dx: 0.11, y: 0.8 - low, z: zD + 0.3 }, foot: { dx: 0.14, y: 0.34 - low, z: zD + 0.08 }, helmet: REC || HOT });
+        knee: { dx: 0.11, y: 0.8 - low, z: zD + 0.3 }, foot: { dx: 0.14, y: 0.34 - low, z: zD + 0.08 }, helmet: REC || HOT || JET });
       if (STD || LSV) {
         // the roof on its struts
         const yR = 1.88;
@@ -10725,7 +11132,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         }
         spots(0.34, 0.58, -0.4 + zF);
       }
-      if (HOT) {
+      if (HOT || JET) {
         // chrome roll hoop behind the buckets, a black stripe down the cowl
         const hp = [V3(-0.5, 0.62 - low, zS1 + 0.06), V3(-0.48, 1.3, zS1 + 0.1), V3(0.48, 1.3, zS1 + 0.1), V3(0.5, 0.62 - low, zS1 + 0.06)];
         add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hp, false, 'centripetal'), 30, 0.03, 10, false), M.chrome, 0, 0, 0);
@@ -10750,7 +11157,61 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.3, 0.3, zR + 0.3), V3(sx * 0.3, 0.12, zR + 0.55 + 0.1), 0.018, M.steel);
         add(body, cylX(0.04, 0.04, 0.66, 14), M.rubber, 0, 0.08, zR + 0.65);
         spots(0.3, 0.45, zF - 0.5);
-      } else if (!HOT && !LSV) P.tips.push(toRoot(V3(0, 0.3, zR + 0.45)));
+      } else if (!HOT && !LSV && !JET) P.tips.push(toRoot(V3(0, 0.3, zR + 0.45)));
+      if (JET) {
+        // the turbojet on its cradle over the back axle: a bellmouth intake behind the buckets, the compressor face (it
+        // spins with the spool), a brushed case with its bands and fuel lines, the afterburner can and its nozzle
+        const ey = 0.6, er = 0.16, ez0 = zS1 + 0.12, eL = 0.9, abL = 0.55;
+        const aluD = M.alu.clone(); aluD.side = THREE.DoubleSide;
+        const heat = new THREE.MeshStandardMaterial({ color: 0x7a6a78, roughness: 0.3, metalness: 1 });
+        const bell = new THREE.LatheGeometry([[0.235, 0], [0.225, 0.02], [0.2, 0.05], [0.18, 0.1], [0.172, 0.16]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+        bell.rotateX(Math.PI / 2); add(body, bell, aluD, 0, ey, ez0);
+        jetFan = new THREE.Group(); jetFan.position.set(0, ey, ez0 + 0.15); body.add(jetFan);
+        add(jetFan, new THREE.CircleGeometry(0.165, 32), M.black, 0, 0, 0.005);
+        add(jetFan, cylZ(0.001, 0.05, 0.08, 18), M.alu, 0, 0, -0.035, Math.PI, 0, 0);
+        for (let k = 0; k < 13; k++) { const b = add(jetFan, new THREE.BoxGeometry(0.012, 0.13, 0.03), M.steel, 0, 0, 0); b.geometry.translate(0, 0.095, 0); b.rotation.set(0, 0.5, k * 2 * Math.PI / 13, 'ZYX'); }
+        add(body, cylZ(er, er, eL, 36), M.alu, 0, ey, ez0 + 0.16 + eL / 2);
+        for (const dz of [0.05, 0.32, 0.6, 0.86]) add(body, new THREE.TorusGeometry(er + 0.004, 0.009, 8, 36), M.steel, 0, ey, ez0 + 0.16 + dz);
+        for (const sx of [-1, 1]) pipe(body, [V3(sx * 0.12, ey - 0.1, ez0 + 0.3), V3(sx * 0.17, ey - 0.02, ez0 + 0.5), V3(sx * 0.17, ey + 0.02, ez0 + 0.9)], 0.008, M.steel, 6);
+        const zA = ez0 + 0.16 + eL;
+        add(body, cylZ(er - 0.012, er - 0.02, abL, 36), heat, 0, ey, zA + abL / 2);
+        const zN = zA + abL;
+        add(body, cylZ(0.14, 0.13, 0.1, 30, true), new THREE.MeshStandardMaterial({ color: 0x3a3436, roughness: 0.5, metalness: 0.8, side: THREE.DoubleSide }), 0, ey, zN + 0.05);
+        add(body, new THREE.CircleGeometry(0.12, 24), M.black, 0, ey, zN - 0.02, 0, Math.PI, 0);
+        // the cradle: four struts from the frame rails
+        for (const sx of [-1, 1]) for (const dz of [0.25, 0.8]) tubeAB(body, V3(sx * 0.3, 0.32, ez0 + dz), V3(sx * 0.1, ey - er + 0.02, ez0 + dz + 0.05), 0.016, M.steel);
+        // the tail fin on top of the afterburner can, swept back
+        const fs = new THREE.Shape(); fs.moveTo(0, 0); fs.lineTo(0.62, 0); fs.lineTo(0.78, 0.5); fs.lineTo(0.5, 0.52); fs.closePath();
+        const fin = new THREE.ExtrudeGeometry(fs, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 });
+        fin.rotateY(-Math.PI / 2); fin.translate(0.011, 0, 0);
+        add(body, fin, M.paint, 0, ey + er - 0.03, zA - 0.2);
+        // the nose cone on the front cowl
+        const cone = new THREE.LatheGeometry([[0.17, 0], [0.16, 0.08], [0.13, 0.18], [0.08, 0.29], [0.02, 0.37], [0.001, 0.38]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+        cone.rotateX(-Math.PI / 2); cone.scale(1.3, 0.8, 1);
+        add(body, cone, M.paint, 0, 0.42 - low, zF - 0.44);
+        // the exhaust: a hot core and the plume around it, both additive - barely there dry, a long orange flame with
+        // shock diamonds on the afterburner
+        const flameMat = (core) => new THREE.ShaderMaterial({
+          uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 } },
+          vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+          fragmentShader: `uniform float uAB; uniform float uThr; uniform float uT; uniform float uCore; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+            void main() {
+              float t = 1.0 - vUv.y;
+              float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
+              float dia = 0.6 + 0.4 * pow(abs(sin(t * 16.0 - uT * 2.0)), 3.0);
+              float flick = 0.85 + 0.15 * sin(uT * 53.0 + t * 9.0) * sin(uT * 31.0 + 1.3);
+              vec3 hot = mix(vec3(1.0, 0.93, 0.78), vec3(1.0, 0.52, 0.14), smoothstep(0.0, 0.45, t));
+              hot = mix(hot, vec3(0.85, 0.2, 0.06), smoothstep(0.45, 1.0, t));
+              float a = edge * (1.0 - smoothstep(0.15, 1.0, t)) * flick * (uCore > 0.5 ? dia * 1.7 : 0.8) * (uAB * 2.4 + uThr * 0.18);
+              gl_FragColor = vec4(hot * a, 1.0);
+              #include <colorspace_fragment>
+            }`,
+          transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+        });
+        const plumeGeo = (r0, r1) => { const g = new THREE.CylinderGeometry(r0, r1, 1, 24, 6, true); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; };
+        jetFx = { outer: add(body, plumeGeo(0.14, 0.07), flameMat(false), 0, ey, zN + 0.1, 0, 0, 0, false), core: add(body, plumeGeo(0.1, 0.015), flameMat(true), 0, ey, zN + 0.1, 0, 0, 0, false), t: 0 };
+        jetFx.outer.renderOrder = 5; jetFx.core.renderOrder = 6;
+      }
     };
 
     // ---------------------------------------------------------------- Rally Car (r4 / r2 / gb)
@@ -10864,7 +11325,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 
     // ---------------------------------------------------------------- the display on the dash
     if (cluster) add(cluster.parent, new THREE.PlaneGeometry(cluster.w, cluster.h), M_cluster, cluster.pos.x, cluster.pos.y, cluster.pos.z + 0.002, cluster.rot, 0, 0, false);
-    const EV = CAR === 'golf' ? ENGINE !== 'busa' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
+    const EV = CAR === 'golf' ? ENGINE !== 'busa' && ENGINE !== 'jet' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
+    const JETC = CAR === 'golf' && ENGINE === 'jet';
 
     // ---------------------------------------------------------------- wheels
     function carcass(R, W, rim) {
@@ -10984,7 +11446,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       g.fillText(String(Math.round(t.speedMph)), 16, 128);
       g.font = 'bold 36px Arial'; g.fillStyle = '#8fb2c6'; g.fillText('MPH', 20, 214);
       g.fillStyle = '#ffffff'; g.font = 'bold 90px Arial'; g.textAlign = 'right'; g.fillText(t.gear.replace(/^[DM](?=\d)/, '') || 'D', 496, 140);
-      g.font = 'bold 30px Arial'; g.fillStyle = '#8fb2c6'; g.fillText(EV ? Math.round(clamp(t.rpm / (t.redline || 1), 0, 1) * 100) + '% MOTOR' : Math.round(t.rpm) + ' RPM', 496, 214);
+      g.font = 'bold 30px Arial'; g.fillStyle = '#8fb2c6'; g.fillText(JETC ? Math.round(t.rpm / 100) + '% N1' : EV ? Math.round(clamp(t.rpm / (t.redline || 1), 0, 1) * 100) + '% MOTOR' : Math.round(t.rpm) + ' RPM', 496, 214);
       clusterTex.needsUpdate = true;
     }
     function drawScreen() {}
@@ -11014,12 +11476,23 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       }
     }
     function setChute() {}
+    // the jet golf cart: the compressor face spins with the spool, the flame follows the thrust and the afterburner
+    function setJet(N, ab, thr, dt) {
+      if (!jetFx) return;
+      jetFx.t += dt;
+      if (jetFan) jetFan.rotation.z += N * 45 * dt;
+      const on = ab > 0.02 || thr > 0.3;
+      jetFx.outer.visible = jetFx.core.visible = on;
+      if (!on) return;
+      jetFx.outer.scale.z = 0.35 + 1.9 * ab + 0.25 * thr; jetFx.core.scale.z = 0.2 + 0.95 * ab + 0.1 * thr;
+      for (const m of [jetFx.outer.material, jetFx.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = jetFx.t; }
+    }
 
     rootG.traverse((o) => { if (o.isMesh && o.material && (o.material.transparent || (Array.isArray(o.material) && false))) o.castShadow = false; });
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW.sw, eye: toRoot(eye),
       exhaustTips: P.tips, materials: M, headlights: P.spots, tailLens: [], mirrors: [],
-      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, variant: 'cc', cls: CAR,
+      setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, setJet, variant: 'cc', cls: CAR,
     };
   }
 
@@ -11059,14 +11532,45 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 } };
+    // the tracks (rally stages, the windy mower course): the distance from the centre line, baked once into a texture from
+    // worldgen's own line (0.1 m steps to 25.5 m) - the shader paints the road, its edges and verges from it
+    const TRK = W.track, trkBox = new THREE.Vector4(0, 0, 1, 1);
+    let trkTex = null;
+    if (TRK) {
+      const M = 26, res = TRK.kind === 'mow' ? 0.5 : 1, bx0 = TRK.box[0] - M, bz0 = TRK.box[1] - M;
+      const w = Math.ceil((TRK.box[2] - TRK.box[0] + 2 * M) / res), h = Math.ceil((TRK.box[3] - TRK.box[1] + 2 * M) / res);
+      const df = new Float32Array(w * h).fill(25.5);
+      for (let i = 0; i < TRK.n; i++) {
+        const j = (i + 1) % TRK.n, ax = TRK.x[i], az = TRK.z[i], dx = TRK.x[j] - ax, dz = TRK.z[j] - az, l2 = dx * dx + dz * dz || 1;
+        const ia = Math.max(0, Math.floor((Math.min(ax, ax + dx) - 25.5 - bx0) / res)), ib = Math.min(w - 1, Math.ceil((Math.max(ax, ax + dx) + 25.5 - bx0) / res));
+        const ja = Math.max(0, Math.floor((Math.min(az, az + dz) - 25.5 - bz0) / res)), jb = Math.min(h - 1, Math.ceil((Math.max(az, az + dz) + 25.5 - bz0) / res));
+        for (let b = ja; b <= jb; b++) {
+          const pz = bz0 + (b + 0.5) * res - az;
+          for (let a = ia; a <= ib; a++) {
+            const px = bx0 + (a + 0.5) * res - ax;
+            let t = (px * dx + pz * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+            const ex = px - dx * t, ez = pz - dz * t, d = Math.sqrt(ex * ex + ez * ez), k = b * w + a;
+            if (d < df[k]) df[k] = d;
+          }
+        }
+      }
+      const u8 = new Uint8Array(w * h);
+      for (let k = 0; k < w * h; k++) u8[k] = Math.round(Math.min(25.5, df[k]) * 10);
+      trkTex = new THREE.DataTexture(u8, w, h, THREE.RedFormat, THREE.UnsignedByteType);
+      trkTex.unpackAlignment = 1; trkTex.magFilter = THREE.LinearFilter; trkTex.minFilter = THREE.LinearMipmapLinearFilter; trkTex.generateMipmaps = true;
+      trkTex.needsUpdate = true;
+      trkBox.set(bx0, bz0, 1 / (w * res), 1 / (h * res));
+    }
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks)
+      uMap: { value: TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+      uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
       sh.vertexShader = 'attribute vec2 aData;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\n' +
         sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
   vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vData = aData; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
+      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nuniform sampler2D uTrk;\nuniform vec4 uTrkBox;\nuniform float uTrkW;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
         sh.fragmentShader
           .replace('#include <color_fragment>', `
   {
@@ -11112,7 +11616,37 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 4.5) {
+    if (uMap > 5.5) {
+      // ---- the tracks: td = metres from the centre line (outside the baked area: far)
+      vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
+      float td = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv).r * 25.5 : 25.5;
+      float n1 = vnoise(P * 0.35), n2 = vnoise(P * 2.2), n3 = vnoise(P * 9.0);
+      if (uMap > 6.5) {
+        // windy mower course: the oval's mown field (light and dark stripes), its dirt worn darker down the middle where
+        // everyone runs, lighter and looser towards the bales, ragged grassy edges
+        float sf = fract(P.x / 10.0 + 0.25), stripe = smoothstep(0.47, 0.53, sf) * (1.0 - smoothstep(0.97, 1.0, sf)) + (1.0 - smoothstep(0.0, 0.03, sf));
+        vec3 g = mix(vec3(0.15, 0.26, 0.065), vec3(0.19, 0.31, 0.085), n1) * (0.9 + 0.1 * n2 + 0.08 * n3) * mix(0.92, 1.06, stripe);
+        vec3 dc = mix(vec3(0.26, 0.155, 0.08), vec3(0.34, 0.21, 0.11), n1) * (0.85 + 0.12 * n2 + 0.06 * n3);
+        dc *= 1.0 - 0.28 * exp(-pow(td / 2.4, 2.0)) * (0.7 + 0.3 * vnoise(P * 0.5));
+        dc = mix(dc, vec3(0.4, 0.27, 0.15) * (0.9 + 0.1 * n3), 0.35 * smoothstep(uTrkW - 2.5, uTrkW - 0.5, td));
+        float edge = uTrkW + (vnoise(P * 1.3) - 0.5) * 0.9 + (n3 - 0.5) * 0.3;
+        col = mix(g, dc, 1.0 - smoothstep(edge - 0.25, edge + 0.25, td));
+        rough = 0.97;
+      } else {
+        // rally gravel: pale crushed stone, two packed darker wheel tracks where the cars run and loose stones thrown up in
+        // ridges along the middle and the edges; a worn verge of dirt and flattened grass, then the land as it is
+        vec3 gv = mix(vec3(0.21, 0.18, 0.14), vec3(0.28, 0.245, 0.195), n1) * (0.84 + 0.13 * n2 + 0.09 * n3);
+        float wt = exp(-pow((td - 0.9) / 0.42, 2.0)) * (0.55 + 0.45 * vnoise(P * 0.6));
+        gv *= 1.0 - 0.3 * wt;
+        float loose = smoothstep(uTrkW - 1.4, uTrkW - 0.2, td) + 0.5 * (1.0 - smoothstep(0.0, 0.4, td));
+        gv = mix(gv, vec3(0.3, 0.275, 0.235) * (0.82 + 0.3 * n3), clamp(loose, 0.0, 1.0) * 0.55);
+        float edge = uTrkW + (vnoise(P * 0.9) - 0.5) * 0.7 + (n3 - 0.5) * 0.25;
+        float onRoad = 1.0 - smoothstep(edge - 0.3, edge + 0.3, td);
+        vec3 verge = mix(col, vec3(0.29, 0.25, 0.18) * (0.8 + 0.3 * n2), (1.0 - smoothstep(uTrkW + 0.2, uTrkW + 2.4, td)) * 0.6);
+        col = mix(verge, gv, onRoad);
+        rough = mix(1.0, 0.94, onRoad);
+      }
+    } else if (uMap > 4.5) {
       // ---- mower track: a mown field (the mower's passes leave light and dark stripes), a dirt oval worn darker along
       // the racing line just inside its centre, looser lighter dirt up the outside, ragged grassy edges, and a chalk
       // start / finish line across the front straight
@@ -11539,6 +12073,24 @@ float lampLight(float lat, float al){
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
     });
     const signMats = signTex.map((t) => new THREE.MeshStandardMaterial({ map: t, transparent: true, alphaTest: 0.5, roughness: 0.5, side: THREE.DoubleSide }));
+    // rally corner boards: red chevrons on white, pointing the way the road goes (0: left, 1: right), on two short posts
+    const chevMats = [-1, 1].map((dir) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+      g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#d0141b';
+      for (let k = 0; k < 3; k++) {
+        const x = 52 + k * 72;
+        g.beginPath();
+        if (dir > 0) { g.moveTo(x - 30, 14); g.lineTo(x + 2, 14); g.lineTo(x + 40, 64); g.lineTo(x + 2, 114); g.lineTo(x - 30, 114); g.lineTo(x + 8, 64); }
+        else { g.moveTo(x + 30, 14); g.lineTo(x - 2, 14); g.lineTo(x - 40, 64); g.lineTo(x - 2, 114); g.lineTo(x + 30, 114); g.lineTo(x - 8, 64); }
+        g.closePath(); g.fill();
+      }
+      g.strokeStyle = '#222'; g.lineWidth = 6; g.strokeRect(3, 3, 250, 122);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, side: THREE.DoubleSide });
+    });
+    const chevPlateGeo = new THREE.PlaneGeometry(1.3, 0.62); chevPlateGeo.translate(0, 1.05, 0.05);
+    const chevPostGeo = new THREE.BoxGeometry(0.07, 1.4, 0.07); chevPostGeo.translate(0, 0.7, 0);
+    const chevPostMat = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 });
     const signPostGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.6, 6); signPostGeo.translate(0, 1.3, 0);
     const signPlateGeo = new THREE.PlaneGeometry(0.75, 0.94); signPlateGeo.translate(0, 2.35, 0.03);
     const boardPostGeo = new THREE.CylinderGeometry(0.1, 0.1, 3.4, 8); boardPostGeo.translate(0, 1.7, 0);
@@ -11735,6 +12287,12 @@ float lampLight(float lat, float al){
       }
       for (const r of (W.rampsInChunk ? W.rampsInChunk(cx, cz) : [])) g.add(buildRamp(r, x0, z0));
       for (const o of (W.jumpsInChunk ? W.jumpsInChunk(cx, cz) : [])) g.add(buildJump(o, x0, z0));
+      for (const cv of cp.chevrons || []) {
+        const b = new THREE.Group(); b.position.set(cv.x - x0, W.terrainHeight(cv.x, cv.z) - 0.05, cv.z - z0); b.rotation.y = cv.rot;
+        for (const px of [-0.45, 0.45]) { const post = new THREE.Mesh(chevPostGeo, chevPostMat); post.position.x = px; b.add(post); }
+        const plate = new THREE.Mesh(chevPlateGeo, chevMats[cv.dir > 0 ? 1 : 0]); b.add(plate);
+        b.traverse((o) => { o.castShadow = true; }); g.add(b);
+      }
       for (const sgn of cp.signs) {
         const post = new THREE.Mesh(signPostGeo, MAT.rock); post.position.set(sgn.x - x0, sgn.y - 0.1, sgn.z - z0); post.rotation.y = sgn.rot;
         const plate = new THREE.Mesh(signPlateGeo, signMats[sgn.kind]); post.add(plate);
@@ -11863,7 +12421,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps';
+    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && !W.track;
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -12083,6 +12641,64 @@ void main(){
       // a rail along the front of the stands
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ST.x - 0.2, 1.0, (ST.z0 + ST.z1) / 2); mg.add(rail);
       for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ST.x - 0.2, 0.5, ST.z0 + k * len / 8); mg.add(post); }
+    }
+
+    // ---------------------------------------------------------------- the tracks (built once): straw bales, the start /
+    // finish arch with a checkered line across the road under it, the mower course's bleachers
+    if (TRK) {
+      const TP = W.trackProps(), tg = new THREE.Group(); scene.add(tg);
+      const gh = (x, z) => W.terrainHeight(x, z);
+      const strawC = document.createElement('canvas'); strawC.width = 128; strawC.height = 64;
+      { const g = strawC.getContext('2d'); g.fillStyle = '#c29a45'; g.fillRect(0, 0, 128, 64);
+        for (let i = 0; i < 420; i++) { g.strokeStyle = Math.random() < 0.5 ? 'rgba(236,205,120,0.7)' : 'rgba(120,88,34,0.5)'; g.lineWidth = 1; const x = Math.random() * 128, y = Math.random() * 64; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 6 + Math.random() * 14, y + (Math.random() - 0.5) * 3); g.stroke(); }
+        g.fillStyle = 'rgba(40,30,20,0.8)'; g.fillRect(34, 0, 3, 64); g.fillRect(90, 0, 3, 64); }
+      const strawT = new THREE.CanvasTexture(strawC); strawT.colorSpace = THREE.SRGBColorSpace;
+      if (TP.bales.length) {
+        const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.18, 0.46, 0.48), new THREE.MeshStandardMaterial({ map: strawT, roughness: 0.95 }), TP.bales.length);
+        im.castShadow = true; im.receiveShadow = true;
+        const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), e = new THREE.Euler(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+        TP.bales.forEach((b, i) => {
+          const j = W.hash01(i, 7, 91) - 0.5;
+          e.set(0, b.rot + Math.PI / 2 + j * 0.08, 0); qq.setFromEuler(e); pv.set(b.x, gh(b.x, b.z) + 0.22, b.z); m4.compose(pv, qq, one); im.setMatrixAt(i, m4);
+        });
+        tg.add(im);
+      }
+      // the arch: two legs either side of the road and a banner across; a checkered line on the road beneath it
+      const A = TP.arch, dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
+      const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz);
+      for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
+      const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : 'WINDY MOWER TRACK';
+      const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
+      { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
+        g.fillStyle = '#f4f4f0'; g.fillRect(0, 32, 1024, 32); g.fillStyle = '#111'; g.font = 'italic 900 30px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('START  ·  FINISH  ·  HELLCAT DRIVE ' + name, 512, 49); }
+      const banT = new THREE.CanvasTexture(banC); banT.colorSpace = THREE.SRGBColorSpace;
+      const banM = new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 });
+      const banner = new THREE.Mesh(new THREE.BoxGeometry(A.w + 0.4, 0.8, 0.06), [dark, dark, dark, dark, banM, banM]);
+      banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; tg.add(banner);
+      const chkC = document.createElement('canvas'); chkC.width = 256; chkC.height = 16;
+      { const g = chkC.getContext('2d'); for (let k = 0; k < 32; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#141414' : '#ecebe6'; g.fillRect(k * 8, r * 8, 8, 8); } }
+      const chkT = new THREE.CanvasTexture(chkC); chkT.colorSpace = THREE.SRGBColorSpace;
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(TRK.W + 0.2, 0.5), new THREE.MeshStandardMaterial({ map: chkT, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      line.rotation.set(-Math.PI / 2, 0, rotA, 'YXZ'); line.position.set(A.x, ay + 0.03, A.z); line.receiveShadow = true; tg.add(line);
+      if (TP.stands) {
+        // bleachers back from the outside of the start straight, climbing away from it, a crowd on every row
+        const ST = TP.stands, concrete = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.95 });
+        const crowdC = document.createElement('canvas'); crowdC.width = 256; crowdC.height = 64;
+        { const g = crowdC.getContext('2d'); g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, 256, 64); const cols = ['#c33', '#36c', '#eee', '#222', '#eb3', '#3a3', '#a5c', '#f80'];
+          for (let i = 0; i < 520; i++) { g.fillStyle = cols[i % cols.length]; g.fillRect(Math.random() * 256, 10 + Math.random() * 50, 3, 6); } }
+        const crowdT = new THREE.CanvasTexture(crowdC); crowdT.colorSpace = THREE.SRGBColorSpace; crowdT.wrapS = THREE.RepeatWrapping; crowdT.repeat.set(5, 1);
+        const crowdM = new THREE.MeshStandardMaterial({ map: crowdT, roughness: 0.95 });
+        const len = ST.z1 - ST.z0, n = 5, dx = ST.d / n;
+        for (let k = 0; k < n; k++) {
+          const h = 0.45 * (k + 1), step = new THREE.Mesh(new THREE.BoxGeometry(dx, h, len), concrete);
+          step.position.set(ST.x + dx * (k + 0.5), h / 2, (ST.z0 + ST.z1) / 2); step.castShadow = true; step.receiveShadow = true; tg.add(step);
+          const people = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.55), crowdM);
+          people.rotation.y = -Math.PI / 2; people.position.set(ST.x + dx * (k + 0.5) - 0.05, h + 0.27, (ST.z0 + ST.z1) / 2); tg.add(people);
+        }
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ST.x - 0.2, 1.0, (ST.z0 + ST.z1) / 2); tg.add(rail);
+        for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ST.x - 0.2, 0.5, ST.z0 + k * len / 8); tg.add(post); }
+      }
     }
 
     // ---------------------------------------------------------------- monster truck arena (built once)
@@ -12843,6 +13459,23 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         this._mmOverlay(g, c, S, heading);
         return;
       }
+      if (W.track || W.map === 'mowtrack') {
+        // the tracks: the whole course (the start / finish line in red); the Mower Track: its oval
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        const path = () => {
+          g.beginPath();
+          if (W.track) { const T = W.track; g.moveTo(T.x[0], T.z[0]); for (let i = 1; i <= T.n; i++) g.lineTo(T.x[i % T.n], T.z[i % T.n]); }
+          else { const M = W.MOWT; g.moveTo(M.R, M.SL); g.lineTo(M.R, -M.SL); g.arc(0, -M.SL, M.R, 0, -Math.PI, true); g.lineTo(-M.R, M.SL); g.arc(0, M.SL, M.R, Math.PI, 0, true); }
+        };
+        const w = W.track ? W.track.W : W.MOWT.W, mow = !W.track || W.track.kind === 'mow';
+        path(); g.strokeStyle = '#111'; g.lineWidth = Math.max(22, w + 12); g.stroke();
+        path(); g.strokeStyle = mow ? '#a0784e' : '#b8ad98'; g.lineWidth = Math.max(12, w); g.stroke();
+        const sx = W.track ? W.track.x[0] : W.MOWT.R, sz = W.track ? W.track.z[0] : 0, tx = W.track ? W.track.tx[0] : 0, tz = W.track ? W.track.tz[0] : -1, hw = Math.max(9, w / 2 + 4);
+        g.strokeStyle = '#e22'; g.lineWidth = 6; g.lineCap = 'butt'; g.beginPath(); g.moveTo(sx + tz * hw, sz - tx * hw); g.lineTo(sx - tz * hw, sz + tx * hw); g.stroke();
+        g.restore();
+        this._mmOverlay(g, c, S, heading);
+        return;
+      }
       if (TAR) {
         // All Road: the avenue grid over the paving, and the jump ramps
         const A = W.TARMAC.AV, e = R * 1.5;
@@ -12992,6 +13625,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         ['lsv', 'Street LSV', 'A 72 V AC motor, 12 kW · 35 mph · 12 in wheels, windscreen, lights and mirrors', 'Pitch Black'],
         ['hot', 'Hot Rod', 'A 45 kW / 160 Nm AC motor and a lithium pack · lowered, roof off, a roll hoop · 0-60 ~6 s · ~84 mph', 'Plum Crazy', 1],
         ['busa', 'Record (Hayabusa)', 'Built like the 118 mph world-record cart: a Hayabusa 1,340 cc four behind the seats, a 6-speed on a quickshifter · 0-60 ~4.8 s · ~120 mph', 'Go Mango', 1],
+        ['jet', 'Jet', 'A surplus turbojet slung low behind the seats · 590 lbf of thrust, 810 with the afterburner · no driven wheels · 0-60 ~4 s · ~185 mph · built to stay straight flat out', 'B5 Blue', 1],
       ],
       eng: {
         lsv: { hint: 'Golf cart (Street LSV): shift up (E) for DRIVE - a 72 V AC conversion, 12 kW, 35 mph, with brakes on all four wheels, lights, mirrors and a windscreen.',
@@ -13000,12 +13634,15 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         hot: { hint: 'Golf cart (Hot Rod): shift up (E) for DRIVE - a 45 kW AC motor on a lithium pack in a lowered cart with the roof off: 0-60 in ~6 s and ~84 mph. Stability control is on (Sport).',
           info: 'A hot-rodded cart · 45 kW / 160 Nm AC motor, a lithium pack under the seats, a 5.8:1 axle · lowered, roof off, a chrome roll hoop, two racing buckets · fat tyres on 13 in deep-dish wheels, four-wheel discs · 440 kg · 0-60 ~6 s, ~84 mph',
           trans: 'Electric · single speed', tyres: 'Street tyres', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.09, whPure: 1, whine: 3.4, rpmRef: 8000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+        jet: { hint: 'Jet golf cart: shift up (E) for DRIVE. The throttle spools a turbojet, and it takes ~3 s to wind up from idle - so at a stop hold SPACE (the brakes), floor it, and let go once it howls; past 96 % the afterburner lights. Nothing drives the wheels: it rolls free (brake early - it keeps pushing for a second after you lift), and in R the cart\'s old electric motor backs it up. Stability control is on (Sport).',
+          info: 'A jet-powered cart for the drag-strip shows: a surplus target-drone turbojet (~590 lbf of thrust dry, ~810 lbf with a homebuilt afterburner) slung low behind the seats so its thrust runs through the centre of gravity, a stretched, lowered and widened frame, 12 in wheels on low-profile radials (wider at the back), four-wheel discs with ABS, a nose cone and a tail fin · 480 kg · 0-60 ~4 s, ~185 mph',
+          trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.6, race: 0 } },
         busa: { hint: 'Golf cart (Record): shift up (E) for DRIVE and floor it - a Hayabusa 1,340 cc four behind the seats, ~190 hp through the bike\'s 6-speed (E / Q or the paddles), a stretched, lowered frame and a wheelie bar. The real one did 118.76 mph. Stability control is on (Sport).',
           info: 'Built like the world\'s fastest golf cart (118.76 mph): a stretched, lowered cart frame with a Suzuki Hayabusa 1,340 cc inline-four (~190 hp at 9,700) bare behind the seats, the bike\'s 6-speed on a quickshifter, a chain to the rear axle, a wheelie bar · slicks · 500 kg · 0-60 ~4.8 s, ~120 mph',
           trans: '6-speed sequential · quickshifter', tyres: 'Cart slicks', snd: { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 11000, race: 0.9, rough: 0.06 } },
       } },
-    rally: { btn: 'RALLY CAR', sub: 'Rally4, Rally2 and Group B · gravel tyres, sequential boxes · 208-530 hp', paint: 'B5 Blue', cam: [1.0, 1.0],
-      hint: 'Rally4: shift up (E) for DRIVE - front-wheel drive, a 1.2 turbo triple with 208 hp and a 5-speed sequential that flat-shifts (E / Q or the paddles). SPACE is the hydraulic handbrake for the hairpins. On gravel tyres it is at home on dirt: try All Ramps, or off the road in the Countryside.',
+    rally: { btn: 'RALLY CAR', sub: 'Rally4, Rally2 and Group B · gravel tyres, sequential boxes · 208-530 hp · its own gravel stages', paint: 'B5 Blue', cam: [1.0, 1.0], map: 'rally',
+      hint: 'Rally4: shift up (E) for DRIVE - front-wheel drive, a 1.2 turbo triple with 208 hp and a 5-speed sequential that flat-shifts (E / Q or the paddles). SPACE is the hydraulic handbrake for the hairpins. Its home is the gravel of the Rally Stage (and the Windy Rally Stage: Esc → Drive → Map).',
       info: 'A Rally4 hatch · front-wheel drive, a plated front diff · 1.2 L turbo triple on a 30 mm restrictor, 208 hp at 5,500, 290 Nm · 5-speed sequential dog box · long-travel dampers, hydraulic handbrake, roll cage · 195/65R15 gravel tyres · 1,240 kg with the crew · 0-60 ~6 s',
       trans: '5-speed sequential · FWD', tyres: 'Gravel rally tyres',
       snd: { nEng: 1, cyl: 3, fmul: 1.25, deep: 0.05, loud: 0.45, open: 0, whK: 0.45, whPure: 1, whine: 0.9, rpmRef: 6600, race: 0.8, rough: 0.12, surge: 1 },
@@ -13139,10 +13776,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
+  // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
+  const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
+  const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
+    rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
+    mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
+    : TRKMAP ? W.trackSpawn()
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -13150,6 +13793,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ Fun tab: live tuning (saved per car)
   const STOCK = JSON.parse(JSON.stringify(veh.spec));
+  const JET = !!STOCK.jet;                      // (the jet golf cart: thrust, no driven wheels)
   const tuneDefaults = () => ({
     power: 1, boost: STOCK.boostMax, stretch: 1, limiter: STOCK.limiterRpm, nolimit: false, idle: STOCK.idleRpm, inertia: 1, nos: 0, pops: STOCK.popScale !== undefined ? STOCK.popScale : 1, whine: 1,
     finalAuto: STOCK.autoFinal, finalManual: STOCK.manualFinal, shiftTime: STOCK.shiftTimeWOT || 0.22, launch: STOCK.launchRpm || 4000, gov: true,
@@ -13183,11 +13827,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     const v = new VEH.Vehicle(flat, JSON.parse(JSON.stringify(veh.spec)));
     v.setTransmission(veh.transType); v.setTires(veh.spec.frontTire, veh.spec.rearTire); v.applySpec();
     v.reset(0, 0, 0, 0, -1); v.running = true; v.eOmega = veh.spec.idleRpm / VEH.RAD2RPM; v.park = false; v.gear = 1; v.tcMode = veh.tcMode; v.launchRpm = veh.launchRpm;
+    if (v.spec.jet) v.jetN = v.spec.jet.idle;
     for (let i = 0; i < 60; i++) { v.input.brake = 1; v.step(1 / 60); }
     v.input.brake = 0;
     for (const w of v.wheels) if (!w.front) w.temp = 75;
     v.input.handbrake = 1; v.input.throttle = 1;
-    for (let i = 0; i < 150; i++) v.step(1 / 120);
+    for (let i = 0; i < (v.spec.jet ? 440 : 150); i++) v.step(1 / 120);        // (a jet: ~3.5 s to spool up against the brakes)
     v.input.handbrake = 0;
     const dt = 1 / 120, z0 = v.pz, MPHc = 2.23694, res = {};
     let t = 0, tStart = null, prevD = 0, trapT = {};
@@ -13269,8 +13914,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
-    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : FREESTYLE ? 'Back on its wheels' : MOWTRACK ? 'Back on the track' : 'Car reset');
-    if (MOWTRACK) LAP.armed = false;                      // (a reset doesn't count as a lap)
+    hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : FREESTYLE ? 'Back on its wheels' : MOWTRACK || TRKMAP ? 'Back on the track' : 'Car reset');
+    if (MOWTRACK || TRKMAP) LAP.armed = false;            // (a reset doesn't count as a lap)
     if (DRAGMAP) dragReset();
   }
   function applyVehicleSettings() {
@@ -13311,11 +13956,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         : CARDEF.cls === 'fx' ? 'Tube chassis, 34 hp single, kart dirt tyres: it digs in on grass and dirt. '
           : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
       + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
-        : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : 'Its home is the Mower Track map (Esc → Drive → Map).'), 11), 1600);
-    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map ? ' Its home is the Straightaway map (Esc → Drive → Map).' : ''), 11), 1600);
+        : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : MOWCOURSE ? 'Laps are timed at the start / finish arch.' : 'Its home is the Mower Track map (Esc → Drive → Map); the Windy Mower Track twists.'), 11), 1600);
+    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map && !(CCD.map === 'rally' && S.map === 'rallywind') ? ' Its home is the ' + (MAP_NAMES[CCD.map] || CCD.map) + ' map (Esc → Drive → Map).' : TRKMAP ? ' ' + TRACK_HINT[S.map] : ''), 12), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (FREESTYLE ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); All Ramps is nothing but jumps.'), 12), 1600);
+    else if (TRKMAP) setTimeout(() => hud.hint(TRACK_HINT[S.map], 10), 1600);
     else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
     else if (RAMPSMAP) setTimeout(() => hud.hint('All Ramps: the whole world is groomed dirt covered in jumps - gap jumps, tabletops, step-ups, kickers and whoops, big and small, every which way, for ever. The first gap jump is dead ahead. Big air, flips and wheelies score.', 11), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: two big gap jumps straight ahead up the middle and a giant tabletop across the far end; tabletops and step-ups either side, the car crush on the left, whoops lanes along the walls and behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
@@ -13345,6 +13991,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ menu
   const TABS = ['Drive', 'Fun', 'Controls', 'Graphics', 'Audio', 'Help'];
+  const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
@@ -13421,7 +14069,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
       const from = MORE_CARS.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
-      const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps');   // (All Ramps is a monster truck's home too)
+      // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
+      const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
       if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
@@ -13494,6 +14143,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     function stats() {
       const e10 = DEMON && S.fuel === 'e10', ratedHp = e10 ? 900 : CARDEF.hp, ratedTq = e10 ? 810 : CARDEF.tq;
       const p = peakFigures(veh.spec), hp = ratedHp * p.hp / STOCK_PEAK.hp, tq = ratedTq * p.tq / STOCK_PEAK.tq, lb = tune.mass * 2.20462;
+      if (JET) { const lbf = veh.spec.jet.thrust * (veh.spec.torqueScale || 1) / 4.448; statsEl.innerHTML = `<b>${Math.round(lbf)} lbf</b> of thrust · ${Math.round(lbf * (1 + veh.spec.jet.ab))} lbf with the afterburner · ${Math.round(lb).toLocaleString()} lb` + (tune.gravity !== 1 ? ` · ${tune.gravity.toFixed(2)} g` : ''); return; }
       statsEl.innerHTML = `<b>${Math.round(hp).toLocaleString()} hp</b> · ${Math.round(tq).toLocaleString()} lb-ft · ${Math.round(lb).toLocaleString()} lb · ${(lb / hp).toFixed(2)} lb/hp` +
         (tune.nos ? ` · +${tune.nos} hp nitrous` : '') + (tune.gravity !== 1 ? ` · ${tune.gravity.toFixed(2)} g` : '');
     }
@@ -13509,9 +14159,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     add(simWrap);
     const k = (x) => Math.round(x).toLocaleString();
     // (an electric car: a motor, not an engine - no boost, idle, nitrous, exhaust, launch rpm or gears to shift)
-    const EVT = !!STOCK.electric;
-    sect(EVT ? 'Motor' : 'Engine');
-    T('power', EVT ? 'Motor power' : 'Engine power', EVT ? 'Multiplies the motor\'s torque (a bigger inverter and pack)' : 'Multiplies the whole torque curve (heads, cam, tune…)', 0.5, 3, 0.05, (x) => Math.round(x * 100) + '%');
+    // (a jet: thrust, and that's all - no revs, gears, boost or exhaust to tune)
+    const EVT = !!STOCK.electric || JET;
+    sect(JET ? 'Jet' : EVT ? 'Motor' : 'Engine');
+    T('power', JET ? 'Thrust' : EVT ? 'Motor power' : 'Engine power', JET ? 'Multiplies the turbojet\'s thrust, dry and with the afterburner' : EVT ? 'Multiplies the motor\'s torque (a bigger inverter and pack)' : 'Multiplies the whole torque curve (heads, cam, tune…)', 0.5, 3, 0.05, (x) => Math.round(x * 100) + '%');
+    if (!JET) {
     if (!EVT) T('boost', 'Supercharger boost', 'More pressure = more torque everywhere (stock ' + STOCK.boostMax + ' psi)', 0, Math.max(45, Math.ceil(STOCK.boostMax * 1.5)), 0.5, (x) => x.toFixed(1) + ' psi');
     T('stretch', EVT ? 'Base speed' : 'Cam / powerband', EVT ? 'Moves where the motor goes from full torque to full power — pair it with the speed limit' : 'Moves the whole powerband up or down the rev range — pair it with the rev limiter', 0.7, 5, 0.05, (x) => k(peakRpm(x)) + ' pk');
     T('limiter', EVT ? 'Motor speed limit' : 'Rev limiter', EVT ? (tune.nolimit ? 'Limit removed: the motor pulls until the wind and its own losses stop it' : 'The controller fades the torque out as the motor reaches it')
@@ -13531,11 +14183,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     matchWrap.appendChild(el('<span class="simout">' + (EVT ? 'Moves the base speed up to suit the speed limit and gears the car to match, so the motor really pulls up there'
       : 'Moves the powerband peak to just under the limiter and gears the car to suit, so the engine really pulls (and the automatic really revs) up there') + '</span>'));
     add(matchWrap);
+    }
     if (!EVT) T('idle', 'Idle speed', 'Higher idle = lumpier, choppier cam sound', 500, 2000, 10, (x) => k(x));
-    T('inertia', EVT ? 'Rotor inertia' : 'Flywheel / rotating mass', 'Lighter revs faster (and bogs easier)', 0.3, 2, 0.05, (x) => x.toFixed(2) + '×');
-    if (!EVT) T('nos', 'Nitrous shot', 'Hold N (or a mapped wheel button) at full throttle', 0, 1000, 25, (x) => x ? '+' + x + ' hp' : 'off');
-    sect('Drivetrain');
-    if (veh.transType === 'auto') {
+    if (!JET) T('inertia', EVT ? 'Rotor inertia' : 'Flywheel / rotating mass', 'Lighter revs faster (and bogs easier)', 0.3, 2, 0.05, (x) => x.toFixed(2) + '×');
+    if (!EVT) {
+      T('nos', 'Nitrous shot', 'Extra horsepower while it sprays: at full throttle, above 1,500 rpm, in gear (traction control still has the last word)', 0, 1000, 25, (x) => x ? '+' + x + ' hp' : 'off');
+      add(row('Nitrous fires', 'Armed: the shot goes in whenever you floor it (a wide-open-throttle switch, like a real kit - works with any wheel) · On the button: only while N or a mapped wheel button is held',
+        seg([['wot', 'Armed — floor it'], ['hold', 'On the button']], tune.nosArm === 'hold' ? 'hold' : 'wot', (v) => { tune.nosArm = v; })));
+    }
+    if (!JET) sect('Drivetrain');
+    if (JET) { /* (nothing drives the wheels) */ } else if (veh.transType === 'auto') {
       T('finalAuto', EVT ? 'Reduction gear' : 'Final drive ratio', 'Higher = harder launch, lower top speed (stock ' + STOCK.autoFinal + ')', 1.8, 25, 0.01, (x) => x.toFixed(2));
       if (!EVT) T('shiftTime', 'Shift speed', 'How long each automatic upshift takes at full throttle', 0.05, 0.5, 0.01, (x) => Math.round(x * 1000) + ' ms');
     } else T('finalManual', 'Final drive ratio', 'Higher = harder launch, lower top speed (stock ' + STOCK.manualFinal + ')', 1.8, 25, 0.01, (x) => x.toFixed(2));
@@ -13552,7 +14209,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     sect('Just for fun');
     T('gravity', 'Gravity', 'Earth = 1 g, Moon = 0.17 g, Jupiter = 2.5 g', 0.1, 2.5, 0.01, (x) => x.toFixed(2) + ' g');
     if (!EVT) T('pops', 'Pops & bangs', 'Overrun crackles and backfire flames', 0, 6, 0.25, (x) => x ? x.toFixed(2) + '×' : 'off');
-    T('whine', EVT ? 'Motor whine' : 'Supercharger whine', '', 0, 3, 0.05, (x) => Math.round(x * 100) + '%');
+    T('whine', JET ? 'Turbine whine' : EVT ? 'Motor whine' : 'Supercharger whine', '', 0, 3, 0.05, (x) => Math.round(x * 100) + '%');
     T('smoke', 'Tyre smoke', '', 0, 4, 0.1, (x) => Math.round(x * 100) + '%');
   }
   function peakRpm(stretch) {
@@ -13645,7 +14302,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       add(row('Paint', S.paint, sw));
       add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · All Ramps: the whole world is dirt covered in jumps (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['prepcountry', 'Prepped Countryside'], ['preptarmac', 'Prepped All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['ramps', 'All Ramps'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        seg(Object.entries(MAP_NAMES), S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -13892,7 +14549,6 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // (monster truck) air assist: eases off whichever pedal would over-rotate it in the air, feathers the gas on landing
     veh.input.airAssist = MONSTER && S.airAssist !== false;
     veh.input.revHold = !!A.rev;
-    veh.input.nos = !!A.nos;
     veh.input.lineLock = !!A.lineLock;
     G.horn = !!A.horn; G.lookBack = !!A.lookBack;
     let thr = st.throttle, brk = st.brake;
@@ -13908,6 +14564,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     veh.input.steer = st.steer; veh.input.throttle = thr; veh.input.brake = brk;
     veh.input.clutch = st.clutch; veh.input.handbrake = st.handbrake;
+    // nitrous: an armed kit fires off its wide-open-throttle switch - floor it (that's how the real ones work, and a wheel
+    // with no spare button gets it too); on the button it only sprays while N / a mapped button is held
+    veh.input.nos = !!A.nos || (tune.nos > 0 && tune.nosArm !== 'hold' && thr > 0.95);
     veh.useClutchPedal = veh.transType === 'manual' && S.clutchPedal && input.hasClutchPedal;
   }
 
@@ -14004,6 +14663,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
     if (car.afterWheels) car.afterWheels();
+    if (car.setJet) car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt);
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
     car.setChute(veh.chuteOut, veh.chuteInfl || 0, veh.chuteT || 0);
@@ -14141,6 +14801,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
+      jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0,
     });
   }
   function processEvents() {
@@ -14202,6 +14863,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
     if (FREESTYLE) chips.push({ html: 'FREESTYLE <b>' + Math.round(FS.score).toLocaleString() + '</b>' });
     if (MOWTRACK && LAP.armed) chips.push({ html: 'LAP ' + (LAP.n + 1) + ' <b>' + (veh.time - LAP.t0).toFixed(1) + '</b>' + (S.mowBest && S.mowBest[TKEY] ? ' · best ' + S.mowBest[TKEY].toFixed(2) : '') });
+    if (TRKMAP && LAP.armed) { const b = S.lapBest && S.lapBest[S.map] && S.lapBest[S.map][TKEY]; chips.push({ html: 'LAP ' + (LAP.n + 1) + ' <b>' + (veh.time - LAP.t0).toFixed(1) + '</b>' + (b ? ' · best ' + lapFmt(b) : '') }); }
     if (veh.flipping) chips.push({ html: 'FLIPPING OVER', cls: 'alert' });
     if (veh.tcActive) chips.push({ html: 'TC', cls: 'warn' });
     if (veh.escActive) chips.push({ html: 'ESC', cls: 'warn' });
@@ -14345,8 +15007,32 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ Mower Track lap timer
   // A lap counts when the car crosses the start / finish line (z = 0 on the front straight) heading up the straight, having
   // been round the far turn since the last time; the first crossing starts the clock. Best laps are kept per vehicle / class
-  const LAP = { armed: false, far: false, t0: 0, n: 0, last: 0, prevZ: null };
+  const LAP = { armed: false, far: false, t0: 0, n: 0, last: 0, prevZ: null, prevS: null, cp: 0 };
+  // (the closed-loop tracks: the line is the start of the course's own centre line - a lap counts crossing it going the right
+  // way having passed a third and two thirds of the way round, in that order, since the last crossing)
+  const lapFmt = (t) => t >= 60 ? Math.floor(t / 60) + ':' + (t % 60).toFixed(2).padStart(5, '0') : t.toFixed(2);
+  function trackLap() {
+    const T = W.track, q = LAP.q || (LAP.q = {});
+    W.trackQuery(veh.px, veh.pz, q);
+    if (q.i < 0 || q.d > T.W / 2 + 8) { LAP.prevS = null; return; }       // (off in the scenery)
+    const s = q.s, L = T.L;
+    if (s > 0.3 * L && s < 0.45 * L && !LAP.cp) LAP.cp = 1;
+    if (s > 0.6 * L && s < 0.75 * L && LAP.cp === 1) LAP.cp = 2;
+    if (LAP.prevS !== null && LAP.prevS > L - 40 && s < 40 && veh.vx * q.tx + veh.vz * q.tz > 0) {
+      const now = veh.time;
+      if (LAP.armed && LAP.cp === 2) {
+        const t = now - LAP.t0; LAP.n++; LAP.last = t;
+        S.lapBest = S.lapBest || {}; const B = S.lapBest[S.map] = S.lapBest[S.map] || {};
+        const best = B[TKEY], pb = !best || t < best;
+        if (pb) { B[TKEY] = t; saveS(); }
+        hud.toast(`Lap ${LAP.n}: ${lapFmt(t)}${pb ? (best ? ' · NEW BEST' : '') : ' · best ' + lapFmt(best)}`, 3);
+      } else if (!LAP.armed) hud.toast('Lap timing on - go!', 1.6);
+      LAP.armed = true; LAP.cp = 0; LAP.t0 = now;
+    }
+    LAP.prevS = s;
+  }
   function lapUpdate() {
+    if (TRKMAP && G.started) return trackLap();
     if (!MOWTRACK || !G.started) return;
     const M = W.MOWT, z = veh.pz, onStraight = Math.abs(veh.px - M.R) < M.W / 2 + 1;
     if (z < -M.SL - M.R * 0.6) LAP.far = true;
