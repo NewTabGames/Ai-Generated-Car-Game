@@ -2589,9 +2589,12 @@
       // ground when it's level, they touch down once it leans a few degrees and hold it up there: a much wider base to
       // tip over, so it slides before it rolls. A caster swivels, so it pushes up and nothing else
       if (s.outriggers) {
-        const o = s.outriggers;
+        const o = s.outriggers, dr = s.cgDrop || 0;
         this.outriggerLoad = 0;
-        for (const [lx, ly, lz] of o.pts) {
+        for (const [lx, ly0, lz] of o.pts) {
+          // (on the body: a tune that drops the CG inside it moves them up from the CG with everything else - left where
+          // they were, a big grip tune had the casters holding the scooter's wheels off the road)
+          const ly = ly0 + dr;
           const bx = px + m00 * lx + m01 * ly + m02 * lz, by = py + m10 * lx + m11 * ly + m12 * lz, bz = pz + m20 * lx + m21 * ly + m22 * lz;
           world.ground(bx, bz, g);
           const pen = g.h + o.r - by;
