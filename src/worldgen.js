@@ -87,6 +87,9 @@
   // 'straight', 'drag' and 'dirtdrag' share the single dead-straight road along -Z; 'drag' is a prepped two-lane strip,
   // 'dirtdrag' the same layout (tree, timing, walls, stands) on groomed dirt
   const DRAGMAP = () => MAP === 'drag' || MAP === 'dirtdrag';
+  // the prepped maps ('prepcountry', 'preptarmac'): the Countryside / All Road with every road prepped like a drag strip
+  // (VHT on rubbered-in asphalt - surface 5). MAP holds the base map, PREP the prep
+  let PREP = false;
   const STRAIGHT = () => MAP === 'straight' || DRAGMAP();
   // drag strip layout (metres): prepped half-width, wall centre, lane centre, lane edge line
   const DRAG = { HALF: 8.3, WALL: 9.0, LANE: 3.1, EDGE: 6.2, SPAWN_Z: 14 };
@@ -379,20 +382,27 @@
     return h * side;
   }
 
-  // ---------------------------------------------------------------- monster truck arena ('arena')
+  // ---------------------------------------------------------------- monster truck arena ('arena', 'ramps')
   // A stadium floor covered in packed, watered clay: HW x HL (half sizes) with rounded corners (radius CR), a concrete
   // wall and debris fence all round (colliders), the stands beyond. Every obstacle is an exact height function (like the
-  // jump ramps), added to the flat ground so the tyres, suspension and body feel it, and meshed from the same function:
-  // The floor is 96 x 184 m (a big domed stadium's, wall to wall):
-  //   east side  - a big tabletop: 13 m faces up to a 4 m deck 16 m long (jump it, or land on the far face)
-  //   west side  - the car crush: a kicker, six junk cars side by side, a kicker back down. The cars flatten under load
-  //   north end  - the big gap jump: a 30 deg kicker to a 3.6 m lip, a gap, a landing mound with a long downslope;
-  //                beside it a step-up (north-west: up a steep face onto a 2.8 m deck, off down a long ramp) and a
-  //                whoops lane (north-east, along the wall: four 1.2 m rollers)
+  // jump ramps), added to the flat ground so the tyres, suspension and body feel it, and meshed from the same function.
+  // The floor is 192 x 368 m, wall to wall. Two layouts (LAYOUTS):
+  //  'arena' (the Monster Arena):
+  //   middle     - two big gap jumps in a row up the centre (a 30 deg kicker to a 3.6 m lip, a gap, a landing mound
+  //                with a long downslope), and across the north end a tabletop half as big again
+  //   east side  - a big tabletop (13 m faces up to a 4 m deck 16 m long: jump it, or land on the far face), a step-up
+  //                in the south-east, a whoops lane along the north-east wall
+  //   west side  - the car crush: a kicker, six junk cars side by side, a kicker back down (the cars flatten under
+  //                load); a second tabletop in the south-west, a whoops lane along the wall, a step-up in the north-west
+  //                (up a steep face onto a 2.8 m deck, off down a long ramp)
   //   south end  - moguls: three 1.2 m whoops across the floor
+  //  'ramps' (the Dirt Ramp Arena): the same stadium with no junk cars - just dirt: three lanes of jumps end to end
+  //   (gap jumps, tabletops, step-ups and moguls, some bigger, some smaller), whoops lanes along both walls, moguls across
+  //   the south end
   //   corners    - banked up to 2.4 m against the wall, for sliding round
-  const ARENA = { HW: 48, HL: 92, CR: 24, SPAWN_X: 0, SPAWN_Z: 44 };
-  const CRUSH_X = -26;                      // the car-crush lane (x of the junk cars)
+  const ARENA = { HW: 96, HL: 184, CR: 48, SPAWN_X: 0, SPAWN_Z: 108 };
+  let RAMPS = false;                        // (the Dirt Ramp Arena: MAP 'arena' with its own layout)
+  const CRUSH_X = -52;                      // the car-crush lane (x of the junk cars)
   const sstep = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const dsstep = (a, b, x) => { const t = (x - a) / (b - a); return t <= 0 || t >= 1 ? 0 : 6 * t * (1 - t) / (b - a); };
   // signed distance to the wall line (negative inside the floor)
@@ -440,25 +450,55 @@
       if (u <= 0 || u >= E) { o.d = 0; return 0; }
       const a = Math.PI * u / W, s = Math.sin(a); o.d = H * 2 * s * Math.cos(a) * Math.PI / W; return H * s * s; },
   };
-  // obstacles: centre-line start (x0, z0), direction (fx, fz), length, half width (flat part + falloff `bev`)
-  const ARENA_OBS = [
-    { kind: 'table', x0: 26, z0: -21, fx: 0, fz: 1, len: 42, hw: 10.5, bev: 6 },
-    { kind: 'crush', x0: CRUSH_X, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
-    { kind: 'gap', x0: 0, z0: -18, fx: 0, fz: -1, len: 36.5, hw: 7.5, bev: 3.5 },
-    { kind: 'mogul', x0: 0, z0: 58, fx: 0, fz: 1, len: 21, hw: 26, bev: 5 },
-    { kind: 'step', x0: -28, z0: -34, fx: 0, fz: -1, len: 32, hw: 8, bev: 3.5 },
-    { kind: 'mogul', n: 4, x0: 39, z0: -34, fx: 0, fz: -1, len: 28, hw: 6, bev: 2.5 },   // (clear of the tabletop's run-out)
-  ];
-  for (const ob of ARENA_OBS) {             // bounding boxes for quick rejection (and for the renderer's meshes)
-    const ex = [ob.x0, ob.x0 + ob.fx * ob.len], ez = [ob.z0, ob.z0 + ob.fz * ob.len], rx = -ob.fz, rz = ob.fx;
-    ob.minX = Math.min(...ex) - Math.abs(rx) * ob.hw; ob.maxX = Math.max(...ex) + Math.abs(rx) * ob.hw;
-    ob.minZ = Math.min(...ez) - Math.abs(rz) * ob.hw; ob.maxZ = Math.max(...ez) + Math.abs(rz) * ob.hw;
+  // obstacles: centre-line start (x0, z0), direction (fx, fz), length (x sc, the scale: 1.3 = a third longer and higher),
+  // half width (flat part + falloff `bev`). The first gap / table / step / mogul of each kind is the one the tests use
+  const GAP = { kind: 'gap', len: 36.5, hw: 7.5, bev: 3.5 }, TABLE = { kind: 'table', len: 42, hw: 10.5, bev: 6 }, STEP = { kind: 'step', len: 32, hw: 8, bev: 3.5 };
+  const ob = (base, o) => Object.assign({}, base, o, { len: (o.len || base.len) * (o.sc || 1) });
+  const LAYOUTS = {
+    arena: [
+      ob(GAP, { x0: 0, z0: -54, fx: 0, fz: -1 }),                                          // the big gap jump (north)
+      ob(TABLE, { x0: 52, z0: -21, fx: 0, fz: 1 }),                                        // east tabletop
+      { kind: 'crush', x0: CRUSH_X, z0: -14.7, fx: 0, fz: 1, len: 29.4, hw: 6.2, bev: 2.6 },
+      ob(STEP, { x0: -56, z0: -84, fx: 0, fz: -1 }),                                       // north-west step-up
+      { kind: 'mogul', x0: 0, z0: 126, fx: 0, fz: 1, len: 21, hw: 40, bev: 5 },           // south moguls
+      { kind: 'mogul', n: 4, x0: 78, z0: -82, fx: 0, fz: -1, len: 28, hw: 6, bev: 2.5 },   // north-east whoops lane
+      ob(GAP, { x0: 0, z0: 58, fx: 0, fz: -1 }),                                           // the first gap jump off the spawn
+      ob(TABLE, { x0: -52, z0: 52, fx: 0, fz: 1 }),                                        // south-west tabletop
+      ob(STEP, { x0: 56, z0: 60, fx: 0, fz: 1 }),                                          // south-east step-up
+      { kind: 'mogul', n: 5, x0: -82, z0: -40, fx: 0, fz: 1, len: 35, hw: 6, bev: 2.5 },   // west whoops lane
+      ob(TABLE, { x0: -30, z0: -140, fx: 1, fz: 0, sc: 1.4, hw: 12 }),                     // the big tabletop across the north end
+    ],
+    ramps: [
+      // centre lane, northbound: gap, tabletop, a bigger gap, step-up
+      ob(GAP, { x0: 0, z0: 96, fx: 0, fz: -1 }), ob(TABLE, { x0: 0, z0: 30, fx: 0, fz: -1 }), ob(GAP, { x0: 0, z0: -40, fx: 0, fz: -1, sc: 1.25 }), ob(STEP, { x0: 0, z0: -112, fx: 0, fz: -1 }),
+      { kind: 'mogul', x0: 0, z0: 136, fx: 0, fz: 1, len: 21, hw: 30, bev: 5 },
+      // west lane, southbound: a big tabletop, gap, moguls, tabletop
+      ob(TABLE, { x0: -48, z0: -130, fx: 0, fz: 1, sc: 1.2 }), ob(GAP, { x0: -48, z0: -58, fx: 0, fz: 1 }),
+      { kind: 'mogul', n: 4, x0: -48, z0: 2, fx: 0, fz: 1, len: 28, hw: 8, bev: 3 }, ob(TABLE, { x0: -48, z0: 52, fx: 0, fz: 1 }),
+      // east lane, northbound: moguls, a small gap, step-up, gap, a big tabletop
+      { kind: 'mogul', x0: 48, z0: 128, fx: 0, fz: -1, len: 21, hw: 8, bev: 3 }, ob(GAP, { x0: 48, z0: 86, fx: 0, fz: -1, sc: 0.8 }),
+      ob(STEP, { x0: 48, z0: 36, fx: 0, fz: -1 }), ob(GAP, { x0: 48, z0: -18, fx: 0, fz: -1 }), ob(TABLE, { x0: 48, z0: -76, fx: 0, fz: -1, sc: 1.3 }),
+      // whoops lanes along both walls
+      { kind: 'mogul', n: 6, x0: -82, z0: -60, fx: 0, fz: 1, len: 42, hw: 6, bev: 2.5 }, { kind: 'mogul', n: 6, x0: 82, z0: 18, fx: 0, fz: 1, len: 42, hw: 6, bev: 2.5 },
+    ],
+  };
+  const ARENA_OBS = [];
+  function useLayout(name) {
+    ARENA_OBS.length = 0;
+    for (const o of LAYOUTS[name]) {
+      const b = Object.assign({}, o);           // bounding boxes for quick rejection (and for the renderer's meshes)
+      const ex = [b.x0, b.x0 + b.fx * b.len], ez = [b.z0, b.z0 + b.fz * b.len], rx = -b.fz, rz = b.fx;
+      b.minX = Math.min(...ex) - Math.abs(rx) * b.hw; b.maxX = Math.max(...ex) + Math.abs(rx) * b.hw;
+      b.minZ = Math.min(...ez) - Math.abs(rz) * b.hw; b.maxZ = Math.max(...ez) + Math.abs(rz) * b.hw;
+      ARENA_OBS.push(b);
+    }
   }
+  useLayout('arena');
   // junk cars on the crush lane: long axis across the lane, side by side along it. Each car carries a grid of dent depths
   // (metres, CNA x CNB nodes over its length and width) that the tyres push in wherever they bear on it - the surface
   // is the car's shape minus the (smoothly interpolated) dents, so the tyres leave real tracks and dents
   const CAR_L = 2.35, CAR_W = 0.92, CNA = 25, CNB = 11;
-  const ARENA_CARS = [];
+  const ARENA_CARS = [], ALL_CARS = [];   // (the Dirt Ramp Arena has none)
   const _cb = { h0: 0, hb: 0 };
   // the undamaged car: h0 = its height, hb = the body alone (hood / trunk / sills up to the belt line, no cabin)
   function carBase(c, a, b, o) {
@@ -477,7 +517,7 @@
       carBase(c, -CAR_L + 2 * CAR_L * ia / (CNA - 1), -CAR_W + 2 * CAR_W * ib / (CNB - 1), _cb);
       c.h0[ia * CNB + ib] = _cb.h0; c.hb[ia * CNB + ib] = _cb.hb;
     }
-    ARENA_CARS.push(c);
+    ARENA_CARS.push(c); ALL_CARS.push(c);
   }
   function carDent(c, a, b) {                   // interpolated dent depth at (a, b) in the car's own frame
     const fa = Math.min(CNA - 1.0001, Math.max(0, (a + CAR_L) / (2 * CAR_L) * (CNA - 1)));
@@ -509,7 +549,7 @@
       if (x < ob.minX || x > ob.maxX || z < ob.minZ || z > ob.maxZ) continue;
       const dx = x - ob.x0, dz = z - ob.z0, u = dx * ob.fx + dz * ob.fz, v = dx * -ob.fz + dz * ob.fx, av = Math.abs(v);
       if (av >= ob.hw) continue;
-      const p = PR[ob.kind](u, _po, ob);
+      const sc = ob.sc || 1, p = PR[ob.kind](u / sc, _po, ob) * sc;
       if (p <= 0) continue;
       const side = 1 - sstep(ob.hw - ob.bev, ob.hw, av), ds = -dsstep(ob.hw - ob.bev, ob.hw, av) * (v < 0 ? -1 : 1);
       const h = p * side;
@@ -690,7 +730,7 @@
     }
     const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
     out.h = h; out.nx = -dx * il; out.ny = il; out.nz = -dz * il;
-    if (MAP === 'tarmac') { out.roadD = 0; out.surface = 0; return out; }   // All Road: it's all asphalt
+    if (MAP === 'tarmac') { out.roadD = 0; out.surface = PREP ? 5 : 0; return out; }   // All Road: it's all asphalt (prepped)
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     // surface
@@ -698,7 +738,7 @@
     out.roadD = ri.d;
     if (DRAGMAP() && Math.abs(x) < DRAG.HALF) out.surface = MAP === 'dirtdrag' ? 3 : 5;   // prepped drag strip / groomed dirt
     else if (h < C.WATER_LEVEL - 0.2) out.surface = 4;          // lake bed / water
-    else if (ri.d < C.ROAD_HALF) out.surface = 0;          // asphalt
+    else if (ri.d < C.ROAD_HALF) out.surface = PREP ? 5 : 0;   // asphalt (prepped)
     else if (ri.d < C.SHOULDER) out.surface = 1;           // gravel shoulder
     else out.surface = (nDet(x * 0.05 + 40, z * 0.05) > 0.45) ? 3 : 2; // dirt / grass
     return out;
@@ -1065,11 +1105,17 @@
   }
 
   function setMap(m) {
+    RAMPS = m === 'ramps';
+    if (RAMPS) m = 'arena';
+    useLayout(RAMPS ? 'ramps' : 'arena');
+    ARENA_CARS.length = 0; if (!RAMPS) ARENA_CARS.push(...ALL_CARS);
+    PREP = m === 'prepcountry' || m === 'preptarmac';
+    if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
     MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' ? m : 'country';
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, DRAG_MARKS, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get ramps() { return RAMPS; }, DRAG_MARKS, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,

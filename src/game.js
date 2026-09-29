@@ -19,6 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -50,11 +51,12 @@
   // "More cars" (the tractor, and whatever joins it) build their entry from their options, e.g. the engine package
   // The Car Crushers 2 cars: a More Cars card each. Per car: its card title / button, paint, the traction-control
   // mode it starts on (tc) and home map (map) where it has them, chase-camera scale [distance, height], the start hint,
-  // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND)
+  // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND). The electric ones have petrol
+  // alternatives: optKey / options as the More cars' (a button each on the card) and eng: per engine, what it changes
   const CC_CARS = {
     couch: { btn: 'COUCH CAR', sub: '850 hp turbo triple · 190 mph sofa', paint: 'Saddle', tc: 2, cam: [0.75, 0.85],
-      hint: 'Couch Car: shift up (E) for DRIVE and floor it - an 850 hp turbo triple under the cushions and a 5-speed sequential (E / Q or the paddles). The turbo needs a moment to spool: hold SPACE, floor it and let go for a launch-control start. Traction control is on Track - and on its short wheelbase it is twitchy at speed.',
-      info: 'A three-seat leather sofa on a hidden tube chassis · 1.6 L turbo triple built like a drag engine, ~850 hp on 40 psi and E85, its three pipes out of the right arm · 5-speed sequential with a quickshifter, locked diff · 13 in R-compound tyres · 520 kg with the driver · 0-60 ~3.2 s, ~190 mph',
+      hint: 'Couch Car: shift up (E) for DRIVE and floor it - an 850 hp turbo triple under the cushions and a 5-speed sequential (E / Q or the paddles). The turbo needs a moment to spool: hold SPACE, floor it and let go for a launch-control start. Traction control is on Track, and wheelie control keeps the front down - and on its short wheelbase it is twitchy at speed.',
+      info: 'A three-seat leather sofa on a hidden tube chassis · 1.6 L turbo triple built like a drag engine, ~850 hp on 40 psi and E85, its three pipes out of the right arm · 5-speed sequential with a quickshifter, locked diff · 13 in R-compound tyres in the softest compound, sticky from cold · wheelie control · 520 kg with the driver · 0-60 ~2.8 s, ~190 mph',
       trans: '5-speed sequential · quickshifter', tyres: 'R-compound 13 in',
       snd: { nEng: 1, cyl: 3, fmul: 1.3, deep: 0.15, loud: 0.5, open: 1, whK: 0.42, whPure: 1, whine: 1.4, rpmRef: 8300, race: 1, rough: 0.15, surge: 1 } },
     eggrod: { btn: 'EGG ROD', sub: '350 small-block hot rod · 142 mph', paint: 'White Knuckle', cam: [0.95, 0.95],
@@ -72,7 +74,7 @@
       info: 'Campbell\'s 1935 Campbell-Napier-Railton Blue Bird · 36.7 L supercharged Rolls-Royce R V12, 2,350 hp at 3,200 rpm · 3-speed gearbox, twin rear wheels · Dunlop 37 x 7 tyres · ~4.9 t · 301.129 mph at Bonneville on 3 September 1935, the first car over 300',
       trans: '3-speed · multi-plate clutch', tyres: 'Dunlop 37 x 7',
       snd: { nEng: 1, cyl: 12, fmul: 0.55, deep: 0.9, loud: 1, open: 1, whK: 0.9, whPure: 1, whine: 1.0, rpmRef: 3300, race: 0.8, rough: 0.2 } },
-    gtr: { btn: 'NISSAN GTR', sub: '565 hp twin-turbo V6 · AWD · 196 mph', paint: 'Bay Blue', cam: [1.0, 1.0],
+    gtr: { btn: 'NISSAN GTR', sub: '565 hp twin-turbo V6 · AWD · 196 mph', paint: 'TorRed', cam: [1.0, 1.0],
       hint: 'Nissan GTR: shift up (E) for DRIVE - a 565 hp twin-turbo V6, a 6-speed dual-clutch (E / Q or the paddles to shift yourself) and all-wheel drive. Launch control: hold SPACE, floor it, let go.',
       info: 'Nissan GT-R (R35) in a Liberty Walk widebody · VR38DETT 3.8 L twin-turbo V6, 565 hp at 6,800, 467 lb-ft · GR6 6-speed dual-clutch · ATTESA E-TS all-wheel drive, rear-biased · 1,752 kg · 0-60 ~3.5 s floored, ~196 mph',
       trans: '6-speed dual-clutch · AWD', tyres: 'Summer tyres',
@@ -81,28 +83,57 @@
       hint: 'Mini Dookie: shift up (E) for DRIVE - an electric one-seat city pod: 20 hp, one gear, 55 mph and in no hurry getting there. Silent at a standstill; lift off and it regenerates.',
       info: 'The game\'s Pamingo Mini (the Fiat Pongo concept) · 15 kW / 60 Nm electric motor, a single 9:1 reduction · 145/70R15 eco tyres · 670 kg · ~55 mph',
       trans: 'Electric · single speed', tyres: 'Eco tyres',
-      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.067, whPure: 0, whine: 3.2, rpmRef: 8000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.067, whPure: 0, whine: 3.2, rpmRef: 8000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'miniEng', options: [
+        ['ev', 'Electric', '15 kW / 60 Nm motor · single speed · ~55 mph'],
+        ['twinair', '0.9 TwinAir', 'Fiat\'s 0.9 L turbo two-cylinder under the rear floor · 85 hp · 5-speed automated manual · 0-60 ~7 s · ~105 mph'],
+      ],
+      eng: { twinair: {
+        hint: 'Mini Dookie (0.9 TwinAir): shift up (E) for DRIVE - Fiat\'s little turbo two-cylinder under the rear floor, 85 hp, and a 5-speed automated manual (E / Q to shift yourself) that takes its time over every shift. ~105 mph.',
+        info: 'The game\'s Pamingo Mini with a petrol engine: the Fiat 0.9 TwinAir turbo two-cylinder, 85 hp at 5,500, 145 Nm at 1,900, mounted across under the rear floor behind the seat · 5-speed automated manual (a robot works the clutch) · 145/70R15 eco tyres · 670 kg · 0-60 ~7 s, ~105 mph',
+        trans: '5-speed automated manual',
+        snd: { nEng: 1, cyl: 2, vt: 180, fmul: 1.35, deep: 0, loud: 0.1, open: 0, whK: 0.5, whPure: 1, whine: 0.45, rpmRef: 6000, race: 0.1, rough: 0.2 } } } },
     potty: { btn: 'PORTA POTTY', sub: '22 hp V-twin toilet · 45 mph', paint: 'Potty Blue', cam: [0.75, 1.25],
       hint: 'Porta Potty: shift up (E) for DRIVE and floor it - a 22 hp V-twin under the throne, 45 mph flat out. The centre of gravity is at hip height on a 1 m track: take a turn quickly and over it goes (once it has stopped, steer left or right to flip it back).',
       info: 'A portable toilet (PolyJohn PJP3-type, 2.3 m tall) on a go-kart frame, the door open · 670 cc V-twin, 22 hp, under the seat · torque-converter drive · 10 in wheels · 290 kg with the driver · ~45 mph · tips over at ~0.75 g',
       trans: 'Torque converter', tyres: '10 in tyres',
       snd: { nEng: 1, cyl: 2, vt: 90, fmul: 1.25, deep: 0.05, loud: 0.2, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 4000, race: 0.5, rough: 0.35 } },
-    scooter: { btn: 'TURBO SCOOTER 3000', sub: '100 kW mobility scooter · 119 mph', paint: 'Crimson', tc: 2, cam: [0.6, 0.95],
-      hint: 'Turbo Scooter 3000: shift up (E) for DRIVE - a mobility scooter with a 100 kW motor, ~119 mph. Wheelie control and the anti-tip wheels stop it looping over on the launch; nothing keeps it upright in a fast turn - it tips at 0.4 g. Straight lines!',
-      info: 'A four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor swapped for a 100 kW axial-flux motor and a lithium pack · 220 Nm through a 2.42:1 belt · soft 10 in tyres · 215 kg with the rider · 0-60 ~4.4 s, ~119 mph · wheelie control (off with TC Off) and anti-tip wheels',
+    scooter: { btn: 'TURBO SCOOTER 3000', sub: '100 kW mobility scooter · 119 mph', paint: 'Crimson', tc: 1, cam: [0.6, 0.95],
+      hint: 'Turbo Scooter 3000: shift up (E) for DRIVE - a mobility scooter with a 100 kW motor, ~119 mph. Wheelie control and the anti-tip wheels stop it looping over on the launch; the wide-track kit and a stabiliser wheel out each side keep it upright in a turn - it leans onto one and slides instead. Stability control is on (Sport).',
+      info: 'A four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor swapped for a 100 kW axial-flux motor and a lithium pack · 220 Nm through a 2.42:1 belt · soft 10 in tyres on a wide-track kit, a stabiliser wheel on an arm out each side · 215 kg with the rider · 0-60 ~3.4 s, ~119 mph · wheelie control (off with TC Off), anti-tip wheels, stability control',
       trans: 'Electric · direct drive', tyres: 'Soft 10 in tyres',
-      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.167, whPure: 1, whine: 3.5, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.167, whPure: 1, whine: 3.5, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'scooterEng', options: [
+        ['ev', 'Electric', '100 kW / 220 Nm motor · direct drive · 0-60 ~3.4 s · ~119 mph'],
+        ['busa', 'Turbo Hayabusa', 'Suzuki Hayabusa 1,340 cc four with a turbo, where the rear shell was · ~260 hp · 6-speed + quickshifter · ~150 mph'],
+      ],
+      eng: { busa: {
+        hint: 'Turbo Scooter 3000 (Turbo Hayabusa): shift up (E) for DRIVE and floor it - a Hayabusa four with a turbo bolted where the rear shell was, ~260 hp, the bike\'s 6-speed on a quickshifter (E / Q or the paddles). Wheelie control holds the front down; the outriggers catch it in a hard turn. ~150 mph on 10 in wheels.',
+        info: 'The mobility scooter with its rear shell thrown away for a Suzuki Hayabusa 1,340 cc inline-four and a turbo on ~10 psi: ~260 hp at 10,000, 206 Nm at 7,500 · the bike\'s 6-speed with a quickshifter, chain to the rear axle · wide-track kit, side stabiliser wheels, anti-tip wheels · soft 10 in tyres · 250 kg with the rider · 0-60 ~4.2 s, ~150 mph',
+        trans: '6-speed sequential · quickshifter',
+        snd: { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.5, whPure: 1, whine: 1.3, rpmRef: 11000, race: 0.85, rough: 0.07, surge: 1 } } } },
     razor: { btn: 'RAZORS EDGE', sub: '110 kW electric glass wedge · 142 mph', paint: 'Go Mango', cam: [1.0, 0.95],
       hint: 'Razors Edge: shift up (E) for DRIVE - a golf cart under a wedge of smoked glass, 110 kW electric, ~142 mph. The paint colour is its neon (Esc → Drive → Paint).',
       info: 'The game\'s Halloween special after the Lo Res Car: a golf-cart chassis under a faceted body of smoked glass edged in neon, a graveyard on its flanks · 110 kW / 250 Nm electric motor, a single 4.95:1 reduction · 18 x 8.50-8 cart tyres · 530 kg · 0-60 ~4.4 s, ~142 mph',
       trans: 'Electric · single speed', tyres: 'Cart tyres',
-      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.1, whPure: 0, whine: 3.4, rpmRef: 12000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.1, whPure: 0, whine: 3.4, rpmRef: 12000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'razorEng', options: [
+        ['ev', 'Electric', '110 kW / 250 Nm motor · single speed · 0-60 ~4.4 s · ~142 mph'],
+        ['ls', '5.3 LS V8', 'A junkyard 5.3 L LS V8 behind the bench · 285 hp · 4-speed automatic · 0-60 ~4.2 s · ~165 mph'],
+      ],
+      eng: { ls: {
+        hint: 'Razors Edge (5.3 LS V8): shift up (E) for DRIVE - a junkyard 5.3 L LS V8 behind the bench, 285 hp through a 4-speed automatic. Below ~70 mph it will light up the cart tyres: squeeze the throttle. ~165 mph.',
+        info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
+        trans: '4-speed automatic',
+        snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
   };
-  const CC = !!CC_CARS[S.car], CCD = CC ? CC_CARS[S.car] : null;
+  // (CCD: the car's entry with its engine's changes over it)
+  const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
   const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart', MOWER = S.car === 'mower';
   const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;     // race engines: their own sound set-up, rumble and shake
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
     : KART ? VEH.CARS.kart.make(S.kartClass) : MOWER ? VEH.CARS.mower.make(S.mowerClass)
+    : CC && VEH.CARS[S.car].make ? VEH.CARS[S.car].make(S[CCD.optKey])
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
   const DEMON = S.car === 'demon', DRAGPAK = S.car === 'dragpak';
   const NITRO = DRAGSTER && CARDEF.cls !== 'tad', FUNNY = DRAGSTER && CARDEF.cls === 'fc';   // (Top Fuel and the Funny Car burn nitro)
@@ -138,11 +169,11 @@
   const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
-  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
+  const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = W.map === 'arena', MOWTRACK = S.map === 'mowtrack';   // (ARENAMAP: the Monster Arena or the Dirt Ramp Arena)
   const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
-    : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : S.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
+    : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
   const sp = veh.spec;
@@ -155,7 +186,8 @@
     mass: STOCK.mass, grip: 1, downforce: 0, drag: 1, brakes: 1, stiff: 1, steer: 1, gravity: 1, smoke: 1,
   });
   S.tune = S.tune || {};
-  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : MOWER ? 'mower_' + CARDEF.cls : S.car;
+  const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : MOWER ? 'mower_' + CARDEF.cls
+    : CC && CARDEF.engine && CARDEF.engine !== 'ev' ? S.car + '_' + CARDEF.engine : S.car;
   const tune = Object.assign(tuneDefaults(), S.tune[TKEY] || {});
   S.tune[TKEY] = tune;
   function applyTune() {
@@ -176,7 +208,7 @@
   const STOCK_PEAK = peakFigures(STOCK);
   // headless quarter-mile run with the current tune (same physics, flat track)
   function simulateQuarter() {
-    const surf = DIRTSTRIP ? 3 : DRAGMAP ? 5 : 0;
+    const surf = DIRTSTRIP ? 3 : DRAGMAP || W.prep ? 5 : 0;
     const flat = { C: { WATER_LEVEL: -1e4 }, ground(x, z, o) { o.h = 0; o.nx = 0; o.ny = 1; o.nz = 0; o.surface = surf; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } };
     const v = new VEH.Vehicle(flat, JSON.parse(JSON.stringify(veh.spec)));
     v.setTransmission(veh.transType); v.setTires(veh.spec.frontTire, veh.spec.rearTire); v.applySpec();
@@ -222,7 +254,7 @@
   const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
     : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
     : MOWER ? MOW.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls, wheelRadiusF: sp.wheelRadiusF, wheelRadiusR: sp.wheelRadiusR }))
-    : CC ? CRU.build(THREE, Object.assign(carOpts, { car: S.car, wheelRadiusF: sp.wheelRadiusF || sp.wheelRadius, wheelRadiusR: sp.wheelRadiusR || sp.wheelRadius })) : CAR.build(THREE, carOpts);
+    : CC ? CRU.build(THREE, Object.assign(carOpts, { car: S.car, engine: CARDEF.engine || 'ev', wheelRadiusF: sp.wheelRadiusF || sp.wheelRadius, wheelRadiusR: sp.wheelRadiusR || sp.wheelRadius })) : CAR.build(THREE, carOpts);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -313,11 +345,13 @@
     else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map ? ' Its home is the Straightaway map (Esc → Drive → Map).' : ''), 11), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
-      + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map).'), 12), 1600);
+      + (ARENAMAP ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); the Dirt Ramp Arena is all jumps.'), 12), 1600);
     else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
-    else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: the big gap jump straight ahead with a step-up (left) and a whoops lane (right) either side of it, the car crush and the tabletop halfway down the sides, whoops behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
+    else if (ARENAMAP && W.ramps) setTimeout(() => hud.hint('Dirt Ramp Arena: nothing but dirt - three lanes of jumps end to end (gap jumps, tabletops, step-ups, moguls; the middle lane runs north from here, the side lanes the other way), whoops along both walls. Tricks score on the big screens.', 11), 1600);
+    else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: two big gap jumps straight ahead up the middle and a giant tabletop across the far end; tabletops and step-ups either side, the car crush on the left, whoops lanes along the walls and behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
     else if (DIRTSTRIP) setTimeout(() => hud.hint('Dirt drag strip: no burnout here. Creep up to stage, hold SPACE + floor it, let go of SPACE on green. Slicks skate on dirt — all-terrains and pulling tyres dig in.', 9), 1600);
     else if (DRAGMAP) setTimeout(() => hud.hint('Burnout in the box (hold B, or brake + throttle), then creep up to stage. Hold SPACE + floor it — let go of SPACE on green!', 9), 1600);
+    else if (W.prep) setTimeout(() => hud.hint('Prepped roads: every road is sprayed and rubbered in like a drag strip - sticky, and stickier still for drag radials and slicks once they\'re warm (do a burnout: hold B). The grass and gravel aren\'t prepped.', 10), 1600);
     else setTimeout(() => hud.hint(veh.transType === 'auto' ? 'In PARK — throttle revs the engine. Shift up (E / right paddle) for DRIVE.' : 'In NEUTRAL — throttle revs the engine. Shift up (E / right paddle) for 1st gear.', 6), 1600);
     if (input.needsSetup()) setTimeout(() => hud.hint('Wheel detected without a standard mapping — press Esc → Controls → Wheel setup', 8), 8000);
   }
@@ -393,7 +427,7 @@
       desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
       btn: 'MONSTER TRUCK', tc: 3 },
     // (the Car Crushers 2 cars, a card each - see CC_CARS)
-    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info })),
+    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options })),
   ];
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
@@ -417,8 +451,9 @@
       const homeOf = (mm, key) => { if (!mm) return null; const oo = key && mm.options ? mm.options.find((x) => x[0] === key) : null; return (oo && oo[5]) || mm.map || null; };
       const from = MORE_CARS.find((x) => x.id === S.car);
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
-      if (homeNew && S.map !== homeNew) { if (!homeOld || S.map !== homeOld) S.mapPrev = S.map; S.map = homeNew; }
-      else if (!homeNew && homeOld && S.map === homeOld && S.mapPrev) S.map = S.mapPrev;
+      const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps');   // (the Dirt Ramp Arena is a monster truck's home too)
+      if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
     if (m && opt) S[m.optKey] = opt;
@@ -503,12 +538,15 @@
     const simWrap = el('<div class="simwrap"></div>'); simWrap.appendChild(simBtn); simWrap.appendChild(simOut);
     add(simWrap);
     const k = (x) => Math.round(x).toLocaleString();
-    sect('Engine');
-    T('power', 'Engine power', 'Multiplies the whole torque curve (heads, cam, tune…)', 0.5, 3, 0.05, (x) => Math.round(x * 100) + '%');
-    T('boost', 'Supercharger boost', 'More pressure = more torque everywhere (stock ' + STOCK.boostMax + ' psi)', 0, Math.max(45, Math.ceil(STOCK.boostMax * 1.5)), 0.5, (x) => x.toFixed(1) + ' psi');
-    T('stretch', 'Cam / powerband', 'Moves the whole powerband up or down the rev range — pair it with the rev limiter', 0.7, 5, 0.05, (x) => k(peakRpm(x)) + ' pk');
-    T('limiter', 'Rev limiter', tune.nolimit ? 'Limiter removed: this is now just the redline and the automatic\'s shift point' : 'Automatic shift points follow it', 3500, 30000, 100, (x) => k(x));
-    add(row('Limiter', 'Unlimited: no fuel cut at all — in manual (or M mode) the engine revs until its own friction and windage stop it',
+    // (an electric car: a motor, not an engine - no boost, idle, nitrous, exhaust, launch rpm or gears to shift)
+    const EVT = !!STOCK.electric;
+    sect(EVT ? 'Motor' : 'Engine');
+    T('power', EVT ? 'Motor power' : 'Engine power', EVT ? 'Multiplies the motor\'s torque (a bigger inverter and pack)' : 'Multiplies the whole torque curve (heads, cam, tune…)', 0.5, 3, 0.05, (x) => Math.round(x * 100) + '%');
+    if (!EVT) T('boost', 'Supercharger boost', 'More pressure = more torque everywhere (stock ' + STOCK.boostMax + ' psi)', 0, Math.max(45, Math.ceil(STOCK.boostMax * 1.5)), 0.5, (x) => x.toFixed(1) + ' psi');
+    T('stretch', EVT ? 'Base speed' : 'Cam / powerband', EVT ? 'Moves where the motor goes from full torque to full power — pair it with the speed limit' : 'Moves the whole powerband up or down the rev range — pair it with the rev limiter', 0.7, 5, 0.05, (x) => k(peakRpm(x)) + ' pk');
+    T('limiter', EVT ? 'Motor speed limit' : 'Rev limiter', EVT ? (tune.nolimit ? 'Limit removed: the motor pulls until the wind and its own losses stop it' : 'The controller fades the torque out as the motor reaches it')
+      : tune.nolimit ? 'Limiter removed: this is now just the redline and the automatic\'s shift point' : 'Automatic shift points follow it', 3500, 30000, 100, (x) => k(x));
+    add(row(EVT ? 'Speed limit' : 'Limiter', EVT ? 'Unlimited: the controller never fades the torque' : 'Unlimited: no fuel cut at all — in manual (or M mode) the engine revs until its own friction and windage stop it',
       seg([[false, 'On'], [true, 'Unlimited']], !!tune.nolimit, (v) => { tune.nolimit = v; applyTune(); })));
     // a sky-high limiter only matters if the engine makes power up there: one click moves the powerband peak up to it
     const matchBtn = el('<button class="btn">Match cam to limiter</button>');
@@ -520,17 +558,18 @@
       applyTune(); saveS(); renderMenu();
     });
     const matchWrap = el('<div class="simwrap"></div>'); matchWrap.appendChild(matchBtn);
-    matchWrap.appendChild(el('<span class="simout">Moves the powerband peak to just under the limiter and gears the car to suit, so the engine really pulls (and the automatic really revs) up there</span>'));
+    matchWrap.appendChild(el('<span class="simout">' + (EVT ? 'Moves the base speed up to suit the speed limit and gears the car to match, so the motor really pulls up there'
+      : 'Moves the powerband peak to just under the limiter and gears the car to suit, so the engine really pulls (and the automatic really revs) up there') + '</span>'));
     add(matchWrap);
-    T('idle', 'Idle speed', 'Higher idle = lumpier, choppier cam sound', 500, 2000, 10, (x) => k(x));
-    T('inertia', 'Flywheel / rotating mass', 'Lighter revs faster (and bogs easier)', 0.3, 2, 0.05, (x) => x.toFixed(2) + '×');
-    T('nos', 'Nitrous shot', 'Hold N (or a mapped wheel button) at full throttle', 0, 1000, 25, (x) => x ? '+' + x + ' hp' : 'off');
+    if (!EVT) T('idle', 'Idle speed', 'Higher idle = lumpier, choppier cam sound', 500, 2000, 10, (x) => k(x));
+    T('inertia', EVT ? 'Rotor inertia' : 'Flywheel / rotating mass', 'Lighter revs faster (and bogs easier)', 0.3, 2, 0.05, (x) => x.toFixed(2) + '×');
+    if (!EVT) T('nos', 'Nitrous shot', 'Hold N (or a mapped wheel button) at full throttle', 0, 1000, 25, (x) => x ? '+' + x + ' hp' : 'off');
     sect('Drivetrain');
     if (veh.transType === 'auto') {
-      T('finalAuto', 'Final drive ratio', 'Higher = harder launch, lower top speed (stock ' + STOCK.autoFinal + ')', 1.8, 25, 0.01, (x) => x.toFixed(2));
-      T('shiftTime', 'Shift speed', 'How long each automatic upshift takes at full throttle', 0.05, 0.5, 0.01, (x) => Math.round(x * 1000) + ' ms');
+      T('finalAuto', EVT ? 'Reduction gear' : 'Final drive ratio', 'Higher = harder launch, lower top speed (stock ' + STOCK.autoFinal + ')', 1.8, 25, 0.01, (x) => x.toFixed(2));
+      if (!EVT) T('shiftTime', 'Shift speed', 'How long each automatic upshift takes at full throttle', 0.05, 0.5, 0.01, (x) => Math.round(x * 1000) + ' ms');
     } else T('finalManual', 'Final drive ratio', 'Higher = harder launch, lower top speed (stock ' + STOCK.manualFinal + ')', 1.8, 25, 0.01, (x) => x.toFixed(2));
-    T('launch', 'Launch / TransBrake rpm', 'Where the engine is held while you hold SPACE at a stop', 1000, 9000, 100, (x) => k(x));
+    if (!EVT) T('launch', 'Launch / TransBrake rpm', 'Where the engine is held while you hold SPACE at a stop', 1000, 9000, 100, (x) => k(x));
     if (STOCK.govSpeed) add(row('Top speed governor', 'The Demon 170 is limited to 149 mph on its drag radials', seg([[true, 'On'], [false, 'Removed']], tune.gov, (v) => { tune.gov = v; applyTune(); })));
     sect('Chassis');
     T('mass', 'Weight', 'Springs and dampers are rescaled so it still rides right', 600, Math.max(3200, Math.round(STOCK.mass * 1.6)), 5, (x) => k(x * 2.20462) + ' lb');
@@ -542,8 +581,8 @@
     T('steer', 'Steering lock', '', 0.6, 1.6, 0.05, (x) => Math.round(x * 100) + '%');
     sect('Just for fun');
     T('gravity', 'Gravity', 'Earth = 1 g, Moon = 0.17 g, Jupiter = 2.5 g', 0.1, 2.5, 0.01, (x) => x.toFixed(2) + ' g');
-    T('pops', 'Pops & bangs', 'Overrun crackles and backfire flames', 0, 6, 0.25, (x) => x ? x.toFixed(2) + '×' : 'off');
-    T('whine', 'Supercharger whine', '', 0, 3, 0.05, (x) => Math.round(x * 100) + '%');
+    if (!EVT) T('pops', 'Pops & bangs', 'Overrun crackles and backfire flames', 0, 6, 0.25, (x) => x ? x.toFixed(2) + '×' : 'off');
+    T('whine', EVT ? 'Motor whine' : 'Supercharger whine', '', 0, 3, 0.05, (x) => Math.round(x * 100) + '%');
     T('smoke', 'Tyre smoke', '', 0, 4, 0.1, (x) => Math.round(x * 100) + '%');
   }
   function peakRpm(stretch) {
@@ -600,6 +639,8 @@
         add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
       if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
+      if (CC && CCD.options) add(row('Engine', 'Swapping engines restarts the game (each keeps its own Fun-tab tune)',
+        seg(CCD.options.map((o) => [o[0], o[1]]), CARDEF.engine || 'ev', (v) => { if (v !== (CARDEF.engine || 'ev')) pickCar(S.car, v); })));
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
@@ -611,7 +652,7 @@
       if (ARENAMAP) {
         const clr = el('<button class="btn small ghost">New run (score to 0)</button>');
         clr.addEventListener('click', () => { FS.score = 0; FS.best = 0; FS.last = ''; arenaScreen(true); hud.toast('Freestyle score reset'); });
-        add(row('Freestyle', 'Big air, flips, wheelies, nose wheelies, donuts and crushed cars all score on the big screens · the junk cars are replaced once they\'re all flat', clr));
+        add(row('Freestyle', W.ramps ? 'Big air, flips, wheelies, nose wheelies and donuts all score on the big screens' : 'Big air, flips, wheelies, nose wheelies, donuts and crushed cars all score on the big screens · the junk cars are replaced once they\'re all flat', clr));
       }
       if (DRAGPAK) {
         add(row('Mopar Drag Pak (race car)', 'Supercharged 354 HEMI · race 3-speed auto, non-lockup converter · spool · wheelie bars · no ABS / ESC. Hold SPACE on the line (TransBrake), floor it, release SPACE to launch.', el('<span></span>')));
@@ -633,8 +674,8 @@
         sw.appendChild(b);
       }
       add(row('Paint', S.paint, sw));
-      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars (restarts)',
-        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+      add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · Dirt Ramp Arena: the same stadium, all jumps (restarts)',
+        seg([['country', 'Countryside'], ['tarmac', 'All Road'], ['prepcountry', 'Prepped Countryside'], ['preptarmac', 'Prepped All Road'], ['straight', 'Straightaway'], ['drag', 'Drag Strip'], ['dirtdrag', 'Dirt Drag'], ['arena', 'Monster Arena'], ['ramps', 'Dirt Ramp Arena'], ['mowtrack', 'Mower Track']], S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -1377,7 +1418,7 @@
     for (let i = 0; i < bh.length; i += 3) crushAt(bh[i], bh[i + 1], bh[i + 2]);
     if (world.arena) world.arena.update(dt);
     // fresh cars once they're all flat and the truck is well clear of the pile
-    if (FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px - W.ARENA_CARS[0].x, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
+    if (W.ARENA_CARS.length && FS.crushed.size === W.ARENA_CARS.length && Math.hypot(veh.px - W.ARENA_CARS[0].x, veh.pz) > 30) { W.arenaResetCars(); FS.crushed.clear(); hud.toast('The crew hauls in fresh junk cars', 2.5); }
     // body axes
     const { qx, qy, qz, qw } = veh;
     const ax = [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qz * qw), 2 * (qx * qz - qy * qw)];            // right

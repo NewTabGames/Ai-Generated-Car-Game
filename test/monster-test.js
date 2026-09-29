@@ -221,18 +221,19 @@ for (const surf of [3, 0]) {
   const crushed = WG.ARENA_CARS.filter((k) => k.cab > 0.4 || k.level > 0.2).length, lv = WG.ARENA_CARS.map((k) => Math.round(k.level * 100) + '%').join(' '), cab = WG.ARENA_CARS.map((k) => Math.round(k.cab * 100) + '%').join(' ');
   console.log(`arena car crush @ 11 mph: ${crushed}/6 cars crushed (flat ${lv}; roofs caved ${cab}), peak ${c.maxG.toFixed(1)} g, air ${c.air.toFixed(2)} s, ${c.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${c.v.pz.toFixed(0)}${nan(c.v) ? ' NaN!' : ''}`);
   // (the tabletop from the south end - the whoops lane is in the way from the north)
-  const TB = WG.ARENA_OBS.find((o) => o.kind === 'table');
+  const TB = WG.ARENA_OBS.find((o) => o.kind === 'table'), GP = WG.ARENA_OBS.find((o) => o.kind === 'gap'), SP = WG.ARENA_OBS.find((o) => o.kind === 'step');
+  const MG = WG.ARENA_OBS.find((o) => o.kind === 'mogul' && o.hw > 20), WL = WG.ARENA_OBS.find((o) => o.kind === 'mogul' && o.hw < 20);
   for (const mph of [28, 34, 40]) {
-    const r = run(TB.x0, 52, 0, -1, mph, 7);
+    const r = run(TB.x0, TB.z0 + TB.len + 31, 0, -1, mph, 7);
     console.log(`arena tabletop @ ${mph} mph: air ${r.air.toFixed(2)} s, ${r.peakH.toFixed(1)} m above the ground, landing ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'CRASHED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`);
   }
   for (const mph of [24, 29, 34, 40]) {
-    const r = run(0, 34, 0, -1, mph, 7);
+    const r = run(GP.x0, GP.z0 + 52, 0, -1, mph, 7);
     console.log(`arena big gap jump @ ${mph} mph: air ${r.air.toFixed(2)} s, rotated ${r.pitchRot.toFixed(0)}° (nose up +), ${r.peakH.toFixed(1)} m up, landing ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'CRASHED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`);
   }
-  { const r = run(0, 40, 0, 1, 20, 6); console.log(`arena moguls @ 20 mph: air ${r.air.toFixed(2)} s, peak ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
-  { const r = run(-28, -20, 0, -1, 24, 7); console.log(`arena step-up @ 24 mph: air ${r.air.toFixed(2)} s, ${r.peakH.toFixed(1)} m up, landing ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'CRASHED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
-  { const r = run(39, -20, 0, -1, 22, 6); console.log(`arena whoops lane @ 22 mph: air ${r.air.toFixed(2)} s, peak ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
+  { const r = run(MG.x0, MG.z0 - 18, 0, 1, 20, 6); console.log(`arena moguls @ 20 mph: air ${r.air.toFixed(2)} s, peak ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
+  { const r = run(SP.x0, SP.z0 + 14, 0, -1, 24, 7); console.log(`arena step-up @ 24 mph: air ${r.air.toFixed(2)} s, ${r.peakH.toFixed(1)} m up, landing ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'CRASHED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
+  { const r = run(WL.x0, WL.z0 + 14, 0, -1, 22, 6); console.log(`arena whoops lane @ 22 mph: air ${r.air.toFixed(2)} s, peak ${r.maxG.toFixed(1)} g, ${r.minUp < 0.2 ? 'ROLLED' : 'upright'}, ends at z ${r.v.pz.toFixed(0)}`); }
   // air assist: the gas held all the way over a jump and floored on landing (a keyboard's W). Off, it lands 50-70 deg nose
   // up and the still-spinning rears kick it over backwards; on, it eases off in the air and lands on its wheels
   const held = (x, z, tz, mph, aa) => {
@@ -248,8 +249,8 @@ for (const surf of [3, 0]) {
     // (on: also the pitch it touched down at - it aims a few degrees nose up of the landing slope)
     return landT === null ? 'no jump' : minUp < 0.3 ? 'FLIPPED' : aa ? `landed ${tdP > 0 ? '+' : ''}${tdP.toFixed(0)} deg` : 'landed';
   };
-  for (const [name, x, z, tz, sp] of [['gap jump', 0, 34, -1, [28, 34, 40]], ['tabletop', TB.x0, 52, -1, [28, 34, 40]], ['step-up', -28, -16, -1, [24, 30]]]) {
+  for (const [name, x, z, tz, sp] of [['gap jump', GP.x0, GP.z0 + 52, -1, [28, 34, 40]], ['tabletop', TB.x0, TB.z0 + TB.len + 31, -1, [28, 34, 40]], ['step-up', SP.x0, SP.z0 + 18, -1, [24, 30]]]) {
     console.log(`air assist, gas held over the ${name} @ ${sp.join(' / ')} mph: off ${sp.map((m) => held(x, z, tz, m, false)).join(' / ')} · on ${sp.map((m) => held(x, z, tz, m, true)).join(' / ')}`);
   }
-  { let maxX = 0; const r = run(12, 34, 1, 0, 30, 5, (v) => { maxX = Math.max(maxX, v.px); }); console.log(`arena wall @ 30 mph: furthest x ${maxX.toFixed(1)} (wall line at ${WG.ARENA.HW}), ${r.minUp < 0.2 ? "rolled" : "upright"}, glanced off and running along it at ${Math.abs(r.v.forwardSpeed * MPH).toFixed(0)} mph`); }
+  { let maxX = 0; const r = run(WG.ARENA.HW - 36, 34, 1, 0, 30, 5, (v) => { maxX = Math.max(maxX, v.px); }); console.log(`arena wall @ 30 mph: furthest x ${maxX.toFixed(1)} (wall line at ${WG.ARENA.HW}), ${r.minUp < 0.2 ? "rolled" : "upright"}, glanced off and running along it at ${Math.abs(r.v.forwardSpeed * MPH).toFixed(0)} mph`); }
 }

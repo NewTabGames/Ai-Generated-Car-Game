@@ -1,17 +1,22 @@
 // The Car Crushers 2 cars: ride height, launches and top speed against their targets (the game's top speeds; the
 // GT-R's and the Blue Bird's real figures), cornering on a skid pad (grip or tip-over), braking, keyboard lane
-// changes, and the Banana Car afloat on a lake. CC=couch,gtr,... picks which to run.
+// changes, and the Banana Car afloat on a lake. CC=couch,gtr,... picks which to run; id:engine runs an electric car
+// with one of its petrol alternatives (mini:twinair, scooter:busa, razor:ls).
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694;
 const flat = (surf, water) => ({ C: { WATER_LEVEL: water === undefined ? -1e4 : water }, ground(x, z, o) { o.h = water === undefined ? 0 : -3; o.nx = 0; o.ny = 1; o.nz = 0; o.surface = water === undefined ? surf : 4; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } });
 // the traction-control mode each starts on in the game
-const TC = { couch: 2, bluebird: 2, scooter: 2 };
-const TARGET = { hellcat: 199, couch: 190, eggrod: 142, banana: 85, bluebird: 301, gtr: 196, mini: 55, potty: 45, scooter: 119, razor: 142 };
+const TC = { couch: 2, bluebird: 2, scooter: 1 };
+const TARGET = { hellcat: 199, couch: 190, eggrod: 142, banana: 85, bluebird: 301, gtr: 196, mini: 55, potty: 45, scooter: 119, razor: 142,
+  'mini:twinair': 100, 'scooter:busa': 160, 'razor:ls': 165 };
+const ALL = 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor,mini:twinair,scooter:busa,razor:ls';
+const defOf = (key) => { const [id, eng] = key.split(':'); return eng ? CARS[id].make(eng) : CARS[id]; };
 function mk(key, surf, water) {
-  const v = new Vehicle(flat(surf || 0, water), CARS[key].spec);
+  const id = key.split(':')[0];
+  const v = new Vehicle(flat(surf || 0, water), defOf(key).spec);
   v.setTires(v.spec.frontTire, v.spec.rearTire);
   v.reset(0, water === undefined ? 0 : -3, 0, 0, -1); v.running = true; v.eOmega = v.spec.idleRpm / 9.549; v.park = false; v.gear = 1;
-  v.tcMode = TC[key] !== undefined ? TC[key] : 1;
+  v.tcMode = TC[id] !== undefined ? TC[id] : 1;
   for (const w of v.wheels) w.temp = 50;
   for (let i = 0; i < 120; i++) { v.input.brake = 1; v.step(1 / 120); }
   v.input.brake = 0;
@@ -20,9 +25,9 @@ function mk(key, surf, water) {
 const upY = (v) => 1 - 2 * (v.qx * v.qx + v.qz * v.qz);
 const slideDeg = (v) => { const fx = -2 * (v.qx * v.qz + v.qy * v.qw), fz = -(1 - 2 * (v.qx * v.qx + v.qy * v.qy)), vv = Math.hypot(v.vx, v.vz);
   return vv > 3 ? Math.acos(Math.max(-1, Math.min(1, (v.vx * fx + v.vz * fz) / (vv * Math.hypot(fx, fz))))) * 57.3 : 0; };
-for (const key of (process.env.CC || 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor').split(',')) {
-  const def = CARS[key], sp = def.spec, top = TARGET[key];
-  console.log(`== ${def.name} (${def.hp} hp, ${sp.mass} kg) · target ~${top} mph`);
+for (const key of (process.env.CC || ALL).split(',')) {
+  const def = defOf(key), sp = def.spec, top = TARGET[key];
+  console.log(`== ${def.name}${def.engine && def.engine !== 'ev' ? ' · ' + def.car : ''} (${def.hp} hp, ${sp.mass} kg) · target ~${top} mph`);
   { const v = mk(key); for (let i = 0; i < 240; i++) v.step(1 / 120);
     console.log(`  static: CG ${v.py.toFixed(3)} m (spec ${sp.cgHeight}) · loads ${v.wheels.map((w) => Math.round(w.Fz)).join('/')} N · ${Math.round(v.rpm())} rpm idle`); }
   // launch + top speed on asphalt (the Blue Bird gets the long run it needs)
@@ -102,14 +107,14 @@ for (const key of (process.env.CC || 'couch,eggrod,banana,bluebird,gtr,mini,pott
 {
   const { OFFROAD_PKG } = require('../src/vehicle.js');
   console.log('\nOff-road package (knobbies): 0-30 mph stock -> package');
-  for (const key of (process.env.CC || 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor').split(',')) {
-    const P = OFFROAD_PKG(key), out = [];
+  for (const key of (process.env.CC || ALL).split(',')) {
+    const id = key.split(':')[0], P = OFFROAD_PKG(id), out = [];
     for (const [surf, name] of [[0, 'asphalt'], [2, 'grass'], [3, 'dirt']]) {
       const r = [];
       for (const pkg of [false, true]) {
-        const v = new Vehicle(flat(surf), CARS[key].spec);
+        const v = new Vehicle(flat(surf), defOf(key).spec);
         v.setTires(pkg ? P.front : v.spec.frontTire, pkg ? P.rear : v.spec.rearTire);
-        v.reset(0, 0, 0, 0, -1); v.running = true; v.eOmega = (v.spec.idleRpm || 0) / 9.549; v.park = false; v.gear = 1; v.tcMode = TC[key] !== undefined ? TC[key] : 1;
+        v.reset(0, 0, 0, 0, -1); v.running = true; v.eOmega = (v.spec.idleRpm || 0) / 9.549; v.park = false; v.gear = 1; v.tcMode = TC[id] !== undefined ? TC[id] : 1;
         for (let i = 0; i < 120; i++) { v.input.brake = 1; v.step(1 / 120); }
         v.input.brake = 0;
         let t = 0, nan = false;
@@ -118,6 +123,6 @@ for (const key of (process.env.CC || 'couch,eggrod,banana,bluebird,gtr,mini,pott
       }
       out.push(`${name} ${r[0]} -> ${r[1]} s`);
     }
-    console.log(`  ${CARS[key].short.padEnd(14)} ${out.join(' · ')}`);
+    console.log(`  ${(key.includes(':') ? defOf(key).short + ' ' + defOf(key).engines[key.split(':')[1]].label : CARS[key].short).padEnd(28)} ${out.join(' · ')}`);
   }
 }

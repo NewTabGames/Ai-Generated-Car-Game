@@ -270,12 +270,14 @@
 
     // ---- the Car Crushers 2 cars (no radius: each car's own wheel size)
     // Couch Car: 13 in R-compound race tyres tucked under the sofa - it needs every bit of bite for ~850 hp on 340 kg
+    // (the softest street-legal compound, sticky from cold, and a wide flat peak: 850 hp on a 520 kg sofa needs every
+    // bit of it - on the old R-compounds it lit them up in any gear and swapped ends when it did)
     couchF: { name: 'R-compound 20.0x7.5-13', short: 'R-comp 13 in', width: 0.2,
-      muX: 1.35, muY: 1.22, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.14, relaxY: 0.26,
-      B: 1.8, C: 1.45, E: -0.25, heatCap: 1500, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+      muX: 1.45, muY: 1.3, loose: 0.8, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.14, relaxY: 0.26,
+      B: 1.7, C: 1.42, E: -0.4, heatCap: 1500, cold: 0.95, coldT: 10, warmT: 35, hotT: 120, overheat: 0.003, prep: 1.15 },
     couchR: { name: 'R-compound 20.5x10.0-13', short: 'R-comp 13 in', width: 0.26,
-      muX: 1.5, muY: 1.26, loose: 0.8, kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.15, relaxY: 0.27,
-      B: 1.8, C: 1.45, E: -0.25, heatCap: 1800, cold: 0.86, coldT: 20, warmT: 55, hotT: 110, overheat: 0.004, prep: 1.15 },
+      muX: 1.75, muY: 1.4, loose: 0.8, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.15, relaxY: 0.27,
+      B: 1.7, C: 1.42, E: -0.4, heatCap: 1800, cold: 0.95, coldT: 10, warmT: 35, hotT: 120, overheat: 0.003, prep: 1.15 },
     // Banana Car: the F-150's all-season truck tyres
     truckAS: { name: 'P235/75R15 all-season', short: 'All-season', width: 0.235,
       muX: 1.05, muY: 0.92, loose: 1.1, kappaPeak: 0.12, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.45,
@@ -639,9 +641,9 @@
     // match the ground. Short of that the pedals are all yours (off: do your own flips)
     // It aims for the ground it's going to land on (the flight path traced ahead to where the tyres meet the dirt:
     // the far side of a gap jump or a tabletop slopes away, so it wants the nose down to match), a touch rear-first.
-    // On top of the pedals a spotter's hand (a game aid, like traction control): a gentle, capped nudge in pitch and
-    // roll towards that landing attitude while it's in the air (_aaTorque) - it steadies a truck that left a ramp
-    // crooked or twisting, but can't save one that's way over (half a turn past level it lets go)
+    // It works the pedals itself in the air - brake to drop the nose, gas to lift it - and on top of that a spotter's hand
+    // (a game aid, like traction control): a light, capped nudge in pitch and roll towards that landing attitude
+    // (_aaTorque) that steadies a truck that left a ramp crooked or twisting, but can't save one that's way over
     _airAssist(dt) {
       const inp = this.input, { qx, qy, qz, qw } = this;
       const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
@@ -666,8 +668,11 @@
         const e = ahead - tgtP;
         if (inp.throttle > 0) inp.throttle *= clamp((16 - e) / 14, 0, 1);
         if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
-        if (e > 20) inp.brake = Math.max(inp.brake, clamp((e - 20) / 18, 0, 1));
-        if (e < -18) inp.throttle = Math.max(inp.throttle, clamp((-18 - e) / 15, 0, 1));
+        // and the feet do the flying: stab the brake to bring a rising nose down, rev the wheels to lift a dropping one
+        // (you hear it working) - from 8 deg off the landing attitude, all in by ~22
+        this.aaAuto = 0;
+        if (e > 8) { const b = clamp((e - 8) / 14, 0, 1); if (b > inp.brake) { inp.brake = b; this.aaAuto = -b; } }
+        if (e < -8) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
       } else {
         this.aaAir = 0;
         if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
@@ -679,15 +684,15 @@
         }
       }
     }
-    // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 1.3 rad/s^2 in
-    // pitch and 2 in roll - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
+    // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 0.5 rad/s^2 in
+    // pitch and 1 in roll - a light hand: the pedals do most of the work - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
     // past ~85 deg: a truck that rolled over on the ramp's edge before it left the ground is beyond saving)
     _aaTorque(m00, m10, m20, m02, m12, m22, m11) {
       const s = this.spec, fade = clamp(((this.aaAir || 0) - 0.08) / 0.2, 0, 1);
       if (fade <= 0 || m11 < 0.1 || this.aaTgtP === undefined) return null;
       const pitch = Math.asin(clamp(-m12, -1, 1)), roll = Math.asin(clamp(m10, -1, 1));
       const wP = this.wx * m00 + this.wy * m10 + this.wz * m20, wR = this.wx * m02 + this.wy * m12 + this.wz * m22;
-      const A = 1.3 * fade, AR = 2 * fade, kp = 5, kd = 4.2;
+      const A = 0.5 * fade, AR = 1.0 * fade, kp = 3.5, kd = 3;
       const aP = clamp(kp * (this.aaTgtP - pitch) - kd * wP, -A, A), aR = clamp(kp * (this.aaTgtR - roll) - kd * wR, -AR, AR);
       const tP = aP * s.Ipitch, tR = aR * s.Iroll;
       const T = this._aaT || (this._aaT = [0, 0, 0]);
@@ -701,6 +706,13 @@
       const sp = Math.hypot(this.vx, this.vz);
       this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
       if (this.input.airAssist) this._airAssist(Math.min(dt, 0.1));
+      // (wheelie control reads the nose-up pitch against the road, not the horizon: the slope under it along its heading)
+      if (this.spec.wheelieCtl) {
+        const g = this._wcG || (this._wcG = {}), { qx, qy, qz, qw } = this;
+        this.world.ground(this.px, this.pz, g);
+        const fx = -2 * (qx * qz + qy * qw), fz = -(1 - 2 * (qx * qx + qy * qy)), fl = Math.hypot(fx, fz) || 1;
+        this.gndPitch = Math.atan(-(g.nx * fx + g.nz * fz) / (fl * Math.max(0.2, g.ny))) * 57.3;
+      }
       let n = 0;
       while (this.acc >= h && n < 110) { this.substep(h); this.acc -= h; n++; }
       if (n === 110) this.acc = 0;
@@ -873,6 +885,24 @@
               : Math.min(wb.Fmax || 60000, kb * (300000 * pen + 14000 * Math.max(0, -bvy)));
             Fy += F; Tx += -rz * F; Tz += rx * F;
             this.wheelieBarLoad += F;
+          }
+        }
+      }
+      // ---------------- outriggers: small stabiliser casters on arms out to the sides (body-mounted). Clear of the
+      // ground when it's level, they touch down once it leans a few degrees and hold it up there: a much wider base to
+      // tip over, so it slides before it rolls. A caster swivels, so it pushes up and nothing else
+      if (s.outriggers) {
+        const o = s.outriggers;
+        this.outriggerLoad = 0;
+        for (const [lx, ly, lz] of o.pts) {
+          const bx = px + m00 * lx + m01 * ly + m02 * lz, by = py + m10 * lx + m11 * ly + m12 * lz, bz = pz + m20 * lx + m21 * ly + m22 * lz;
+          world.ground(bx, bz, g);
+          const pen = g.h + o.r - by;
+          if (pen > 0) {
+            const rx = bx - px, rz = bz - pz, bvy = vy + (wz * rx - wx * rz);
+            const F = clamp(o.k * pen - o.damp * bvy, 0, o.Fmax);
+            Fy += F; Tx += -rz * F; Tz += rx * F;
+            this.outriggerLoad += F;
           }
         }
       }
@@ -1407,7 +1437,7 @@
       if (s.wheelieCtl && this.tcMode < 3) {
         const { qx, qy, qz, qw } = this, m12 = 2 * (qy * qz - qx * qw);
         const m00 = 1 - 2 * (qy * qy + qz * qz), m10 = 2 * (qx * qy + qz * qw), m20 = 2 * (qx * qz - qy * qw);
-        const ahead = (Math.asin(clamp(-m12, -1, 1)) + 0.12 * (this.wx * m00 + this.wy * m10 + this.wz * m20)) * 57.3;
+        const ahead = (Math.asin(clamp(-m12, -1, 1)) + 0.12 * (this.wx * m00 + this.wy * m10 + this.wz * m20)) * 57.3 - (this.gndPitch || 0);
         const tgt = clamp(1 - (ahead - s.wheelieCtl) / 4, 0.1, 1), wc0 = this.wcCut === undefined ? 1 : this.wcCut;
         this.wcCut = wc0 + (tgt - wc0) * Math.min(1, h / 0.03);
       } else this.wcCut = 1;
@@ -2374,7 +2404,9 @@
   // a box's corners and mid-edges (both sides), for the body / roll-over contacts
   const ccBox = (hw, y0, y1, z0, z1) => [-1, 1].map((sx) => [[hw, y0, z0], [hw, y0, z1], [hw, y1, z0], [hw, y1, z1], [hw, y0, (z0 + z1) / 2], [hw, y1, (z0 + z1) / 2],
     [hw, (y0 + y1) / 2, z0], [hw, (y0 + y1) / 2, z1]].map(([x, y, z]) => [sx * x, y, z])).flat();
-  const EV_CLUTCH = { rpm0: -2, rpm1: -1, kc: 0, base: [[0, 6000]], rev: 6000 };   // (an electric motor: always coupled)
+  // (an electric motor: always coupled, whichever way it turns - it used to let go below 0 rpm, so a car rolling back
+  // at all, off a bump or on a slope, had its motor disconnected: it couldn't drive forwards again, only creep back)
+  const EV_CLUTCH = { rpm0: -1e6, rpm1: -1e6 + 1, kc: 0, base: [[0, 6000]], rev: 6000 };
   // an electric motor's torque curve: constant torque to its base speed, constant power past it (lb-ft)
   const evCurve = (Nm, kW, maxRpm) => {
     const base = kW * 1000 / Nm * 30 / Math.PI, c = [[0, Nm / LBFT], [base, Nm / LBFT]];
@@ -2400,7 +2432,7 @@
     torqueCurve: [[0, 90], [1000, 110], [2000, 170], [3000, 300], [4000, 450], [5000, 560], [6000, 600], [7000, 595], [7800, 572], [8500, 520], [9500, 380]],
     turbo: { lag: 0.45, base: 0.3, rpm0: 2200, rpm1: 5000 }, boostMax: 40,
     autoRatios: [2.6, 1.85, 1.42, 1.15, 0.96], autoRev: 2.6, autoFinal: 2.56, shiftTimeWOT: 0.06, shiftTimePart: 0.1, shiftCutDepth: 0.6,
-    launchRpm: 5500, engineTc: true, noCoastBlip: true, blipMax: 0.3,
+    launchRpm: 5500, engineTc: true, noCoastBlip: true, blipMax: 0.3, wheelieCtl: 1,
     dragClutch: { rpm0: 3000, rpm1: 5600, kc: 0, base: [[0, 1400]], muSlip: 0.2, slipRef: 200, rev: 400 },
     lsdPreload: 250, lsdRamp: 0.3, driveEff: 0.9,
     CdA: 1.18,
@@ -2539,39 +2571,47 @@
   } };
   // Turbo Scooter 3000: a four-wheel mobility scooter (Shoprider Venturer-type) with its 1 hp motor thrown away for a
   // 100 kW axial-flux motor and a lithium pack - 220 Nm straight to the rear axle through a 2.42:1 belt, 10 in tyres, the
-  // basket still on the front and the battery pack in the footwell. 215 kg with the rider; ~119 mph. The motor
-  // controller's wheelie control and the anti-tip wheels at the back stop it looping over on the launch; nothing stops it
-  // rolling over in a turn - the rider sits high on a half-metre track
-  CARS.scooter = { name: 'Turbo Scooter 3000', short: 'Turbo Scooter', car: '100 kW ELECTRIC', hp: 134, tq: 162, cc: true, kbLat: 3, spec: {
+  // basket still on the front and the battery pack low in the deck. 215 kg with the rider; ~119 mph. The motor
+  // controller's wheelie control and the anti-tip wheels at the back stop it looping over on the launch. Sideways, the
+  // rider sits high on a narrow track: on its wheels alone it went over at 0.4 g, in any real turn. So it has a
+  // wide-track kit (the wheels on long stub axles, 0.83 m apart) that keeps all four down to ~0.75 g, and a stabiliser
+  // caster on an arm out each side, 1.5 m apart and an inch off the ground: past that it leans a few degrees onto the
+  // outside one and the tyres slide before it can roll
+  CARS.scooter = { name: 'Turbo Scooter 3000', short: 'Turbo Scooter', car: '100 kW ELECTRIC', hp: 134, tq: 162, cc: true, kbLat: 7, spec: {
     name: 'Turbo Scooter 3000',
-    mass: 215, Ipitch: 45, Iyaw: 30, Iroll: 26, cgHeight: 0.66, wheelbase: 1.1, frontWeight: 0.45,
-    trackF: 0.5, trackR: 0.56, wheelRadius: 0.13, wheelInertiaF: 0.02, wheelInertiaR: 0.04,
+    mass: 215, Ipitch: 45, Iyaw: 36, Iroll: 30, cgHeight: 0.57, wheelbase: 1.1, frontWeight: 0.48,
+    trackF: 0.8, trackR: 0.86, wheelRadius: 0.13, wheelInertiaF: 0.02, wheelInertiaR: 0.04,
     frontTire: 'scooter10', rearTire: 'scooter10', Fz0: 900, loadSens: 0.1,
     springF: 30000, springR: 30000, dampBumpF: 900, dampRebF: 1100, dampBumpR: 1100, dampRebR: 1300,
-    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.06, rearToe: 0,
-    brakeTorqueF: 80, brakeTorqueR: 100, handbrakeTorque: 100, noABS: true, noESC: true,
+    arbF: 12000, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.06, rearToe: 0.004,
+    // (and a yaw-rate stability control in the motor controller, braking a wheel: on so short a wheelbase a quick
+    // flick of the wheel otherwise swaps its ends)
+    brakeTorqueF: 80, brakeTorqueR: 100, handbrakeTorque: 100, noABS: true,
     maxSteer: 0.6, steerRate: 3, steerRatio: 5, ackermann: 0.6,
     electric: true, idleRpm: 0, limiterRpm: 10000, redlineRpm: 10000, shiftRpm: 11000, engineInertia: 0.03, fricA: 1, fricB: 1.6, starterTorque: 0,
     torqueCurve: evCurve(220, 100, 10000), boostMax: 0, popScale: 0,
     autoRatios: [1], autoRev: 1, autoFinal: 2.42, engineTc: true, noCoastBlip: true,
     dragClutch: EV_CLUTCH, lsdPreload: 6, lsdRamp: 0, driveEff: 0.92,
     wheelieBar: { len: 0.32, clr: 0.08, halfW: 0.18, r: 0.04, k: 150000, damp: 5000, Fmax: 5000 }, wheelieCtl: 1,
+    // (the casters: 4 in wheels, 0.74 m out each side beside the CG, their bottoms 3 cm off the ground)
+    outriggers: { pts: ccPts(0.57, 0.48, 1.1, [[-0.74, 0.08, 0.05], [0.74, 0.08, 0.05]]), r: 0.05, k: 160000, damp: 4000, Fmax: 7000 },
     CdA: 0.68, bodyK: 60000, bodyC: 3000, bodyMu: 0.5,
     bodyHalfW: 0.32, bodyFront: -0.95, bodyRear: 0.6, bodyBottom: -0.5, bodyTop: 0.9,
-    bodyPts: ccPts(0.66, 0.45, 1.1, ccBox(0.3, 0.1, 0.45, -0.8, 0.64).concat(ccBox(0.25, 0.55, 1.35, 0.0, 0.45))
+    bodyPts: ccPts(0.57, 0.48, 1.1, ccBox(0.3, 0.1, 0.45, -0.8, 0.64).concat(ccBox(0.25, 0.55, 1.35, 0.0, 0.45))
       .concat([[0, 1.55, 0.35], [0, 1.0, -0.6], [0, 0.5, -0.9]])),
   } };
   // Razors Edge: the game's Halloween special after the Lo Res Car - a golf cart's chassis under a long faceted body of
-  // smoked glass panels edged in neon. Here: a stretched cart frame with a 110 kW / 250 Nm motor through a 4.95:1
+  // black glass panels edged in neon. Here: a stretched cart frame with a 110 kW / 250 Nm motor through a 4.95:1
   // reduction, 18 x 8.50-8 cart tyres, two seats. 530 kg with the driver; ~142 mph, the glass wedge cleaving the air
-  CARS.razor = { name: 'Razors Edge', short: 'Razors Edge', car: '110 kW ELECTRIC', hp: 148, tq: 184, cc: true, spec: {
+  CARS.razor = { name: 'Razors Edge', short: 'Razors Edge', car: '110 kW ELECTRIC', hp: 148, tq: 184, cc: true, kbLat: 7, spec: {
     name: 'Razors Edge',
     mass: 530, Ipitch: 520, Iyaw: 600, Iroll: 110, cgHeight: 0.42, wheelbase: 2.3, frontWeight: 0.45,
     trackF: 1.12, trackR: 1.12, wheelRadius: 0.26, wheelInertiaF: 0.3, wheelInertiaR: 0.35,
     frontTire: 'golf', rearTire: 'golf',
     springF: 20000, springR: 24000, dampBumpF: 1200, dampRebF: 1700, dampBumpR: 1400, dampRebR: 2000,
-    arbF: 7000, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15,
-    brakeTorqueF: 350, brakeTorqueR: 300, handbrakeTorque: 400, noABS: true, noESC: true,
+    arbF: 12000, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15, rearToe: 0.004,
+    // (a yaw-rate stability control, braking a wheel: on the short cart frame, power in a turn swaps its ends)
+    brakeTorqueF: 350, brakeTorqueR: 300, handbrakeTorque: 400, noABS: true,
     maxSteer: 0.55, steerRate: 4, steerRatio: 14,
     electric: true, idleRpm: 0, limiterRpm: 12000, redlineRpm: 12000, shiftRpm: 13000, engineInertia: 0.04, fricA: 1, fricB: 1.5, starterTorque: 0,
     torqueCurve: evCurve(250, 110, 12000), boostMax: 0, popScale: 0,
@@ -2579,19 +2619,82 @@
     dragClutch: EV_CLUTCH, lsdPreload: 10, lsdRamp: 0.05, driveEff: 0.92,
     CdA: 0.5,
     bodyHalfW: 0.8, bodyFront: -2.3, bodyRear: 2.3, bodyBottom: -0.28, bodyTop: 0.85,
-    bodyPts: ccPts(0.42, 0.45, 2.3, ccBox(0.84, 0.16, 0.5, -1.4, 1.5).concat([[0, 0.3, -2.25], [0, 0.95, 2.2], [0, 1.28, -0.5], [-0.55, 0.9, 0.5], [0.55, 0.9, 0.5]])),
+    bodyPts: ccPts(0.42, 0.45, 2.3, ccBox(0.84, 0.16, 0.5, -1.4, 1.5).concat([[0, 0.55, -2.4], [0, 1.0, 2.3], [0, 1.2, 0.3], [-0.55, 1.12, 0.5], [0.55, 1.12, 0.5], [-0.6, 1.04, 2.3], [0.6, 1.04, 2.3]])),
   } };
+  // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
+  // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
+  // restarts to swap)
+  const ICE = { electric: false, popScale: 1, noCoastBlip: false };
+  function ccEngines(id, alts) {
+    const base = CARS[id];
+    base.engines = Object.assign({ ev: { label: 'Electric' } }, alts);
+    base.make = (key) => {
+      const a = alts[key];
+      if (!a) return Object.assign({}, base, { engine: 'ev' });
+      return Object.assign({}, base, a, { engine: key, spec: Object.assign({}, base.spec, ICE, a.spec) });
+    };
+  }
+  // Mini Dookie with the Fiat 0.9 TwinAir turbo twin (the Pongo was a Fiat): 85 hp at 5,500, 145 Nm at 1,900, mounted
+  // across under the rear floor behind the seat like a Smart's, into a 5-speed automated manual (Dualogic-type: a
+  // robot works the clutch and shifts, slowly). ~100 mph
+  ccEngines('mini', {
+    twinair: { label: '0.9 TwinAir', car: '0.9 TWINAIR TURBO', hp: 85, tq: 107, spec: {
+      idleRpm: 850, limiterRpm: 6300, redlineRpm: 6000, shiftRpm: 5800, engineInertia: 0.09, fricA: 7, fricB: 4, starterTorque: 60,
+      // (lb-ft: the little turbo gives 107 lb-ft from 1,900 to 3,500)
+      torqueCurve: [[0, 40], [1000, 62], [1500, 88], [1900, 107], [3500, 107], [4500, 97], [5500, 81], [6000, 72], [6500, 56]],
+      turbo: { lag: 0.35, base: 0.55, rpm0: 1300, rpm1: 2100 }, boostMax: 14,
+      autoRatios: [3.91, 2.16, 1.48, 1.12, 0.92], autoRev: 3.73, autoFinal: 4.0, shiftTimeWOT: 0.4, shiftTimePart: 0.55, shiftCutDepth: 1,
+      launchRpm: 2200, engineTc: false,
+      dragClutch: { rpm0: 1250, rpm1: 2300, kc: 0, base: [[0, 260]], muSlip: 0.15, slipRef: 150, rev: 200 },
+      lsdPreload: 5, driveEff: 0.9, mass: 670,
+    } },
+  });
+  // Turbo Scooter 3000 with the name made literal: a Suzuki Hayabusa 1,340 cc four with a turbo on ~10 psi, ~260 hp at
+  // 10,000, 206 Nm at 7,500, sitting bare where the rear shell was, crank across the frame, the bike's 6-speed on a
+  // quickshifter and a chain to the rear axle. 250 kg with the rider, more of it at the back. ~160 mph - on 10 in
+  // wheels spinning 5,000 rpm
+  ccEngines('scooter', {
+    busa: { label: 'Turbo Hayabusa', car: 'TURBO HAYABUSA', hp: 260, tq: 152, spec: {
+      mass: 250, Ipitch: 52, Iyaw: 42, Iroll: 34, frontWeight: 0.43,
+      idleRpm: 1200, limiterRpm: 11500, redlineRpm: 11000, shiftRpm: 10800, engineInertia: 0.04, fricA: 4, fricB: 2, starterTorque: 25,
+      torqueCurve: [[0, 45], [2000, 60], [3000, 75], [4000, 100], [5000, 125], [6000, 145], [7500, 152], [9000, 147], [10000, 137], [10800, 120], [11500, 95], [12500, 60]],
+      turbo: { lag: 0.3, base: 0.55, rpm0: 4000, rpm1: 7000 }, boostMax: 10, thrExp: 1.3,
+      // (the bike's gears; its 1.596 primary and the chain make 1.9 overall before them)
+      autoRatios: [2.615, 1.937, 1.526, 1.285, 1.136, 1.043], autoRev: 2.615, autoFinal: 1.9, shiftTimeWOT: 0.05, shiftTimePart: 0.09, shiftCutDepth: 0.4,
+      launchRpm: 6500, engineTc: true,
+      dragClutch: { rpm0: 3000, rpm1: 6000, kc: 0, rev: 60, base: [[0, 360]], muSlip: 0.25, slipRef: 220 },
+      outriggers: { pts: ccPts(0.57, 0.43, 1.1, [[-0.74, 0.08, 0.05], [0.74, 0.08, 0.05]]), r: 0.05, k: 160000, damp: 4000, Fmax: 7000 },
+      bodyPts: ccPts(0.57, 0.43, 1.1, ccBox(0.3, 0.1, 0.45, -0.8, 0.64).concat(ccBox(0.25, 0.55, 1.35, 0.0, 0.45))
+        .concat([[0, 1.55, 0.35], [0, 1.0, -0.6], [0, 0.5, -0.9], [-0.26, 0.62, 0.72], [0.26, 0.62, 0.72]])),
+    } },
+  });
+  // Razors Edge with the golf-cart builder's favourite: a junkyard 5.3 L LS V8 (285 hp at 5,200, 325 lb-ft at 4,000)
+  // behind the bench, a 4L60E 4-speed automatic and a 9-inch rear axle with 3.08 gears. 690 kg; traction-limited on
+  // cart tyres below ~70 mph, ~165 mph at the limiter in top
+  ccEngines('razor', {
+    ls: { label: '5.3 LS V8', car: '5.3 LS V8', hp: 285, tq: 325, spec: {
+      mass: 690, Ipitch: 640, Iyaw: 740, Iroll: 130, frontWeight: 0.4,
+      idleRpm: 700, limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5700, engineInertia: 0.2, fricA: 20, fricB: 12, starterTorque: 150,
+      torqueCurve: [[0, 200], [1000, 250], [2000, 290], [3000, 312], [4000, 325], [4800, 318], [5200, 288], [5800, 250], [6200, 215], [6800, 170]],
+      boostMax: 0,
+      autoRatios: [3.06, 1.63, 1.0, 0.7], autoRev: 2.29, autoFinal: 3.08, tcK: 0.0072, tcStall: 2.0, lockupTorque: 700,
+      launchRpm: 2400, engineTc: false, dragClutch: undefined,
+      lsdPreload: 60, lsdRamp: 0.2, driveEff: 0.86,
+    } },
+  });
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
-    const pr = (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock
+    // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)
+    const EVb = !!b.electric;
+    const pr = EVb ? 1 : (1 + t.boost / 14.7) / (1 + b.boostMax / 14.7);          // supercharger pressure ratio vs stock
     s.torqueScale = (b.torqueScale || 1) * t.power * pr;
-    s.boostMax = t.boost; s.rpmStretch = t.stretch;
+    s.boostMax = EVb ? 0 : t.boost; s.rpmStretch = t.stretch;
     s.limiterRpm = t.limiter; s.redlineRpm = t.limiter - (b.limiterRpm - b.redlineRpm);
     s.noLimiter = !!t.nolimit;          // (the slider value still sets the redline and the automatic's shift points)
 
     if (b.shiftRpm) s.shiftRpm = t.limiter - (b.limiterRpm - b.shiftRpm);
-    s.idleRpm = t.idle; s.engineInertia = b.engineInertia * t.inertia;
-    s.nosHp = t.nos; s.popScale = t.pops;
+    s.idleRpm = EVb ? b.idleRpm : t.idle; s.engineInertia = b.engineInertia * t.inertia;
+    s.nosHp = EVb ? 0 : t.nos; s.popScale = EVb ? 0 : t.pops;
     s.autoFinal = t.finalAuto; s.manualFinal = t.finalManual;
     s.shiftTimeWOT = t.shiftTime; s.shiftTimePart = t.shiftTime * 1.55;
     s.launchRpm = t.launch;

@@ -29,14 +29,14 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 } };
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: C.WATER_LEVEL }, uMap: { value: W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
       sh.vertexShader = 'attribute vec2 aData;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\n' +
         sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
   vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vData = aData; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
+      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
         sh.fragmentShader
           .replace('#include <color_fragment>', `
   {
@@ -209,6 +209,14 @@ float lampLight(float lat, float al){
       paint += tline(ab.y - 14.2, 0.25, px) * step(ab.x, 7.2) * step(0.0, lp.x * lp.y) + tline(ab.x - 14.2, 0.25, px) * step(ab.y, 7.2) * step(lp.x * lp.y, 0.0);
       paint += step(9.4, ab.y) * step(ab.y, 13.0) * step(ab.x, 7.2) * tline(fract(lp.x / 1.2 + 0.25) - 0.5, 0.25, px / 1.2)
              + step(9.4, ab.x) * step(ab.x, 13.0) * step(ab.y, 7.2) * tline(fract(lp.y / 1.2 + 0.25) - 0.5, 0.25, px / 1.2);
+      if (uPrep > 0.5) {
+        // prepped: the whole lot sprayed with traction compound and laid with rubber - near black, blacker in long
+        // streaks where launches have gone down it (and in the avenues' wheel tracks), with a tacky sheen
+        float st = vnoise(vec2(P.x * 0.9, P.y * 0.018)) * 0.5 + vnoise(vec2(P.x * 0.018, P.y * 0.9)) * 0.5;
+        float rb = clamp(0.2 + 0.55 * smoothstep(0.45, 0.8, st) + 0.7 * trk * onAv, 0.0, 0.95);
+        c = mix(c * 0.8, vec3(0.014, 0.014, 0.016), rb);
+        r2 -= 0.12 * rb;
+      }
       c = mix(c, yellow, clamp(ypaint, 0.0, 1.0));
       c = mix(c, white, clamp(paint, 0.0, 1.0));
       col = c;
@@ -277,8 +285,16 @@ float lampLight(float lat, float al){
       float trk = exp(-pow((abs(sdr) - 0.95) / 0.38, 2.0)) + exp(-pow((abs(sdr) - 2.65) / 0.38, 2.0));
       asphC *= 1.0 - 0.14 * trk * smoothstep(5.0, 7.0, dOther);
       asphC = mix(asphC, vec3(0.05, 0.05, 0.053), step(0.8, vnoise(vec2(along * 0.045, sdr * 0.35))) * 0.55);
+      float prepRub = 0.0;
+      if (uPrep > 0.5) {
+        // prepped: traction compound sprayed lane to lane and laid with rubber - two black grooves down each lane where
+        // the tyres run, darker all over, a tacky sheen
+        float g2 = exp(-pow((abs(sdr) - 0.9) / 0.36, 2.0)) + exp(-pow((abs(sdr) - 2.6) / 0.36, 2.0));
+        prepRub = clamp(0.12 + g2 * (0.75 + 0.3 * vnoise(vec2(along * 0.25, sdr * 2.5))) * (0.35 + 0.65 * smoothstep(4.5, 6.5, dOther)), 0.0, 0.95);
+        asphC = mix(asphC * 0.8, vec3(0.014, 0.014, 0.016), prepRub);
+      }
       col = mix(col, asphC, asph);
-      rough = mix(rough, 0.86, asph);
+      rough = mix(rough, 0.86 - 0.12 * prepRub, asph);
       float inter = smoothstep(5.2, 7.2, dOther);
       float fwS = max(fwidth(sdr), 0.003);
       float edge = 1.0 - smoothstep(0.075 - fwS, 0.075 + fwS, abs(d - 3.55));
@@ -1259,7 +1275,7 @@ void main(){
         g.fillStyle = '#888'; g.font = 'bold 34px Arial'; g.fillText(o.foot || '', w / 2, 520, w - 60);
         scrT.needsUpdate = true;
       }
-      drawScreen({ big: 'WELCOME', sub: 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
+      drawScreen({ big: 'WELCOME', sub: W.ramps ? 'DIRT RAMPS · BIG AIR · TABLETOPS · STEP-UPS · WHOOPS' : 'BIG AIR · CAR CRUSH · TABLETOP · STEP-UP · WHOOPS' });
       arena = {
         update(dt) {
           for (const k of cars) if (k.ver !== k.c.ver) k.refresh();
