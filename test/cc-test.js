@@ -8,8 +8,8 @@ const flat = (surf, water) => ({ C: { WATER_LEVEL: water === undefined ? -1e4 : 
 // the traction-control mode each starts on in the game
 const TC = { couch: 2, bluebird: 2, scooter: 1 };
 const TARGET = { hellcat: 199, couch: 190, eggrod: 142, banana: 85, bluebird: 301, gtr: 196, mini: 55, potty: 45, scooter: 119, razor: 142,
-  'mini:twinair': 100, 'scooter:busa': 160, 'razor:ls': 165 };
-const ALL = 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor,mini:twinair,scooter:busa,razor:ls';
+  'mini:twinair': 100, 'scooter:busa': 160, 'razor:ls': 165, golf: 19, 'golf:lsv': 35, 'golf:hot': 84, 'golf:busa': 119, rally: 116, 'rally:r2': 120, 'rally:gb': 140 };
+const ALL = 'couch,eggrod,banana,bluebird,gtr,mini,potty,scooter,razor,mini:twinair,scooter:busa,razor:ls,golf,golf:lsv,golf:hot,golf:busa,rally,rally:r2,rally:gb';
 const defOf = (key) => { const [id, eng] = key.split(':'); return eng ? CARS[id].make(eng) : CARS[id]; };
 function mk(key, surf, water) {
   const id = key.split(':')[0];

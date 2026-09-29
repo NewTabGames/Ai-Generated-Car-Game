@@ -174,14 +174,16 @@
     // ---- off-road packages for the More Cars (see OFFROAD_PKG). finalK: the package's matching final drive (a bigger
     // sprocket / ring gear) so a taller tyre doesn't just gear the vehicle up
     // Tractor: Firestone R-2 30.5L-32 "cane & rice" deep-lug tyres, uncut - lugs twice as deep as a farm R-1 and never
-    // sharpened. They paddle through mud and dig into turf where the cut pullers skate; the hard-packed clay of a pull
-    // track suits the sharpened bars better, and on pavement the tall lugs squirm and thump. ~2 in taller, ~130 lb heavier
+    // sharpened. Off the pavement they out-dig the cut pullers everywhere - they paddle through mud, dig into turf and
+    // bite deeper into loose dirt (the pullers' sharpened bars only really win on a pull track's prepped strip); on
+    // pavement the tall lugs squirm and thump. ~2 in taller, ~130 lb heavier. (They used to bite less than the stock
+    // tyres on dirt and barely more on grass - "the off-road package is worse than the regular wheels")
     pullingR2: { name: 'Firestone R-2 30.5L-32 deep-lug', short: 'R-2 deep lugs', width: 0.78, radius: 0.915,
-      muX: 0.95, muY: 0.8, loose: 2.6, looseY: 1.6, kappaPeak: 0.25, alphaPeak: 0.12, relaxX: 0.65, relaxY: 0.6,
+      muX: 0.95, muY: 0.8, loose: 3.2, looseY: 1.75, kappaPeak: 0.25, alphaPeak: 0.12, relaxX: 0.65, relaxY: 0.6,
       // (asphalt gravel grass dirt water/mud strip)
-      looseKx: [1, 1.05, 2.0, 0.92, 2.0, 1],
+      looseKx: [1, 1.1, 1.75, 1.15, 2.2, 1], tcTargets: [0.26, 0.32, 0.4],
       B: 1.3, C: 1.35, E: -0.2, heatCap: 20000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.4,
-      crr: [2.8, 1.3, 1.0, 1.1, 0.9, 2.8], massAdd: 60, inertiaAdd: 40, finalK: 0.915 / 0.87 },
+      crr: [2.8, 1.3, 1.0, 1.1, 0.9, 2.8], massAdd: 60, inertiaAdd: 30, finalK: 0.915 / 0.87 },
     // ... and lugged fronts (R-1 bar tread instead of the smooth ribs) so it steers in the soft stuff. Still less side
     // grip than the rears, so it understeers rather than swapping ends
     tractorFrontLug: { name: '11L-15 lugged fronts', short: 'Lug fronts', width: 0.28, radius: 0.385,
@@ -307,6 +309,12 @@
       muX: 0.95, muY: 0.86, loose: 1.05, kappaPeak: 0.11, alphaPeak: 0.14, relaxX: 0.14, relaxY: 0.26,
       B: 1.7, C: 1.38, E: -0.2, heatCap: 1600, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.004, prep: 1.0,
       crr: [1.1, 1.1, 1.05, 1.05, 1, 1.1] },
+    // rally cars: gravel tyres - a tall, soft sidewall and a deep block tread that cuts into loose stuff; less than a
+    // road tyre on tarmac, a lot more on gravel, dirt and grass
+    rallyG: { name: '195/65R15 gravel rally', short: 'Gravel rally', width: 0.195,
+      muX: 1.08, muY: 0.98, loose: 1.3, looseKx: [1, 1.08, 1.0, 1.12, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.42,
+      B: 1.6, C: 1.35, E: -0.1, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
+      crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -1265,7 +1273,9 @@
         const peak = W[2].tire.kappaPeak * (s.tcPeakK || [0.6, 0.9, 1.0][this.tcMode] || 1);
         // (tcTargets: tyres that bite at a lot more slip - the tractor's pulling tyres peak at ~22 % - get targets near
         // their own peak in every mode, instead of a road tyre's 6-17 % that would starve them)
-        let target = s.tcTargets ? s.tcTargets[this.tcMode] : Math.min(this.tcMode === 0 ? 0.06 : this.tcMode === 1 ? 0.11 : 0.17, peak);
+        // (and a tyre can bring its own: the puller's deep-lug off-road package bites at more slip than its cut pullers)
+        const tgts = W[2].tire.tcTargets || s.tcTargets;
+        let target = tgts ? tgts[this.tcMode] : Math.min(this.tcMode === 0 ? 0.06 : this.tcMode === 1 ? 0.11 : 0.17, peak);
         // (tcCombined - dragsters: keep the driven tyres inside their friction circle. The more cornering load the rears
         // carry, the less wheelspin is allowed, so a hard-driven slick can't be pushed past its limit in a turn. Without
         // it, part throttle on street asphalt used all the rear grip and the short Funny Car swapped ends in a lane change)
@@ -1728,7 +1738,8 @@
       const Gdot = gliding && this._gPrev ? (G - this._gPrev) / h : 0;
       this._gPrev = G;
       const Te = this.Te, lt = s.lsdRamp * Math.abs(this.lastTin);
-      const lkR = s.lsdPreload + lt, lkF = (s.lsdPreloadF || s.lsdPreload) + lt, lkC = (s.centerPreload || 2 * s.lsdPreload) + 2 * lt;
+      // (fwd: front-wheel drive through this driveline - all of it to the fronts, the rears on no diff at all)
+      const lkR = s.fwd ? 0 : s.lsdPreload + lt, lkF = (s.lsdPreloadF || s.lsdPreload) + lt, lkC = s.fwd ? 0 : (s.centerPreload || 2 * s.lsdPreload) + 2 * lt;
       const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
       const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
@@ -2625,13 +2636,14 @@
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
   // restarts to swap)
   const ICE = { electric: false, popScale: 1, noCoastBlip: false };
-  function ccEngines(id, alts) {
-    const base = CARS[id];
-    base.engines = Object.assign({ ev: { label: 'Electric' } }, alts);
+  // (baseKey / baseLabel: the stock one's key and name; an alternative with ev: true is another electric one)
+  function ccEngines(id, alts, baseKey, baseLabel) {
+    const base = CARS[id], bk = baseKey || 'ev';
+    base.engines = Object.assign({ [bk]: { label: baseLabel || 'Electric' } }, alts);
     base.make = (key) => {
       const a = alts[key];
-      if (!a) return Object.assign({}, base, { engine: 'ev' });
-      return Object.assign({}, base, a, { engine: key, spec: Object.assign({}, base.spec, ICE, a.spec) });
+      if (!a) return Object.assign({}, base, { engine: bk });
+      return Object.assign({}, base, a, { engine: key, spec: Object.assign({}, base.spec, a.ev || !base.spec.electric ? {} : ICE, a.spec) });
     };
   }
   // Mini Dookie with the Fiat 0.9 TwinAir turbo twin (the Pongo was a Fiat): 85 hp at 5,500, 145 Nm at 1,900, mounted
@@ -2682,6 +2694,123 @@
       lsdPreload: 60, lsdRamp: 0.2, driveEff: 0.86,
     } },
   });
+  // ---------------------------------------------------------------- golf carts
+  // A standard electric golf cart (Club Car / E-Z-GO type): steel frame, a 48 V series-wound motor (~4 kW) on a 12.44:1
+  // rear axle, 18 x 8.50-8 tyres, leaf springs, drum brakes on the rears only, a speed governor at the course's 19 mph;
+  // 380 kg with the driver. Then three more powerful ones (CARS.golf.make(key)):
+  //   lsv  - a street-legal LSV build: a 72 V AC motor and controller (12 kW), 35 mph, 12 in wheels, lights and mirrors
+  //   hot  - a hot rod: lowered, no roof, a 45 kW / 160 Nm AC motor and a lithium pack, fat 22 in tyres, ~84 mph
+  //   busa - the record cart, built like the 118 mph world-record holder: a Suzuki Hayabusa 1,340 cc four (~190 hp) behind
+  //          the seat, its 6-speed on a quickshifter, a chain to the axle, a stretched and lowered frame, wheelie bar
+  CARS.golf = { name: 'Golf Cart', short: 'Golf Cart', car: '48 V ELECTRIC', hp: 5, tq: 18, cc: true, kbLat: 5, spec: {
+    name: 'Golf Cart',
+    mass: 380, Ipitch: 180, Iyaw: 220, Iroll: 60, cgHeight: 0.58, wheelbase: 1.65, frontWeight: 0.42,
+    trackF: 0.88, trackR: 0.98, wheelRadius: 0.229, wheelInertiaF: 0.25, wheelInertiaR: 0.3,
+    frontTire: 'golf', rearTire: 'golf', Fz0: 1200, loadSens: 0.1,
+    springF: 18000, springR: 22000, dampBumpF: 900, dampRebF: 1300, dampBumpR: 1100, dampRebR: 1600,
+    arbF: 4000, arbR: 0, travelUp: 0.06, travelDown: 0.07, suspS0: 0.12, rearToe: 0.002,
+    brakeTorqueF: 0, brakeTorqueR: 380, handbrakeTorque: 380, noABS: true, noESC: true,
+    maxSteer: 0.6, steerRate: 3.5, steerRatio: 12, ackermann: 0.7,
+    electric: true, idleRpm: 0, limiterRpm: 4500, redlineRpm: 4500, shiftRpm: 5000, engineInertia: 0.02, fricA: 1.5, fricB: 1, starterTorque: 0,
+    torqueCurve: evCurve(25, 4, 4500), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 12.44, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
+    CdA: 0.9,
+    bodyHalfW: 0.6, bodyFront: -1.2, bodyRear: 1.25, bodyBottom: -0.4, bodyTop: 1.3,
+    bodyPts: ccPts(0.58, 0.42, 1.65, ccBox(0.6, 0.15, 0.75, -1.2, 1.25).concat([[-0.6, 1.9, -0.55], [0.6, 1.9, -0.55], [-0.6, 1.9, 1.0], [0.6, 1.9, 1.0]])),
+  } };
+  ccEngines('golf', {
+    lsv: { label: 'Street LSV', car: '72 V AC', hp: 16, tq: 52, ev: true, spec: {
+      mass: 420, Ipitch: 195, Iyaw: 240, wheelRadius: 0.28, wheelInertiaF: 0.3, wheelInertiaR: 0.36,
+      brakeTorqueF: 300, brakeTorqueR: 420,
+      limiterRpm: 6000, redlineRpm: 6000, shiftRpm: 6500, torqueCurve: evCurve(70, 12, 6000), autoFinal: 11.2,
+    } },
+    hot: { label: 'Hot Rod', car: '45 kW AC', hp: 60, tq: 118, ev: true, kbLat: 7, spec: {
+      mass: 440, Ipitch: 190, Iyaw: 250, Iroll: 58, cgHeight: 0.46, wheelRadius: 0.265, wheelInertiaF: 0.32, wheelInertiaR: 0.45, trackF: 1.0, trackR: 1.1,
+      springF: 26000, springR: 32000, travelUp: 0.05, travelDown: 0.05, arbF: 9000, arbR: 3000,
+      brakeTorqueF: 600, brakeTorqueR: 700, handbrakeTorque: 700, noESC: false,
+      limiterRpm: 8000, redlineRpm: 8000, shiftRpm: 8500, engineInertia: 0.03, torqueCurve: evCurve(160, 45, 8000), autoFinal: 5.8,
+      lsdPreload: 20, CdA: 0.72,
+      bodyPts: ccPts(0.46, 0.42, 1.65, ccBox(0.62, 0.12, 0.75, -1.2, 1.25).concat([[0, 1.3, 0.5]])),
+    } },
+    busa: { label: 'Record (Hayabusa)', car: 'HAYABUSA 1340', hp: 190, tq: 111, kbLat: 7, spec: {
+      mass: 500, Ipitch: 330, Iyaw: 380, Iroll: 62, cgHeight: 0.42, wheelbase: 2.1, frontWeight: 0.4, trackF: 1.05, trackR: 1.15,
+      wheelRadius: 0.29, wheelRadiusF: 0.26, wheelRadiusR: 0.29, wheelInertiaF: 0.3, wheelInertiaR: 0.6,
+      springF: 30000, springR: 38000, dampBumpF: 1500, dampRebF: 2200, dampBumpR: 1800, dampRebR: 2600, travelUp: 0.05, travelDown: 0.05, arbF: 12000, arbR: 5000,
+      brakeTorqueF: 900, brakeTorqueR: 900, handbrakeTorque: 900, noESC: false,
+      idleRpm: 1200, limiterRpm: 11500, redlineRpm: 11000, shiftRpm: 10800, engineInertia: 0.04, fricA: 4, fricB: 2, starterTorque: 25,
+      // (lb-ft: the Hayabusa's 150 Nm at 7,000, ~190 hp at 9,700)
+      torqueCurve: [[0, 45], [2000, 60], [3000, 72], [4000, 85], [5000, 98], [6000, 106], [7000, 111], [8000, 109], [9000, 105], [9700, 103], [10500, 94], [11500, 78], [12500, 55]],
+      boostMax: 0, thrExp: 1.3,
+      autoRatios: [2.615, 1.937, 1.526, 1.285, 1.136, 1.043], autoRev: 2.615, autoFinal: 5.95, shiftTimeWOT: 0.05, shiftTimePart: 0.09, shiftCutDepth: 0.4,
+      launchRpm: 6500, engineTc: true, tcRefBody: true,
+      dragClutch: { rpm0: 3000, rpm1: 6000, kc: 0, rev: 60, base: [[0, 330]], muSlip: 0.25, slipRef: 220 },
+      lsdPreload: 60, lsdRamp: 0.2, driveEff: 0.88, popScale: 1,
+      wheelieBar: { len: 0.55, clr: 0.08, halfW: 0.3, r: 0.04, k: 150000, damp: 5000, Fmax: 9000 }, wheelieCtl: 2,
+      CdA: 0.7,
+      bodyHalfW: 0.62, bodyFront: -1.5, bodyRear: 1.5, bodyBottom: -0.3, bodyTop: 0.8,
+      bodyPts: ccPts(0.42, 0.4, 2.1, ccBox(0.62, 0.12, 0.7, -1.45, 1.5).concat([[0, 1.25, 0.6]])),
+    } },
+  }, 'std', 'Standard');
+  // ---------------------------------------------------------------- rally cars
+  // Three power levels of a gravel rally hatch (roll cage, sequential dog box, hydraulic handbrake, gravel tyres, two up):
+  //   r4 - Rally4: front-wheel drive, a 1.2 L turbo triple on a 30 mm restrictor (208 hp, 290 Nm), 5-speed sequential,
+  //        a plated front diff; 1,240 kg with the crew
+  //   r2 - Rally2: four-wheel drive (no centre diff, plated front and rear), a 1.6 L turbo four on a 32 mm restrictor
+  //        (290 hp, 420 Nm), 5-speed sequential; 1,390 kg with the crew
+  //   gb - Group B: the 1986 monsters - mid-engined, four-wheel drive with a rear-biased centre diff, a twin-charged
+  //        1.8 L four at ~530 hp, heavy turbo lag and an anti-lag that bangs and spits on every lift; 1,150 kg
+  CARS.rally = { name: 'Rally Car', short: 'Rally Car', car: '1.2 TURBO TRIPLE', hp: 208, tq: 214, cc: true, kbLat: 8, spec: {
+    name: 'Rally Car',
+    mass: 1240, Ipitch: 1500, Iyaw: 1700, Iroll: 420, cgHeight: 0.5, wheelbase: 2.55, frontWeight: 0.6,
+    trackF: 1.52, trackR: 1.5, wheelRadius: 0.317, wheelInertiaF: 0.9, wheelInertiaR: 0.9,
+    frontTire: 'rallyG', rearTire: 'rallyG',
+    springF: 42000, springR: 36000, dampBumpF: 3200, dampRebF: 5000, dampBumpR: 2800, dampRebR: 4400,
+    arbF: 16000, arbR: 9000, travelUp: 0.11, travelDown: 0.13, suspS0: 0.3,
+    // (no ABS; the stability control - which the real ones don't have - is there in Street and Sport, off in Track / Off)
+    brakeTorqueF: 2600, brakeTorqueR: 1300, handbrakeTorque: 2600, noABS: true,
+    maxSteer: 0.6, steerRate: 6, steerRatio: 11,
+    idleRpm: 1100, limiterRpm: 6800, redlineRpm: 6600, shiftRpm: 6500, engineInertia: 0.12, fricA: 12, fricB: 7, starterTorque: 120,
+    // (lb-ft: 214 lb-ft / 290 Nm from 3,000, 208 hp at 5,500)
+    torqueCurve: [[0, 70], [1500, 140], [2500, 200], [3000, 214], [4500, 214], [5500, 199], [6200, 172], [6800, 135], [7400, 100]],
+    turbo: { lag: 0.25, base: 0.5, rpm0: 1500, rpm1: 2800 }, boostMax: 22, popScale: 3,
+    autoRatios: [2.92, 2.05, 1.6, 1.3, 1.08], autoRev: 2.92, autoFinal: 4.02, shiftTimeWOT: 0.06, shiftTimePart: 0.1, shiftCutDepth: 0.5,
+    // (traction control, where it's on, lets the gravel tyres spin up to where they bite best, ~13-20 %)
+    launchRpm: 4500, engineTc: true, tcRefBody: true, noCoastBlip: false, tcTargets: [0.13, 0.16, 0.2],
+    dragClutch: { rpm0: 2200, rpm1: 4200, kc: 0, base: [[0, 650]], muSlip: 0.15, slipRef: 150, rev: 400 },
+    awd: true, awdFront: 1, fwd: true, lsdPreload: 0, lsdPreloadF: 160, lsdRamp: 0.45, driveEff: 0.9,
+    CdA: 0.78, ClA: 0.25,
+    bodyHalfW: 0.88, bodyFront: -2.0, bodyRear: 2.0, bodyBottom: -0.3, bodyTop: 0.95,
+  } };
+  ccEngines('rally', {
+    r2: { label: 'Rally2', car: '1.6 TURBO FOUR', hp: 290, tq: 310, spec: {
+      mass: 1390, Ipitch: 1650, Iyaw: 1900, Iroll: 470, frontWeight: 0.58, trackF: 1.6, trackR: 1.6,
+      springF: 46000, springR: 44000, arbF: 17000, arbR: 13000,
+      brakeTorqueF: 2900, brakeTorqueR: 1800,
+      idleRpm: 1100, limiterRpm: 7200, redlineRpm: 7000, shiftRpm: 6900,
+      // (lb-ft: 310 lb-ft / 420 Nm from 3,500 to 4,500, 290 hp at 5,500)
+      torqueCurve: [[0, 90], [1500, 180], [2500, 280], [3500, 310], [4500, 310], [5500, 277], [6500, 222], [7200, 180], [7800, 140]],
+      turbo: { lag: 0.22, base: 0.5, rpm0: 1600, rpm1: 3000 }, boostMax: 24, popScale: 3.5,
+      autoRatios: [2.73, 1.94, 1.52, 1.24, 1.03], autoRev: 2.73, autoFinal: 4.25,
+      dragClutch: { rpm0: 2300, rpm1: 4300, kc: 0, base: [[0, 900]], muSlip: 0.15, slipRef: 150, rev: 500 },
+      awdFront: 0.5, fwd: false, lsdPreload: 150, lsdPreloadF: 120, centerPreload: 2500, lsdRamp: 0.45,
+      CdA: 0.8, ClA: 0.35, bodyHalfW: 0.92,
+    } },
+    gb: { label: 'Group B', car: '1.8 TWIN-CHARGED', hp: 530, tq: 361, spec: {
+      mass: 1150, Ipitch: 1250, Iyaw: 1500, Iroll: 400, cgHeight: 0.47, wheelbase: 2.44, frontWeight: 0.42, trackF: 1.52, trackR: 1.56,
+      springF: 44000, springR: 52000, arbF: 22000, arbR: 8000, rearToe: 0.003,
+      brakeTorqueF: 2700, brakeTorqueR: 2000,
+      idleRpm: 1200, limiterRpm: 8600, redlineRpm: 8400, shiftRpm: 8200, engineInertia: 0.13,
+      // (lb-ft: 361 lb-ft / 490 Nm at 5,000, ~530 hp at 8,000 - once the big turbo's awake)
+      torqueCurve: [[0, 90], [2000, 180], [3000, 280], [4000, 345], [5000, 361], [6000, 356], [7000, 350], [8000, 348], [8600, 320], [9200, 260]],
+      turbo: { lag: 0.45, base: 0.38, rpm0: 3000, rpm1: 5200 }, boostMax: 28, popScale: 5,
+      autoRatios: [2.3, 1.7, 1.33, 1.1, 0.93], autoRev: 2.3, autoFinal: 4.89,
+      launchRpm: 5500,
+      dragClutch: { rpm0: 2800, rpm1: 5000, kc: 0, base: [[0, 1000]], muSlip: 0.15, slipRef: 150, rev: 500 },
+      awdFront: 0.45, fwd: false, lsdPreload: 160, lsdPreloadF: 100, centerPreload: 500, lsdRamp: 0.45,
+      CdA: 0.82, ClA: 0.45, bodyHalfW: 0.93, bodyFront: -1.95, bodyRear: 1.95,
+    } },
+  }, 'r4', 'Rally4');
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)

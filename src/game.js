@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -54,6 +54,46 @@
   // the Drive-tab line, the HUD's gearbox / tyre chips and its engine sound (see ENG_SND). The electric ones have petrol
   // alternatives: optKey / options as the More cars' (a button each on the card) and eng: per engine, what it changes
   const CC_CARS = {
+    golf: { btn: 'GOLF CART', sub: 'A standard 19 mph cart, a street LSV, an electric hot rod and a 120 mph Hayabusa record cart', paint: 'White Knuckle', cam: [0.72, 0.95],
+      hint: 'Golf cart: shift up (E) for DRIVE - a standard 48 V cart, governed to 19 mph, with drum brakes on the back wheels only. The quicker ones are on its More Cars card (or Esc → Drive → Version).',
+      info: 'A standard two-seat electric golf cart (Club Car / E-Z-GO type) · 48 V series-wound motor, ~4 kW, through a 12.44:1 rear axle · 18 x 8.50-8 tyres, leaf springs, drum brakes on the rears · a bag rack with two golf bags · 380 kg with the driver · governed to 19 mph',
+      trans: 'Electric · forward / reverse', tyres: 'Cart tyres',
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.12, whPure: 0, whine: 2.4, rpmRef: 4500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'golfEng', optLabel: 'Version', options: [
+        ['std', 'Standard', '48 V, ~4 kW · governed to 19 mph · a bag rack with two golf bags', 'White Knuckle'],
+        ['lsv', 'Street LSV', 'A 72 V AC motor, 12 kW · 35 mph · 12 in wheels, windscreen, lights and mirrors', 'Pitch Black'],
+        ['hot', 'Hot Rod', 'A 45 kW / 160 Nm AC motor and a lithium pack · lowered, roof off, a roll hoop · 0-60 ~6 s · ~84 mph', 'Plum Crazy', 1],
+        ['busa', 'Record (Hayabusa)', 'Built like the 118 mph world-record cart: a Hayabusa 1,340 cc four behind the seats, a 6-speed on a quickshifter · 0-60 ~4.8 s · ~120 mph', 'Go Mango', 1],
+      ],
+      eng: {
+        lsv: { hint: 'Golf cart (Street LSV): shift up (E) for DRIVE - a 72 V AC conversion, 12 kW, 35 mph, with brakes on all four wheels, lights, mirrors and a windscreen.',
+          info: 'A street-legal low-speed-vehicle build of the cart · 72 V AC motor and controller, 12 kW / 70 Nm · 12 in alloy wheels on low-profile tyres · four-wheel brakes, headlights, mirrors, windscreen · 420 kg · 35 mph',
+          trans: 'Electric · single speed', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.1, whPure: 0, whine: 3, rpmRef: 6000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+        hot: { hint: 'Golf cart (Hot Rod): shift up (E) for DRIVE - a 45 kW AC motor on a lithium pack in a lowered cart with the roof off: 0-60 in ~6 s and ~84 mph. Stability control is on (Sport).',
+          info: 'A hot-rodded cart · 45 kW / 160 Nm AC motor, a lithium pack under the seats, a 5.8:1 axle · lowered, roof off, a chrome roll hoop, two racing buckets · fat tyres on 13 in deep-dish wheels, four-wheel discs · 440 kg · 0-60 ~6 s, ~84 mph',
+          trans: 'Electric · single speed', tyres: 'Street tyres', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.09, whPure: 1, whine: 3.4, rpmRef: 8000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+        busa: { hint: 'Golf cart (Record): shift up (E) for DRIVE and floor it - a Hayabusa 1,340 cc four behind the seats, ~190 hp through the bike\'s 6-speed (E / Q or the paddles), a stretched, lowered frame and a wheelie bar. The real one did 118.76 mph. Stability control is on (Sport).',
+          info: 'Built like the world\'s fastest golf cart (118.76 mph): a stretched, lowered cart frame with a Suzuki Hayabusa 1,340 cc inline-four (~190 hp at 9,700) bare behind the seats, the bike\'s 6-speed on a quickshifter, a chain to the rear axle, a wheelie bar · slicks · 500 kg · 0-60 ~4.8 s, ~120 mph',
+          trans: '6-speed sequential · quickshifter', tyres: 'Cart slicks', snd: { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 11000, race: 0.9, rough: 0.06 } },
+      } },
+    rally: { btn: 'RALLY CAR', sub: 'Rally4, Rally2 and Group B · gravel tyres, sequential boxes · 208-530 hp', paint: 'B5 Blue', cam: [1.0, 1.0],
+      hint: 'Rally4: shift up (E) for DRIVE - front-wheel drive, a 1.2 turbo triple with 208 hp and a 5-speed sequential that flat-shifts (E / Q or the paddles). SPACE is the hydraulic handbrake for the hairpins. On gravel tyres it is at home on dirt: try All Ramps, or off the road in the Countryside.',
+      info: 'A Rally4 hatch · front-wheel drive, a plated front diff · 1.2 L turbo triple on a 30 mm restrictor, 208 hp at 5,500, 290 Nm · 5-speed sequential dog box · long-travel dampers, hydraulic handbrake, roll cage · 195/65R15 gravel tyres · 1,240 kg with the crew · 0-60 ~6 s',
+      trans: '5-speed sequential · FWD', tyres: 'Gravel rally tyres',
+      snd: { nEng: 1, cyl: 3, fmul: 1.25, deep: 0.05, loud: 0.45, open: 0, whK: 0.45, whPure: 1, whine: 0.9, rpmRef: 6600, race: 0.8, rough: 0.12, surge: 1 },
+      optKey: 'rallyEng', optLabel: 'Class', options: [
+        ['r4', 'Rally4', 'Front-wheel drive · a 1.2 turbo triple, 208 hp · 5-speed sequential · 1,240 kg · 0-60 ~6 s', 'B5 Blue'],
+        ['r2', 'Rally2', 'Four-wheel drive · a 1.6 turbo four, 290 hp · 5-speed sequential · 1,390 kg · 0-60 ~4 s', 'White Knuckle'],
+        ['gb', 'Group B', 'The 1986 monsters: mid-engined, four-wheel drive, a twin-charged 1.8 four at ~530 hp and an anti-lag that bangs on every lift · 0-60 ~3 s', 'TorRed'],
+      ],
+      eng: {
+        r2: { hint: 'Rally2: shift up (E) for DRIVE - four-wheel drive, a 1.6 turbo four with 290 hp, a 5-speed sequential (E / Q or the paddles). SPACE is the hydraulic handbrake. Launch: hold SPACE, floor it, let go.',
+          info: 'A Rally2 car · four-wheel drive with no centre diff, plated front and rear diffs · 1.6 L turbo four on a 32 mm restrictor, 290 hp at 5,500, 420 Nm · 5-speed sequential · long-travel dampers, hydraulic handbrake, roll cage · gravel tyres · 1,390 kg with the crew · 0-60 ~4 s',
+          trans: '5-speed sequential · 4WD', snd: { nEng: 1, cyl: 4, fmul: 1.3, deep: 0.05, loud: 0.55, open: 0, whK: 0.42, whPure: 1, whine: 1.0, rpmRef: 7000, race: 0.85, rough: 0.1, surge: 1 } },
+        gb: { hint: 'Group B: shift up (E) for DRIVE - mid-engined, four-wheel drive, ~530 hp from a twin-charged 1.8. The turbo takes a moment to wake up, then it goes; the anti-lag bangs on every lift. Launch: hold SPACE, floor it, let go. Traction control Off is the real thing.',
+          info: 'A 1986 Group B car · the engine behind the seats, four-wheel drive with a rear-biased centre diff · twin-charged 1.8 L four, ~530 hp at 8,000, 490 Nm, big turbo lag, anti-lag · 5-speed · a huge wing · gravel tyres · 1,150 kg with the crew · 0-60 ~3 s',
+          trans: '5-speed · 4WD', snd: { nEng: 1, cyl: 4, fmul: 1.15, deep: 0.1, loud: 0.8, open: 0, whK: 0.5, whPure: 1, whine: 1.3, rpmRef: 8400, race: 1, rough: 0.12, surge: 1 } },
+      } },
     couch: { btn: 'COUCH CAR', sub: '850 hp turbo triple · 190 mph sofa', paint: 'Saddle', tc: 2, cam: [0.75, 0.85],
       hint: 'Couch Car: shift up (E) for DRIVE and floor it - an 850 hp turbo triple under the cushions and a 5-speed sequential (E / Q or the paddles). The turbo needs a moment to spool: hold SPACE, floor it and let go for a launch-control start. Traction control is on Track, and wheelie control keeps the front down - and on its short wheelbase it is twitchy at speed.',
       info: 'A three-seat leather sofa on a hidden tube chassis · 1.6 L turbo triple built like a drag engine, ~850 hp on 40 psi and E85, its three pipes out of the right arm · 5-speed sequential with a quickshifter, locked diff · 13 in R-compound tyres in the softest compound, sticky from cold · wheelie control · 520 kg with the driver · 0-60 ~2.8 s, ~190 mph',
@@ -153,7 +193,7 @@
   const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
   const PKG = VEH.OFFROAD_PKG(S.car, CARDEF.cls);
   const PKG_UI = PULLER ? ['R-2 deep lugs', 'R-2 deep lugs + lug fronts', 'Firestone R-2 30.5L-32 "cane & rice" rears left uncut (lugs twice as deep as a farm tyre, never sharpened) and lugged 11L-15 fronts. '
-      + 'They paddle through mud and dig into turf, and it steers in the soft stuff · the sharpened pullers bite harder on hard-packed clay, and on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
+      + 'Off the pavement they out-dig the cut pullers everywhere - they paddle through mud, dig into turf and bite deeper into loose dirt (traction control lets them spin up to where they bite), and it steers in the soft stuff · on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
     : DRAGSTER ? ['Sand-drag paddles', 'Paddles + rib fronts', 'The sand-drag setup: paddle tyres (a smooth carcass with ~1.5 in rubber paddles across the tread) and ribbed sand fronts. The paddles shovel the ground - huge bite on dirt and gravel '
       + '(the quickest sand dragster does 300 ft in 2.16 s @ 156 mph) - but next to none on pavement or a prepped strip, and little side grip anywhere. Try the Dirt Drag map']
     : MONSTER ? ['Full-depth lugs', 'Full-depth lugs', 'The BKTs left full-depth, as moulded, instead of shaved and hand-cut for a stadium floor: ~1 in more lug and ~100 lb more rubber each. '
@@ -183,7 +223,7 @@
   // ------------------------------------------------------------------ Fun tab: live tuning (saved per car)
   const STOCK = JSON.parse(JSON.stringify(veh.spec));
   const tuneDefaults = () => ({
-    power: 1, boost: STOCK.boostMax, stretch: 1, limiter: STOCK.limiterRpm, nolimit: false, idle: STOCK.idleRpm, inertia: 1, nos: 0, pops: 1, whine: 1,
+    power: 1, boost: STOCK.boostMax, stretch: 1, limiter: STOCK.limiterRpm, nolimit: false, idle: STOCK.idleRpm, inertia: 1, nos: 0, pops: STOCK.popScale !== undefined ? STOCK.popScale : 1, whine: 1,
     finalAuto: STOCK.autoFinal, finalManual: STOCK.manualFinal, shiftTime: STOCK.shiftTimeWOT || 0.22, launch: STOCK.launchRpm || 4000, gov: true,
     mass: STOCK.mass, grip: 1, downforce: 0, drag: 1, brakes: 1, stiff: 1, steer: 1, gravity: 1, smoke: 1,
   });
@@ -641,7 +681,7 @@
         add(row('Driving a racing mower', 'No suspension: the soft tyres and the seat are it. The driver sits high on a narrow track - on level ground the tyres slide before it tips, but a side slope or a bump taken sideways can put it over. Turn in smoothly, lift to tighten the line, and lean on the throttle out of the turn. Real races run on grass and dirt ovals.', el('<span></span>')));
       }
       if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
-      if (CC && CCD.options) add(row('Engine', 'Swapping engines restarts the game (each keeps its own Fun-tab tune)',
+      if (CC && CCD.options) add(row(CCD.optLabel || 'Engine', (CCD.optLabel ? 'Switching' : 'Swapping engines') + ' restarts the game (each keeps its own Fun-tab tune)',
         seg(CCD.options.map((o) => [o[0], o[1]]), CARDEF.engine || 'ev', (v) => { if (v !== (CARDEF.engine || 'ev')) pickCar(S.car, v); })));
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
