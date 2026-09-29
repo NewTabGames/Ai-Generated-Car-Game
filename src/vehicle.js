@@ -1972,14 +1972,17 @@
       this.wz += m20 * alx + m21 * aly + m22 * alz;
     }
 
-    _resolveContact(nx, nz, pen, cx, cz, m00, m20, m02, m22) {
+    _resolveContact(nx, nz, pen, cx, cz, m00, m20, m02, m22, ob) {
       // n points from the car towards the obstacle (horizontal). contact point (cx, cz) at bumper height
-      const s = this.spec;
+      // (ob with vx / vz / m: another car - online play - moving, with its own mass: the impulse is worked out on the speed
+      // between the two, shared by their masses, and each car only pushes itself out of half the overlap; the other
+      // player's game does the other half)
+      const s = this.spec, mv = ob && ob.m;
       const rx = cx - this.px, ry = 0.0, rz = cz - this.pz;
-      const cvx = this.vx + (this.wy * rz - this.wz * ry), cvz = this.vz + (this.wx * ry - this.wy * rx);
+      const cvx = this.vx + (this.wy * rz - this.wz * ry) - (mv ? ob.vx : 0), cvz = this.vz + (this.wx * ry - this.wy * rx) - (mv ? ob.vz : 0);
       const vn = cvx * nx + cvz * nz;
       // positional correction
-      this.px -= nx * pen * 0.9; this.pz -= nz * pen * 0.9;
+      this.px -= nx * pen * (mv ? 0.45 : 0.9); this.pz -= nz * pen * (mv ? 0.45 : 0.9);
       if (vn <= 0) return;
       // effective mass (yaw dominated). The impulse turns the body about the world's vertical, and that's its yaw axis
       // only while it's upright: on its side or its roof the same push turns it about its roll or pitch axis, and
@@ -1988,15 +1991,16 @@
       const m10 = 2 * (this.qx * this.qy + this.qz * this.qw), m11 = 1 - 2 * (this.qx * this.qx + this.qz * this.qz), m12 = 2 * (this.qy * this.qz - this.qx * this.qw);
       const iIy = m10 * m10 / s.Ipitch + m11 * m11 / s.Iyaw + m12 * m12 / s.Iroll;
       const rxn = rx * nz - rz * nx;
-      const k = 1 / s.mass + rxn * rxn * iIy;
+      const k = 1 / s.mass + rxn * rxn * iIy + (mv ? 1 / ob.m : 0);
       const j = (1 + 0.15) * vn / k;
       let jx = -nx * j, jz = -nz * j;
       // friction along tangent
       const tx = -nz, tz = nx;
       const vt = cvx * tx + cvz * tz;
       const rxt = rx * tz - rz * tx;
-      const kt = 1 / s.mass + rxt * rxt * iIy;
-      const jt = clamp(-vt / kt, -0.45 * j, 0.45 * j);
+      const kt = 1 / s.mass + rxt * rxt * iIy + (mv ? 1 / ob.m : 0);
+      // (ob.mu: a slippery obstacle - online play's invisible walls, which you slide along instead of grinding to a stop)
+      const mu = ob && ob.mu !== undefined ? ob.mu : 0.45, jt = clamp(-vt / kt, -mu * j, mu * j);
       jx += tx * jt; jz += tz * jt;
       this._applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22);
       const dv = j / s.mass;
@@ -2063,7 +2067,7 @@
             if (!best || pen > best[2]) best = [nx, nz, pen, wx_, wz_];
           }
         }
-        if (best) this._resolveContact(best[0], best[1], Math.min(best[2], 0.5), best[3], best[4], m00, m20, m02, m22);
+        if (best) this._resolveContact(best[0], best[1], Math.min(best[2], 0.5), best[3], best[4], m00, m20, m02, m22, b);
       }
     }
   }

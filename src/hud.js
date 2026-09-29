@@ -143,6 +143,7 @@
     drawMinimap(px, pz, heading) {
       const g = this.mmg, S = 380, c = S / 2, R = 520, sc = c / R;
       const W = this.W;
+      this._mm = { px, pz, heading, sc };
       g.clearRect(0, 0, S, S);
       g.save();
       g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.clip();
@@ -223,6 +224,18 @@
       this._mmOverlay(g, c, S, heading);
     }
     _mmOverlay(g, c, S, heading) {
+      // online: the other drivers, blue dots (at the edge, pointing the way, when they're off the map)
+      if (this.mmPlayers && this._mm) {
+        const m = this._mm, ch = Math.cos(m.heading), shh = Math.sin(m.heading);
+        for (const p of this.mmPlayers) {
+          const dx = (p.x - m.px) * m.sc, dz = (p.z - m.pz) * m.sc;
+          let x = dx * ch - dz * shh, y = dx * shh + dz * ch;
+          const d = Math.hypot(x, y), lim = c - 16;
+          if (d > lim) { x *= lim / d; y *= lim / d; }
+          g.fillStyle = '#3aa0ff'; g.strokeStyle = '#fff'; g.lineWidth = 3;
+          g.beginPath(); g.arc(c + x, c + y, d > lim ? 8 : 11, 0, 7); g.fill(); g.stroke();
+        }
+      }
       // car arrow
       g.fillStyle = '#e22'; g.strokeStyle = '#fff'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(c, c - 18); g.lineTo(c + 11, c + 13); g.lineTo(c, c + 6); g.lineTo(c - 11, c + 13); g.closePath(); g.fill(); g.stroke();

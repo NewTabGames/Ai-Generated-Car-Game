@@ -26,6 +26,25 @@
   #perf td:nth-child(2), #perf td:nth-child(3) { text-align: right; }
   #perf td:nth-child(3) { color: var(--dim); padding-left: 10px; }
   #gmeter { position: absolute; right: 18px; top: 150px; width: 110px; height: 110px; }
+  /* online racing: the points board (top right) and the reset timer (over the minimap) */
+  #netBoard { position: absolute; right: 18px; top: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 12px; min-width: 210px; max-width: 280px; }
+  #netBoard .nbMe { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+  #nbPts { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  #nbMul { font-size: 17px; font-weight: 800; color: #7dff8a; }
+  #nbMul.off { color: #f5c35a; }
+  #nbSt { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin: 1px 0 6px; }
+  #nbSt.off { color: #f5c35a; }
+  #nbSt.hay { color: #ff6b6b; font-weight: 700; }
+  #nbList { border-top: 1px solid var(--line); padding-top: 4px; }
+  #nbList div { display: flex; justify-content: space-between; gap: 14px; padding: 1px 0; font-variant-numeric: tabular-nums; color: var(--dim); }
+  #nbList div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #nbList div.me { color: #fff; font-weight: 700; }
+  #resetCd { position: absolute; left: 18px; bottom: 218px; width: 190px; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 9px 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+  #resetCd .rcBar { height: 3px; background: rgba(255,255,255,0.1); margin-top: 4px; border-radius: 2px; overflow: hidden; }
+  #resetCd .rcBar i { display: block; height: 100%; width: 0; background: var(--red); }
+  #resetCd.ready { border-color: rgba(125,255,138,0.45); color: #b9ffc0; }
+  #resetCd.ready .rcBar i { background: #3fcf5a; }
+  #carPick.locked button { opacity: 0.4; cursor: not-allowed; }
   #inputs { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: flex-end; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; }
   .bar { width: 14px; height: 60px; background: rgba(255,255,255,0.08); position: relative; border-radius: 2px; overflow: hidden; }
   .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; }
@@ -158,6 +177,8 @@
   <canvas id="gmeter" width="220" height="220"></canvas>
   <canvas id="gauge" width="760" height="500"></canvas>
   <canvas id="minimap" width="380" height="380"></canvas>
+  <div id="netBoard" class="hidden"><div class="nbMe"><span id="nbPts">0</span><span id="nbMul">×1.0</span></div><div id="nbSt"></div><div id="nbList"></div></div>
+  <div id="resetCd" class="hidden"><div></div><div class="rcBar"><i></i></div></div>
   <div id="inputs">
     <div><div class="bar"><i id="ib-c" style="background:#3a8dff"></i></div><div class="blab">CLU</div></div>
     <div><div class="bar"><i id="ib-b" style="background:#e23"></i></div><div class="blab">BRK</div></div>
@@ -190,7 +211,8 @@
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
       <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button>
     </div>
-    <button class="btn" id="startBtn">Start engine</button>
+    <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
+    <div id="netTitle" style="margin-top:8px;font-size:13px;color:#9ab"></div>
     <div id="loadbar"><i></i></div>
     <div id="padstatus">Wheel users: press any button on your wheel so the browser can see it.</div>
     <p style="font-size:12px;margin-top:18px">Press <kbd>Esc</kbd> any time for the options menu (transmission, tyres, drive modes, wheel setup, views).</p>
@@ -229,6 +251,7 @@
   </div>
 </div>
 
+<script src="src/net.js"></script>
 <script src="src/worldgen.js"></script>
 <script src="src/vehicle.js"></script>
 <script src="src/audio.js"></script>

@@ -64,6 +64,18 @@ Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side a
 
 ---
 
+## 🌐 Online Racing
+
+**Play online** on the title screen (or Esc → Online): one player hosts a room and gets a 5-letter code, friends type it in to join. Needs an internet connection; it runs on Firebase (anonymous guest sign-in, a Realtime Database), and the single-player game never touches the network.
+
+- **The host sets everything:** the course - Windy Rally Stage, Rally Stage, Windy Mower Track or Mower Track - and the car, set up their way (version / class / engine, fuel, transmission, tyres, off-road package and the whole Fun-tab tune). Everyone drives that exact car; when the host changes any of it, everyone follows (a new car or course reloads and rejoins by itself). Your paint, driver aids and controls stay yours, your own car and tune are kept, and leaving the room puts you back in them.
+- **Points** for ground covered along the course: on the road 1 point a metre, times a streak that builds the longer you stay on it (+0.1 every 40 m, up to ×3). Off the road it's a quarter of that and the streak's gone. Hitting a straw bale costs 100 and the streak. Driving backwards earns nothing, and what you gave up has to be made up first. The board (top right) ranks everyone; the host can start a **new round** (everyone to 0, back on the start grid).
+- **No shortcuts:** invisible walls run a few metres off the road (behind the verge on the rally stages, just behind the bales on the mower tracks) and follow your own bit of the course, so you can't cut across to another bit of it; a car that ends up past them is put back where it was.
+- **Reset** (Backspace) once every 30 s - the timer's over the minimap, bottom left.
+- The others' cars are solid (bumps are shared by weight), their engines play from where they are, and their names float over them.
+
+---
+
 ## 🕹️ Controls
 
 ### Keyboard Controls
@@ -119,6 +131,7 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── game.js             # Core game loop, scene management, cameras, and menus
 │   ├── hud.js              # Gauges, tachometer, minimap, and telemetry HUD
 │   ├── input.js            # Keyboard, gamepad, and steering wheel input handling
+│   ├── net.js              # Online rooms over Firebase (guest sign-in, Realtime Database), loaded only when you go online
 │   ├── vehicle.js          # Vehicle dynamics, suspension, engine torque curves, transmission
 │   ├── worldgen.js         # Procedural road network, elevation, terrain, the Monster Arena's jumps / crushable cars, the Mower Track, the rally stages and the windy mower course (closed-loop tracks)
 │   └── worldrender.js      # Three.js world rendering, lighting, and foliage instancing

@@ -451,6 +451,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
           ok = true;
         } catch (e) { console.warn('AudioWorklet unavailable, falling back', e); }
       }
+      this.worklet = ok;
       if (!ok) {
         const CarSynth = new Function(SYNTH_SRC + '\nreturn CarSynth;')();
         const synth = new CarSynth(this.ctx.sampleRate);
@@ -466,6 +467,36 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       this.master.gain.value = 1;
       this.node.connect(this.comp).connect(this.master).connect(this.ctx.destination);
       this.ready = true;
+    }
+    // online play: another car's engine - its own synth, placed in 3D (a panner: it sits where the car is, fading with
+    // distance and panning as it passes). update / event as the car's own; at(x, y, z) each frame; remove() when it goes
+    addVoice() {
+      if (!this.ready) return null;
+      let node, send;
+      if (this.worklet) {
+        node = new AudioWorkletNode(this.ctx, 'hellcat-synth', { numberOfInputs: 0, outputChannelCount: [2] });
+        send = (m) => node.port.postMessage(m);
+      } else {
+        const CarSynth = new Function(SYNTH_SRC + '\nreturn CarSynth;')(), synth = new CarSynth(this.ctx.sampleRate);
+        node = this.ctx.createScriptProcessor(1024, 0, 2);
+        node.onaudioprocess = (ev) => { const b = ev.outputBuffer; synth.render(b.getChannelData(0), b.getChannelData(1), b.length); };
+        send = (m) => { if (m.t === 'p') synth.set(m.p); else synth.event(m); };
+      }
+      const pan = this.ctx.createPanner();
+      pan.panningModel = 'equalpower'; pan.distanceModel = 'inverse'; pan.refDistance = 7; pan.rolloffFactor = 1.2; pan.maxDistance = 3000;
+      node.connect(pan).connect(this.comp);
+      return {
+        update: (p) => send({ t: 'p', p }), event: (t, v) => send({ t, v }),
+        at: (x, y, z) => { if (pan.positionX) { pan.positionX.value = x; pan.positionY.value = y; pan.positionZ.value = z; } else pan.setPosition(x, y, z); },
+        remove: () => { try { node.disconnect(); pan.disconnect(); } catch (e) { /* gone */ } if (node.port) node.port.close(); },
+      };
+    }
+    // where the ears are (the camera), for the other cars' voices
+    setListener(x, y, z, fx, fy, fz, ux, uy, uz) {
+      if (!this.ready) return;
+      const L = this.ctx.listener;
+      if (L.positionX) { L.positionX.value = x; L.positionY.value = y; L.positionZ.value = z; L.forwardX.value = fx; L.forwardY.value = fy; L.forwardZ.value = fz; L.upX.value = ux; L.upY.value = uy; L.upZ.value = uz; }
+      else { L.setPosition(x, y, z); L.setOrientation(fx, fy, fz, ux, uy, uz); }
     }
     resume() { if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); }
     suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }

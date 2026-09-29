@@ -219,10 +219,48 @@
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
+  // (online rooms race on the two rally stages and the two mower tracks: the course's centre line, points every ~2 m -
+  // the track's own, or the Mower Track's oval)
+  const NET_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack'], COURSE = NET_MAPS.includes(S.map);
+  function ovalLine() {
+    const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
+    for (let k = 0; k < n; k++) {
+      // (from the start / finish line - z = 0 on the front straight - up the straight, round the far turn and back)
+      let t = (k * L / n + M.SL) % L;
+      if (t < 2 * M.SL) { x[k] = r; z[k] = M.SL - t; }
+      else if ((t -= 2 * M.SL) < Math.PI * r) { const a = t / r; x[k] = r * Math.cos(a); z[k] = -M.SL - r * Math.sin(a); }
+      else if ((t -= Math.PI * r) < 2 * M.SL) { x[k] = -r; z[k] = -M.SL + t; }
+      else { t -= 2 * M.SL; const a = Math.PI + t / r; x[k] = r * Math.cos(a); z[k] = M.SL - r * Math.sin(a); }
+    }
+    const T = { n, L, W: M.W, x, z, s: new Float64Array(n + 1), tx: new Float64Array(n), tz: new Float64Array(n), R: new Float64Array(n) };
+    for (let k = 0; k <= n; k++) T.s[k] = k * L / n;
+    for (let k = 0; k < n; k++) {
+      const a = (k - 1 + n) % n, b = (k + 1) % n, dx = x[b] - x[a], dz = z[b] - z[a], l = Math.hypot(dx, dz) || 1;
+      T.tx[k] = dx / l; T.tz[k] = dz / l;
+      T.R[k] = Math.abs(z[k]) > M.SL + 0.01 ? r : 1e4;         // (+: turning left - it's run anticlockwise)
+    }
+    return T;
+  }
+  const CRS_T = COURSE ? W.track || ovalLine() : null;
+  function coursePoint(s, o) {
+    const T = CRS_T, L = T.L;
+    s = ((s % L) + L) % L;
+    const f = s / L * T.n, i = Math.floor(f) % T.n, j = (i + 1) % T.n, u = f - Math.floor(f);
+    const tx = T.tx[i] * (1 - u) + T.tx[j] * u, tz = T.tz[i] * (1 - u) + T.tz[j] * u, tl = Math.hypot(tx, tz) || 1;
+    o.x = T.x[i] + (T.x[j] - T.x[i]) * u; o.z = T.z[i] + (T.z[j] - T.z[i]) * u; o.tx = tx / tl; o.tz = tz / tl;
+    return o;
+  }
+  // a start-grid slot behind the line (k 0..7: two across, rows 8 m apart)
+  function gridSpot(k) {
+    const p = coursePoint(-10 - 8 * (k >> 1), {}), lat = (k & 1 ? 1 : -1) * Math.min(2, CRS_T.W / 2 - 1.3);
+    const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
+    return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
+  }
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
-  const spawn = DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
+  const spawn = S.netRoom && COURSE ? gridSpot(Math.floor(Math.random() * 8))        // (back in a room: somewhere on the grid)
+    : DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
@@ -313,11 +351,27 @@
     TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
   }
   const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8);      // (engine diameter against stock: airflow ~ area)
-  const carOpts = { variant: DRAGPAK ? 'dragpak' : DEMON ? 'demon' : 'hellcat', paint: S.paint, cgHeight: sp.cgHeight, zOff: (sp.cgToRear - sp.cgToFront) / 2, cgToFront: sp.cgToFront, cgToRear: sp.cgToRear, trackF: sp.trackF, trackR: sp.trackR };
-  const car = PULLER ? PULL.build(THREE, Object.assign(carOpts, { engine: CARDEF.engine })) : DRAGSTER ? DRAGM.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
-    : MONSTER ? MON.build(THREE, carOpts) : KART ? KRT.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls }))
-    : MOWER ? MOW.build(THREE, Object.assign(carOpts, { cls: CARDEF.cls, wheelRadiusF: sp.wheelRadiusF, wheelRadiusR: sp.wheelRadiusR }))
-    : CC ? CRU.build(THREE, Object.assign(carOpts, { car: S.car, engine: CARDEF.engine || 'ev', wheelRadiusF: sp.wheelRadiusF || sp.wheelRadius, wheelRadiusR: sp.wheelRadiusR || sp.wheelRadius })) : CAR.build(THREE, carOpts);
+  // the model for any vehicle, from its id, its CARS entry and its (constructed) spec - the other players' cars in online
+  // play are built by the same
+  function buildModel(id, def, s, paint) {
+    const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
+    return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
+      : id === 'monster' ? MON.build(THREE, o) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
+      : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
+      : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius })) : CAR.build(THREE, o);
+  }
+  // (a vehicle's CARS entry from its id and option key - engine, class or version)
+  function defOf(id, opt) {
+    const C = VEH.CARS;
+    if (id === 'puller') return C.puller.make(opt || 'hemi4');
+    if (id === 'dragster') return C.dragster.make(opt || 'tf');
+    if (id === 'kart') return C.kart.make(opt || 'tag');
+    if (id === 'mower') return C.mower.make(opt || 'bp');
+    if (id === 'monster') return C.monster;
+    if (C[id] && C[id].make) return C[id].make(opt || undefined);
+    return C[id] && !C[id].more ? C[id] : C.hellcat;
+  }
+  const car = buildModel(S.car, CARDEF, sp, S.paint);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
 
@@ -334,7 +388,8 @@
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
   // ------------------------------------------------------------------ state
-  const G = { started: false, paused: true, menu: false, lightsOn: false, horn: false, arcadeT: 0, time: 0, rearMan: 0, flipHintT: 0, lastEv: { shift: 0, backfire: 0, grind: 0 }, emitAcc: [0, 0, 0, 0], rumbleT: 0, loadDone: false, shake: 0 };
+  const G = { started: false, paused: true, menu: false, lightsOn: false, horn: false, arcadeT: 0, time: 0, rearMan: 0, flipHintT: 0, lastEv: { shift: 0, backfire: 0, grind: 0 }, emitAcc: [0, 0, 0, 0], rumbleT: 0, loadDone: false, shake: 0,
+    smk: [[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]] };
   const cam = { mode: S.camMode | 0, fwd: new THREE.Vector3(0, 0, -1), off: new THREE.Vector3(), yS: 0, vyS: 0, orbitYaw: 0, orbitPitch: 0, orbitT: 0, dragging: false, headYaw: 0, head: new THREE.Vector3(), zoom: 1, init: false };
   const TC_NAMES = ['STREET', 'SPORT', 'TRACK', 'OFF'];
   const RS_NAMES = { auto: 'AUTO (counter-steer)', crab: 'CRAB', manual: 'MANUAL (, and .)', front: 'FRONT ONLY' };
@@ -352,9 +407,8 @@
       ux: 2 * (qx * qy - qz * qw), uy: 1 - 2 * (qx * qx + qz * qz), uz: 2 * (qy * qz + qx * qw),
     };
   }
-  function resetCar() {
-    const a = carAxes();
-    const spot = DRAGMAP ? spawn : W.nearestRoadSpot(veh.px, veh.pz, a.fx, a.fz);
+  // (the car put down at a spot: on its wheels, the engine kept running, the camera caught up)
+  function putCar(spot) {
     const keepRunning = veh.running;
     veh.reset(spot.x, spot.y, spot.z, spot.tx, spot.tz);
     veh.running = keepRunning;
@@ -362,6 +416,23 @@
     if (veh.transType === 'auto') { veh.park = false; veh.gear = 1; }
     skids.last = [null, null, null, null];
     cam.init = false;
+  }
+  function resetCar(auto) {
+    // racing online: once every 30 s, back on the centre line where you are on the course (auto: thrown off the course -
+    // that one's free)
+    if (RACE.on) {
+      if (!auto) {
+        const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+        if (wait > 0) { hud.toast('Reset in ' + Math.ceil(wait) + ' s', 1.2); return; }
+        RACE.resetT = performance.now(); raceLost();
+      }
+      putCar(raceSpot()); RACE.hayOn.clear(); LAP.armed = false;
+      hud.toast(auto ? 'Back on the course' : 'Back on the track');
+      return;
+    }
+    const a = carAxes();
+    const spot = DRAGMAP ? spawn : W.nearestRoadSpot(veh.px, veh.pz, a.fx, a.fz);
+    putCar(spot);
     hud.toast(DIRTSTRIP ? 'Back behind the line' : DRAGMAP ? 'Back to the burnout box' : FREESTYLE ? 'Back on its wheels' : MOWTRACK || TRKMAP ? 'Back on the track' : 'Car reset');
     if (MOWTRACK || TRKMAP) LAP.armed = false;            // (a reset doesn't count as a lap)
     if (DRAGMAP) dragReset();
@@ -380,7 +451,7 @@
   $('startBtn').addEventListener('click', startGame);
   for (const b of document.querySelectorAll('#mapPick button')) {
     b.classList.toggle('on', b.dataset.map === S.map);
-    b.addEventListener('click', () => { if (b.dataset.map !== S.map) { S.map = b.dataset.map; saveS(); location.reload(); } });
+    b.addEventListener('click', () => { if (b.dataset.map !== S.map) { if (mapLocked(b.dataset.map)) return; S.map = b.dataset.map; saveS(); location.reload(); } });
   }
   window.addEventListener('keydown', (e) => { if (!G.started && (e.code === 'Enter' || e.code === 'Space') && G.loadDone) startGame(); });
   async function startGame() {
@@ -438,7 +509,7 @@
   canvas.addEventListener('wheel', (e) => { cam.zoom = clamp(cam.zoom * (e.deltaY > 0 ? 1.08 : 0.93), 0.6, 2.2); }, { passive: true });
 
   // ------------------------------------------------------------------ menu
-  const TABS = ['Drive', 'Fun', 'Controls', 'Graphics', 'Audio', 'Help'];
+  const TABS = ['Drive', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
     dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage' };
   let curTab = 'Drive';
@@ -497,6 +568,7 @@
   ];
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
+    if (carLocked()) { $('moreCars').classList.add('hidden'); return; }
     const m = MORE_CARS.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
@@ -537,7 +609,7 @@
       const cur = MORE_CARS.find((m) => m.id === S.car);
       more.classList.toggle('on', !!cur);
       if (cur) more.innerHTML = `<b>${cur.btn || cur.name}</b><span>${cur.options ? (cur.options.find((o) => o[0] === S[cur.optKey]) || cur.options[0])[1] + ' · ' : ''}more cars…</span>`;
-      more.addEventListener('click', () => openMoreCars());
+      more.addEventListener('click', () => { if (!carLocked()) openMoreCars(); });
     }
   }
   function openMoreCars() {
@@ -584,6 +656,11 @@
     d.appendChild(i); d.appendChild(v); return d;
   }
   function renderFun(add) {
+    if (carLocked(true)) {
+      add(row('<span style="color:#7fb4ff">Online: the host\'s tune</span>', 'Everyone in the room drives the host\'s car with the host\'s Fun-tab tune - it changes when they change it. '
+        + 'Your own tune for this car is kept, and comes back when you leave the room.', el('<span></span>')));
+      return;
+    }
     const onT = (k) => (x) => { tune[k] = x; applyTune(); stats(); };
     const T = (k, label, sub, min, max, step, fmt) => add(row(label, sub, slider(min, max, step, tune[k], fmt, onT(k))));
     const sect = (t) => add(el(`<div class="sect">${t}</div>`));
@@ -667,20 +744,24 @@
     return at;
   }
   function renderMenu() {
+    // (online, in someone else's room: the car buttons are the host's to press)
+    $('carPick').classList.toggle('locked', carLocked(true));
     const tabs = $('tabs'); tabs.innerHTML = '';
     for (const t of TABS) { const b = el(`<button class="${t === curTab ? 'on' : ''}">${t}</button>`); b.addEventListener('click', () => { curTab = t; renderMenu(); }); tabs.appendChild(b); }
     const body = $('tabbody'); body.innerHTML = '';
     const add = (n) => body.appendChild(n);
     if (curTab === 'Drive') {
+      if (carLocked(true)) add(row('<span style="color:#7fb4ff">Online: the host\'s car</span>', 'Everyone in the room drives the car the host picked, set up their way - its '
+        + 'version, tyres, transmission, package and Fun-tab tune. Your paint, driver aids and controls are still yours. Leaving the room puts you back in your own car.', el('<span></span>')));
       if (DEMON) {
         add(row('Fuel', 'E85: 1,025 hp / 945 lb-ft (calibrated to the NHRA 8.91 s @ 151 mph pass) · 91-octane E10: 900 hp / 810 lb-ft (restarts)',
-          seg([['e85', 'E85 — 1,025 hp'], ['e10', '91 octane — 900 hp']], S.fuel, (v) => { if (v !== S.fuel) { S.fuel = v; saveS(); location.reload(); } })));
+          seg([['e85', 'E85 — 1,025 hp'], ['e10', '91 octane — 900 hp']], S.fuel, (v) => { if (v !== S.fuel) { if (carLocked()) return; S.fuel = v; saveS(); location.reload(); } })));
         add(row('TransBrake 2.0', 'Hold SPACE (handbrake button) at the line, floor it, release SPACE to launch. 8HP90 auto · MT ET Street R 315/50R17 drag radials · governed to 149 mph', el('<span></span>')));
       }
       if (PULLER) {
         add(row('Modified pulling tractor', '3.6 t · ' + CARDEF.hp.toLocaleString() + ' hp · 30.5L-32 cut pulling tyres · slider clutch + 3-speed planetary · spool · no suspension, no ABS / ESC. Hold SPACE on the line, floor it, let go to dump the clutch.', el('<span></span>')));
         add(row('Engines', 'Swapping engines restarts the game (each package keeps its own Fun-tab tune)',
-          seg(VEH.CARS.puller.make && Object.entries(VEH.CARS.puller.engines).map(([k, e]) => [k, e.short]), CARDEF.engine, (v) => { if (v !== CARDEF.engine) { S.pullerEng = v; saveS(); location.reload(); } })));
+          seg(VEH.CARS.puller.make && Object.entries(VEH.CARS.puller.engines).map(([k, e]) => [k, e.short]), CARDEF.engine, (v) => { if (v !== CARDEF.engine) { if (carLocked()) return; S.pullerEng = v; saveS(); location.reload(); } })));
         add(row('Weight bar', 'On dirt, gravel or a prepped strip it stands up on its weight bar (the front wheels in the air — you can\'t steer). Lift off to set it down. On pavement the pulling tyres just spin.', el('<span></span>')));
         add(row('Staying straight', 'Traction control on Track (the default) keeps the tyres hooked so it stays straight at speed. Off is the real thing: floor it in a turn on pavement and it swaps ends.', el('<span></span>')));
       }
@@ -691,7 +772,7 @@
           : '526 ci blown methanol HEMI, ~3,900 hp · 5-disc clutch into a 2-speed planetary box · 34.5x17 slicks · 2,050 lb · rear brakes + two chutes · races the full ¼ mile', el('<span></span>')));
         add(row('Class', 'Switching restarts the game (each class keeps its own Fun-tab tune)',
           seg(Object.entries(VEH.CARS.dragster.classes).map(([k, c]) => [k, c.short]), CARDEF.cls, (v) => {
-            if (v !== CARDEF.cls) { const o = MORE_CARS.find((x) => x.id === 'dragster').options.find((x) => x[0] === v); if (o && o[3]) S.paint = o[3]; S.dragClass = v; saveS(); location.reload(); }
+            if (v !== CARDEF.cls) { if (carLocked()) return; const o = MORE_CARS.find((x) => x.id === 'dragster').options.find((x) => x[0] === v); if (o && o[3]) S.paint = o[3]; S.dragClass = v; saveS(); location.reload(); }
           })));
         add(row('Making a pass', 'Burnout: hold B and floor it — no front brakes, so it rolls forward spinning its wet slicks (that\'s the heat they need). Back up (X / reverse, it creeps). Stage, hold SPACE (clutch pedal in) and floor it, let go of SPACE on green. The clutch slips by design — the engine sits near 7,000 rpm and climbs as the clutch locks up. Lift at the finish; the chutes pop by themselves (F pulls them).', el('<span></span>')));
         add(row('Staying straight', 'Traction control on Track (the default) plays crew chief: it backs off the clutch and timing when the slicks start to spin. Off is the real thing — on plain asphalt it goes up in smoke and swaps ends.', el('<span></span>')));
@@ -731,26 +812,27 @@
       }
       if (DRAGPAK) {
         add(row('Mopar Drag Pak (race car)', 'Supercharged 354 HEMI · race 3-speed auto, non-lockup converter · spool · wheelie bars · no ABS / ESC. Hold SPACE on the line (TransBrake), floor it, release SPACE to launch.', el('<span></span>')));
-        if (!OFFROAD()) add(row('Rear tyres', 'Slicks: fatter footprint, more grip (~7.5 s) · Radials: the 9-inch tyre NHRA Factory Stock requires (~7.7 s) · both need heat', seg([['etdrag', 'MT ET Drag 29.5x10.5 slicks'], ['etdragpro', 'MT ET Drag Pro 30x9 radials']], S.dpRear || 'etdrag', (v) => { S.dpRear = v; applyVehicleSettings(); })));
+        if (!OFFROAD()) add(row('Rear tyres', 'Slicks: fatter footprint, more grip (~7.5 s) · Radials: the 9-inch tyre NHRA Factory Stock requires (~7.7 s) · both need heat', seg([['etdrag', 'MT ET Drag 29.5x10.5 slicks'], ['etdragpro', 'MT ET Drag Pro 30x9 radials']], S.dpRear || 'etdrag', (v) => { if (carLocked()) return; S.dpRear = v; applyVehicleSettings(); })));
         add(row('Parachute', 'F (or map a wheel button) pulls the 10 ft chute above ~10 mph · it deploys by itself past the drag-strip finish line · press again when stopped to repack', el('<span></span>')));
       }
-      if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { S.trans = v; applyVehicleSettings(); })));
+      if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { if (carLocked()) return; S.trans = v; applyVehicleSettings(); })));
       if (!FIXED) add(row('Manual clutch', input.hasClutchPedal ? 'Use your clutch pedal (can stall!) or let the car work the clutch for you' : 'Map a clutch pedal in Controls → Wheel setup to use it', seg([[false, 'Auto-clutch'], [true, 'Clutch pedal']], S.clutchPedal, (v) => { S.clutchPedal = v; })));
       add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
+        if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
-      if (!FIXED && !OFFROAD()) add(row('Rear tyres', 'Drag radials: huge launch grip once warm (do a burnout!), soft sidewall, less cornering grip, slick when cold', seg([['street', 'Pirelli P Zero 275/40ZR20'], ['drag', 'Nitto NT555R II 315/35R20 drag radials']], S.rearTire, (v) => { S.rearTire = v; applyVehicleSettings(); })));
+      if (!FIXED && !OFFROAD()) add(row('Rear tyres', 'Drag radials: huge launch grip once warm (do a burnout!), soft sidewall, less cornering grip, slick when cold', seg([['street', 'Pirelli P Zero 275/40ZR20'], ['drag', 'Nitto NT555R II 315/35R20 drag radials']], S.rearTire, (v) => { if (carLocked()) return; S.rearTire = v; applyVehicleSettings(); })));
       add(row(DRAGPAK || PULLER || DRAGSTER || MONSTER ? 'Traction control' + (DRAGPAK ? ' (Holley EFI)' : DRAGSTER ? ' (clutch management)' : '') : 'Drive mode (ESC / traction)', DRAGPAK ? 'Timing-based wheel-speed traction management — Street: most intervention · Track: least · Off: all on you (no ESC on a race car)' : 'Street: full nannies · Sport: some slip · Track: TC only, ESC off · Off: everything off', seg(TC_NAMES.map((n, i) => [i, n]), S.tcMode, (v) => { S.tcMode = v; applyVehicleSettings(); })));
       if (!sp.noABS) add(row('ABS', '', seg([[true, 'On'], [false, 'Off']], S.abs, (v) => { S.abs = v; applyVehicleSettings(); })));
       const sw = el('<div class="swatches"></div>');
       for (const [name, hex] of Object.entries(CAR.PAINTS)) {
         const b = el(`<div class="sw ${name === S.paint ? 'on' : ''}" title="${name}" style="background:#${hex.toString(16).padStart(6, '0')}"></div>`);
-        b.addEventListener('click', () => { S.paint = name; car.setPaint(name); saveS(); renderMenu(); });
+        b.addEventListener('click', () => { S.paint = name; car.setPaint(name); saveS(); renderMenu(); netProfileSync(); });
         sw.appendChild(b);
       }
       add(row('Paint', S.paint, sw));
       add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · All Ramps: the whole world is dirt covered in jumps (restarts)',
-        seg(Object.entries(MAP_NAMES), S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        seg(Object.entries(MAP_NAMES).filter(([k]) => !inRoom() || NET_MAPS.includes(k)), S.map, (v) => { if (v !== S.map) { if (mapLocked(v)) return; S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -777,6 +859,8 @@
       add(row('HUD', '', seg([[true, 'Show'], [false, 'Hide']], S.showHud, (v) => { S.showHud = v; $('hud').classList.toggle('hidden', !v); })));
       add(row('Pedal / steering bars', '', seg([[true, 'Show'], [false, 'Hide']], S.showInputs, (v) => { S.showInputs = v; })));
       add(row('Gauges in cockpit view', 'The real dash works — the big HUD gauge is hidden by default in the cockpit', seg([[false, 'Dash only'], [true, 'Dash + HUD']], S.cockpitHud, (v) => { S.cockpitHud = v; })));
+    } else if (curTab === 'Online') {
+      renderOnline(add);
     } else if (curTab === 'Audio') {
       add(row('Master volume', '', slider(0, 1, 0.05, S.vol, (v) => Math.round(v * 100) + '%', (v) => { S.vol = v; })));
       add(row('Engine & supercharger', '', slider(0, 1.5, 0.05, S.engVol, (v) => Math.round(v * 100) + '%', (v) => { S.engVol = v; })));
@@ -1029,6 +1113,7 @@
     const speed = Math.hypot(veh.vx, veh.vy, veh.vz);
     for (let i = 0; i < 4; i++) {
       const w = veh.wheels[i];
+      G.smk[i][0] = 0;
       if (!w.contact) { skids.break(i); continue; }
       const slip = w.slipSpeed;
       const cs = Math.cos(w.steer), sn = Math.sin(w.steer);
@@ -1057,6 +1142,7 @@
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
       if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
+      { const m = G.smk[i]; m[0] = rate * tune.smoke; m[1] = alpha; m[2] = size; m[3] = shade; m[4] = grow; m[5] = life; m[6] = up; }
       // (a cloud already filling the screen many times over gets its new puffs fewer but denser: same look, a
       // fraction of the pixels to draw)
       const bud = smoke.budget;
@@ -1215,19 +1301,24 @@
   // (the supercharged kart: a 4-into-1 superbike four, and the centrifugal blower's whistle - its impeller turns ~9.3x
   // crank, ~2.2 kHz at the limiter - with the surge chirp when you lift at boost)
   // (mowers: a 90 deg V-twin on open pipes, a big single, a superbike four through its end can)
-  const ENG_SND = CC ? CCD.snd : MOWER ? (CARDEF.cls === 'bp' ? { nEng: 1, cyl: 2, vt: 90, fmul: 1.15, deep: 0.15, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.9, rough: 0.3 }
-      : CARDEF.cls === 'fx' ? { nEng: 1, cyl: 1, fmul: 1.3, deep: 0.05, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 7700, race: 1, rough: 0.3 }
+  // the engine sound's set-up for any vehicle (the other players' cars' too)
+  function engSndFor(id, def) {
+    const cc = CC_CARS[id], ccd = cc ? Object.assign({}, cc, (cc.eng || {})[def.engine] || {}) : null;
+    return cc ? ccd.snd : id === 'mower' ? (def.cls === 'bp' ? { nEng: 1, cyl: 2, vt: 90, fmul: 1.15, deep: 0.15, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.9, rough: 0.3 }
+      : def.cls === 'fx' ? { nEng: 1, cyl: 1, fmul: 1.3, deep: 0.05, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 7700, race: 1, rough: 0.3 }
         : { nEng: 1, cyl: 4, fmul: 1.5, deep: 0, loud: 0.5, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13000, race: 0.9, rough: 0.06 })
-    : KART ? (CARDEF.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
-      : CARDEF.cls === 'sc' ? { nEng: 1, cyl: 4, fmul: 1.6, deep: 0, loud: 0.45, open: 1, whK: 0.155, whPure: 1, whine: 1.5, rpmRef: 13000, race: 0.8, rough: 0.08, surge: 1 }
-      : CARDEF.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15, pipe: [9000, 11500] }
+    : id === 'kart' ? (def.cls === 'rental' ? { nEng: 1, cyl: 1, fmul: 1.5, deep: 0, loud: 0.15, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 3800, race: 0.3, rough: 0.35 }
+      : def.cls === 'sc' ? { nEng: 1, cyl: 4, fmul: 1.6, deep: 0, loud: 0.45, open: 1, whK: 0.155, whPure: 1, whine: 1.5, rpmRef: 13000, race: 0.8, rough: 0.08, surge: 1 }
+      : def.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15, pipe: [9000, 11500] }
       : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15, pipe: [8500, 11000] })
-    : MONSTER ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
-    : DRAGSTER ? (NITRO ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
+    : id === 'monster' ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
+    : id === 'dragster' ? (def.cls !== 'tad' ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
-    : !PULLER ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
-    : CARDEF.engine === 'v12' ? { nEng: 2, cyl: 12, fmul: 0.5, deep: 1, loud: 1, open: 1, whK: 2.0, whPure: 1, whine: 1.2, rpmRef: 3700, race: 0.5 }
+    : id !== 'puller' ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
+    : def.engine === 'v12' ? { nEng: 2, cyl: 12, fmul: 0.5, deep: 1, loud: 1, open: 1, whK: 2.0, whPure: 1, whine: 1.2, rpmRef: 3700, race: 0.5 }
     : { nEng: 4, cyl: 8, fmul: 0.62, deep: 1, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.4, rpmRef: 8400, race: 1 };
+  }
+  const ENG_SND = engSndFor(S.car, CARDEF);
   function audioUpdate() {
     if (!audio.ready) return;
     let squeal = veh.squeal || 0, spin = 0, pitch = 0.5;
@@ -1285,7 +1376,7 @@
     const inCockpit = cam.mode === 2;
     const showGauge = S.showHud && (!inCockpit || S.cockpitHud);
     $('gauge').style.display = showGauge ? '' : 'none';
-    $('gmeter').style.display = showGauge ? '' : 'none';
+    $('gmeter').style.display = showGauge && !RACE.on ? '' : 'none';
     $('inputs').style.display = S.showInputs ? '' : 'none';
     const cs = $('cockpitSpeed');
     cs.classList.toggle('hidden', showGauge || !S.showHud);
@@ -1325,6 +1416,8 @@
     if (!veh.running && !veh.cranking) chips.push({ html: veh.stalled ? 'STALLED — press I' : 'ENGINE OFF — press I', cls: 'alert' });
     if (veh.inWater > 0.3) chips.push({ html: 'IN THE LAKE — Backspace to reset', cls: 'alert' });
     if (!S.abs && !sp.noABS) chips.push({ html: 'ABS OFF', cls: 'warn' });
+    raceHud(dt);
+    if (ONLINE.net && ONLINE.net.code) chips.push({ html: 'ONLINE <b>' + ONLINE.net.code + '</b> · ' + (ONLINE.ghosts.size + 1) + (ONLINE.ghosts.size ? ' drivers' : ' (waiting for friends)') });
     hud.setChips(chips);
   }
 
@@ -1586,7 +1679,628 @@
 
   // ------------------------------------------------------------------ main loop
   let last = performance.now(), worldT = 0, fpsT = 0, frames = 0;
-  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke };
+  // ------------------------------------------------------------------ online play (net.js)
+  // One of you hosts a room (a 5-letter code), the others join it; everyone drives their own car (any car) on the host's
+  // map. Each game runs its own car and sends its pose ~10 times a second; the others' cars are drawn from those, ~130 ms
+  // behind real time so there's always a pose either side to blend between (a little ahead of the last one on a
+  // hiccup). They're solid - you can bump them (each game pushes its own car out) - their engines play from where they
+  // are, and their names float over them
+  const ONLINE = { net: null, ghosts: new Map(), pending: {}, sendT: 0, profT: 0, lastProf: '', boxes: [], busy: false, status: '', err: '', reloading: false,
+    hostMap: COURSE ? S.map : 'rally', carT: 0, lastCar: '' };
+  const NET_DELAY = 130, NET_SEND = 0.1, VOICES = 4;
+  if (!S.netName) { S.netName = 'Driver ' + Math.floor(100 + Math.random() * 900); saveS(); }
+  const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const inRoom = () => !!(ONLINE.net && ONLINE.net.code);
+  // (in a room the host picks the car too: the others can't change it, or its setup)
+  function carLocked(silent) {
+    if (!inRoom() || ONLINE.net.isHost) return false;
+    if (!silent) hud.toast('Online: the host picks the car', 2.5);
+    return true;
+  }
+  // the host's car and its setup, as it goes out with the room: the car, its version / class / engine, the Demon's
+  // fuel, the transmission, the tyres, the off-road package and the Fun-tab tune (no undefined: the database won't take it)
+  function carSetup() {
+    const m = MORE_CARS.find((x) => x.id === S.car);
+    return JSON.parse(JSON.stringify({ c: S.car, o: m && m.optKey ? S[m.optKey] || '' : '', fuel: S.fuel, trans: S.trans, rear: S.rearTire, dp: S.dpRear || 'etdrag', off: OFFROAD(), tune }));
+  }
+  // (a joiner's own car, kept while they drive the host's, back when they leave)
+  const OWN_KEYS = ['car', 'fuel', 'trans', 'rearTire', 'dpRear', 'offroad', 'tcMode'].concat(MORE_CARS.filter((m) => m.optKey).map((m) => m.optKey));
+  function ownCarKeep() { if (!S.netOwn) S.netOwn = JSON.parse(JSON.stringify(OWN_KEYS.reduce((o, k) => { o[k] = S[k]; return o; }, {}))); }
+  // (the host's tune goes on the car live; your own tune for it stays saved as it was)
+  let tuneOwnKept = false;
+  function hostTune(t) {
+    if (!t) return;
+    if (!tuneOwnKept) { tuneOwnKept = true; S.tune[TKEY] = JSON.parse(JSON.stringify(tune)); }
+    Object.assign(tune, tuneDefaults(), t); applyTune();
+  }
+  function ownCarBack() {
+    const own = S.netOwn;
+    if (tuneOwnKept) { Object.assign(tune, tuneDefaults(), S.tune[TKEY]); S.tune[TKEY] = tune; tuneOwnKept = false; applyTune(); }
+    if (!own) return;
+    delete S.netOwn;
+    const m = MORE_CARS.find((x) => x.id === own.car), k = m && m.optKey;
+    const restart = own.car !== S.car || (k && own[k] && own[k] !== S[k]) || (own.car === 'demon' && own.fuel !== S.fuel);
+    for (const key of OWN_KEYS) if (own[key] !== undefined) S[key] = own[key];
+    saveS();
+    if (restart) { hud.toast('Back in your own car…', 2.5); setTimeout(() => location.reload(), 900); }
+    else { applyVehicleSettings(); veh.tcMode = S.tcMode; }
+  }
+  // a joiner follows the host: their course, and their car set up their way. Changes that need a restart (the course,
+  // the car, its version, the Demon's fuel) reload the game - it rejoins by itself; the rest goes on live
+  function followHost(m) {
+    if (!inRoom() || !m) return;
+    let why = '';
+    if (ONLINE.net.isHost) {
+      if (m.map && m.map !== S.map) { if (COURSE) ONLINE.net.setMap(S.map); else { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); } }
+    } else {
+      if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
+      const cs = m.car;
+      if (cs && cs.c && (VEH.CARS[cs.c] || MORE_IDS.includes(cs.c))) {
+        ownCarKeep();
+        const mm = MORE_CARS.find((x) => x.id === cs.c), k = mm && mm.optKey;
+        const restart = cs.c !== S.car || (k && cs.o && S[k] !== cs.o) || (cs.c === 'demon' && cs.fuel && S.fuel !== cs.fuel);
+        if (restart) {
+          // (a car that starts on its own traction-control mode starts on it here too)
+          const o = mm && mm.options ? mm.options.find((x) => x[0] === cs.o) : null;
+          S.tcMode = o && o[4] !== undefined ? o[4] : mm && mm.tc !== undefined ? mm.tc : S.tcMode;
+        }
+        S.car = cs.c; if (k && cs.o) S[k] = cs.o;
+        if (cs.fuel) S.fuel = cs.fuel;
+        if (cs.trans) S.trans = cs.trans;
+        if (cs.rear) S.rearTire = cs.rear;
+        if (cs.dp) S.dpRear = cs.dp;
+        S.offroad = Object.assign({}, S.offroad, { [cs.c]: !!cs.off });
+        if (restart) why = (why ? why + ' and ' : '') + 'the host\'s ' + carLabel(cs.c, cs.o);
+        else if (!why && !ONLINE.reloading) { hostTune(cs.tune); applyVehicleSettings(); if (G.menu) renderMenu(); }
+      }
+    }
+    if (!why) return;
+    saveS();
+    if (ONLINE.reloading) return;
+    ONLINE.reloading = true;
+    hud.toast('Following the host: loading ' + why + '…', 3);
+    setTimeout(() => location.reload(), 900);
+  }
+  // (in a room the host picks the map - one of the four courses)
+  function mapLocked(v) {
+    if (!inRoom()) return false;
+    if (!ONLINE.net.isHost) { hud.toast('Online: the host picks the map', 2.5); return true; }
+    if (!NET_MAPS.includes(v)) { hud.toast('Online rooms race on the rally stages and the mower tracks', 2.5); return true; }
+    return false;
+  }
+  const optOf = () => CARDEF.engine || CARDEF.cls || '';
+  function carLabel(id, opt) {
+    const m = MORE_CARS.find((x) => x.id === id), o = m && m.options ? m.options.find((x) => x[0] === opt) : null;
+    const d = VEH.CARS[id];
+    return (m ? m.btn || m.name : d ? d.short || d.name : id) + (o ? ' ' + o[1] : '');
+  }
+  function netProfile() {
+    return { n: String(S.netName || 'Driver').slice(0, 16), c: S.car, o: optOf(), p: S.paint, tf: tireF(), tr: tireR(), js: JET ? +jetSize().toFixed(2) : 1, cd: +(sp.cgDrop || 0).toFixed(3) };
+  }
+  // (paint, tyres, a tune that grows the jet: sent when they change)
+  function netProfileSync() {
+    if (!inRoom()) return;
+    const p = netProfile(), k = JSON.stringify(p);
+    if (k !== ONLINE.lastProf) { ONLINE.lastProf = k; ONLINE.net.setProfile(p); }
+  }
+  const netErr = (e) => {
+    const m = String((e && e.message) || e);
+    return /permission|denied/i.test(m) ? 'Firebase refused it - have the database rules been published?'
+      : /admin-restricted|operation-not-allowed/i.test(m) ? 'Anonymous sign-in is off in the Firebase project (Authentication → Sign-in method)'
+        : /network|fetch|import|load/i.test(m) ? 'Could not reach Firebase - check your internet connection' : m;
+  };
+  function netCreate() {
+    if (ONLINE.net) return ONLINE.net;
+    ONLINE.net = window.HCNet.create({
+      onStatus: (m) => { ONLINE.status = m; if (G.menu && curTab === 'Online') renderMenu(); netTitle(); },
+      onMeta: (m) => { raceMeta(m); followHost(m); },
+      onRoomGone: () => { hud.toast('The room has closed', 3); onlineLeave(); },
+      onPlayer: (uid, prof) => ghostProfile(uid, prof),
+      onLeave: (uid) => ghostRemove(uid, true),
+      onState: (uid, st) => {
+        if (!Array.isArray(st)) return;
+        const g = ONLINE.ghosts.get(uid);
+        if (!g) { ONLINE.pending[uid] = st; return; }
+        const sn = g.snaps;
+        if (sn.length && st[0] <= sn[sn.length - 1][0]) return;             // (out of order)
+        sn.push(st); if (sn.length > 30) sn.splice(0, sn.length - 30);
+      },
+    });
+    return ONLINE.net;
+  }
+  async function onlineHost() {
+    if (ONLINE.busy) return;
+    ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
+    try {
+      const net = netCreate(), map = NET_MAPS.includes(ONLINE.hostMap) ? ONLINE.hostMap : 'rally';
+      await net.hostRoom(map, netProfile());
+      ONLINE.lastProf = JSON.stringify(netProfile());
+      S.netRoom = net.code; saveS();
+      if (map !== S.map) {
+        // (not on it yet: load it - the room's rejoined after the reload)
+        ONLINE.reloading = true; S.map = map; saveS();
+        hud.toast('Room ' + net.code + ' is open - loading the ' + MAP_NAMES[map] + '…', 4);
+        setTimeout(() => location.reload(), 1200);
+      } else hud.toast('Room ' + net.code + ' is open - give your friends the code', 5);
+    } catch (e) { ONLINE.err = netErr(e); console.warn(e); }
+    ONLINE.busy = false; renderOnlineIfOpen(); netTitle();
+  }
+  async function onlineJoin(code, auto) {
+    if (ONLINE.busy) return;
+    code = String(code || '').trim().toUpperCase();
+    if (!/^[A-Z2-9]{5}$/.test(code)) { ONLINE.err = 'Room codes are 5 letters / numbers'; renderOnlineIfOpen(); return; }
+    ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
+    try {
+      const net = netCreate();
+      const meta = await net.joinRoom(code, netProfile());
+      ONLINE.lastProf = JSON.stringify(netProfile());
+      S.netRoom = net.code; saveS();
+      followHost(meta);
+      if (!auto && !ONLINE.reloading) hud.toast('Joined room ' + net.code, 3);
+    } catch (e) {
+      ONLINE.err = netErr(e); console.warn(e);
+      if (auto) { S.netRoom = null; saveS(); hud.toast('Couldn\'t rejoin room ' + code + ': ' + ONLINE.err, 5); }
+    }
+    ONLINE.busy = false; renderOnlineIfOpen(); netTitle();
+  }
+  async function onlineLeave() {
+    S.netRoom = null; saveS(); RACE.r = null; ONLINE.lastCar = '';
+    for (const uid of [...ONLINE.ghosts.keys()]) ghostRemove(uid, false);
+    if (ONLINE.net) { try { await ONLINE.net.leaveRoom(); } catch (e) { /* offline */ } }
+    ownCarBack();
+    renderOnlineIfOpen(); netTitle();
+  }
+  function renderOnlineIfOpen() { if (G.menu && curTab === 'Online') renderMenu(); }
+
+  // ---- the other players' cars
+  const TIRE_OK = (t) => (t && VEH.TIRES[t] ? t : null);
+  function setTag(g, name) {
+    g.name = name;
+    if (g.tag) { scene.remove(g.tag); g.tag.material.map.dispose(); g.tag.material.dispose(); }
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
+    x.font = 'bold 32px "Segoe UI", Arial, sans-serif';
+    const w = Math.min(250, x.measureText(name).width + 30);
+    x.fillStyle = 'rgba(10,10,12,0.7)'; x.fillRect(128 - w / 2, 10, w, 46);
+    x.fillStyle = '#e8313a'; x.fillRect(128 - w / 2, 52, w, 4);
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name, 128, 33);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }));
+    spr.scale.set(2.6, 0.65, 1); spr.renderOrder = 20; spr.visible = false; scene.add(spr);
+    g.tag = spr;
+  }
+  function disposeTree(o) {
+    o.traverse((m) => {
+      if (m.geometry) m.geometry.dispose();
+      const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
+      for (const mt of mats) { if (mt.map) mt.map.dispose(); mt.dispose(); }
+    });
+  }
+  function ghostProfile(uid, prof) {
+    if (!prof || typeof prof !== 'object') return;
+    prof.n = String(prof.n || 'Driver').slice(0, 16);
+    let g = ONLINE.ghosts.get(uid);
+    const key = [prof.c, prof.o, prof.tf, prof.tr].join('|');
+    if (g && g.key === key) {
+      if (g.prof.p !== prof.p) g.model.setPaint(prof.p);
+      if (g.model.setJetSize) g.model.setJetSize(prof.js || 1);
+      if (g.name !== prof.n) setTag(g, prof.n);
+      g.prof = prof;
+      renderOnlineIfOpen();
+      return;
+    }
+    const snaps = g ? g.snaps : ONLINE.pending[uid] ? [ONLINE.pending[uid]] : [];
+    delete ONLINE.pending[uid];
+    if (g) ghostRemove(uid, false); else hud.toast(prof.n + ' joined', 3);
+    try {
+      const def = defOf(prof.c, prof.o);
+      const gv = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: (x, z, r, c, b) => { c.length = 0; b.length = 0; } }, Object.assign({}, def.spec));
+      const tf = TIRE_OK(prof.tf) || gv.spec.frontTire, tr = TIRE_OK(prof.tr) || gv.spec.rearTire;
+      gv.setTires(tf, tr);
+      const model = buildModel(prof.c, def, gv.spec, prof.p);
+      model.setTires(tf, tr); model.setPaint(prof.p);
+      if (model.setInteriorVisible) model.setInteriorVisible(true, false);
+      if (model.setJetSize) model.setJetSize(prof.js || 1);
+      // (no headlight spot lights on the others' cars: a light joining the scene recompiles every material - a hitch)
+      const lights = []; model.root.traverse((o) => { if (o.isLight) lights.push(o); });
+      for (const l of lights) l.parent.remove(l);
+      if (Array.isArray(model.headlights)) model.headlights.length = 0;
+      model.root.visible = false;
+      scene.add(model.root);
+      const flm = new FX.Flames(THREE, model.root, model.exhaustTips || []);
+      g = { uid, prof, key, def, gv, model, flm, snaps, spin: [0, 0, 0, 0], ev: null, voice: null, snd: engSndFor(prof.c, def), emit: [0, 0, 0, 0], big: !!CC_CARS[prof.c] || ['puller', 'dragster', 'monster', 'kart', 'mower'].includes(prof.c), dist: 1e9, box: null };
+      setTag(g, prof.n);
+      ONLINE.ghosts.set(uid, g);
+    } catch (e) { console.warn('could not build the other car', prof, e); }
+    renderOnlineIfOpen();
+  }
+  function ghostRemove(uid, announce) {
+    const g = ONLINE.ghosts.get(uid);
+    if (!g) return;
+    ONLINE.ghosts.delete(uid);
+    scene.remove(g.model.root); disposeTree(g.model.root);
+    if (g.tag) { scene.remove(g.tag); g.tag.material.map.dispose(); g.tag.material.dispose(); }
+    if (g.voice) g.voice.remove();
+    if (announce) hud.toast(g.prof.n + ' left', 3);
+    renderOnlineIfOpen();
+  }
+
+  // ---- the pose we send: [t, x, y, z, qx, qy, qz, qw, vx, vy, vz, steer, rearSteer, s0-3, omega0-3, rpm, load, throttle,
+  // boost, flags, shifts, pops, jetN, afterburner, chute, points, (when there's smoke: 7 numbers a wheel)]
+  const r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000, r4 = (x) => Math.round(x * 1e4) / 1e4;
+  function netState() {
+    const fl = (veh.input.brake > 0.04 || veh.lineLockActive ? 1 : 0) | (veh.gear < 0 && !veh.park ? 2 : 0) | (G.lightsOn || world.preset === 'night' ? 4 : 0)
+      | (veh.running ? 8 : 0) | (G.horn ? 16 : 0) | (veh.nosActive ? 32 : 0) | (veh.cranking ? 64 : 0) | (veh.fuelCut ? 128 : 0);
+    const load = veh.running ? clamp(veh.thrEff * veh.tcCut * veh.escCut * (veh.shiftCut || 1), 0, 1) : 0;
+    const a = [Math.round(ONLINE.net.serverNow()), r2(veh.px), r2(veh.py), r2(veh.pz), r4(veh.qx), r4(veh.qy), r4(veh.qz), r4(veh.qw), r2(veh.vx), r2(veh.vy), r2(veh.vz),
+      r3(veh.steerAngle), r3(veh.rearSteerAngle || 0)];
+    for (const w of veh.wheels) a.push(r3(w.s));
+    for (const w of veh.wheels) a.push(Math.round(w.omega * 10) / 10);
+    a.push(Math.round(veh.rpm()), r2(load), r2(veh.input.throttle), Math.round(veh.boost * 10) / 10, fl, veh.events.shift, veh.events.backfire, r2(veh.jetN || 0), r2(veh.jetAB || 0), r2(veh.chuteInfl || 0),
+      Math.round(RACE.pts));
+    if (G.smk.some((m) => m[0] > 0.5)) for (const m of G.smk) a.push(Math.round(m[0]), r2(m[1]), r2(m[2]), r2(m[3]), r2(m[4]), r2(m[5]), r2(m[6]));
+    return a;
+  }
+
+  // ---- every frame: send ours, draw theirs
+  const _gq = new THREE.Quaternion(), _gq2 = new THREE.Quaternion(), _gv = new THREE.Vector3(), _gu = new THREE.Vector3();
+  function onlineTick(dt) {
+    if (inRoom()) {
+      ONLINE.sendT -= dt;
+      if (ONLINE.sendT <= 0 && G.started) { ONLINE.sendT = NET_SEND; ONLINE.net.publish(netState()); }
+      ONLINE.profT -= dt;
+      if (ONLINE.profT <= 0) { ONLINE.profT = 2; netProfileSync(); }
+      ONLINE.carT -= dt;
+      if (ONLINE.carT <= 0 && ONLINE.net.isHost) {
+        ONLINE.carT = 1;
+        const cs = carSetup(), k = JSON.stringify(cs);
+        if (k !== ONLINE.lastCar) { ONLINE.lastCar = k; ONLINE.net.setCar(cs); }
+      }
+    }
+    ONLINE.boxes.length = 0;
+    hud.mmPlayers = null;
+    if (!ONLINE.ghosts.size) return;
+    const now = ONLINE.net.serverNow() - NET_DELAY, night = world.preset === 'night', dots = [];
+    const cp = camera.position;
+    for (const g of ONLINE.ghosts.values()) {
+      const sn = g.snaps;
+      if (!sn.length) { g.model.root.visible = false; g.tag.visible = false; continue; }
+      while (sn.length > 2 && sn[1][0] <= now) sn.shift();
+      let A = sn[0], B = sn.length > 1 ? sn[1] : null, u = 0, ext = 0;
+      if (B && now >= B[0]) { A = B; B = null; }
+      if (B) u = clamp((now - A[0]) / Math.max(1, B[0] - A[0]), 0, 1);
+      else ext = clamp((now - A[0]) / 1000, 0, 0.35);
+      const L = (k) => (B ? A[k] + (B[k] - A[k]) * u : A[k]), N = B || A;
+      const x = L(1) + A[8] * ext, y = L(2) + A[9] * ext, z = L(3) + A[10] * ext;
+      _gq.set(A[4], A[5], A[6], A[7]).normalize();
+      if (B) _gq.slerp(_gq2.set(B[4], B[5], B[6], B[7]).normalize(), u);
+      const m = g.model, gv = g.gv, cd = g.prof.cd || 0;
+      m.root.visible = true;
+      m.root.position.set(x, y, z); m.root.quaternion.copy(_gq);
+      if (cd) m.root.position.add(_gv.set(0, cd, 0).applyQuaternion(_gq));
+      const steer = L(11), rs = L(12);
+      for (let i = 0; i < 4; i++) {
+        const w = gv.wheels[i], vw = m.wheels[i];
+        if (!vw) continue;
+        vw.corner.position.set(w.mx, w.my - L(13 + i), w.mz);
+        vw.corner.rotation.y = -(i < 2 ? steer : rs);
+        g.spin[i] = (g.spin[i] + L(17 + i) * dt) % (Math.PI * 2);
+        vw.spin.rotation.x = vw.left ? g.spin[i] : -g.spin[i];
+      }
+      if (m.afterWheels) m.afterWheels();
+      if (m.steerWheel) m.steerWheel.rotation.z = -steer * (gv.spec.steerRatio || 14);
+      const fl = N[25] | 0;
+      m.setLights({ brake: !!(fl & 1), reverse: !!(fl & 2), headlights: !!(fl & 4), night });
+      if (m.setChute) m.setChute(L(30) > 0.01, L(30), 1);
+      if (m.setJet) m.setJet(L(28), L(29), L(22), dt);
+      // pops and gear changes since the last pose
+      if (!g.ev) g.ev = [N[26], N[27]];
+      if (N[27] > g.ev[1]) { g.flm.pop(1); if (g.voice) g.voice.event('pop', 0.9); }
+      if (N[26] > g.ev[0] && g.voice) g.voice.event('shift');
+      g.ev[0] = N[26]; g.ev[1] = N[27];
+      g.flm.update(dt);
+      // the name over it
+      const top = (gv.spec.bodyTop || 1) + 1.0;
+      g.dist = Math.hypot(x - cp.x, y - cp.y, z - cp.z);
+      g.tag.visible = g.dist < 450 && G.started;
+      g.tag.position.set(x, y + top, z);
+      g.tag.scale.set(2.6, 0.65, 1).multiplyScalar(1 + clamp((g.dist - 30) / 200, 0, 1.5));
+      // solid: a box on its footprint, moving with it (only when it's at our height - you can jump over one)
+      const fx = -2 * (_gq.x * _gq.z + _gq.y * _gq.w), fz = -(1 - 2 * (_gq.x * _gq.x + _gq.y * _gq.y)), fln = Math.hypot(fx, fz) || 1;
+      if (Math.abs(y - veh.py) < 2.5) {
+        const zc = (gv.spec.bodyFront + gv.spec.bodyRear) / 2;
+        ONLINE.boxes.push({ x: x - fx / fln * zc, z: z - fz / fln * zc, hx: gv.spec.bodyHalfW, hz: (gv.spec.bodyRear - gv.spec.bodyFront) / 2, c: fz / fln, s: fx / fln, vx: A[8], vz: A[10], m: gv.spec.mass, ghost: true });
+      }
+      dots.push({ x, z });
+      // its tyre smoke
+      if (N.length > 32 && G.started) {
+        const bud = smoke.budget;
+        for (let i = 0; i < 4; i++) {
+          const k = 32 + i * 7, rate = N[k];
+          if (!(rate > 0.5)) continue;
+          g.emit[i] += rate * dt * bud;
+          if (g.emit[i] < 1) continue;
+          m.wheels[i].corner.getWorldPosition(_gv);
+          const gy = groundH(_gv.x, _gv.z); smoke.setGround(gy);
+          while (g.emit[i] >= 1) {
+            g.emit[i] -= 1;
+            smoke.emit(_gv.x + (Math.random() - 0.5) * 0.3, gy + 0.15 + Math.random() * 0.1, _gv.z + (Math.random() - 0.5) * 0.3,
+              A[8] * 0.3 + (Math.random() - 0.5) * 1.2, 0.4 + Math.random() * (0.8 + N[k + 6]), A[10] * 0.3 + (Math.random() - 0.5) * 1.2,
+              N[k + 2] * (0.8 + Math.random() * 0.4), N[k + 4], N[k + 5] * (0.7 + Math.random() * 0.6), N[k + 1], N[k + 3]);
+          }
+        }
+      }
+      g.st = { rpm: L(21), load: L(22), thr: L(23), boost: L(24), fl, ab: L(29), sq: N.length > 32 ? clamp(Math.max(N[32], N[39], N[46], N[53]) / 120, 0, 1) : 0 };
+    }
+    hud.mmPlayers = dots;
+    // their engines: the nearest few get a voice of their own, placed where the car is
+    if (audio.ready) {
+      const f = _gv.set(0, 0, -1).applyQuaternion(camera.quaternion), up = _gu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      audio.setListener(cp.x, cp.y, cp.z, f.x, f.y, f.z, up.x, up.y, up.z);
+      const near = [...ONLINE.ghosts.values()].filter((g) => g.st && g.model.root.visible && g.dist < 400).sort((a, b) => a.dist - b.dist).slice(0, VOICES);
+      for (const g of ONLINE.ghosts.values()) {
+        if (!near.includes(g)) { if (g.voice) { g.voice.remove(); g.voice = null; } continue; }
+        if (!g.voice) g.voice = audio.addVoice();
+        if (!g.voice) continue;
+        const p = g.model.root.position; g.voice.at(p.x, p.y, p.z);
+        g.voice.update(voiceParams(g));
+      }
+    }
+  }
+  function voiceParams(g) {
+    const st = g.st, snd = g.snd, id = g.prof.c, dp = id === 'dragpak', dm = id === 'demon', bm = g.gv.spec.boostMax || 0;
+    return { rpm: st.rpm, load: st.load, thr: st.thr, cut: st.fl & 128 ? 1 : 0, boost: st.boost, run: st.fl & 8 ? 1 : 0, crank: st.fl & 64 ? 1 : 0,
+      squeal: st.sq, sqPitch: 0.5, spin: st.sq * 0.8, speed: 0, surf: 0, interior: 0, horn: st.fl & 16 ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol * 0.7,
+      rough: snd.rough || 0, whine: g.big ? snd.whine : dp ? 1.7 : dm ? 1.45 : 1, rpmRef: g.big ? snd.rpmRef : dp ? 8800 : 6200, hum: 0,
+      boostRef: Math.max(g.big ? bm : dp ? 24 : 11.6, bm), race: g.big ? snd.race : dp ? 1 : 0,
+      nEng: snd.nEng, cyl: snd.cyl, fmul: snd.fmul, deep: snd.deep, loud: snd.loud, open: snd.open, whK: snd.whK, whPure: snd.whPure,
+      pipe: snd.pipe ? clamp((st.rpm - snd.pipe[0]) / (snd.pipe[1] - snd.pipe[0]), 0, 1) : 0, vt: snd.vt || 0, surge: snd.surge || 0, ev: snd.ev || 0,
+      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1 };
+  }
+  // ---- racing in a room: points, invisible walls, a reset every 30 s
+  // Points come for ground covered along the course: on the road, 1 a metre times a streak that builds the longer you
+  // stay on it (+0.1 every 40 m, up to x3); off it, a quarter of that and the streak's gone. Going backwards earns
+  // nothing, and the metres you gave up have to be made up again before any more come. Hitting a straw bale costs 100
+  // (and the streak). Invisible walls a few metres off the road (just behind the bales on the mower tracks) follow your
+  // own bit of the course, so there's no cutting across to another bit of it: the car's place on the course is followed
+  // along the centre line from where it was - never jumping to whichever bit is nearest - so a shortcut can't count
+  const RACE = { on: false, i: -1, s: 0, sd: 0, px: 0, pz: 0, tx: 0, tz: -1, prevS: null, debt: 0, pts: 0, streak: 1, streakM: 0, road: true,
+    hayT: 0, hayOn: new Set(), flash: '', flashT: 0, resetT: -1e9, walls: [], r: null, saveT: 0, boardT: 0, savedP: -1 };
+  const RESET_WAIT = 30, HAY_PTS = 100, STREAK_M = 40, STREAK_MAX = 3, OFF_RATE = 0.25;
+  // (the walls: this far from the centre line - rally stages 4 m past the road's edge, the verge and the ditch, short of
+  // the woods; the mower tracks 2.5 m, just behind the bales)
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 4 : 2.5) : 0;
+  function raceTrack(x, z) {
+    const T = CRS_T, n = T.n, X = T.x, Z = T.z;
+    const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
+    let i = RACE.i;
+    if (i < 0) { let b = 1e18; for (let k = 0; k < n; k++) { const d = d2(k); if (d < b) { b = d; i = k; } } }
+    else {
+      // (downhill along the line from last time: it follows the car round, and never jumps to another bit of the course -
+      // at most ~24 m a frame, so a car that somehow jumps is left behind, off the course, and put back)
+      let d = d2(i);
+      for (let it = 0; it < 12; it++) {
+        const a = i + 1 === n ? 0 : i + 1, b = i === 0 ? n - 1 : i - 1, da = d2(a), db = d2(b);
+        if (da < d) { i = a; d = da; } else if (db < d) { i = b; d = db; } else break;
+      }
+    }
+    RACE.i = i;
+    // the nearest point on the segments either side of it
+    let best = 1e18;
+    for (const a of [i === 0 ? n - 1 : i - 1, i]) {
+      const b = a + 1 === n ? 0 : a + 1, dx = X[b] - X[a], dz = Z[b] - Z[a];
+      let t = ((x - X[a]) * dx + (z - Z[a]) * dz) / (dx * dx + dz * dz);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = X[a] + dx * t, pz = Z[a] + dz * t, e = (x - px) * (x - px) + (z - pz) * (z - pz);
+      if (e >= best) continue;
+      best = e;
+      const tx = T.tx[a] * (1 - t) + T.tx[b] * t, tz = T.tz[a] * (1 - t) + T.tz[b] * t, l = Math.hypot(tx, tz) || 1;
+      RACE.px = px; RACE.pz = pz; RACE.tx = tx / l; RACE.tz = tz / l; RACE.s = T.s[a] + (T.s[a + 1] - T.s[a]) * t;
+    }
+    RACE.sd = (x - RACE.px) * -RACE.tz + (z - RACE.pz) * RACE.tx;
+  }
+  // the walls either side, for the next physics step: 10 m thick, 60 m long, lined up with the course where the car is
+  // (the inside of a tight turn: closer in, short of the turn's middle)
+  function raceWalls() {
+    const R = CRS_T.R[RACE.i] || 1e4, inner = Math.max(CRS_T.W / 2 + 1.5, Math.min(RACE_WD, Math.abs(R) - 3)), tx = RACE.tx, tz = RACE.tz, HX = 5;
+    RACE.walls.length = 0;
+    for (const side of [1, -1]) {                       // (+1: on the right)
+      const o = ((side > 0 ? R < 0 : R > 0) ? inner : RACE_WD) + HX;
+      RACE.walls.push({ x: RACE.px - tz * side * o, z: RACE.pz + tx * side * o, hx: HX, hz: 30, c: tz, s: tx, mu: 0.08, wall: true });
+    }
+  }
+  // back on the course: the centre line where you are on it, facing the way it runs
+  const raceSpot = () => ({ x: RACE.px, y: groundH(RACE.px, RACE.pz), z: RACE.pz, tx: RACE.tx, tz: RACE.tz });
+  function raceLost() { RACE.streak = 1; RACE.streakM = 0; }
+  function raceFlash(t, secs) { RACE.flash = t; RACE.flashT = secs || 2; }
+  // (the course's straw bales, in 8 m cells, for the hay penalty)
+  let HAY = null;
+  function hayCells() {
+    if (HAY) return HAY;
+    HAY = new Map();
+    const list = S.map === 'mowtrack' ? W.mowtrackBales() : W.trackProps().bales;
+    list.forEach((b, k) => { const key = (Math.floor(b.x / 8) + 4096) * 8192 + Math.floor(b.z / 8) + 4096; let l = HAY.get(key); if (!l) HAY.set(key, l = []); l.push([k, b.x, b.z]); });
+    return HAY;
+  }
+  function raceHay(dt) {
+    RACE.hayT -= dt;
+    const a = carAxes(), fl = Math.hypot(a.fx, a.fz) || 1, rl = Math.hypot(a.rx, a.rz) || 1;
+    const fX = a.fx / fl, fZ = a.fz / fl, rX = a.rx / rl, rZ = a.rz / rl;
+    // (the body's footprint, as the physics has it: the bales' colliders are 0.6 m round)
+    const zc = 0.5 * (sp.bodyFront + sp.bodyRear), hl = 0.5 * (sp.bodyRear - sp.bodyFront), hw = sp.bodyHalfW, R = 0.6 + 0.08;
+    const cx = veh.px - fX * zc, cz = veh.pz - fZ * zc, H = hayCells(), on = new Set();
+    const i0 = Math.floor(cx / 8), j0 = Math.floor(cz / 8);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+      const l = H.get((i + 4096) * 8192 + j + 4096);
+      if (!l) continue;
+      for (const [k, bx, bz] of l) {
+        const dx = bx - cx, dz = bz - cz, lx = dx * rX + dz * rZ, lz = -(dx * fX + dz * fZ);
+        const ex = lx - clamp(lx, -hw, hw), ez = lz - clamp(lz, -hl, hl);
+        if (ex * ex + ez * ez < R * R) on.add(k);
+      }
+    }
+    let hit = false;
+    for (const k of on) if (!RACE.hayOn.has(k)) hit = true;
+    RACE.hayOn = on;
+    if (hit && RACE.hayT <= 0 && Math.hypot(veh.vx, veh.vz) > 1) {
+      RACE.hayT = 1.5;
+      RACE.pts = Math.max(0, RACE.pts - HAY_PTS); raceLost();
+      raceFlash('−' + HAY_PTS + ' · hit the hay', 2);
+    }
+  }
+  function raceUpdate(dt) {
+    const on = COURSE && inRoom() && G.started;
+    if (!on) { RACE.on = false; RACE.i = -1; RACE.prevS = null; RACE.walls.length = 0; return; }
+    RACE.on = true;
+    RACE.flashT -= dt;
+    const was = RACE.i >= 0 ? [RACE.i, RACE.px, RACE.pz, RACE.tx, RACE.tz, RACE.s] : null;
+    raceTrack(veh.px, veh.pz);
+    // out past the walls (joined from off in the scenery, or somehow over them): back on the course - where it was on it
+    // before (a car that jumped gains nothing from it)
+    if (Math.abs(RACE.sd) > RACE_WD + 3) {
+      if (was) [RACE.i, RACE.px, RACE.pz, RACE.tx, RACE.tz, RACE.s] = was;
+      resetCar(true); return;
+    }
+    raceWalls();
+    // on the road: the car's middle inside the road's edge (a wheel or two off still counts)
+    const T = CRS_T, onRoad = Math.abs(RACE.sd) < T.W / 2 + 0.5;
+    if (!onRoad && RACE.road) raceLost();
+    RACE.road = onRoad;
+    if (RACE.prevS !== null) {
+      let ds = RACE.s - RACE.prevS;
+      if (ds > T.L / 2) ds -= T.L; else if (ds < -T.L / 2) ds += T.L;
+      if (ds < 0) RACE.debt -= ds;
+      else if (ds > 0) {
+        const pay = Math.min(ds, RACE.debt); RACE.debt -= pay; ds -= pay;
+        if (ds > 0 && onRoad) {
+          RACE.pts += ds * RACE.streak; RACE.streakM += ds;
+          while (RACE.streakM >= STREAK_M) { RACE.streakM -= STREAK_M; RACE.streak = Math.min(STREAK_MAX, Math.round(RACE.streak * 10 + 1) / 10); }
+        } else if (ds > 0) RACE.pts += ds * OFF_RATE;
+      }
+    }
+    RACE.prevS = RACE.s;
+    raceHay(dt);
+    // (kept through a reload - a new car, the host's map - for this room and round)
+    RACE.saveT -= dt;
+    if (RACE.saveT <= 0) { RACE.saveT = 3; raceSave(); }
+  }
+  function raceSave() {
+    if (!inRoom() || RACE.r === null || Math.round(RACE.pts) === RACE.savedP) return;
+    RACE.savedP = Math.round(RACE.pts);
+    // (per tab, like the guest sign-in - two tabs are two players)
+    try { sessionStorage.setItem('hc_netPts', JSON.stringify({ code: ONLINE.net.code, r: RACE.r, p: RACE.savedP })); } catch (e) { /* storage unavailable */ }
+  }
+  window.addEventListener('pagehide', raceSave);
+  // the room's round: the host can start a new one - everyone back to 0 points on the start line
+  function raceMeta(m) {
+    const r = m.r || 0;
+    if (RACE.r === r) return;
+    const first = RACE.r === null; RACE.r = r;
+    if (first) {
+      // (back after a reload: the points you had in this round)
+      let k = null; try { k = JSON.parse(sessionStorage.getItem('hc_netPts')); } catch (e) { /* storage unavailable */ }
+      RACE.pts = k && k.code === ONLINE.net.code && k.r === r ? k.p : 0;
+      RACE.savedP = Math.round(RACE.pts);
+      return;
+    }
+    RACE.pts = 0; RACE.debt = 0; RACE.resetT = -1e9; raceLost(); raceSave();
+    if (COURSE && G.started) { putCar(gridSpot(Math.floor(Math.random() * 8))); RACE.i = -1; RACE.prevS = null; LAP.armed = false; }
+    hud.toast('New round - everyone back to 0 points. Go!', 3);
+  }
+  // ---- the HUD: the points board (top right) and the reset timer (bottom left, over the map)
+  function raceHud(dt) {
+    const bd = $('netBoard'), rc = $('resetCd');
+    bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on);
+    $('perf').style.display = RACE.on ? 'none' : '';
+    if (!RACE.on) return;
+    const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+    rc.classList.toggle('ready', wait <= 0);
+    rc.firstElementChild.textContent = wait > 0 ? 'Reset in ' + Math.ceil(wait) + ' s' : 'Reset ready · Backspace';
+    rc.querySelector('i').style.width = (wait > 0 ? 100 * (1 - wait / RESET_WAIT) : 100).toFixed(1) + '%';
+    RACE.boardT -= dt;
+    if (RACE.boardT > 0) return;
+    RACE.boardT = 0.2;
+    $('nbPts').textContent = Math.round(RACE.pts).toLocaleString();
+    const mul = $('nbMul');
+    mul.textContent = RACE.road ? '×' + RACE.streak.toFixed(1) : '×' + OFF_RATE;
+    mul.className = RACE.road ? '' : 'off';
+    const st = $('nbSt');
+    st.textContent = RACE.flashT > 0 ? RACE.flash : RACE.road ? (RACE.streak < STREAK_MAX ? 'On the road · streak building' : 'On the road · max streak') : 'Off the road · ¼ points';
+    st.className = RACE.flashT > 0 ? 'hay' : RACE.road ? '' : 'off';
+    const list = [{ n: S.netName, p: RACE.pts, me: true }];
+    for (const g of ONLINE.ghosts.values()) { const L = g.snaps[g.snaps.length - 1]; list.push({ n: g.prof.n, p: L && L.length > 31 ? L[31] : 0 }); }
+    list.sort((a, b) => b.p - a.p);
+    $('nbList').innerHTML = list.length < 2 ? '<div><span>Waiting for friends…</span></div>'
+      : list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${Math.round(e.p).toLocaleString()}</span></div>`).join('');
+  }
+  // (the others' cars are solid - our car's obstacle list gets their footprints - and so are the course's walls)
+  veh.world.collidersNear = (x, z, r, c, b) => {
+    W.collidersNear(x, z, r, c, b);
+    for (const bx of ONLINE.boxes) { const dx = bx.x - x, dz = bx.z - z; if (dx * dx + dz * dz < (r + 8) * (r + 8)) b.push(bx); }
+    for (const w of RACE.walls) b.push(w);
+  };
+
+  // ---- the Online tab
+  function renderOnline(add) {
+    const net = ONLINE.net, on = inRoom(), maps = NET_MAPS.map((k) => [k, MAP_NAMES[k]]);
+    add(row('Online play', 'Race your friends: one of you hosts a room and shares its code, the others join it. Everyone drives the host\'s car, set up the host\'s way, on the host\'s course: '
+      + 'the Windy Rally Stage, the Rally Stage, the Windy Mower Track or the Mower Track. Needs an internet connection.' + (ONLINE.status ? ' · <b>' + esc(ONLINE.status) + '</b>' : ''), el('<span></span>')));
+    add(row('Points', 'For ground covered along the course: on the road 1 a metre, times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
+      + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls keep everyone on the course - no shortcuts - '
+      + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s.', el('<span></span>')));
+    const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
+    const name = inp('Your name', S.netName, 16, 170);
+    name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
+    add(row('Your name', 'Shown over your car', name));
+    const carNow = el(`<b style="font-size:13px">${esc(carLabel(S.car, optOf()))}</b>`);
+    if (!on) add(row('Car', 'Hosting? Everyone in your room drives the car you\'re in now, set up your way - its version, tyres, transmission, off-road package and Fun-tab tune', carNow));
+    else if (net.isHost) add(row('Car', 'Everyone drives the car you\'re in, set up your way (version, tyres, transmission, package, Fun-tab tune). Change any of it and they follow', carNow));
+    else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
+    if (!on) {
+      add(row('Course', 'For a room you host', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      const hb = el('<button class="btn small">Host a game</button>');
+      hb.addEventListener('click', () => onlineHost());
+      add(row('Host', 'Opens a room on that course (loading it if you\'re not on it) and gives you its code to share', hb));
+      const code = inp('CODE', '', 5, 90); code.style.textTransform = 'uppercase'; code.style.letterSpacing = '0.15em';
+      const jb = el('<button class="btn small">Join</button>');
+      jb.addEventListener('click', () => onlineJoin(code.value));
+      code.addEventListener('keydown', (e) => { if (e.key === 'Enter') onlineJoin(code.value); });
+      const w = el('<div style="display:flex;gap:8px;align-items:center"></div>'); w.appendChild(code); w.appendChild(jb);
+      add(row('Join a friend', 'Type the 5-letter code they give you', w));
+    } else {
+      add(row('Room code', net.isHost ? 'You\'re the host: the course you pick is everyone\'s. Give your friends this code.' : 'The host picks the course and the car.',
+        el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
+      if (net.isHost) {
+        add(row('Course', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        const rb = el('<button class="btn small">New round</button>');
+        rb.addEventListener('click', () => { net.newRound(); hud.toast('New round!', 1.5); });
+        add(row('New round', 'Everyone back to 0 points, on the start line', rb));
+      }
+      const pts = (p) => '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
+      const list = [`<b>${esc(S.netName)}</b> (you) · ${esc(carLabel(S.car, optOf()))} · ${pts(RACE.pts)}`]
+        .concat([...ONLINE.ghosts.values()].map((g) => { const L = g.snaps[g.snaps.length - 1]; return `${esc(g.prof.n)} · ${esc(carLabel(g.prof.c, g.prof.o))} · ${pts(L && L.length > 31 ? L[31] : 0)}`; }));
+      add(row('Drivers', list.length + ' in the room', el('<div style="text-align:right;font-size:13px;line-height:1.7">' + list.join('<br>') + '</div>')));
+      const lb = el('<button class="btn small ghost">Leave the room</button>');
+      lb.addEventListener('click', () => onlineLeave());
+      add(row('', '', lb));
+    }
+    if (ONLINE.busy) add(row('Working…', '', el('<span></span>')));
+    if (ONLINE.err) add(row('<span style="color:#ff6b6b">Couldn\'t do that</span>', esc(ONLINE.err), el('<span></span>')));
+  }
+  // ---- the title screen: Play online (start, then the Online tab), and the room it's in / rejoining
+  function netTitle() {
+    const t = $('netTitle'); if (!t) return;
+    t.textContent = inRoom() ? 'Online · room ' + ONLINE.net.code + (ONLINE.net.isHost ? ' (you host)' : '') : S.netRoom ? 'Rejoining room ' + S.netRoom + '…' : '';
+  }
+  $('onlineBtn').addEventListener('click', async () => {
+    if (!G.loadDone) return;
+    await startGame();
+    curTab = 'Online'; openMenu(true);
+  });
+  netTitle();
+  // (back in the room you were in after a reload - a new car, the host's map)
+  if (S.netRoom) onlineJoin(S.netRoom, true);
+
+  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE };
   function loop(now) {
     requestAnimationFrame(loop);
     frame(now);
@@ -1605,11 +2319,13 @@
       dragUpdate(dt);
       arenaUpdate(dt);
       lapUpdate();
+      raceUpdate(dt);
       flipHint(dt);
       effects(dt);
       rumble(dt);
     }
     updateCarVisual(dt);
+    onlineTick(dt);
     if (G.started) updateCamera(dt); else attractCamera(G.time);
     worldT -= dt;
     if (worldT <= 0) { world.update(camera.position); worldT = 0.2; }
