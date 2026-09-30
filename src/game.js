@@ -360,7 +360,7 @@
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
     }
   }
-  const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8) * (STOCK.jet.size || 1);   // (engine diameter against stock: airflow ~ area)
+  const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8) * ((STOCK.jet && STOCK.jet.size) || 1);   // (engine diameter against stock: airflow ~ area)
   // the model for any vehicle, from its id, its CARS entry and its (constructed) spec - the other players' cars in online
   // play are built by the same
   function buildModel(id, def, s, paint) {
