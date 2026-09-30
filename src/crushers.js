@@ -1143,6 +1143,7 @@
       M.seam = new THREE.MeshStandardMaterial({ color: 0x08080a, roughness: 0.6 });
       M.drl = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 2.4, toneMapped: false });
       M.lampIn = new THREE.MeshStandardMaterial({ color: 0xd4d9df, roughness: 0.16, metalness: 0.95, emissive: 0x20242a });
+      M.lampSmoke = new THREE.MeshStandardMaterial({ color: 0x5b6169, roughness: 0.2, metalness: 0.9 });
       M.lampLens = new THREE.MeshPhysicalMaterial({ color: 0x0c0f13, roughness: 0.05, metalness: 0.2, clearcoat: 1 });
       M.trimIn = new THREE.MeshStandardMaterial({ color: 0x1d1e21, roughness: 0.85, side: THREE.DoubleSide });
       M.hidden = new THREE.MeshBasicMaterial({ visible: false });
@@ -1234,32 +1235,47 @@
       // the headlamps, the bumper (black, up under the headlamps at the corners) with the fog lamps, the lower grille,
       // tow hooks and the skid plate
       const GZ = zN - 0.012;
-      const hexTex = canvasTex(256, 128, (g, w, h) => {
-        g.fillStyle = '#030304'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3d42'; g.lineWidth = 4;
-        const r = 11, dx = r * Math.sqrt(3);
-        for (let row = -1; row * r * 1.5 < h + r; row++) for (let col = -1; col * dx < w + dx; col++) {
-          const cx = col * dx + (row & 1 ? dx / 2 : 0), cy = row * r * 1.5; g.beginPath();
-          for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; g.lineTo(cx + Math.cos(a) * (r - 1.5), cy + Math.sin(a) * (r - 1.5)); }
-          g.closePath(); g.stroke();
-        }
+      // (polygons in the front view, (x, y): a point-in test, a path, an inset of a convex anticlockwise one)
+      const inPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+      const polyPath = (P, path) => { path.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) path.lineTo(P[i][0], P[i][1]); path.closePath(); return path; };
+      const inset = (P, d) => P.map((_, i) => {
+        const n = P.length, a = P[(i - 1 + n) % n], b = P[i], c = P[(i + 1) % n];
+        const off = (p, q) => { const ex = q[0] - p[0], ey = q[1] - p[1], l = Math.hypot(ex, ey); return { px: p[0] - ey / l * d, py: p[1] + ex / l * d, ex, ey }; };
+        const L1 = off(a, b), L2 = off(b, c), den = L1.ex * L2.ey - L1.ey * L2.ex, t = ((L2.px - L1.px) * L2.ey - (L2.py - L1.py) * L2.ex) / den;
+        return [L1.px + L1.ex * t, L1.py + L1.ey * t];
       });
-      hexTex.wrapS = hexTex.wrapT = THREE.RepeatWrapping; hexTex.repeat.set(5, 2.3);
-      M.hex = new THREE.MeshStandardMaterial({ map: hexTex, roughness: 0.5, metalness: 0.3 });
-      const gx = 0.58, gy0 = 0.745, gy1 = 1.262, ch = 0.07, fw = 0.052;
-      { const s = new THREE.Shape();
-        s.moveTo(-gx + ch, gy0); s.lineTo(gx - ch, gy0); s.lineTo(gx, gy0 + ch); s.lineTo(gx, gy1); s.lineTo(-gx, gy1); s.lineTo(-gx, gy0 + ch); s.closePath();
-        const hIn = new THREE.Path(), ix = gx - fw, iy0 = gy0 + fw * 0.9, iy1 = gy1 - fw, ic = ch * 0.7;
-        hIn.moveTo(-ix + ic, iy0); hIn.lineTo(-ix, iy0 + ic); hIn.lineTo(-ix, iy1); hIn.lineTo(ix, iy1); hIn.lineTo(ix, iy0 + ic); hIn.lineTo(ix - ic, iy0); hIn.closePath();
-        s.holes.push(hIn);
-        add(body, new THREE.ExtrudeGeometry(s, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 2 }), M.frame, 0, 0, GZ - 0.045);
-        add(body, new THREE.PlaneGeometry(2 * ix, iy1 - iy0), M.hex, 0, (iy0 + iy1) / 2, GZ + 0.012, 0, Math.PI, 0, false);
-        add(body, rbox(2 * ix + 0.02, 0.09, 0.045, 0.014), M.clad, 0, 1.035, GZ - 0.012);
-        add(body, rbox(2 * ix - 0.1, 0.04, 0.02, 0.008), M.gloss, 0, 1.035, GZ - 0.036); }
+      // a honeycomb: a plate cut with hexagonal cells (pointy-topped, radius r, webs w wide) wherever a whole cell fits
+      // inside the outline P - real openings with depth, each cell lit on its own
+      function honeycomb(P, r, w, depth) {
+        const sh = polyPath(P, new THREE.Shape()), dx = Math.sqrt(3) * r, dy = 1.5 * r, hr = r - w / Math.sqrt(3);
+        const xs = P.map((q) => q[0]), ys = P.map((q) => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        for (let row = 0, y = y0 + r * 0.8; y < y1; row++, y += dy) for (let x = x0 - dx + (row & 1 ? dx / 2 : 0); x < x1 + dx; x += dx) {
+          const V = [], Vm = [];
+          for (let k = 0; k < 6; k++) { const a = Math.PI / 2 + k * Math.PI / 3; V.push([x + Math.cos(a) * hr, y + Math.sin(a) * hr]); Vm.push([x + Math.cos(a) * (hr + w * 0.8), y + Math.sin(a) * (hr + w * 0.8)]); }
+          if (Vm.every(([vx, vy]) => inPoly(P, vx, vy))) sh.holes.push(polyPath(V, new THREE.Path()));
+        }
+        return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: 1 });
+      }
+      // the Rebel's grille: an octagon - straight across the top under the hood lip, straight down the sides, the lower
+      // corners cut away at 45 deg to a narrower bottom - in a heavy satin-black surround with a stepped gloss lip inside
+      // it, a big open honeycomb recessed behind that, and the radiator's fins dark behind the cells
+      const G_OUT = [[-0.44, 0.745], [0.44, 0.745], [0.585, 0.9], [0.585, 1.262], [-0.585, 1.262], [-0.585, 0.9]];
+      const G_LIP = inset(G_OUT, 0.046), G_IN = inset(G_OUT, 0.06);
+      { const sh = polyPath(G_OUT, new THREE.Shape()); sh.holes.push(polyPath(G_LIP, new THREE.Path()));
+        add(body, new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.008, bevelSegments: 3 }), M.clad, 0, 0, GZ - 0.058);
+        const lip = polyPath(G_LIP, new THREE.Shape()); lip.holes.push(polyPath(G_IN, new THREE.Path()));
+        add(body, new THREE.ExtrudeGeometry(lip, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.003, bevelSegments: 2 }), M.frame, 0, 0, GZ - 0.046);
+        add(body, honeycomb(inset(G_OUT, 0.052), 0.032, 0.009, 0.024), M.frame, 0, 0, GZ - 0.042);
+        const fin = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#16171a'; g.fillRect(0, 0, w, h); g.fillStyle = '#26282c'; for (let k = 0; k < 8; k++) g.fillRect(k * 8, 0, 3, h); g.fillStyle = '#0b0b0c'; g.fillRect(0, 0, w, 10); });
+        fin.wrapS = fin.wrapT = THREE.RepeatWrapping; fin.repeat.set(40, 40);
+        add(body, new THREE.ShapeGeometry(polyPath(inset(G_OUT, 0.045), new THREE.Shape())), new THREE.MeshStandardMaterial({ map: fin, roughness: 0.7, metalness: 0.4 }), 0, 0, GZ + 0.005, 0, 0, 0, false);
+        // (the surround's top is a heavier beam than its sides)
+        add(body, rbox(1.08, 0.046, 0.034, 0.012), M.clad, 0, 1.2, GZ - 0.05); }
       for (const sx of [-1, 1]) {
         // headlamp: the housing swept back at its outer end, the grey inside, two projectors, the DRL strip
         const hl = new THREE.Group(); hl.position.set(sx * 0.768, 1.15, zN + 0.022); hl.rotation.y = -sx * 0.19; body.add(hl);
         add(hl, rbox(0.382, 0.2, 0.07, 0.02), M.frame, 0, 0, 0.025);
-        add(hl, new THREE.PlaneGeometry(0.356, 0.172), M.lampIn, 0, -0.004, -0.0115, 0, Math.PI, 0, false);
+        add(hl, new THREE.PlaneGeometry(0.356, 0.172), M.lampSmoke, 0, -0.004, -0.0115, 0, Math.PI, 0, false);
         for (const px of [-0.105, 0.03]) {
           add(hl, cylZ(0.056, 0.056, 0.012, 28), M.frame, sx * px, -0.016, -0.008);
           add(hl, new THREE.TorusGeometry(0.048, 0.008, 8, 28), M.chrome, sx * px, -0.016, -0.016, 0, 0, 0, false);
@@ -1267,10 +1283,8 @@
           add(hl, new THREE.CircleGeometry(0.016, 16), M.head, sx * px, -0.016, -0.033, 0, Math.PI, 0, false);
         }
         add(hl, new THREE.BoxGeometry(0.006, 0.15, 0.006), M.frame, sx * 0.1, -0.008, -0.014, 0, 0, 0, false);
-        add(hl, rbox(0.354, 0.022, 0.01, 0.006), M.drl, 0, 0.077, -0.016, 0, 0, 0, false);
-        add(hl, rbox(0.018, 0.15, 0.01, 0.006), M.drl, sx * 0.169, 0.0, -0.016, 0, 0, 0, false);
-        add(hl, rbox(0.11, 0.018, 0.01, 0.006), M.drl, sx * 0.12, -0.075, -0.016, 0, 0, 0, false);
-        add(hl, rbox(0.075, 0.016, 0.01, 0.005), M.amber, sx * 0.02, -0.076, -0.016, 0, 0, 0, false);
+        add(hl, rbox(0.35, 0.024, 0.01, 0.008), M.drl, 0, 0.068, -0.016, 0, 0, 0, false);
+        add(hl, rbox(0.2, 0.014, 0.01, 0.005), M.amber, sx * 0.07, -0.078, -0.016, 0, 0, 0, false);
         add(body, rbox(0.22, 0.29, 0.04, 0.012), M.clad, sx * 0.69, 0.905, zN - 0.004);                                 // (the black under the lamp)
       }
       spots(0.72, 1.15, zN - 0.02);
@@ -1281,14 +1295,16 @@
         const bg = new THREE.ExtrudeGeometry(bp, { depth: 0.29, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 3, curveSegments: 12 });
         bg.rotateX(-Math.PI / 2); add(body, bg, M.clad, 0, 0.46, 0); }
       for (const sx of [-1, 1]) {
-        add(body, cylZ(0.058, 0.064, 0.03, 24), M.frame, sx * 0.63, 0.6, zN - 0.095);
-        add(body, new THREE.TorusGeometry(0.046, 0.006, 8, 24), M.chrome, sx * 0.63, 0.6, zN - 0.111, 0, 0, 0, false);
-        add(body, new THREE.CircleGeometry(0.044, 24), M.lampIn, sx * 0.63, 0.6, zN - 0.109, 0, Math.PI, 0, false);
-        add(body, new THREE.SphereGeometry(0.02, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), M.head, sx * 0.63, 0.6, zN - 0.11, 0, 0, 0, false);
+        add(body, rbox(0.23, 0.1, 0.03, 0.022), M.frame, sx * 0.66, 0.6, zN - 0.094);
+        add(body, rbox(0.17, 0.042, 0.012, 0.012), M.lampIn, sx * 0.665, 0.6, zN - 0.109, 0, 0, 0, false);
+        add(body, new THREE.PlaneGeometry(0.15, 0.012), M.head, sx * 0.665, 0.6, zN - 0.1155, 0, Math.PI, 0, false);
         add(body, rbox(0.035, 0.07, 0.14, 0.012), M.steel, sx * 0.5, 0.425, zN - 0.05);
       }
-      add(body, new THREE.PlaneGeometry(0.84, 0.15), M.hex, 0, 0.585, zN - 0.093, 0, Math.PI, 0, false);             // the lower grille
-      add(body, rbox(0.88, 0.028, 0.02, 0.01), M.gloss, 0, 0.668, zN - 0.095); add(body, rbox(0.88, 0.028, 0.02, 0.01), M.gloss, 0, 0.502, zN - 0.095);
+      { const L = [[-0.42, 0.515], [0.42, 0.515], [0.42, 0.655], [-0.42, 0.655]];
+        add(body, honeycomb(L, 0.021, 0.006, 0.014), M.frame, 0, 0, zN - 0.104);
+        const fr = polyPath([[-0.44, 0.498], [0.44, 0.498], [0.44, 0.672], [-0.44, 0.672]], new THREE.Shape()); fr.holes.push(polyPath(L, new THREE.Path()));
+        add(body, new THREE.ExtrudeGeometry(fr, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 }), M.frame, 0, 0, zN - 0.112); }
+      for (const x of [-0.24, 0, 0.24]) add(body, rbox(0.15, 0.042, 0.012, 0.008), M.frame, x, 0.472, zN - 0.095);
       add(body, rbox(1.1, 0.03, 0.4, 0.01), M.steel, 0, 0.38, zN + 0.16, 0.2, 0, 0);                                  // skid plate
       // the hood: its shut lines, the dome's two vents, the wipers
       const seam = (a, b) => tubeAB(body, a, b, 0.0035, M.seam, 5);
