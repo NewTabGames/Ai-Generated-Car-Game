@@ -1226,9 +1226,13 @@
         const zN = zA + abL;
         add(jg, cylZ(0.14, 0.13, 0.1, 30, true), new THREE.MeshStandardMaterial({ color: 0x3a3436, roughness: 0.5, metalness: 0.8, side: THREE.DoubleSide }), 0, 0, zN + 0.05);
         add(jg, new THREE.CircleGeometry(0.12, 24), M.black, 0, 0, zN - 0.02, 0, Math.PI, 0);
-        // the cradle: four struts from the frame rails up to the case (re-aimed when the engine grows)
-        const strutGeo = new THREE.CylinderGeometry(0.016, 0.016, 1, 10), struts = [];
+        // the mount: two frame rails run back from the seat pod under the engine (past the back axle, and on under a big
+        // engine's afterburner), a pylon in the body colour stands from them to the case's belly along its length, and
+        // four struts brace the case from the rails - all re-sized and re-aimed with the engine (jetSize)
+        const strutGeo = new THREE.CylinderGeometry(0.026, 0.026, 1, 10), struts = [];
         for (const sx of [-1, 1]) for (const dz of [0.25, 0.8]) struts.push({ m: add(body, strutGeo, M.steel, 0, 0, 0), sx, dz });
+        const unit = new THREE.BoxGeometry(1, 1, 1);
+        const rails = [-1, 1].map((sx) => ({ m: add(body, unit, M.steel, 0, 0, 0), sx })), cross = add(body, unit, M.steel, 0, 0, 0), pylon = add(body, unit, M.paint, 0, 0, 0);
         // the tail fin on top of the afterburner can, swept back
         const fs = new THREE.Shape(); fs.moveTo(0, 0); fs.lineTo(0.62, 0); fs.lineTo(0.78, 0.5); fs.lineTo(0.5, 0.52); fs.closePath();
         const fin = new THREE.ExtrudeGeometry(fs, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 });
@@ -1260,13 +1264,22 @@
         const plumeGeo = (r0, r1) => { const g = new THREE.CylinderGeometry(r0, r1, 1, 24, 6, true); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; };
         jetFx = { outer: add(jg, plumeGeo(0.14, 0.07), flameMat(false), 0, 0, zN + 0.1, 0, 0, 0, false), core: add(jg, plumeGeo(0.1, 0.015), flameMat(true), 0, 0, zN + 0.1, 0, 0, 0, false), t: 0 };
         jetFx.outer.renderOrder = 5; jetFx.core.renderOrder = 6;
-        // a bigger engine (s: its diameter against stock): fatter by s, longer by less, sat a little higher to clear the axle
-        const up = V3(0, 1, 0), dv = V3(0, 0, 0);
+        // a bigger engine (s: its diameter against stock): fatter by s, longer by less, sat a little higher to clear the axle -
+        // and a huge one high enough that its intake clears the back tyres and its belly the frame rails
+        const up = V3(0, 1, 0), dv = V3(0, 0, 0), RY = 0.28, RH = 0.08;
         jetSize = (sz) => {
-          const sa = 1 + (sz - 1) * 0.6, y = ey + Math.max(0, sz - 1) * 0.07, zb = ez0 + Math.max(0, sz - 1.4) * 0.3;
+          const bell = 0.235 * sz, sa = 1 + (sz - 1) * 0.6, zb = ez0 + Math.max(0, sz - 1.4) * 0.3;
+          const y = Math.max(ey + Math.max(0, sz - 1) * 0.07, RY + RH / 2 + (er - 0.01) * sz, 0.58 + Math.sqrt(Math.max(0, bell * bell - 0.47 * 0.47)));
           jg.scale.set(sz, sz, sa); jg.position.set(0, y, zb);
+          // (the rails: from the seat pod back past the axle, or to the afterburner of a long engine; the pylon: rail top to
+          // the case's belly, from just behind the intake to the rails' end)
+          const caseBot = y - (er - 0.01) * sz, zAb = zb + (0.16 + eL) * sa, r0 = zS1 - 0.05, r1 = Math.max(zR + 0.5, zAb);
+          for (const r of rails) { r.m.scale.set(0.06, RH, r1 - r0); r.m.position.set(r.sx * 0.3, RY, (r0 + r1) / 2); }
+          cross.scale.set(0.66, 0.06, 0.06); cross.position.set(0, RY, r1 - 0.03);
+          const p0 = zb + 0.2 * sa, p1 = Math.min(zAb, r1 - 0.04), ph = caseBot - (RY + RH / 2) + 0.03;
+          pylon.scale.set(0.12 + 0.05 * sz, Math.max(0.02, ph), Math.max(0.1, p1 - p0)); pylon.position.set(0, RY + RH / 2 + ph / 2 - 0.01, (p0 + p1) / 2);
           for (const st of struts) {
-            const a = V3(st.sx * 0.3, 0.32, ez0 + st.dz), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, zb + (st.dz + 0.05) * sa);
+            const a = V3(st.sx * 0.3, RY + RH / 2, zb + st.dz * sa), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, zb + (st.dz + 0.05) * sa);
             dv.subVectors(b, a); const len = dv.length();
             st.m.position.addVectors(a, b).multiplyScalar(0.5); st.m.quaternion.setFromUnitVectors(up, dv.normalize()); st.m.scale.set(1, len, 1);
           }

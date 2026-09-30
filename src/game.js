@@ -65,7 +65,7 @@
         ['hot', 'Hot Rod', 'A 45 kW / 160 Nm AC motor and a lithium pack · lowered, roof off, a roll hoop · 0-60 ~6 s · ~84 mph', 'Plum Crazy', 1],
         ['busa', 'Record (Hayabusa)', 'Built like the 118 mph world-record cart: a Hayabusa 1,340 cc four behind the seats, a 6-speed on a quickshifter · 0-60 ~4.8 s · ~120 mph', 'Go Mango', 1],
         ['jet', 'Jet', 'A surplus turbojet slung low behind the seats · 590 lbf of thrust, 810 with the afterburner · no driven wheels · 0-60 ~4 s · ~185 mph · built to stay straight flat out', 'B5 Blue', 1],
-        ['mega', 'Mega Jet', 'An afterburning fighter-trainer turbojet, half as big again as the Unhinged jet · 3,300 lbf dry, 4,600 lit · 0-60 in 0.8 s once spooled · ~340 mph · a big fin and downforce keep it straight', 'TorRed', 1],
+        ['mega', 'Mega Jet', 'An afterburning fighter-trainer turbojet, half as big again as the Unhinged jet, in a streamliner · 3,300 lbf dry, 4,600 lit · 0-60 in 0.8 s once spooled · 600 mph (Stage 2 700, Unhinged 800) · built to stay straight flat out', 'TorRed', 1],
       ],
       eng: {
         lsv: { hint: 'Golf cart (Street LSV): shift up (E) for DRIVE - a 72 V AC conversion, 12 kW, 35 mph, with brakes on all four wheels, lights, mirrors and a windscreen.',
@@ -78,7 +78,7 @@
           info: 'A jet-powered cart for the drag-strip shows: a surplus target-drone turbojet (~590 lbf of thrust dry, ~810 lbf with a homebuilt afterburner) slung low behind the seats so its thrust runs through the centre of gravity, a stretched, lowered and widened frame, 12 in wheels on low-profile radials (wider at the back), four-wheel discs with ABS, a nose cone and a tail fin · 480 kg · 0-60 ~4 s, ~185 mph',
           trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.6, race: 0 } },
         mega: { hint: 'Mega Jet golf cart: shift up (E) for DRIVE. The throttle spools an afterburning fighter-trainer turbojet (~3 s from idle) - hold SPACE (the brakes), floor it and let go as it howls: the brakes only hold it about halfway up the spool, and then it drags the locked tyres. The afterburner lights as you go - 0-60 in under a second. Nothing drives the wheels; reverse (R) is an electric motor. Stability control is on (Sport).',
-          info: 'The jet cart with an engine half as big again as the Unhinged one - 2.4 times the stock turbojet across: an afterburning fighter-trainer turbojet, ~3,300 lbf of thrust dry and ~4,600 lbf lit, on a longer, wider frame with the thrust through the centre of gravity, half its weight on the nose, a big fin on the afterburner can and a body shaped to be held down (~1,800 lb at 150 mph) · 700 kg · 0-60 in 0.8 s once spooled, 0-200 in under 4 s, ~340 mph',
+          info: 'The jet cart with an engine half as big again as the Unhinged one - 2.4 times the stock turbojet across: an afterburning fighter-trainer turbojet, ~3,300 lbf of thrust dry and ~4,600 lbf lit, on a longer, wider frame with the thrust through the centre of gravity, half its weight on the nose, a big fin on the afterburner can and a slippery streamliner body held down (~1,800 lb from 150 mph up - no more, so it never crushes itself onto its belly) · 700 kg · 0-60 in 0.8 s once spooled, 0-400 in ~8 s, 600 mph - Stage 2 ~700 mph, Unhinged 800 mph. Flat out it flies off crests for seconds and lands on its wheels',
           trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', cam: [1.3, 1.75],          // (the chase camera back and up: over the engine and its fin)
           snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.8, race: 0 } },
         busa: { hint: 'Golf cart (Record): shift up (E) for DRIVE and floor it - a Hayabusa 1,340 cc four behind the seats, ~190 hp through the bike\'s 6-speed (E / Q or the paddles), a stretched, lowered frame and a wheelie bar. The real one did 118.76 mph. Stability control is on (Sport).',
@@ -354,6 +354,11 @@
   if (JET) {
     TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
     TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
+    // (the Mega Jet, a streamliner: 600 mph stock, Stage 2 ~700 (a touch sleeker), Unhinged 800 - its wings cost drag)
+    if (STOCK.jet.size > 2) {
+      TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2, drag: 0.95 });
+      TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
+    }
   }
   const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8) * (STOCK.jet.size || 1);   // (engine diameter against stock: airflow ~ area)
   // the model for any vehicle, from its id, its CARS entry and its (constructed) spec - the other players' cars in online

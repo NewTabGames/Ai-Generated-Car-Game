@@ -1076,8 +1076,11 @@
 
       // ---------------- aero
       if (s.ClA) {
-        // tuned downforce: pushes the body down along its own up axis, squashing the tyres into the road
-        const df = 0.5 * s.rho * s.ClA * vFwd * vFwd;
+        // tuned downforce: pushes the body down along its own up axis, squashing the tyres into the road (dfV: past this
+        // speed it stops growing - the Mega Jet's 800 mph would otherwise crush it onto its belly)
+        // and it fades as the car tilts, gone on its side or its roof - flying off a crest at 500+ mph, a car rolled half
+        // over had its own 'down' holding it in the air as lift)
+        const vd = s.dfV && vFwd > s.dfV ? s.dfV : vFwd, df = 0.5 * s.rho * s.ClA * vd * vd * (s.dfV ? Math.max(0, upY) : 1);
         Fx -= upX * df; Fy -= upY * df; Fz -= upZ * df;
       }
       const q = 0.5 * s.rho * s.CdA * speed;
@@ -1098,7 +1101,9 @@
       // jet thrust: along the car's own axis, on the turbine's centre line (above the CG - it leans on the nose a little,
       // which is what keeps it from standing up on the rear axle like a wheelie car)
       if (s.jet && this.jetF > 0) {
-        const T = this.jetF, ly = s.jet.y + (s.cgDrop || 0), lz = s.jet.z;
+        // (a grip tune lowers the whole cart, the engine with it: the thrust stays on the CG. Left where it was, above a
+        // lowered CG, it tipped the nose down in the air - 5 rad/s over a crest at 500 mph, onto its roof)
+        const T = this.jetF, ly = s.jet.y, lz = s.jet.z;
         const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
         const fx = -m02 * T, fy = -m12 * T, fz = -m22 * T;
         Fx += fx; Fy += fy; Fz += fz;
@@ -2910,8 +2915,10 @@
     // afterburning fighter-trainer turbojet, ~3,300 lbf dry and ~4,600 lbf lit (thrust goes with the intake's area, so
     // 2.25 times the Unhinged tune's). 700 kg with it and its fuel. The frame is longer and wider, the thrust line still
     // runs through the CG, half its weight is on the nose, a big fin rides on the afterburner can (it and the body's
-    // yaw damping keep it straight when a 7 g shove meets a hard turn) and the body is shaped to be held down by the air
-    // (~1,800 lb at 150 mph) - 0-60 in 0.8 s once it's spooled, 0-200 in under 4 s, ~340 mph
+    // yaw damping keep it straight when a 7 g shove meets a hard turn), and a slippery streamliner shell is held down by
+    // the air - ~1,800 lb from 150 mph up and no more (dfV), or at 600 mph it squashed itself onto its belly and dragged.
+    // Its thrust falls off less with speed than the drone engine's (an afterburner near Mach 1 holds its thrust) - 0-60 in
+    // 0.8 s once it's spooled, 0-400 in ~8 s, 600 mph (Stage 2 ~700, Unhinged 800 with their tunes in game.js)
     mega: { label: 'Mega Jet', car: 'TURBOJET 4,600 LBF', hp: 0, tq: 0, kbLat: 4.5, spec: {
       mass: 700, Ipitch: 640, Iyaw: 760, Iroll: 100, cgHeight: 0.46, wheelbase: 2.55, frontWeight: 0.5, trackF: 1.22, trackR: 1.32,
       wheelRadius: 0.27, wheelRadiusF: 0.26, wheelRadiusR: 0.27, wheelInertiaF: 0.28, wheelInertiaR: 0.32,
@@ -2924,9 +2931,9 @@
       torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
       autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
       dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
-      jet: { thrust: 14600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.4, revTq: 34, revRpm: 4000, size: 2.37 },
+      jet: { thrust: 14600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0008, y: 0, z: 1.4, revTq: 34, revRpm: 4000, size: 2.37 },
       fin: { y: 0.3, z: 2.1, CyA: 1.3 }, aeroDamp: [1.2, 4, 1.2],
-      CdA: 0.84, ClA: 3.0,
+      CdA: 0.36, ClA: 3.0, dfV: 70,
       bodyHalfW: 0.68, bodyFront: -1.85, bodyRear: 2.9, bodyBottom: -0.28, bodyTop: 1.25,
       bodyPts: ccPts(0.46, 0.47, 2.55, ccBox(0.68, 0.12, 0.8, -1.85, 2.9).concat([[0, 1.7, 1.7], [0, 1.2, 0.9]])),
     } },

@@ -2909,8 +2909,11 @@
 
       // ---------------- aero
       if (s.ClA) {
-        // tuned downforce: pushes the body down along its own up axis, squashing the tyres into the road
-        const df = 0.5 * s.rho * s.ClA * vFwd * vFwd;
+        // tuned downforce: pushes the body down along its own up axis, squashing the tyres into the road (dfV: past this
+        // speed it stops growing - the Mega Jet's 800 mph would otherwise crush it onto its belly)
+        // and it fades as the car tilts, gone on its side or its roof - flying off a crest at 500+ mph, a car rolled half
+        // over had its own 'down' holding it in the air as lift)
+        const vd = s.dfV && vFwd > s.dfV ? s.dfV : vFwd, df = 0.5 * s.rho * s.ClA * vd * vd * (s.dfV ? Math.max(0, upY) : 1);
         Fx -= upX * df; Fy -= upY * df; Fz -= upZ * df;
       }
       const q = 0.5 * s.rho * s.CdA * speed;
@@ -2931,7 +2934,9 @@
       // jet thrust: along the car's own axis, on the turbine's centre line (above the CG - it leans on the nose a little,
       // which is what keeps it from standing up on the rear axle like a wheelie car)
       if (s.jet && this.jetF > 0) {
-        const T = this.jetF, ly = s.jet.y + (s.cgDrop || 0), lz = s.jet.z;
+        // (a grip tune lowers the whole cart, the engine with it: the thrust stays on the CG. Left where it was, above a
+        // lowered CG, it tipped the nose down in the air - 5 rad/s over a crest at 500 mph, onto its roof)
+        const T = this.jetF, ly = s.jet.y, lz = s.jet.z;
         const rx = m01 * ly + m02 * lz, ry = m11 * ly + m12 * lz, rz = m21 * ly + m22 * lz;
         const fx = -m02 * T, fy = -m12 * T, fz = -m22 * T;
         Fx += fx; Fy += fy; Fz += fz;
@@ -4743,8 +4748,10 @@
     // afterburning fighter-trainer turbojet, ~3,300 lbf dry and ~4,600 lbf lit (thrust goes with the intake's area, so
     // 2.25 times the Unhinged tune's). 700 kg with it and its fuel. The frame is longer and wider, the thrust line still
     // runs through the CG, half its weight is on the nose, a big fin rides on the afterburner can (it and the body's
-    // yaw damping keep it straight when a 7 g shove meets a hard turn) and the body is shaped to be held down by the air
-    // (~1,800 lb at 150 mph) - 0-60 in 0.8 s once it's spooled, 0-200 in under 4 s, ~340 mph
+    // yaw damping keep it straight when a 7 g shove meets a hard turn), and a slippery streamliner shell is held down by
+    // the air - ~1,800 lb from 150 mph up and no more (dfV), or at 600 mph it squashed itself onto its belly and dragged.
+    // Its thrust falls off less with speed than the drone engine's (an afterburner near Mach 1 holds its thrust) - 0-60 in
+    // 0.8 s once it's spooled, 0-400 in ~8 s, 600 mph (Stage 2 ~700, Unhinged 800 with their tunes in game.js)
     mega: { label: 'Mega Jet', car: 'TURBOJET 4,600 LBF', hp: 0, tq: 0, kbLat: 4.5, spec: {
       mass: 700, Ipitch: 640, Iyaw: 760, Iroll: 100, cgHeight: 0.46, wheelbase: 2.55, frontWeight: 0.5, trackF: 1.22, trackR: 1.32,
       wheelRadius: 0.27, wheelRadiusF: 0.26, wheelRadiusR: 0.27, wheelInertiaF: 0.28, wheelInertiaR: 0.32,
@@ -4757,9 +4764,9 @@
       torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
       autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
       dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
-      jet: { thrust: 14600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.4, revTq: 34, revRpm: 4000, size: 2.37 },
+      jet: { thrust: 14600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0008, y: 0, z: 1.4, revTq: 34, revRpm: 4000, size: 2.37 },
       fin: { y: 0.3, z: 2.1, CyA: 1.3 }, aeroDamp: [1.2, 4, 1.2],
-      CdA: 0.84, ClA: 3.0,
+      CdA: 0.36, ClA: 3.0, dfV: 70,
       bodyHalfW: 0.68, bodyFront: -1.85, bodyRear: 2.9, bodyBottom: -0.28, bodyTop: 1.25,
       bodyPts: ccPts(0.46, 0.47, 2.55, ccBox(0.68, 0.12, 0.8, -1.85, 2.9).concat([[0, 1.7, 1.7], [0, 1.2, 0.9]])),
     } },
@@ -11453,9 +11460,13 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         const zN = zA + abL;
         add(jg, cylZ(0.14, 0.13, 0.1, 30, true), new THREE.MeshStandardMaterial({ color: 0x3a3436, roughness: 0.5, metalness: 0.8, side: THREE.DoubleSide }), 0, 0, zN + 0.05);
         add(jg, new THREE.CircleGeometry(0.12, 24), M.black, 0, 0, zN - 0.02, 0, Math.PI, 0);
-        // the cradle: four struts from the frame rails up to the case (re-aimed when the engine grows)
-        const strutGeo = new THREE.CylinderGeometry(0.016, 0.016, 1, 10), struts = [];
+        // the mount: two frame rails run back from the seat pod under the engine (past the back axle, and on under a big
+        // engine's afterburner), a pylon in the body colour stands from them to the case's belly along its length, and
+        // four struts brace the case from the rails - all re-sized and re-aimed with the engine (jetSize)
+        const strutGeo = new THREE.CylinderGeometry(0.026, 0.026, 1, 10), struts = [];
         for (const sx of [-1, 1]) for (const dz of [0.25, 0.8]) struts.push({ m: add(body, strutGeo, M.steel, 0, 0, 0), sx, dz });
+        const unit = new THREE.BoxGeometry(1, 1, 1);
+        const rails = [-1, 1].map((sx) => ({ m: add(body, unit, M.steel, 0, 0, 0), sx })), cross = add(body, unit, M.steel, 0, 0, 0), pylon = add(body, unit, M.paint, 0, 0, 0);
         // the tail fin on top of the afterburner can, swept back
         const fs = new THREE.Shape(); fs.moveTo(0, 0); fs.lineTo(0.62, 0); fs.lineTo(0.78, 0.5); fs.lineTo(0.5, 0.52); fs.closePath();
         const fin = new THREE.ExtrudeGeometry(fs, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 });
@@ -11487,13 +11498,22 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         const plumeGeo = (r0, r1) => { const g = new THREE.CylinderGeometry(r0, r1, 1, 24, 6, true); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; };
         jetFx = { outer: add(jg, plumeGeo(0.14, 0.07), flameMat(false), 0, 0, zN + 0.1, 0, 0, 0, false), core: add(jg, plumeGeo(0.1, 0.015), flameMat(true), 0, 0, zN + 0.1, 0, 0, 0, false), t: 0 };
         jetFx.outer.renderOrder = 5; jetFx.core.renderOrder = 6;
-        // a bigger engine (s: its diameter against stock): fatter by s, longer by less, sat a little higher to clear the axle
-        const up = V3(0, 1, 0), dv = V3(0, 0, 0);
+        // a bigger engine (s: its diameter against stock): fatter by s, longer by less, sat a little higher to clear the axle -
+        // and a huge one high enough that its intake clears the back tyres and its belly the frame rails
+        const up = V3(0, 1, 0), dv = V3(0, 0, 0), RY = 0.28, RH = 0.08;
         jetSize = (sz) => {
-          const sa = 1 + (sz - 1) * 0.6, y = ey + Math.max(0, sz - 1) * 0.07, zb = ez0 + Math.max(0, sz - 1.4) * 0.3;
+          const bell = 0.235 * sz, sa = 1 + (sz - 1) * 0.6, zb = ez0 + Math.max(0, sz - 1.4) * 0.3;
+          const y = Math.max(ey + Math.max(0, sz - 1) * 0.07, RY + RH / 2 + (er - 0.01) * sz, 0.58 + Math.sqrt(Math.max(0, bell * bell - 0.47 * 0.47)));
           jg.scale.set(sz, sz, sa); jg.position.set(0, y, zb);
+          // (the rails: from the seat pod back past the axle, or to the afterburner of a long engine; the pylon: rail top to
+          // the case's belly, from just behind the intake to the rails' end)
+          const caseBot = y - (er - 0.01) * sz, zAb = zb + (0.16 + eL) * sa, r0 = zS1 - 0.05, r1 = Math.max(zR + 0.5, zAb);
+          for (const r of rails) { r.m.scale.set(0.06, RH, r1 - r0); r.m.position.set(r.sx * 0.3, RY, (r0 + r1) / 2); }
+          cross.scale.set(0.66, 0.06, 0.06); cross.position.set(0, RY, r1 - 0.03);
+          const p0 = zb + 0.2 * sa, p1 = Math.min(zAb, r1 - 0.04), ph = caseBot - (RY + RH / 2) + 0.03;
+          pylon.scale.set(0.12 + 0.05 * sz, Math.max(0.02, ph), Math.max(0.1, p1 - p0)); pylon.position.set(0, RY + RH / 2 + ph / 2 - 0.01, (p0 + p1) / 2);
           for (const st of struts) {
-            const a = V3(st.sx * 0.3, 0.32, ez0 + st.dz), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, zb + (st.dz + 0.05) * sa);
+            const a = V3(st.sx * 0.3, RY + RH / 2, zb + st.dz * sa), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, zb + (st.dz + 0.05) * sa);
             dv.subVectors(b, a); const len = dv.length();
             st.m.position.addVectors(a, b).multiplyScalar(0.5); st.m.quaternion.setFromUnitVectors(up, dv.normalize()); st.m.scale.set(1, len, 1);
           }
@@ -13975,7 +13995,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         ['hot', 'Hot Rod', 'A 45 kW / 160 Nm AC motor and a lithium pack · lowered, roof off, a roll hoop · 0-60 ~6 s · ~84 mph', 'Plum Crazy', 1],
         ['busa', 'Record (Hayabusa)', 'Built like the 118 mph world-record cart: a Hayabusa 1,340 cc four behind the seats, a 6-speed on a quickshifter · 0-60 ~4.8 s · ~120 mph', 'Go Mango', 1],
         ['jet', 'Jet', 'A surplus turbojet slung low behind the seats · 590 lbf of thrust, 810 with the afterburner · no driven wheels · 0-60 ~4 s · ~185 mph · built to stay straight flat out', 'B5 Blue', 1],
-        ['mega', 'Mega Jet', 'An afterburning fighter-trainer turbojet, half as big again as the Unhinged jet · 3,300 lbf dry, 4,600 lit · 0-60 in 0.8 s once spooled · ~340 mph · a big fin and downforce keep it straight', 'TorRed', 1],
+        ['mega', 'Mega Jet', 'An afterburning fighter-trainer turbojet, half as big again as the Unhinged jet, in a streamliner · 3,300 lbf dry, 4,600 lit · 0-60 in 0.8 s once spooled · 600 mph (Stage 2 700, Unhinged 800) · built to stay straight flat out', 'TorRed', 1],
       ],
       eng: {
         lsv: { hint: 'Golf cart (Street LSV): shift up (E) for DRIVE - a 72 V AC conversion, 12 kW, 35 mph, with brakes on all four wheels, lights, mirrors and a windscreen.',
@@ -13988,7 +14008,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           info: 'A jet-powered cart for the drag-strip shows: a surplus target-drone turbojet (~590 lbf of thrust dry, ~810 lbf with a homebuilt afterburner) slung low behind the seats so its thrust runs through the centre of gravity, a stretched, lowered and widened frame, 12 in wheels on low-profile radials (wider at the back), four-wheel discs with ABS, a nose cone and a tail fin · 480 kg · 0-60 ~4 s, ~185 mph',
           trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.6, race: 0 } },
         mega: { hint: 'Mega Jet golf cart: shift up (E) for DRIVE. The throttle spools an afterburning fighter-trainer turbojet (~3 s from idle) - hold SPACE (the brakes), floor it and let go as it howls: the brakes only hold it about halfway up the spool, and then it drags the locked tyres. The afterburner lights as you go - 0-60 in under a second. Nothing drives the wheels; reverse (R) is an electric motor. Stability control is on (Sport).',
-          info: 'The jet cart with an engine half as big again as the Unhinged one - 2.4 times the stock turbojet across: an afterburning fighter-trainer turbojet, ~3,300 lbf of thrust dry and ~4,600 lbf lit, on a longer, wider frame with the thrust through the centre of gravity, half its weight on the nose, a big fin on the afterburner can and a body shaped to be held down (~1,800 lb at 150 mph) · 700 kg · 0-60 in 0.8 s once spooled, 0-200 in under 4 s, ~340 mph',
+          info: 'The jet cart with an engine half as big again as the Unhinged one - 2.4 times the stock turbojet across: an afterburning fighter-trainer turbojet, ~3,300 lbf of thrust dry and ~4,600 lbf lit, on a longer, wider frame with the thrust through the centre of gravity, half its weight on the nose, a big fin on the afterburner can and a slippery streamliner body held down (~1,800 lb from 150 mph up - no more, so it never crushes itself onto its belly) · 700 kg · 0-60 in 0.8 s once spooled, 0-400 in ~8 s, 600 mph - Stage 2 ~700 mph, Unhinged 800 mph. Flat out it flies off crests for seconds and lands on its wheels',
           trans: 'Jet thrust · electric reverse', tyres: 'Cart radials', cam: [1.3, 1.75],          // (the chase camera back and up: over the engine and its fin)
           snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1, rpmRef: 10000, open: 1, fmul: 1, deep: 0, loud: 0.8, race: 0 } },
         busa: { hint: 'Golf cart (Record): shift up (E) for DRIVE and floor it - a Hayabusa 1,340 cc four behind the seats, ~190 hp through the bike\'s 6-speed (E / Q or the paddles), a stretched, lowered frame and a wheelie bar. The real one did 118.76 mph. Stability control is on (Sport).',
@@ -14264,6 +14284,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   if (JET) {
     TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
     TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
+    // (the Mega Jet, a streamliner: 600 mph stock, Stage 2 ~700 (a touch sleeker), Unhinged 800 - its wings cost drag)
+    if (STOCK.jet.size > 2) {
+      TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2, drag: 0.95 });
+      TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
+    }
   }
   const jetSize = () => clamp(Math.sqrt(tune.power), 0.75, 1.8) * (STOCK.jet.size || 1);   // (engine diameter against stock: airflow ~ area)
   // the model for any vehicle, from its id, its CARS entry and its (constructed) spec - the other players' cars in online
