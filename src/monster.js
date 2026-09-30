@@ -616,9 +616,10 @@
         // (the plain patches: body colour, and dark for the underside)
         g.fillStyle = P; g.fillRect(LW - 14, LH - 14, 14, 14); g.fillStyle = '#0d0d0e'; g.fillRect(0, LH - 14, 14, 14);
         livTex.needsUpdate = true;
-        // the cab: body colour, the windows dark with a black seal
+        // the cab: body colour, the windows dark with a black seal - the side windows on the side views, the windshield and
+        // the back glass on the front and back views (1024 x 1536: sides in rows 0-800, front 800-1150, back 1150-1500)
         const c2 = cabTex.userData.canvas, g2 = c2.getContext('2d');
-        g2.fillStyle = P; g2.fillRect(0, 0, 1024, 1024);
+        g2.fillStyle = P; g2.fillRect(0, 0, 1024, 1536);
         for (let s = 0; s < 2; s++) {
           g2.save(); g2.translate(0, s * 400); if (s === 1) { g2.translate(1024, 0); g2.scale(-1, 1); }
           const cz = (z) => (z - CZ0) / (CZ1 - CZ0) * 1024, cy = (y) => (CY1 - y) / (CY1 - CY0) * 400;
@@ -629,11 +630,24 @@
           g2.strokeStyle = 'rgba(0,0,0,0.45)'; g2.lineWidth = 5; g2.beginPath(); g2.moveTo(cz(0.66), cy(2.5)); g2.lineTo(cz(0.66), cy(3.3)); g2.stroke();
           g2.restore();
         }
-        g2.fillStyle = '#07090b'; g2.fillRect(0, 1000, 24, 24); g2.fillStyle = P; g2.fillRect(1000, 1000, 24, 24);
+        // (a glass pane: rounded corners, a faint sheen across the top, the black rubber seal round it)
+        const pane = (row, yb, yt, wb, wt, bow) => {
+          const fx = (x) => (x + 1.6) / 3.2 * 1024, fy = (y) => row + (CY1 - y) / (CY1 - CY0) * 350, r = 0.07;
+          g2.beginPath();
+          g2.moveTo(fx(-wb + r), fy(yb)); g2.lineTo(fx(wb - r), fy(yb)); g2.quadraticCurveTo(fx(wb), fy(yb), fx(wb - 0.02), fy(yb + r));
+          g2.lineTo(fx(wt + 0.01), fy(yt - r)); g2.quadraticCurveTo(fx(wt), fy(yt), fx(wt - r), fy(yt + bow * 0.3));
+          g2.quadraticCurveTo(fx(0), fy(yt + bow), fx(-wt + r), fy(yt + bow * 0.3)); g2.quadraticCurveTo(fx(-wt), fy(yt), fx(-wt - 0.01), fy(yt - r));
+          g2.lineTo(fx(-wb + 0.02), fy(yb + r)); g2.quadraticCurveTo(fx(-wb), fy(yb), fx(-wb + r), fy(yb)); g2.closePath();
+          const gl = g2.createLinearGradient(0, fy(yt), 0, fy(yb)); gl.addColorStop(0, '#1a232b'); gl.addColorStop(0.35, '#0a0e12'); gl.addColorStop(1, '#05070a');
+          g2.fillStyle = gl; g2.fill(); g2.lineJoin = 'round'; g2.lineWidth = 10; g2.strokeStyle = '#0d0d0e'; g2.stroke();
+        };
+        pane(800, 2.9, 3.33, 1.0, 0.84, 0.03);                                               // windshield
+        pane(1150, 2.98, 3.28, 0.92, 0.72, 0.02);                                            // back glass
+        g2.fillStyle = P; g2.fillRect(1000, 1510, 24, 24);
         cabTex.needsUpdate = true;
       }
       const CZ0 = -0.7, CZ1 = 1.55, CY0 = 2.45, CY1 = 3.52;
-      const cabTex = canvasTex(1024, 1024, () => {});
+      const cabTex = canvasTex(1024, 1536, () => {});
       const livMat = new THREE.MeshPhysicalMaterial({ map: livTex, metalness: 0.05, roughness: 0.4, clearcoat: 0.55, clearcoatRoughness: 0.15 });
       const cabMat = new THREE.MeshPhysicalMaterial({ map: cabTex, metalness: 0.05, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.1 });
       drawAvenger(PAINTS[opts.paint] || 0x6fd21e);
@@ -660,9 +674,12 @@
       const cabG = new THREE.Group(); bodyG.add(cabG);
       { const CT = [[-0.66, 2.6], [-0.56, 2.86], [-0.42, 3.28], [-0.28, 3.44], [0.4, 3.48], [0.8, 3.43], [1.05, 3.24], [1.3, 2.94], [1.52, 2.66]];
         const CW = [[-0.66, 1.4], [-0.3, 1.48], [0.9, 1.48], [1.52, 1.38]];
-        const placeCab = (k, x, y, z) => { const u = (z - CZ0) / (CZ1 - CZ0) * 1024, v = (CY1 - y) / (CY1 - CY0) * 400; return k === 'L' ? [u, v] : k === 'R' ? [1024 - u, 400 + v] : k === 'D' ? [10, 1012] : [1012, 1012]; };
-        const kindCab = (nx, ny, nz, cx, cy, cz) => (Math.abs(nx) >= 0.45 ? (nx < 0 ? 'L' : 'R') : nz <= -0.35 && cy > 2.74 ? 'D' : nz >= 0.35 && cy > 2.78 && cz > 0.9 ? 'D' : 'P');
-        const g = mapUV(loft(range(-0.66, 1.52, 60), (z) => ({ w: tbl(CW, z), yb: 2.4, yt: tbl(CT, z), nT: 3.0, nB: 9 }), 40), 1024, 1024, placeCab, kindCab);
+        // (sideways faces: the side views at their (z, y); forward / backward faces: the front / back views at their (x, y);
+        // the roof: plain - every boundary between them is body colour, so no seam shows)
+        const placeCab = (k, x, y, z) => { const u = (z - CZ0) / (CZ1 - CZ0) * 1024, v = (CY1 - y) / (CY1 - CY0) * 400, fx = (x + 1.6) / 3.2 * 1024, fv = (CY1 - y) / (CY1 - CY0) * 350;
+          return k === 'L' ? [u, v] : k === 'R' ? [1024 - u, 400 + v] : k === 'F' ? [fx, 800 + fv] : k === 'B' ? [fx, 1150 + fv] : [1012, 1522]; };
+        const kindCab = (nx, ny, nz) => (Math.abs(nx) >= 0.45 ? (nx < 0 ? 'L' : 'R') : nz <= -0.3 ? 'F' : nz >= 0.3 ? 'B' : 'P');
+        const g = mapUV(loft(range(-0.66, 1.52, 90), (z) => ({ w: tbl(CW, z), yb: 2.4, yt: tbl(CT, z), nT: 3.0, nB: 9 }), 56), 1024, 1536, placeCab, kindCab);
         add(cabG, g, cabMat, 0, 0, 0);
       }
       // the nose: an oval chrome grille with vertical bars, round headlamps in chrome bezels on the fenders' fronts, a red
@@ -738,12 +755,15 @@
     add(eng, rbox(0.42, 0.06, 0.78, 0.02), M.black, 0, ey + 0.84, ez);
     // butterfly injector hat standing up through the bed
     // (a forward-facing scoop: tapered aluminium walls, a dark mouth, the butterfly plate and its linkage on top)
-    { const sc = new THREE.CylinderGeometry(0.2, 0.26, 0.52, 4, 1, false); sc.rotateY(Math.PI / 4); sc.scale(1, 1, 1.25);
-      add(eng, sc, M.alu, 0, ey + 1.12, ez - 0.02); }
-    add(eng, rbox(0.3, 0.26, 0.05, 0.02), M.gloss, 0, ey + 1.16, ez - 0.36, 0.25, 0, 0, false);            // the mouth
-    add(eng, rbox(0.3, 0.035, 0.38, 0.01), M.gloss, 0, ey + 1.39, ez - 0.02);                               // butterfly plate
-    for (const sx of [-0.07, 0.07]) add(eng, cylX(0.028, 0.028, 0.012, 14), M.red, sx, ey + 1.415, ez - 0.02, 0, 0, Math.PI / 2);
-    add(eng, rbox(0.34, 0.06, 0.08, 0.02), M.red, 0, ey + 0.93, ez - 0.02);                               // hat base ring
+    // (the AVENGER's hat stays under its fastback: no hole in the body for it)
+    if (opts.body !== 'avenger') {
+      { const sc = new THREE.CylinderGeometry(0.2, 0.26, 0.52, 4, 1, false); sc.rotateY(Math.PI / 4); sc.scale(1, 1, 1.25);
+        add(eng, sc, M.alu, 0, ey + 1.12, ez - 0.02); }
+      add(eng, rbox(0.3, 0.26, 0.05, 0.02), M.gloss, 0, ey + 1.16, ez - 0.36, 0.25, 0, 0, false);            // the mouth
+      add(eng, rbox(0.3, 0.035, 0.38, 0.01), M.gloss, 0, ey + 1.39, ez - 0.02);                               // butterfly plate
+      for (const sx of [-0.07, 0.07]) add(eng, cylX(0.028, 0.028, 0.012, 14), M.red, sx, ey + 1.415, ez - 0.02, 0, 0, Math.PI / 2);
+      add(eng, rbox(0.34, 0.06, 0.08, 0.02), M.red, 0, ey + 0.93, ez - 0.02);                               // hat base ring
+    }
     add(eng, cylX(0.1, 0.1, 0.04, 24), M.polish, 0, ey + 0.66, ez - 0.4, 0, Math.PI / 2, 0);
     // belt drive at the front of the blower
     add(eng, rbox(0.12, 0.62, 0.08, 0.03), M.black, 0, ey + 0.33, ez - 0.46);
@@ -777,7 +797,7 @@
     const cage = new THREE.Group(); model.add(cage);
     const clusterCanvas = document.createElement('canvas'); clusterCanvas.width = 512; clusterCanvas.height = 300;
     const clusterTex = new THREE.CanvasTexture(clusterCanvas); clusterTex.colorSpace = THREE.SRGBColorSpace;
-    const dash = new THREE.Group(); dash.position.set(0.32, sY + 0.37, sZ - 0.7); dash.rotation.set(-0.45, -0.3, 0); cage.add(dash);
+    const dash = new THREE.Group(); dash.position.set(0.32, sY + 0.37, sZ - (opts.body === 'avenger' ? 0.52 : 0.7)); dash.rotation.set(-0.45, -0.3, 0); cage.add(dash);
     add(dash, rbox(0.34, 0.2, 0.05, 0.02), M.black, 0, 0, -0.03);
     add(dash, new THREE.PlaneGeometry(0.31, 0.18), new THREE.MeshBasicMaterial({ map: clusterTex, toneMapped: false }), 0, 0, 0.0, 0, 0, 0, false);
     const colG = new THREE.Group(); colG.position.set(0, sY + 0.28, sZ - 0.4); colG.rotation.x = -0.6; cage.add(colG);
