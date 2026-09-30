@@ -105,6 +105,32 @@
   // the outside of the front straight into the pits; the start / finish line crosses the front straight at z = 0,
   // bleachers stand beyond it. Gentle country rises well back from the field. Physics: dirt on the track, grass off it
   const MOWT = { SL: 40, R: 28, W: 12, BALE: 1.25, PIT: [18, 30], SPAWN_X: 28, SPAWN_Z: 12, STANDS: { x: 47, z0: -26, z1: 26, d: 9 } };
+  // 'dunes' (Sand Dunes): an endless sand sea. Transverse dune ridges across a steady wind blowing along +x (UX, UZ):
+  // each rises on a long, gentle windward face (up to ~20 deg) to a rounded brink, then drops down its slip face at
+  // sand's angle of repose (~30-37 deg) - so heading downwind you climb the gentle side and go over the top. Ridges ~L
+  // apart, the windward face K of the way; the crests wander (the field is warped), each ridge swells and dies away
+  // along its crest (crescents, gaps, bowls), the dune fields grow and shrink, big slow swells underneath. The start is
+  // a flat hardpan of packed sand CAMP_R across (dirt physics; the dunes rise round it by CAMP_E). Sand everywhere else.
+  const DUNES = { L: 80, K: 0.68, UX: 0.96, UZ: 0.28, A0: 1.5, A1: 10.5, CAMP_R: 38, CAMP_E: 95, SPAWN_X: -22, SPAWN_Z: 0 };
+  function duneSwell(x, z) { return nLow1(x * 0.0011, z * 0.0011) * 14 + nLow2(x * 0.0031 + 5.3, z * 0.0031 - 2.2) * 3.5; }
+  function duneHeight(x, z) {
+    const D = DUNES;
+    const wx = x + nHill(x * 0.0035, z * 0.0035) * 22 + nDet(x * 0.012 + 7.1, z * 0.012 - 2.9) * 3.5;
+    const wz = z + nHill(x * 0.0035 + 31.7, z * 0.0035 - 17.3) * 22;
+    const q = (wx * D.UX + wz * D.UZ) / D.L, n = Math.floor(q), ph = q - n;
+    // (the profile: an S up the windward face to the brink, a steeper S down the slip face; zero at the trough, where
+    // one ridge meets the next - so each ridge can have its own height with no step between them)
+    const prof = ph < D.K ? 0.5 - 0.5 * Math.cos(Math.PI * ph / D.K) : 0.5 + 0.5 * Math.cos(Math.PI * (ph - D.K) / (1 - D.K));
+    const along = -wx * D.UZ + wz * D.UX;
+    const field = smooth(-0.4, 0.45, nRegion(x * 0.0016, z * 0.0016));
+    const cres = smooth(-0.55, 0.35, nForest2(along * 0.009, n * 1.37 + 0.5));
+    const A = D.A0 + D.A1 * Math.pow(field, 0.8) * cres;
+    // small dunes riding on the big ones' windward faces
+    const q2 = (wx * 0.9 + wz * 0.44) / 23 + nDet(x * 0.02, z * 0.02) * 0.4, p2 = q2 - Math.floor(q2);
+    const small = (p2 < 0.72 ? 0.5 - 0.5 * Math.cos(Math.PI * p2 / 0.72) : 0.5 + 0.5 * Math.cos(Math.PI * (p2 - 0.72) / 0.28)) * 0.7 * (1 - 0.6 * prof);
+    return duneSwell(x, z) + A * prof + small;
+  }
+  function duneCampD(x, z) { return Math.hypot(x, z); }
   // signed distance from the track's centre line (- towards the infield)
   function mowtD(x, z) { const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z; return Math.hypot(x, z - zc) - MOWT.R; }
   // the bales: one every ~1.25 m round both edges, each with its heading along the edge
@@ -360,7 +386,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || MAP === 'dunes' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -863,7 +889,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || MAP === 'dunes' || TRK) return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -879,6 +905,11 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (MAP === 'dunes') {
+      // (the hardpan: dead flat at the swell's height in the middle of it, the dunes rising round it)
+      const m = smooth(DUNES.CAMP_R, DUNES.CAMP_E, duneCampD(x, z)), h0 = duneSwell(0, 0);
+      return m > 0 ? h0 + (duneHeight(x, z) - h0) * m : h0;
+    }
     if (TRK) {
       if (TRK.kind === 'mow') {
         // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
@@ -978,6 +1009,7 @@
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
+    if (MAP === 'dunes') { out.roadD = 1e4; out.surface = duneCampD(x, z) < DUNES.CAMP_R + 3 ? 3 : 6; return out; }   // sand, the packed hardpan
     if (TRK) {
       // rally stages: a gravel road (with a strip of loose stuff along its edges); the mower course: dirt. Grass or dirt off it
       const d = trackQuery(x, z, _gtq).d;
@@ -998,7 +1030,7 @@
 
   // ---------------------------------------------------------------- vegetation / props
   function forestDensity(x, z) {
-    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
     if (TRK) {
       if (TRK.kind === 'mow') return 0.7 * smooth(150, 330, Math.hypot(x - TRK.cx, z - TRK.cz)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
@@ -1024,7 +1056,7 @@
     const trees = [], bushes = [], rocks = [], buildings = [], poles = [], signs = [], labels = [], lines = [], walls = [];
     const circles = [], boxes = [];
     const ri = {};
-    if (MAP === 'arena' || MAP === 'ramps') {
+    if (MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') {
       if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
@@ -1393,7 +1425,7 @@
       }
       return { x, z, y: ground(x, z, {}).h, tx, tz };
     }
-    if (MAP === 'ramps') {
+    if (MAP === 'ramps' || MAP === 'dunes') {
       // back on its wheels right where it is, facing the hint
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
       const l = Math.hypot(tx, tz);
@@ -1426,14 +1458,14 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || TRACK_DEFS[m] ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || TRACK_DEFS[m] ? m : 'country';
     TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
     trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,

@@ -227,7 +227,7 @@ class CarSynth {
     const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8);
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
-    const hard = c.surf < 0.5 || c.surf > 4.5;
+    const hard = c.surf < 0.5 || (c.surf > 4.5 && c.surf < 5.5);
     const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9 * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
     if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;

@@ -194,7 +194,7 @@
         const corner = new THREE.Group(); corner.position.set(side * HX, R - cgH, (frontW ? zF : zR) + zOff); rootG.add(corner);
         const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
         const spin = new THREE.Group(); flip.add(spin);
-        const w = { corner, flip, spin, left, front: frontW, side, stock: [], pkg: [] };
+        const w = { corner, flip, spin, left, front: frontW, side, stock: [], pkg: [], knob: [] };
         buildWheel(w, R);
         wheels.push(w);
       }
@@ -582,10 +582,16 @@
       const padG = mergeGeos(pad);
       const ribF = []; for (const ox of [-0.33, 0, 0.33]) { const t = new THREE.TorusGeometry(RF + 0.004, 0.009, 6, 48); t.rotateY(Math.PI / 2); t.translate(ox * fW, 0, 0); ribF.push(t); }
       const ribG = mergeGeos(ribF);
+      // (the other package: off-road knobbies, 27x8.50-15 / 31x10.50R15 - big staggered blocks, shoulder lugs down the sides)
+      const kF = 0.2, kRR = 0.39, kR = 0.267;
+      const tyKF = carcass(0.327, kF, 0.19), trKF = blocks(0.327, kF, 26, [[0.22, 0.34, 0.5, 0], [-0.22, 0.34, 0.5, 0.5], [0.47, 0.12, 0.45, 0.25], [-0.47, 0.12, 0.45, 0.75]], 0.018, 1);
+      const tyKR = carcass(kRR - 0.018, kR, 0.19), trKR = blocks(kRR - 0.018, kR, 28, [[0.22, 0.34, 0.5, 0], [-0.22, 0.34, 0.5, 0.5], [0.47, 0.12, 0.45, 0.25], [-0.47, 0.12, 0.45, 0.75]], 0.022, 1);
       makeWheels((w, R) => {
-        if (w.front) { w.stock.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, trF, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, ribG, M.rubber, 0, 0, 0)); rim(w.spin, R, fW, 0.19); }
-        else { w.stock.push(add(w.spin, tyR, M.rubber, 0, 0, 0), add(w.spin, trR, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padG, M.rubber, 0, 0, 0)); rim(w.spin, R, rW, 0.19); }
-        for (const m of w.pkg) m.visible = false;
+        if (w.front) { w.stock.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, trF, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, ribG, M.rubber, 0, 0, 0)); rim(w.spin, R, fW, 0.19);
+          w.knob.push(add(w.spin, tyKF, M.rubber, 0, 0, 0), add(w.spin, trKF, M.rubber, 0, 0, 0)); }
+        else { w.stock.push(add(w.spin, tyR, M.rubber, 0, 0, 0), add(w.spin, trR, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padG, M.rubber, 0, 0, 0)); rim(w.spin, R, rW, 0.19);
+          w.knob.push(add(w.spin, tyKR, M.rubber, 0, 0, 0), add(w.spin, trKR, M.rubber, 0, 0, 0)); }
+        for (const m of w.pkg.concat(w.knob)) m.visible = false;
         add(w.flip, cylX(0.11, 0.11, 0.06, 24), M.cast, -0.03, 0, 0);                                                  // drum
       });
       // front: the VW beam (two tubes across), trailing arms back to the spindles, yellow coil-overs; back: trailing arms
@@ -641,7 +647,10 @@
     }
     function setTires(front, rear) {
       if (TT) return;
-      for (const w of wheels) { const pkg = (w.front ? front : rear) !== (w.front ? 'buggyF' : 'buggyR'); for (const m of w.stock) m.visible = !pkg; for (const m of w.pkg) m.visible = pkg; }
+      for (const w of wheels) {
+        const t = w.front ? front : rear, knob = t === 'buggyKnobF' || t === 'buggyKnobR', pkg = !knob && t !== (w.front ? 'buggyF' : 'buggyR');
+        for (const m of w.stock) m.visible = !pkg && !knob; for (const m of w.pkg) m.visible = pkg; for (const m of w.knob) m.visible = knob;
+      }
     }
     // cockpit view: the driver goes (you're in their seat); the trophy truck's cab shell stays - you look out of it
     function setInteriorVisible(v, cp) { if (driver) driver.visible = !cp; }

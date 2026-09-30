@@ -194,8 +194,8 @@
           trans: '3-speed automatic · 4WD',
           snd: { nEng: 1, cyl: 8, fmul: 0.92, deep: 0.4, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 0.4, rpmRef: 7000, race: 1, rough: 0.2 } },
       } },
-    buggy: { btn: 'DUNE BUGGY', sub: 'A VW sand rail · tube frame, diamond-plate floor, two buckets and a roll cage · a 1600 VW, a built 2276 on dual Webers, or an LS V8', paint: 'Crimson', tc: 1, cam: [0.95, 1.05],
-      hint: 'Dune Buggy: shift up (E) for DRIVE - a stock 1600 VW flat-four, ~60 hp through the VW 4-speed (it shifts for you, or E / Q), 560 kg, ~80 mph. Light, rear-engined and loose on its skinny fronts - it slides in the dirt. Sand paddles are in the off-road package.',
+    buggy: { btn: 'DUNE BUGGY', sub: 'A VW sand rail · tube frame, diamond-plate floor, two buckets and a roll cage · a 1600 VW, a built 2276 on dual Webers, or an LS V8 · sand paddles or off-road knobbies · its own sand dunes', paint: 'Crimson', tc: 1, cam: [0.95, 1.05], map: 'dunes',
+      hint: 'Dune Buggy: shift up (E) for DRIVE - a stock 1600 VW flat-four, ~60 hp through the VW 4-speed (it shifts for you, or E / Q), 560 kg, ~80 mph. Light, rear-engined and loose on its skinny fronts - it slides in the dirt. Tyres (Esc → Drive): sand paddles for the dunes, or off-road knobbies.',
       info: 'A VW-based sand rail: a chromoly tube frame on a diamond-plate floor, a roll cage with two lamps, two high-back buckets, the battery on the nose · 1600 cc VW flat-four (dual-port), ~60 hp, 82 lb-ft · VW 4-speed transaxle · VW beam front end on coil-overs, trailing arms at the back · 5.60-15 fronts, 235/75R15 rears on polished five-spokes · ~560 kg with the driver, 38 / 62 · 0-60 ~10 s, ~80 mph',
       trans: 'VW 4-speed', tyres: 'Buggy tyres',
       snd: { nEng: 1, cyl: 4, fmul: 1.25, deep: 0.1, loud: 0.35, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5000, race: 0.3, rough: 0.35 },
@@ -291,8 +291,10 @@
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
   // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
+  // (the dune buggy has two packages: its dune tyres - true - or off-road knobbies - 'knobby')
   const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
-  const PKG = VEH.OFFROAD_PKG(S.car, CARDEF.cls);
+  const PKG_KIND = () => (S.offroad && S.offroad[S.car] === 'knobby' ? 'knobby' : null);
+  const pkg = () => VEH.OFFROAD_PKG(S.car, CARDEF.cls, PKG_KIND());
   const PKG_UI = PULLER ? ['R-2 deep lugs', 'R-2 deep lugs + lug fronts', 'Firestone R-2 30.5L-32 "cane & rice" rears left uncut (lugs twice as deep as a farm tyre, never sharpened) and lugged 11L-15 fronts. '
       + 'Off the pavement they out-dig the cut pullers everywhere - they paddle through mud, dig into turf and bite deeper into loose dirt (traction control lets them spin up to where they bite), and it steers in the soft stuff · on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
     : DRAGSTER ? ['Sand-drag paddles', 'Paddles + rib fronts', 'The sand-drag setup: paddle tyres (a smooth carcass with ~1.5 in rubber paddles across the tread) and ribbed sand fronts. The paddles shovel the ground - huge bite on dirt and gravel '
@@ -312,12 +314,13 @@
       + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
     : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
       + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, tread hum, and taller effective gearing'];
-  const tireF = () => (OFFROAD() ? PKG.front : FIXED ? carSpec.frontTire : 'street');
-  const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
+  const tireF = () => (OFFROAD() ? pkg().front : FIXED ? carSpec.frontTire : 'street');
+  const tireR = () => (OFFROAD() ? pkg().rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
+  const DUNESMAP = S.map === 'dunes';
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
@@ -357,6 +360,7 @@
     const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
     return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
   }
+  const DUNES_HINT = 'Sand Dunes: an endless sea of sand. The wind blows the way you face at the start - head that way and you climb the long, gentle faces and go over the brinks, the steep slip faces drop away on the far side (coming back, you climb those). Sand eats street tyres and bogs skinny ones down: paddles (the dune buggy\'s dune tyres), big all-terrains and four-wheel drive are the way to go.';
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
@@ -365,6 +369,7 @@
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
+    : DUNESMAP ? { x: W.DUNES.SPAWN_X, y: W.ground(W.DUNES.SPAWN_X, W.DUNES.SPAWN_Z, {}).h, z: W.DUNES.SPAWN_Z, tx: 1, tz: 0 }
     : TRKMAP ? W.trackSpawn()
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
@@ -487,7 +492,7 @@
   const smoke = new FX.Particles(THREE, scene, 2800);
   smoke.setCamera(camera);
   const skids = new FX.Skids(THREE, scene, 9000);
-  const SOIL = [null, [0.3, 0.27, 0.22], [0.2, 0.19, 0.09], [0.27, 0.19, 0.11]];   // rut colours: gravel, grass (torn turf), dirt
+  const SOIL = [null, [0.3, 0.27, 0.22], [0.2, 0.19, 0.09], [0.27, 0.19, 0.11], null, null, [0.44, 0.32, 0.18]];   // rut colours: gravel, grass (torn turf), dirt, sand
   const flames = new FX.Flames(THREE, car.root, car.exhaustTips);
   const audio = new AUD.CarAudio();
   const input = new INP.Input();
@@ -586,11 +591,12 @@
           : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
       + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
         : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : MOWCOURSE ? 'Laps are timed at the start / finish arch.' : 'Its home is the Mower Track map (Esc → Drive → Map); the Windy Mower Track twists.'), 11), 1600);
-    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map && !(CCD.map === 'rally' && S.map === 'rallywind') ? ' Its home is the ' + (MAP_NAMES[CCD.map] || CCD.map) + ' map (Esc → Drive → Map).' : TRKMAP ? ' ' + TRACK_HINT[S.map] : ''), 12), 1600);
+    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map && !(CCD.map === 'rally' && S.map === 'rallywind') ? ' Its home is the ' + (MAP_NAMES[CCD.map] || CCD.map) + ' map (Esc → Drive → Map).' : TRKMAP ? ' ' + TRACK_HINT[S.map] : DUNESMAP ? ' ' + DUNES_HINT : ''), 14), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (FREESTYLE ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); All Ramps is nothing but jumps.'), 12), 1600);
     else if (TRKMAP) setTimeout(() => hud.hint(TRACK_HINT[S.map], 10), 1600);
+    else if (DUNESMAP) setTimeout(() => hud.hint(DUNES_HINT, 12), 1600);
     else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
     else if (RAMPSMAP) setTimeout(() => hud.hint('All Ramps: the whole world is groomed dirt covered in jumps - gap jumps, tabletops, step-ups, kickers and whoops, big and small, every which way, for ever. The first gap jump is dead ahead. Big air, flips and wheelies score.', 11), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: two big gap jumps straight ahead up the middle and a giant tabletop across the far end; tabletops and step-ups either side, the car crush on the left, whoops lanes along the walls and behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
@@ -621,7 +627,7 @@
   // ------------------------------------------------------------------ menu
   const TABS = ['Drive', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
@@ -931,7 +937,13 @@
       }
       if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { if (carLocked()) return; S.trans = v; applyVehicleSettings(); })));
       if (!FIXED) add(row('Manual clutch', input.hasClutchPedal ? 'Use your clutch pedal (can stall!) or let the car work the clutch for you' : 'Map a clutch pedal in Controls → Wheel setup to use it', seg([[false, 'Auto-clutch'], [true, 'Clutch pedal']], S.clutchPedal, (v) => { S.clutchPedal = v; })));
-      add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
+      if (S.car === 'buggy') add(row('Tyres', 'Buggy tyres: a narrow bias front, a fat street-tread rear · Sand paddles: rubber scoops across a smooth rear carcass and ribbed fronts - made for the dunes: '
+        + 'huge bite in sand (and dirt and mud), they float over it, next to none on pavement · Off-road knobbies: 27 in fronts, 31 in rears - they bite in dirt, gravel, grass and mud and hold their own in sand, less grip on pavement',
+        seg([[false, 'Buggy tyres'], [true, 'Sand paddles'], ['knobby', 'Off-road knobbies']], (S.offroad && S.offroad.buggy) || false, (v) => {
+          if (carLocked()) return;
+          S.offroad = Object.assign({}, S.offroad, { buggy: v }); applyVehicleSettings();
+        })));
+      else add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
@@ -1257,7 +1269,7 @@
         const amt = clamp((slip - 1.0) / 7 + (w.surface === 2 ? 0.25 : 1) * clamp((speed - 6) / 50, 0, 0.6), 0, 1);
         // a tyre spinning hard in loose ground throws a rooster tail of it, darker for dirt
         const roost = clamp((slip - 4) / 12, 0, 1) * clamp(w.Fz / 5000, 0.3, 1.5);
-        rate = amt * 45 + roost * 140; alpha = 0.08 + 0.2 * amt + 0.16 * roost; shade = w.surface === 3 ? 1.25 : 1;
+        rate = amt * 45 + roost * 140; alpha = 0.08 + 0.2 * amt + 0.16 * roost; shade = w.surface === 3 ? 1.25 : w.surface === 6 ? 0.55 : 1;
         size = 0.45 + 0.4 * roost; grow = 1.2 + 1.6 * roost; life = 1.6 + amt + roost; up = roost * 3;
         // loose ground: a spinning or sliding tyre digs a soil-coloured rut
         const rut = past * clamp((slip - 2) / 5, 0, 1) * clamp(w.Fz / 3500, 0.2, 1) * 0.6;
@@ -1534,7 +1546,7 @@
       { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER || CC ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
       { html: CC ? CCD.trans : MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
         : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? PKG_UI[0] : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_UI[0]) : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
@@ -1839,7 +1851,7 @@
   // fuel, the transmission, the tyres, the off-road package and the Fun-tab tune (no undefined: the database won't take it)
   function carSetup() {
     const m = MORE_CARS.find((x) => x.id === S.car);
-    return JSON.parse(JSON.stringify({ c: S.car, o: m && m.optKey ? S[m.optKey] || '' : '', fuel: S.fuel, trans: S.trans, rear: S.rearTire, dp: S.dpRear || 'etdrag', off: OFFROAD(), tune }));
+    return JSON.parse(JSON.stringify({ c: S.car, o: m && m.optKey ? S[m.optKey] || '' : '', fuel: S.fuel, trans: S.trans, rear: S.rearTire, dp: S.dpRear || 'etdrag', off: (S.offroad && S.offroad[S.car]) || false, tune }));
   }
   // (a joiner's own car, kept while they drive the host's, back when they leave)
   const OWN_KEYS = ['car', 'fuel', 'trans', 'rearTire', 'dpRear', 'offroad', 'tcMode'].concat(MORE_CARS.filter((m) => m.optKey).map((m) => m.optKey));
@@ -1887,7 +1899,7 @@
         if (cs.trans) S.trans = cs.trans;
         if (cs.rear) S.rearTire = cs.rear;
         if (cs.dp) S.dpRear = cs.dp;
-        S.offroad = Object.assign({}, S.offroad, { [cs.c]: !!cs.off });
+        S.offroad = Object.assign({}, S.offroad, { [cs.c]: cs.off === 'knobby' ? 'knobby' : !!cs.off });
         if (restart) why = (why ? why + ' and ' : '') + 'the host\'s ' + carLabel(cs.c, cs.o);
         else if (!why && !ONLINE.reloading) { hostTune(cs.tune); applyVehicleSettings(); if (G.menu) renderMenu(); }
       }

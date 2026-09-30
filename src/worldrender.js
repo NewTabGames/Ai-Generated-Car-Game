@@ -58,8 +58,9 @@ float lampLight(float lat, float al){
       trkTex.needsUpdate = true;
       trkBox.set(bx0, bz0, 1 / (w * res), 1 / (h * res));
     }
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks)
-      uMap: { value: TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+    const DUNEMAP = W.map === 'dunes';
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
       uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
@@ -113,7 +114,42 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 5.5) {
+    if (uMap > 7.5) {
+      // ---- Sand Dunes: warm golden sand - redder and paler patches, the slip faces (facing downwind) fresh, smooth and
+      // a touch lighter, wind ripples across everything else (sharp crests, fading out with distance), old tyre tracks
+      // wandering over it all; the packed hardpan at the start greyer and firmer, rutted where everyone's parked
+      vec2 U = vec2(0.96, 0.28);
+      float s1 = vnoise(P * 0.06), s2 = fbm3(P * 0.004 + 3.0), s3 = vnoise(P * 1.7), s4 = vnoise(P * 9.0);
+      vec3 c = mix(vec3(0.42, 0.24, 0.085), vec3(0.5, 0.3, 0.115), s1) * (0.94 + 0.05 * s3 + 0.03 * s4);
+      c = mix(c, vec3(0.46, 0.21, 0.065), smoothstep(0.55, 0.85, s2) * 0.4);
+      c = mix(c, vec3(0.5, 0.34, 0.16), smoothstep(0.3, 0.05, s2) * 0.3);
+      float lee = dot(vWN.xz, U);
+      float slip = smoothstep(0.18, 0.4, lee);
+      c *= 1.0 + 0.05 * slip;
+      // ripples: ~30 cm apart across the wind, a sharp crest and its shadow; none on the slip faces or far off
+      float rq = dot(P, U) / 0.3 + vnoise(P * 0.45) * 3.0 + vnoise(P * 2.1) * 0.6;
+      float fwR = fwidth(rq), rf = fract(rq);
+      float rip = rf < 0.78 ? rf / 0.78 : (1.0 - rf) / 0.22;
+      float rfade = (1.0 - smoothstep(6.0, 40.0, dist)) * (1.0 - smoothstep(0.2, 0.45, fwR)) * (1.0 - slip) * (0.55 + 0.45 * vnoise(P * 0.08));
+      c *= 1.0 + 0.1 * (rip - 0.5) * rfade;
+      // old tyre tracks
+      float px = max(length(fwidth(P)), 1e-4), trk = 0.0;
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k);
+        float v = vnoise(P * (0.008 + 0.004 * fk) + vec2(fk * 5.1, fk * 2.3)) - 0.5;
+        float gv = max(length(vec2(dFdx(v), dFdy(v))) / px, 1e-4);
+        float dd = abs(v) / gv;
+        trk += exp(-pow((dd - 0.8) / 0.22, 2.0)) * (0.5 + 0.5 * vnoise(P * 0.7 + fk)) * step(0.45, vnoise(P * 0.006 + fk * 9.0));
+      }
+      c *= 1.0 - 0.16 * clamp(trk, 0.0, 1.0) * (1.0 - smoothstep(60.0, 300.0, dist));
+      // the hardpan
+      float cd = length(P) - ${W.DUNES.CAMP_R.toFixed(1)} - (vnoise(P * 0.2) - 0.5) * 3.0;
+      float hard = 1.0 - smoothstep(-1.0, 4.0, cd);
+      vec3 hp = mix(vec3(0.3, 0.19, 0.09), vec3(0.36, 0.24, 0.12), s3) * (0.92 + 0.08 * s4);
+      hp *= 1.0 - 0.22 * clamp(trk * 1.6, 0.0, 1.0);
+      col = mix(c, hp, hard);
+      rough = 0.96;
+    } else if (uMap > 5.5) {
       // ---- the tracks: td = metres from the centre line (outside the baked area: far)
       vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
       float td = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv).r * 25.5 : 25.5;
@@ -918,7 +954,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && !W.track;
+    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && W.map !== 'dunes' && !W.track;
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -982,6 +1018,12 @@ void main(){
       sun.color.setRGB(...p.sun); sun.intensity = p.sunI;
       hemi.color.setHex(p.hs); hemi.groundColor.setHex(p.hg); hemi.intensity = p.hemiI;
       scene.fog.color.setRGB(...p.fog);
+      if (DUNEMAP && !p.night) {
+        hemi.groundColor.setHex(name === 'sunset' ? 0x7a4a2a : 0x8a6a42);
+        scene.fog.color.lerp(new THREE.Color(0.8, 0.7, 0.56), 0.3);
+        skyUniforms.uHorizon.value.lerp(new THREE.Color(0.9, 0.82, 0.7), 0.3);
+        skyUniforms.uCloud.value = p.cloud * 0.35;
+      }
       // All Road street lights come on at dusk
       terrUniforms.uLamp.value = p.night ? 1 : name === 'sunset' ? 0.3 : 0;
       lampLensMat.emissiveIntensity = p.night ? 6 : name === 'sunset' ? 2 : 0;

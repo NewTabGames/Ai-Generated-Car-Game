@@ -216,7 +216,7 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button>
     </div>
     <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
     <div id="netTitle" style="margin-top:8px;font-size:13px;color:#9ab"></div>
@@ -489,6 +489,32 @@
   // the outside of the front straight into the pits; the start / finish line crosses the front straight at z = 0,
   // bleachers stand beyond it. Gentle country rises well back from the field. Physics: dirt on the track, grass off it
   const MOWT = { SL: 40, R: 28, W: 12, BALE: 1.25, PIT: [18, 30], SPAWN_X: 28, SPAWN_Z: 12, STANDS: { x: 47, z0: -26, z1: 26, d: 9 } };
+  // 'dunes' (Sand Dunes): an endless sand sea. Transverse dune ridges across a steady wind blowing along +x (UX, UZ):
+  // each rises on a long, gentle windward face (up to ~20 deg) to a rounded brink, then drops down its slip face at
+  // sand's angle of repose (~30-37 deg) - so heading downwind you climb the gentle side and go over the top. Ridges ~L
+  // apart, the windward face K of the way; the crests wander (the field is warped), each ridge swells and dies away
+  // along its crest (crescents, gaps, bowls), the dune fields grow and shrink, big slow swells underneath. The start is
+  // a flat hardpan of packed sand CAMP_R across (dirt physics; the dunes rise round it by CAMP_E). Sand everywhere else.
+  const DUNES = { L: 80, K: 0.68, UX: 0.96, UZ: 0.28, A0: 1.5, A1: 10.5, CAMP_R: 38, CAMP_E: 95, SPAWN_X: -22, SPAWN_Z: 0 };
+  function duneSwell(x, z) { return nLow1(x * 0.0011, z * 0.0011) * 14 + nLow2(x * 0.0031 + 5.3, z * 0.0031 - 2.2) * 3.5; }
+  function duneHeight(x, z) {
+    const D = DUNES;
+    const wx = x + nHill(x * 0.0035, z * 0.0035) * 22 + nDet(x * 0.012 + 7.1, z * 0.012 - 2.9) * 3.5;
+    const wz = z + nHill(x * 0.0035 + 31.7, z * 0.0035 - 17.3) * 22;
+    const q = (wx * D.UX + wz * D.UZ) / D.L, n = Math.floor(q), ph = q - n;
+    // (the profile: an S up the windward face to the brink, a steeper S down the slip face; zero at the trough, where
+    // one ridge meets the next - so each ridge can have its own height with no step between them)
+    const prof = ph < D.K ? 0.5 - 0.5 * Math.cos(Math.PI * ph / D.K) : 0.5 + 0.5 * Math.cos(Math.PI * (ph - D.K) / (1 - D.K));
+    const along = -wx * D.UZ + wz * D.UX;
+    const field = smooth(-0.4, 0.45, nRegion(x * 0.0016, z * 0.0016));
+    const cres = smooth(-0.55, 0.35, nForest2(along * 0.009, n * 1.37 + 0.5));
+    const A = D.A0 + D.A1 * Math.pow(field, 0.8) * cres;
+    // small dunes riding on the big ones' windward faces
+    const q2 = (wx * 0.9 + wz * 0.44) / 23 + nDet(x * 0.02, z * 0.02) * 0.4, p2 = q2 - Math.floor(q2);
+    const small = (p2 < 0.72 ? 0.5 - 0.5 * Math.cos(Math.PI * p2 / 0.72) : 0.5 + 0.5 * Math.cos(Math.PI * (p2 - 0.72) / 0.28)) * 0.7 * (1 - 0.6 * prof);
+    return duneSwell(x, z) + A * prof + small;
+  }
+  function duneCampD(x, z) { return Math.hypot(x, z); }
   // signed distance from the track's centre line (- towards the infield)
   function mowtD(x, z) { const zc = z < -MOWT.SL ? -MOWT.SL : z > MOWT.SL ? MOWT.SL : z; return Math.hypot(x, z - zc) - MOWT.R; }
   // the bales: one every ~1.25 m round both edges, each with its heading along the edge
@@ -744,7 +770,7 @@
    *  dOther (distance to nearest road of the other axis). */
   function roadInfo(x, z, out) {
     out = out || {};
-    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
+    if (MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || MAP === 'dunes' || TRK) { out.d = 1e4; out.sd = 1e4; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (STRAIGHT()) { out.d = Math.abs(x); out.sd = x; out.axis = 0; out.idx = 0; out.slope = 0; out.dOther = 1e9; return out; }
     if (MAP === 'tarmac') {
       const A = TARMAC.AV, i = Math.round(x / A), j = Math.round(z / A), sx = x - i * A, sz = z - j * A;
@@ -1247,7 +1273,7 @@
 
   // ---------------------------------------------------------------- terrain height
   function lowHeight(x, z) {
-    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || TRK) return 0;
+    if (STRAIGHT() || MAP === 'tarmac' || MAP === 'arena' || MAP === 'mowtrack' || MAP === 'ramps' || MAP === 'dunes' || TRK) return 0;
     return nLow1(x * 0.00085, z * 0.00085) * 20 + nLow2(x * 0.0024 + 11.3, z * 0.0024 - 7.1) * 6;
   }
   function ridged(x, z) {
@@ -1263,6 +1289,11 @@
   const _ri = {};
   function terrainHeight(x, z, ri) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (MAP === 'dunes') {
+      // (the hardpan: dead flat at the swell's height in the middle of it, the dunes rising round it)
+      const m = smooth(DUNES.CAMP_R, DUNES.CAMP_E, duneCampD(x, z)), h0 = duneSwell(0, 0);
+      return m > 0 ? h0 + (duneHeight(x, z) - h0) * m : h0;
+    }
     if (TRK) {
       if (TRK.kind === 'mow') {
         // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
@@ -1362,6 +1393,7 @@
     if (MAP === 'mowtrack') { out.roadD = 1e4; out.surface = Math.abs(mowtD(x, z)) < MOWT.W / 2 ? 3 : 2; return out; }   // dirt oval, grass
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
+    if (MAP === 'dunes') { out.roadD = 1e4; out.surface = duneCampD(x, z) < DUNES.CAMP_R + 3 ? 3 : 6; return out; }   // sand, the packed hardpan
     if (TRK) {
       // rally stages: a gravel road (with a strip of loose stuff along its edges); the mower course: dirt. Grass or dirt off it
       const d = trackQuery(x, z, _gtq).d;
@@ -1382,7 +1414,7 @@
 
   // ---------------------------------------------------------------- vegetation / props
   function forestDensity(x, z) {
-    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps') return 0;
+    if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
     if (TRK) {
       if (TRK.kind === 'mow') return 0.7 * smooth(150, 330, Math.hypot(x - TRK.cx, z - TRK.cz)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
@@ -1408,7 +1440,7 @@
     const trees = [], bushes = [], rocks = [], buildings = [], poles = [], signs = [], labels = [], lines = [], walls = [];
     const circles = [], boxes = [];
     const ri = {};
-    if (MAP === 'arena' || MAP === 'ramps') {
+    if (MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') {
       if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
@@ -1777,7 +1809,7 @@
       }
       return { x, z, y: ground(x, z, {}).h, tx, tz };
     }
-    if (MAP === 'ramps') {
+    if (MAP === 'ramps' || MAP === 'dunes') {
       // back on its wheels right where it is, facing the hint
       let tx = hintX || 0, tz = hintZ === undefined ? -1 : hintZ || 0;
       const l = Math.hypot(tx, tz);
@@ -1810,14 +1842,14 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || TRACK_DEFS[m] ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || TRACK_DEFS[m] ? m : 'country';
     TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
     trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
@@ -1863,9 +1895,10 @@
     // tyres: per-axle compounds, see TIRES
     loadSens: 0.11, Fz0: 5200,
     frontTire: 'street', rearTire: 'street',
-    //          asphalt gravel grass dirt water prepped-strip
-    surfMu:   [1.00, 0.68, 0.58, 0.64, 0.30, 1.00],
-    surfCrr:  [0.012, 0.030, 0.055, 0.045, 0.25, 0.011],
+    //          asphalt gravel grass dirt water prepped-strip sand
+    // (sand: soft, dry dune sand - it shears under a tyre and piles up in front of it: little bite, a lot of drag)
+    surfMu:   [1.00, 0.68, 0.58, 0.64, 0.30, 1.00, 0.42],
+    surfCrr:  [0.012, 0.030, 0.055, 0.045, 0.25, 0.011, 0.075],
     // brakes: Brembo 6-piston / 400x34 mm two-piece front, 4-piston / 350x28 mm rear
     brakeTorqueF: 4300, brakeTorqueR: 2250, handbrakeTorque: 3400,
     // steering
@@ -1935,7 +1968,7 @@
     // Interlocking blocks bite into loose ground; on pavement it matches the street tyre's grip with a touch slower
     // response, and a rounded peak that slides progressively
     // (C 1.25: ~92 % of peak when sliding vs ~79 % for the P Zero). Also: more rolling drag on tarmac, less on dirt.
-    offroad: { name: 'BFGoodrich All-Terrain T/A KO2 LT285/55R20', short: 'KO2 all-terrain', width: 0.285, radius: 0.4,
+    offroad: { name: 'BFGoodrich All-Terrain T/A KO2 LT285/55R20', short: 'KO2 all-terrain', width: 0.285, radius: 0.4, sandKx: 1.0, sandKy: 1.0,
       muX: 1.45, muY: 1.16, loose: 1.55, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
       B: 2.91, C: 1.25, E: -0.1, heatCap: 4200, cold: 0.95, coldT: 5, warmT: 35, hotT: 95, overheat: 0.005, prep: 1.02,
       crr: [1.25, 0.75, 0.75, 0.75, 0.85, 1.25], inertiaAdd: 1.6, massAdd: 15, lift: 0.05, droop: 0.03,
@@ -2001,7 +2034,7 @@
       muX: 1.2, muY: 1.18, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.07, relaxY: 0.1,
       B: 1.75, C: 1.4, E: -0.25, heatCap: 650, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
       crr: [1, 1.5, 1.6, 1.5, 1, 1] },
-    monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838,
+    monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838, sandKx: 1.1, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
       crr: [1.5, 1.2, 1.1, 1.1, 1.0, 1.5] },
@@ -2029,26 +2062,26 @@
     // tread - and ribbed sand fronts. The paddles scoop the ground: enormous bite in sand, dirt and mud, next to none on
     // pavement or a prepped strip (they skate on their tips), and little side grip anywhere. No heat to speak of.
     // (they shovel the ground rather than grip it: the quickest sand pass is 2.16 s @ 156 mph in 300 ft, ~4 g)
-    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487,
+    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 10, inertiaAdd: 0.5, finalK: 0.487 / 0.457 },
-    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468,
+    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 9, inertiaAdd: 0.45, finalK: 0.468 / 0.438 },
-    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3,
+    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3, sandKx: 1.0, sandKy: 1.5, sandCrr: 0.7,
       muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
       B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
       crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.08 },
-    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33,
+    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33, sandKx: 1.0, sandKy: 1.5, sandCrr: 0.7,
       muX: 1.0, muY: 0.85, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
       B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
       crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.1 },
     // Monster truck: the BKTs left full-depth (as moulded) instead of shaved and hand-cut for a stadium floor: ~1 in
     // more lug and ~100 lb more rubber each. More bite in mud, turf and loose dirt, about the same on the arena's
     // packed clay, less on pavement (the tall lugs squirm), and heavier to spin up
-    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858,
+    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858, sandKx: 1.15, sandKy: 1.05,
       muX: 0.92, muY: 0.8, loose: 2.0, looseY: 1.45, looseKx: [1, 1.08, 1.25, 1.06, 1.35, 1], kappaPeak: 0.24, alphaPeak: 0.21, relaxX: 0.6, relaxY: 0.9,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05,
       crr: [1.8, 1.25, 1.1, 1.1, 1.0, 1.8], massAdd: 45, inertiaAdd: 30, finalK: 0.858 / 0.838 },
@@ -2161,13 +2194,13 @@
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // the rally cars' off-road package: mud tyres - big open lugs that bite in grass, dirt and mud (~1 g in the grass, twice
     // the gravel tyre's grip in mud), about the same on gravel, a lot less on tarmac; heavier, and they bite at more slip
-    rallyKnob: { name: '205/70R15 rally mud tyre', short: 'Rally mud', width: 0.205,
+    rallyKnob: { name: '205/70R15 rally mud tyre', short: 'Rally mud', width: 0.205, sandKx: 1.05, sandKy: 1.0,
       muX: 0.9, muY: 0.85, loose: 1.7, looseKx: [1, 1.0, 1.15, 1.08, 1.3, 1], looseKy: [1, 0.95, 1.1, 1.02, 1.25, 1], kappaPeak: 0.15, alphaPeak: 0.16, relaxX: 0.22, relaxY: 0.45,
       B: 1.5, C: 1.35, E: -0.05, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.3, 1.1, 1.1, 1.1, 1, 1.3], massAdd: 3, inertiaAdd: 0.15, lift: 0.02, tcTargets: [0.15, 0.18, 0.22] },
     // the Cybertruck's 35 in all-terrains on 20 in wheels: a road-biased AT tread - a truck tyre's grip on tarmac (~0.9 g
     // on 3 t), a lot more than a road tyre's in the loose stuff
-    cyberAT: { name: 'Goodyear Wrangler Territory RT LT285/65R20', short: '35 in all-terrain', width: 0.285, radius: 0.44,
+    cyberAT: { name: 'Goodyear Wrangler Territory RT LT285/65R20', short: '35 in all-terrain', width: 0.285, radius: 0.44, sandKx: 1.0, sandKy: 1.0,
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
@@ -2187,12 +2220,12 @@
       B: 2.2, C: 1.45, E: -0.15, heatCap: 2200, cold: 0.88, coldT: 20, warmT: 60, hotT: 120, overheat: 0.003, prep: 1.05 },
     // the trophy truck's: BFGoodrich Baja T/A KR3-type 39x13.5R17 desert racing tyres - a stiff 10-ply carcass, big
     // interlocking blocks: they hook on dirt and gravel nearly as well as on tarmac and shrug off rocks at 130 mph
-    ttKR3: { name: '39x13.50R17 desert racing (Baja KR3-type)', short: '39 in desert', width: 0.343, radius: 0.495,
+    ttKR3: { name: '39x13.50R17 desert racing (Baja KR3-type)', short: '39 in desert', width: 0.343, radius: 0.495, sandKx: 1.2, sandKy: 1.1,
       muX: 1.12, muY: 1.0, loose: 1.62, looseKx: [1, 1.05, 0.95, 1.05, 0.85, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.28, relaxY: 0.55,
       B: 1.8, C: 1.35, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.02,
       crr: [1.2, 1.1, 1.1, 1.05, 1.0, 1.2] },
     // (its off-road package: 40 in mud-terrains - open lugs for mud and grass, give-away grip on tarmac)
-    ttMud: { name: '40x13.50R17 mud-terrain', short: '40 in mud', width: 0.343, radius: 0.508,
+    ttMud: { name: '40x13.50R17 mud-terrain', short: '40 in mud', width: 0.343, radius: 0.508, sandKx: 1.1, sandKy: 1.0,
       muX: 0.98, muY: 0.86, loose: 1.9, looseKx: [1, 1.0, 1.1, 1.1, 1.25, 1], looseKy: [1, 0.95, 1.05, 1.05, 1.2, 1], kappaPeak: 0.16, alphaPeak: 0.17, relaxX: 0.3, relaxY: 0.58,
       B: 1.7, C: 1.32, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.0,
       crr: [1.35, 1.2, 1.2, 1.1, 1.0, 1.35], massAdd: 6, inertiaAdd: 0.6, finalK: 0.508 / 0.495 },
@@ -2206,35 +2239,61 @@
       B: 1.9, C: 1.35, E: -0.1, heatCap: 2400, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // (its off-road package: sand paddles on the back, ribbed sand fronts - dune tyres)
-    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381,
+    // (in sand they're at home: ~1.8 g of bite at ~30 % slip - so traction control lets them have that slip - and they
+    // float, rolling easier than any tyre that digs in)
+    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.3, relaxY: 0.45,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 8000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
-      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367 },
+      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367, tcTargets: [0.26, 0.32, 0.4] },
+    // (its other package: off-road knobbies - 27x8.50-15 fronts and 31x10.50R15 rears on the same five-spokes. They bite
+    // in dirt, gravel, grass and mud where the stock tyres slide, hold their own in sand (nothing like the paddles, but
+    // they don't skate on hard ground either), and give up grip on pavement, where the knobs squirm)
+    buggyKnobF: { name: '27x8.50-15 knobby front', short: 'Knobbies', width: 0.2, radius: 0.345, sandKx: 1.05, sandKy: 1.1, sandCrr: 1.0,
+      muX: 0.92, muY: 0.85, loose: 1.55, looseKx: [1, 1.08, 1.12, 1.15, 1.1, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.18, relaxY: 0.36,
+      B: 1.8, C: 1.32, E: -0.1, heatCap: 2000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 3, inertiaAdd: 0.1 },
+    buggyKnobR: { name: '31x10.50R15 knobby rear', short: 'Knobbies', width: 0.267, radius: 0.39, sandKx: 1.1, sandKy: 1.05, sandCrr: 0.9,
+      muX: 0.95, muY: 0.88, loose: 1.65, looseKx: [1, 1.08, 1.15, 1.15, 1.15, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.4,
+      B: 1.8, C: 1.32, E: -0.1, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 5, inertiaAdd: 0.2, finalK: 0.39 / 0.367, tcTargets: [0.15, 0.18, 0.22] },
     // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
     // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
     // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
-    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36,
+    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36, sandKx: 1.1, sandKy: 1.05, sandCrr: 0.4,
       muX: 0.95, muY: 0.62, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
     // (its off-road package: the rubber pads off - bare steel grousers dig into dirt, mud and grass, slide on tarmac)
-    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36,
+    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36, sandKx: 1.2, sandKy: 1.1, sandCrr: 0.4,
       muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
-    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
+    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16, sandKx: 1.05, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
       B: 1.8, C: 1.3, E: -0.1, heatCap: 1500, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
       crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.02, lift: 0.02 },
   };
-  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
-  function OFFROAD_PKG(car, cls) {
+  // Sand (surface 7th in the per-surface lists): each tyre's bite in soft sand on top of its loose-ground grip, forwards
+  // (sandKx) and sideways (sandKy), and its rolling drag there (sandCrr). A narrow, hard tyre digs in and ploughs, a wide
+  // soft one floats on top - the drag defaults from the tread width; the tyres made for sand set their own (paddles
+  // scoop it, ribbed fronts steer in it)
+  for (const t of Object.values(TIRES)) {
+    const kx = t.sandKx !== undefined ? t.sandKx : 0.9, ky = t.sandKy !== undefined ? t.sandKy : 0.9;
+    const cr = t.sandCrr !== undefined ? t.sandCrr : clamp(0.26 / (t.width || 0.25), 0.55, 2.4);
+    t.looseKx = (t.looseKx || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([kx]);
+    t.looseKy = (t.looseKy || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([ky]);
+    t.crr = (t.crr || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([cr]);
+  }
+  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them).
+  // kind: a package choice where a vehicle has more than one (the dune buggy: 'knobby' - off-road knobbies, else
+  // its dune tyres)
+  function OFFROAD_PKG(car, cls, kind) {
     if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
     if (car === 'monster' || car === 'avenger') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'trophy') return { front: 'ttMud', rear: 'ttMud' };
-    if (car === 'buggy') return { front: 'sandRib', rear: 'buggyPaddle' };
+    if (car === 'buggy') return kind === 'knobby' ? { front: 'buggyKnobF', rear: 'buggyKnobR' } : { front: 'sandRib', rear: 'buggyPaddle' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
@@ -2259,6 +2318,10 @@
     const c = s.torqueCurve, rEnd = c[c.length - 1][0] * (s.rpmStretch || 1);
     return rpm > rEnd ? 0.6 * Math.pow((rpm - rEnd) / 1000, 2) : 0;
   }
+  // sand on a steep face: past ~24 deg it's nearing its angle of repose (~34 deg) - a tyre biting into it just starts
+  // an avalanche under itself - so the bite falls away (to under a third by 40 deg): nothing climbs a slip face from
+  // standing, whatever it runs on (ny: the ground normal's up component)
+  function sandSlope(ny) { const a = Math.acos(clamp(ny, -1, 1)) * 57.2958; return a <= 24 ? 1 : Math.max(0.3, 1 - (a - 24) * 0.046); }
   function tempGrip(T, t) {
     if (T < t.warmT) return t.cold + (1 - t.cold) * clamp((T - t.coldT) / (t.warmT - t.coldT), 0, 1);
     if (T < t.hotT) return 1.0;
@@ -2915,7 +2978,7 @@
         let kd = fade * 0.03 / Lx;
         if (kd > 0) {
           const kpE = ty.kappaPeak * Math.pow(clamp(w.Fz / s.Fz0, 0.35, 2.5), 0.2);
-          const muE = (w.surface >= 1 && w.surface <= 4 ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : 1) * tempGrip(w.temp, ty) * (s.gripScale || 1);
+          const muE = ((w.surface >= 1 && w.surface <= 4) || w.surface === 6 ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : w.surface === 6 ? sandSlope(w.ny) : 1) * tempGrip(w.temp, ty) * (s.gripScale || 1);
           const gain = muE * w.Fz * ty.B * ty.C * kd / kpE * h * r * r / w.inertia;
           const cap = s.tireDampCap || 3;
           if (gain > cap) kd *= cap / gain;
@@ -2930,8 +2993,8 @@
         const loadF = clamp(1 - s.loadSens * (Fzn / s.Fz0 - 1), 0.72, 1.18);
         // burnout in a dragster (no front brakes to hold it): the slicks come out of the water box wet and spin up
         const wet = s.burnoutWet && this.lineLockActive && !w.front ? s.burnoutWet : 1;
-        const mu = s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : 1) * loadF * tempGrip(w.temp, ty) * (s.gripScale || 1) * wet;
-        const loose = w.surface >= 1 && w.surface <= 4;
+        const mu = s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : w.surface === 6 ? sandSlope(w.ny) : 1) * loadF * tempGrip(w.temp, ty) * (s.gripScale || 1) * wet;
+        const loose = (w.surface >= 1 && w.surface <= 4) || w.surface === 6;
         let Fxt = 0, Fyt = 0;
         if (rho > 1e-7) {
           const f = mu * Fzn * MF(rho, ty) / rho;
@@ -5465,7 +5528,7 @@ class CarSynth {
     const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8);
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
-    const hard = c.surf < 0.5 || c.surf > 4.5;
+    const hard = c.surf < 0.5 || (c.surf > 4.5 && c.surf < 5.5);
     const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9 * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
     if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
@@ -13485,7 +13548,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         const corner = new THREE.Group(); corner.position.set(side * HX, R - cgH, (frontW ? zF : zR) + zOff); rootG.add(corner);
         const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
         const spin = new THREE.Group(); flip.add(spin);
-        const w = { corner, flip, spin, left, front: frontW, side, stock: [], pkg: [] };
+        const w = { corner, flip, spin, left, front: frontW, side, stock: [], pkg: [], knob: [] };
         buildWheel(w, R);
         wheels.push(w);
       }
@@ -13873,10 +13936,16 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const padG = mergeGeos(pad);
       const ribF = []; for (const ox of [-0.33, 0, 0.33]) { const t = new THREE.TorusGeometry(RF + 0.004, 0.009, 6, 48); t.rotateY(Math.PI / 2); t.translate(ox * fW, 0, 0); ribF.push(t); }
       const ribG = mergeGeos(ribF);
+      // (the other package: off-road knobbies, 27x8.50-15 / 31x10.50R15 - big staggered blocks, shoulder lugs down the sides)
+      const kF = 0.2, kRR = 0.39, kR = 0.267;
+      const tyKF = carcass(0.327, kF, 0.19), trKF = blocks(0.327, kF, 26, [[0.22, 0.34, 0.5, 0], [-0.22, 0.34, 0.5, 0.5], [0.47, 0.12, 0.45, 0.25], [-0.47, 0.12, 0.45, 0.75]], 0.018, 1);
+      const tyKR = carcass(kRR - 0.018, kR, 0.19), trKR = blocks(kRR - 0.018, kR, 28, [[0.22, 0.34, 0.5, 0], [-0.22, 0.34, 0.5, 0.5], [0.47, 0.12, 0.45, 0.25], [-0.47, 0.12, 0.45, 0.75]], 0.022, 1);
       makeWheels((w, R) => {
-        if (w.front) { w.stock.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, trF, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, ribG, M.rubber, 0, 0, 0)); rim(w.spin, R, fW, 0.19); }
-        else { w.stock.push(add(w.spin, tyR, M.rubber, 0, 0, 0), add(w.spin, trR, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padG, M.rubber, 0, 0, 0)); rim(w.spin, R, rW, 0.19); }
-        for (const m of w.pkg) m.visible = false;
+        if (w.front) { w.stock.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, trF, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyF, M.rubber, 0, 0, 0), add(w.spin, ribG, M.rubber, 0, 0, 0)); rim(w.spin, R, fW, 0.19);
+          w.knob.push(add(w.spin, tyKF, M.rubber, 0, 0, 0), add(w.spin, trKF, M.rubber, 0, 0, 0)); }
+        else { w.stock.push(add(w.spin, tyR, M.rubber, 0, 0, 0), add(w.spin, trR, M.rubber, 0, 0, 0)); w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padG, M.rubber, 0, 0, 0)); rim(w.spin, R, rW, 0.19);
+          w.knob.push(add(w.spin, tyKR, M.rubber, 0, 0, 0), add(w.spin, trKR, M.rubber, 0, 0, 0)); }
+        for (const m of w.pkg.concat(w.knob)) m.visible = false;
         add(w.flip, cylX(0.11, 0.11, 0.06, 24), M.cast, -0.03, 0, 0);                                                  // drum
       });
       // front: the VW beam (two tubes across), trailing arms back to the spindles, yellow coil-overs; back: trailing arms
@@ -13932,7 +14001,10 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     function setTires(front, rear) {
       if (TT) return;
-      for (const w of wheels) { const pkg = (w.front ? front : rear) !== (w.front ? 'buggyF' : 'buggyR'); for (const m of w.stock) m.visible = !pkg; for (const m of w.pkg) m.visible = pkg; }
+      for (const w of wheels) {
+        const t = w.front ? front : rear, knob = t === 'buggyKnobF' || t === 'buggyKnobR', pkg = !knob && t !== (w.front ? 'buggyF' : 'buggyR');
+        for (const m of w.stock) m.visible = !pkg && !knob; for (const m of w.pkg) m.visible = pkg; for (const m of w.knob) m.visible = knob;
+      }
     }
     // cockpit view: the driver goes (you're in their seat); the trophy truck's cab shell stays - you look out of it
     function setInteriorVisible(v, cp) { if (driver) driver.visible = !cp; }
@@ -14012,8 +14084,9 @@ float lampLight(float lat, float al){
       trkTex.needsUpdate = true;
       trkBox.set(bx0, bz0, 1 / (w * res), 1 / (h * res));
     }
-    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks)
-      uMap: { value: TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+    const DUNEMAP = W.map === 'dunes';
+    const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
       uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
@@ -14067,7 +14140,42 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 5.5) {
+    if (uMap > 7.5) {
+      // ---- Sand Dunes: warm golden sand - redder and paler patches, the slip faces (facing downwind) fresh, smooth and
+      // a touch lighter, wind ripples across everything else (sharp crests, fading out with distance), old tyre tracks
+      // wandering over it all; the packed hardpan at the start greyer and firmer, rutted where everyone's parked
+      vec2 U = vec2(0.96, 0.28);
+      float s1 = vnoise(P * 0.06), s2 = fbm3(P * 0.004 + 3.0), s3 = vnoise(P * 1.7), s4 = vnoise(P * 9.0);
+      vec3 c = mix(vec3(0.42, 0.24, 0.085), vec3(0.5, 0.3, 0.115), s1) * (0.94 + 0.05 * s3 + 0.03 * s4);
+      c = mix(c, vec3(0.46, 0.21, 0.065), smoothstep(0.55, 0.85, s2) * 0.4);
+      c = mix(c, vec3(0.5, 0.34, 0.16), smoothstep(0.3, 0.05, s2) * 0.3);
+      float lee = dot(vWN.xz, U);
+      float slip = smoothstep(0.18, 0.4, lee);
+      c *= 1.0 + 0.05 * slip;
+      // ripples: ~30 cm apart across the wind, a sharp crest and its shadow; none on the slip faces or far off
+      float rq = dot(P, U) / 0.3 + vnoise(P * 0.45) * 3.0 + vnoise(P * 2.1) * 0.6;
+      float fwR = fwidth(rq), rf = fract(rq);
+      float rip = rf < 0.78 ? rf / 0.78 : (1.0 - rf) / 0.22;
+      float rfade = (1.0 - smoothstep(6.0, 40.0, dist)) * (1.0 - smoothstep(0.2, 0.45, fwR)) * (1.0 - slip) * (0.55 + 0.45 * vnoise(P * 0.08));
+      c *= 1.0 + 0.1 * (rip - 0.5) * rfade;
+      // old tyre tracks
+      float px = max(length(fwidth(P)), 1e-4), trk = 0.0;
+      for (int k = 0; k < 3; k++) {
+        float fk = float(k);
+        float v = vnoise(P * (0.008 + 0.004 * fk) + vec2(fk * 5.1, fk * 2.3)) - 0.5;
+        float gv = max(length(vec2(dFdx(v), dFdy(v))) / px, 1e-4);
+        float dd = abs(v) / gv;
+        trk += exp(-pow((dd - 0.8) / 0.22, 2.0)) * (0.5 + 0.5 * vnoise(P * 0.7 + fk)) * step(0.45, vnoise(P * 0.006 + fk * 9.0));
+      }
+      c *= 1.0 - 0.16 * clamp(trk, 0.0, 1.0) * (1.0 - smoothstep(60.0, 300.0, dist));
+      // the hardpan
+      float cd = length(P) - ${W.DUNES.CAMP_R.toFixed(1)} - (vnoise(P * 0.2) - 0.5) * 3.0;
+      float hard = 1.0 - smoothstep(-1.0, 4.0, cd);
+      vec3 hp = mix(vec3(0.3, 0.19, 0.09), vec3(0.36, 0.24, 0.12), s3) * (0.92 + 0.08 * s4);
+      hp *= 1.0 - 0.22 * clamp(trk * 1.6, 0.0, 1.0);
+      col = mix(c, hp, hard);
+      rough = 0.96;
+    } else if (uMap > 5.5) {
       // ---- the tracks: td = metres from the centre line (outside the baked area: far)
       vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
       float td = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv).r * 25.5 : 25.5;
@@ -14872,7 +14980,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && !W.track;
+    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && W.map !== 'dunes' && !W.track;
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -14936,6 +15044,12 @@ void main(){
       sun.color.setRGB(...p.sun); sun.intensity = p.sunI;
       hemi.color.setHex(p.hs); hemi.groundColor.setHex(p.hg); hemi.intensity = p.hemiI;
       scene.fog.color.setRGB(...p.fog);
+      if (DUNEMAP && !p.night) {
+        hemi.groundColor.setHex(name === 'sunset' ? 0x7a4a2a : 0x8a6a42);
+        scene.fog.color.lerp(new THREE.Color(0.8, 0.7, 0.56), 0.3);
+        skyUniforms.uHorizon.value.lerp(new THREE.Color(0.9, 0.82, 0.7), 0.3);
+        skyUniforms.uCloud.value = p.cloud * 0.35;
+      }
       // All Road street lights come on at dusk
       terrUniforms.uLamp.value = p.night ? 1 : name === 'sunset' ? 0.3 : 0;
       lampLensMat.emissiveIntensity = p.night ? 6 : name === 'sunset' ? 2 : 0;
@@ -15892,10 +16006,35 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       g.clearRect(0, 0, S, S);
       g.save();
       g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.clip();
-      const TAR = W.map === 'tarmac', RMP = W.map === 'ramps';
-      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : RMP ? 'rgba(70,48,30,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
+      const TAR = W.map === 'tarmac', RMP = W.map === 'ramps', DUN = W.map === 'dunes';
+      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : RMP ? 'rgba(70,48,30,0.85)' : DUN ? 'rgba(150,118,74,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
+      if (DUN) {
+        // the dunes: every 16 m a cell shaded by the ground's slope (light on the windward faces, dark down the slip
+        // faces), refreshed when you've moved far enough; the hardpan at the start
+        const D = this._dun || (this._dun = { c: document.createElement('canvas'), x: 1e9, z: 1e9 }), N = 96, cell = 16;
+        if (Math.hypot(px - D.x, pz - D.z) > 120) {
+          D.x = Math.round(px / cell) * cell; D.z = Math.round(pz / cell) * cell; D.c.width = N; D.c.height = N;
+          const dg = D.c.getContext('2d'), im = dg.createImageData(N, N);
+          for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+            const x = D.x + (i - N / 2) * cell, z = D.z + (j - N / 2) * cell;
+            const hC = W.terrainHeight(x, z), dx = (W.terrainHeight(x + 4, z) - hC) / 4, dz = (W.terrainHeight(x, z + 4) - hC) / 4;
+            const sh = Math.max(-1, Math.min(1, (dx * 0.8 - dz * 0.3) * 3.2)), hard = Math.hypot(x, z) < W.DUNES.CAMP_R, k = (j * N + i) * 4;
+            im.data[k] = hard ? 176 : 196 + sh * 40; im.data[k + 1] = hard ? 150 : 158 + sh * 34; im.data[k + 2] = hard ? 118 : 104 + sh * 24; im.data[k + 3] = 235;
+          }
+          dg.putImageData(im, 0, 0);
+        }
+        this._dunDraw = D;
+      }
       g.translate(c, c); g.rotate(heading); g.scale(sc, sc); g.translate(-px, -pz);
       g.lineCap = 'round'; g.lineJoin = 'round';
+      if (DUN) {
+        const D = this._dunDraw, N = D.c.width, cell = 16;
+        g.imageSmoothingEnabled = true;
+        g.drawImage(D.c, D.x - N / 2 * cell - cell / 2, D.z - N / 2 * cell - cell / 2, N * cell, N * cell);
+        g.restore();
+        this._mmOverlay(g, c, S, heading);
+        return;
+      }
       if (RMP) {
         // All Ramps: every jump, lighter the taller it stands
         const e = R * 1.5, CH = W.C.CHUNK, COL = { table: '#d9a766', gap: '#f0c080', step: '#c89058', kick: '#b8844e', mogul: '#a57a4c' };
@@ -16219,8 +16358,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           trans: '3-speed automatic · 4WD',
           snd: { nEng: 1, cyl: 8, fmul: 0.92, deep: 0.4, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 0.4, rpmRef: 7000, race: 1, rough: 0.2 } },
       } },
-    buggy: { btn: 'DUNE BUGGY', sub: 'A VW sand rail · tube frame, diamond-plate floor, two buckets and a roll cage · a 1600 VW, a built 2276 on dual Webers, or an LS V8', paint: 'Crimson', tc: 1, cam: [0.95, 1.05],
-      hint: 'Dune Buggy: shift up (E) for DRIVE - a stock 1600 VW flat-four, ~60 hp through the VW 4-speed (it shifts for you, or E / Q), 560 kg, ~80 mph. Light, rear-engined and loose on its skinny fronts - it slides in the dirt. Sand paddles are in the off-road package.',
+    buggy: { btn: 'DUNE BUGGY', sub: 'A VW sand rail · tube frame, diamond-plate floor, two buckets and a roll cage · a 1600 VW, a built 2276 on dual Webers, or an LS V8 · sand paddles or off-road knobbies · its own sand dunes', paint: 'Crimson', tc: 1, cam: [0.95, 1.05], map: 'dunes',
+      hint: 'Dune Buggy: shift up (E) for DRIVE - a stock 1600 VW flat-four, ~60 hp through the VW 4-speed (it shifts for you, or E / Q), 560 kg, ~80 mph. Light, rear-engined and loose on its skinny fronts - it slides in the dirt. Tyres (Esc → Drive): sand paddles for the dunes, or off-road knobbies.',
       info: 'A VW-based sand rail: a chromoly tube frame on a diamond-plate floor, a roll cage with two lamps, two high-back buckets, the battery on the nose · 1600 cc VW flat-four (dual-port), ~60 hp, 82 lb-ft · VW 4-speed transaxle · VW beam front end on coil-overs, trailing arms at the back · 5.60-15 fronts, 235/75R15 rears on polished five-spokes · ~560 kg with the driver, 38 / 62 · 0-60 ~10 s, ~80 mph',
       trans: 'VW 4-speed', tyres: 'Buggy tyres',
       snd: { nEng: 1, cyl: 4, fmul: 1.25, deep: 0.1, loud: 0.35, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5000, race: 0.3, rough: 0.35 },
@@ -16316,8 +16455,10 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
   // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
+  // (the dune buggy has two packages: its dune tyres - true - or off-road knobbies - 'knobby')
   const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
-  const PKG = VEH.OFFROAD_PKG(S.car, CARDEF.cls);
+  const PKG_KIND = () => (S.offroad && S.offroad[S.car] === 'knobby' ? 'knobby' : null);
+  const pkg = () => VEH.OFFROAD_PKG(S.car, CARDEF.cls, PKG_KIND());
   const PKG_UI = PULLER ? ['R-2 deep lugs', 'R-2 deep lugs + lug fronts', 'Firestone R-2 30.5L-32 "cane & rice" rears left uncut (lugs twice as deep as a farm tyre, never sharpened) and lugged 11L-15 fronts. '
       + 'Off the pavement they out-dig the cut pullers everywhere - they paddle through mud, dig into turf and bite deeper into loose dirt (traction control lets them spin up to where they bite), and it steers in the soft stuff · on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
     : DRAGSTER ? ['Sand-drag paddles', 'Paddles + rib fronts', 'The sand-drag setup: paddle tyres (a smooth carcass with ~1.5 in rubber paddles across the tread) and ribbed sand fronts. The paddles shovel the ground - huge bite on dirt and gravel '
@@ -16337,12 +16478,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
     : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
       + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, tread hum, and taller effective gearing'];
-  const tireF = () => (OFFROAD() ? PKG.front : FIXED ? carSpec.frontTire : 'street');
-  const tireR = () => (OFFROAD() ? PKG.rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
+  const tireF = () => (OFFROAD() ? pkg().front : FIXED ? carSpec.frontTire : 'street');
+  const tireR = () => (OFFROAD() ? pkg().rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
+  const DUNESMAP = S.map === 'dunes';
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
@@ -16382,6 +16524,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
     return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
   }
+  const DUNES_HINT = 'Sand Dunes: an endless sea of sand. The wind blows the way you face at the start - head that way and you climb the long, gentle faces and go over the brinks, the steep slip faces drop away on the far side (coming back, you climb those). Sand eats street tyres and bogs skinny ones down: paddles (the dune buggy\'s dune tyres), big all-terrains and four-wheel drive are the way to go.';
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
@@ -16390,6 +16533,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
+    : DUNESMAP ? { x: W.DUNES.SPAWN_X, y: W.ground(W.DUNES.SPAWN_X, W.DUNES.SPAWN_Z, {}).h, z: W.DUNES.SPAWN_Z, tx: 1, tz: 0 }
     : TRKMAP ? W.trackSpawn()
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
@@ -16512,7 +16656,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const smoke = new FX.Particles(THREE, scene, 2800);
   smoke.setCamera(camera);
   const skids = new FX.Skids(THREE, scene, 9000);
-  const SOIL = [null, [0.3, 0.27, 0.22], [0.2, 0.19, 0.09], [0.27, 0.19, 0.11]];   // rut colours: gravel, grass (torn turf), dirt
+  const SOIL = [null, [0.3, 0.27, 0.22], [0.2, 0.19, 0.09], [0.27, 0.19, 0.11], null, null, [0.44, 0.32, 0.18]];   // rut colours: gravel, grass (torn turf), dirt, sand
   const flames = new FX.Flames(THREE, car.root, car.exhaustTips);
   const audio = new AUD.CarAudio();
   const input = new INP.Input();
@@ -16611,11 +16755,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           : 'A 189 hp superbike engine and racing slicks: 0-100 in ~6.3 s, ~150 mph, 6 gears (E / Q or the paddles). Keep it on the pavement - slicks are hopeless on grass and dirt. ')
       + (CARDEF.cls === 'rec' ? (S.map === 'straight' ? 'The Straightaway is its record strip: see how close to 150 you get.' : 'Its record strip is the Straightaway map (Esc → Drive → Map).')
         : MOWTRACK ? 'Laps are timed at the start / finish arch - left turns, anticlockwise.' : MOWCOURSE ? 'Laps are timed at the start / finish arch.' : 'Its home is the Mower Track map (Esc → Drive → Map); the Windy Mower Track twists.'), 11), 1600);
-    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map && !(CCD.map === 'rally' && S.map === 'rallywind') ? ' Its home is the ' + (MAP_NAMES[CCD.map] || CCD.map) + ' map (Esc → Drive → Map).' : TRKMAP ? ' ' + TRACK_HINT[S.map] : ''), 12), 1600);
+    else if (CC) setTimeout(() => hud.hint(CCD.hint + (CCD.map && S.map !== CCD.map && !(CCD.map === 'rally' && S.map === 'rallywind') ? ' Its home is the ' + (MAP_NAMES[CCD.map] || CCD.map) + ' map (Esc → Drive → Map).' : TRKMAP ? ' ' + TRACK_HINT[S.map] : DUNESMAP ? ' ' + DUNES_HINT : ''), 14), 1600);
     else if (MONSTER) setTimeout(() => hud.hint('Monster truck: shift up (E) for DRIVE. All four wheels drive AND steer: G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). '
       + 'In the air, GAS lifts the nose and BRAKE drops it (air assist keeps it landable - turn it off in Esc → Drive for flips). Rolled it? Steer left or right to flip it back over.'
       + (FREESTYLE ? '' : ' Its home is the Monster Arena map (Esc → Drive → Map); All Ramps is nothing but jumps.'), 12), 1600);
     else if (TRKMAP) setTimeout(() => hud.hint(TRACK_HINT[S.map], 10), 1600);
+    else if (DUNESMAP) setTimeout(() => hud.hint(DUNES_HINT, 12), 1600);
     else if (MOWTRACK) setTimeout(() => hud.hint('Mower Track: a 1/5-mile dirt oval in a mown field, straw bales for walls, left turns. Laps are timed at the start / finish arch; the gap on the outside of the front straight leads out to the field. (The racing mowers live here: Esc → More cars.)', 10), 1600);
     else if (RAMPSMAP) setTimeout(() => hud.hint('All Ramps: the whole world is groomed dirt covered in jumps - gap jumps, tabletops, step-ups, kickers and whoops, big and small, every which way, for ever. The first gap jump is dead ahead. Big air, flips and wheelies score.', 11), 1600);
     else if (ARENAMAP) setTimeout(() => hud.hint('Monster Arena: two big gap jumps straight ahead up the middle and a giant tabletop across the far end; tabletops and step-ups either side, the car crush on the left, whoops lanes along the walls and behind you. Tricks score on the big screens. (The monster truck lives here: Esc → More cars.)', 11), 1600);
@@ -16646,7 +16791,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ menu
   const TABS = ['Drive', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
@@ -16956,7 +17101,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       if (!FIXED) add(row('Transmission', 'TorqueFlite 8HP90 8-speed automatic with paddles, or Tremec TR-6060 6-speed manual', seg([['auto', '8-speed auto'], ['manual', '6-speed manual']], S.trans, (v) => { if (carLocked()) return; S.trans = v; applyVehicleSettings(); })));
       if (!FIXED) add(row('Manual clutch', input.hasClutchPedal ? 'Use your clutch pedal (can stall!) or let the car work the clutch for you' : 'Map a clutch pedal in Controls → Wheel setup to use it', seg([[false, 'Auto-clutch'], [true, 'Clutch pedal']], S.clutchPedal, (v) => { S.clutchPedal = v; })));
-      add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
+      if (S.car === 'buggy') add(row('Tyres', 'Buggy tyres: a narrow bias front, a fat street-tread rear · Sand paddles: rubber scoops across a smooth rear carcass and ribbed fronts - made for the dunes: '
+        + 'huge bite in sand (and dirt and mud), they float over it, next to none on pavement · Off-road knobbies: 27 in fronts, 31 in rears - they bite in dirt, gravel, grass and mud and hold their own in sand, less grip on pavement',
+        seg([[false, 'Buggy tyres'], [true, 'Sand paddles'], ['knobby', 'Off-road knobbies']], (S.offroad && S.offroad.buggy) || false, (v) => {
+          if (carLocked()) return;
+          S.offroad = Object.assign({}, S.offroad, { buggy: v }); applyVehicleSettings();
+        })));
+      else add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
@@ -17282,7 +17433,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const amt = clamp((slip - 1.0) / 7 + (w.surface === 2 ? 0.25 : 1) * clamp((speed - 6) / 50, 0, 0.6), 0, 1);
         // a tyre spinning hard in loose ground throws a rooster tail of it, darker for dirt
         const roost = clamp((slip - 4) / 12, 0, 1) * clamp(w.Fz / 5000, 0.3, 1.5);
-        rate = amt * 45 + roost * 140; alpha = 0.08 + 0.2 * amt + 0.16 * roost; shade = w.surface === 3 ? 1.25 : 1;
+        rate = amt * 45 + roost * 140; alpha = 0.08 + 0.2 * amt + 0.16 * roost; shade = w.surface === 3 ? 1.25 : w.surface === 6 ? 0.55 : 1;
         size = 0.45 + 0.4 * roost; grow = 1.2 + 1.6 * roost; life = 1.6 + amt + roost; up = roost * 3;
         // loose ground: a spinning or sliding tyre digs a soil-coloured rut
         const rut = past * clamp((slip - 2) / 5, 0, 1) * clamp(w.Fz / 3500, 0.2, 1) * 0.6;
@@ -17559,7 +17710,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER || CC ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
       { html: CC ? CCD.trans : MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
         : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? PKG_UI[0] : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_UI[0]) : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
@@ -17864,7 +18015,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // fuel, the transmission, the tyres, the off-road package and the Fun-tab tune (no undefined: the database won't take it)
   function carSetup() {
     const m = MORE_CARS.find((x) => x.id === S.car);
-    return JSON.parse(JSON.stringify({ c: S.car, o: m && m.optKey ? S[m.optKey] || '' : '', fuel: S.fuel, trans: S.trans, rear: S.rearTire, dp: S.dpRear || 'etdrag', off: OFFROAD(), tune }));
+    return JSON.parse(JSON.stringify({ c: S.car, o: m && m.optKey ? S[m.optKey] || '' : '', fuel: S.fuel, trans: S.trans, rear: S.rearTire, dp: S.dpRear || 'etdrag', off: (S.offroad && S.offroad[S.car]) || false, tune }));
   }
   // (a joiner's own car, kept while they drive the host's, back when they leave)
   const OWN_KEYS = ['car', 'fuel', 'trans', 'rearTire', 'dpRear', 'offroad', 'tcMode'].concat(MORE_CARS.filter((m) => m.optKey).map((m) => m.optKey));
@@ -17912,7 +18063,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         if (cs.trans) S.trans = cs.trans;
         if (cs.rear) S.rearTire = cs.rear;
         if (cs.dp) S.dpRear = cs.dp;
-        S.offroad = Object.assign({}, S.offroad, { [cs.c]: !!cs.off });
+        S.offroad = Object.assign({}, S.offroad, { [cs.c]: cs.off === 'knobby' ? 'knobby' : !!cs.off });
         if (restart) why = (why ? why + ' and ' : '') + 'the host\'s ' + carLabel(cs.c, cs.o);
         else if (!why && !ONLINE.reloading) { hostTune(cs.tune); applyVehicleSettings(); if (G.menu) renderMenu(); }
       }

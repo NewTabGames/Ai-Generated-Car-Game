@@ -147,10 +147,35 @@
       g.clearRect(0, 0, S, S);
       g.save();
       g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.clip();
-      const TAR = W.map === 'tarmac', RMP = W.map === 'ramps';
-      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : RMP ? 'rgba(70,48,30,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
+      const TAR = W.map === 'tarmac', RMP = W.map === 'ramps', DUN = W.map === 'dunes';
+      g.fillStyle = TAR ? 'rgba(40,40,42,0.85)' : RMP ? 'rgba(70,48,30,0.85)' : DUN ? 'rgba(150,118,74,0.85)' : 'rgba(28,38,24,0.82)'; g.fillRect(0, 0, S, S);
+      if (DUN) {
+        // the dunes: every 16 m a cell shaded by the ground's slope (light on the windward faces, dark down the slip
+        // faces), refreshed when you've moved far enough; the hardpan at the start
+        const D = this._dun || (this._dun = { c: document.createElement('canvas'), x: 1e9, z: 1e9 }), N = 96, cell = 16;
+        if (Math.hypot(px - D.x, pz - D.z) > 120) {
+          D.x = Math.round(px / cell) * cell; D.z = Math.round(pz / cell) * cell; D.c.width = N; D.c.height = N;
+          const dg = D.c.getContext('2d'), im = dg.createImageData(N, N);
+          for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+            const x = D.x + (i - N / 2) * cell, z = D.z + (j - N / 2) * cell;
+            const hC = W.terrainHeight(x, z), dx = (W.terrainHeight(x + 4, z) - hC) / 4, dz = (W.terrainHeight(x, z + 4) - hC) / 4;
+            const sh = Math.max(-1, Math.min(1, (dx * 0.8 - dz * 0.3) * 3.2)), hard = Math.hypot(x, z) < W.DUNES.CAMP_R, k = (j * N + i) * 4;
+            im.data[k] = hard ? 176 : 196 + sh * 40; im.data[k + 1] = hard ? 150 : 158 + sh * 34; im.data[k + 2] = hard ? 118 : 104 + sh * 24; im.data[k + 3] = 235;
+          }
+          dg.putImageData(im, 0, 0);
+        }
+        this._dunDraw = D;
+      }
       g.translate(c, c); g.rotate(heading); g.scale(sc, sc); g.translate(-px, -pz);
       g.lineCap = 'round'; g.lineJoin = 'round';
+      if (DUN) {
+        const D = this._dunDraw, N = D.c.width, cell = 16;
+        g.imageSmoothingEnabled = true;
+        g.drawImage(D.c, D.x - N / 2 * cell - cell / 2, D.z - N / 2 * cell - cell / 2, N * cell, N * cell);
+        g.restore();
+        this._mmOverlay(g, c, S, heading);
+        return;
+      }
       if (RMP) {
         // All Ramps: every jump, lighter the taller it stands
         const e = R * 1.5, CH = W.C.CHUNK, COL = { table: '#d9a766', gap: '#f0c080', step: '#c89058', kick: '#b8844e', mogul: '#a57a4c' };

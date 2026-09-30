@@ -30,9 +30,10 @@
     // tyres: per-axle compounds, see TIRES
     loadSens: 0.11, Fz0: 5200,
     frontTire: 'street', rearTire: 'street',
-    //          asphalt gravel grass dirt water prepped-strip
-    surfMu:   [1.00, 0.68, 0.58, 0.64, 0.30, 1.00],
-    surfCrr:  [0.012, 0.030, 0.055, 0.045, 0.25, 0.011],
+    //          asphalt gravel grass dirt water prepped-strip sand
+    // (sand: soft, dry dune sand - it shears under a tyre and piles up in front of it: little bite, a lot of drag)
+    surfMu:   [1.00, 0.68, 0.58, 0.64, 0.30, 1.00, 0.42],
+    surfCrr:  [0.012, 0.030, 0.055, 0.045, 0.25, 0.011, 0.075],
     // brakes: Brembo 6-piston / 400x34 mm two-piece front, 4-piston / 350x28 mm rear
     brakeTorqueF: 4300, brakeTorqueR: 2250, handbrakeTorque: 3400,
     // steering
@@ -102,7 +103,7 @@
     // Interlocking blocks bite into loose ground; on pavement it matches the street tyre's grip with a touch slower
     // response, and a rounded peak that slides progressively
     // (C 1.25: ~92 % of peak when sliding vs ~79 % for the P Zero). Also: more rolling drag on tarmac, less on dirt.
-    offroad: { name: 'BFGoodrich All-Terrain T/A KO2 LT285/55R20', short: 'KO2 all-terrain', width: 0.285, radius: 0.4,
+    offroad: { name: 'BFGoodrich All-Terrain T/A KO2 LT285/55R20', short: 'KO2 all-terrain', width: 0.285, radius: 0.4, sandKx: 1.0, sandKy: 1.0,
       muX: 1.45, muY: 1.16, loose: 1.55, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
       B: 2.91, C: 1.25, E: -0.1, heatCap: 4200, cold: 0.95, coldT: 5, warmT: 35, hotT: 95, overheat: 0.005, prep: 1.02,
       crr: [1.25, 0.75, 0.75, 0.75, 0.85, 1.25], inertiaAdd: 1.6, massAdd: 15, lift: 0.05, droop: 0.03,
@@ -168,7 +169,7 @@
       muX: 1.2, muY: 1.18, loose: 0.6, kappaPeak: 0.09, alphaPeak: 0.11, relaxX: 0.07, relaxY: 0.1,
       B: 1.75, C: 1.4, E: -0.25, heatCap: 650, cold: 0.95, coldT: 15, warmT: 35, hotT: 110, overheat: 0.003, prep: 1.08,
       crr: [1, 1.5, 1.6, 1.5, 1, 1] },
-    monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838,
+    monster: { name: 'BKT 66x43.00-25 hand-cut', short: 'BKT 66x43', width: 1.09, radius: 0.838, sandKx: 1.1, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.95, looseY: 1.3, looseKx: [1, 1, 1.08, 1.08, 1.1, 1], kappaPeak: 0.22, alphaPeak: 0.2, relaxX: 0.55, relaxY: 0.85,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1,
       crr: [1.5, 1.2, 1.1, 1.1, 1.0, 1.5] },
@@ -196,26 +197,26 @@
     // tread - and ribbed sand fronts. The paddles scoop the ground: enormous bite in sand, dirt and mud, next to none on
     // pavement or a prepped strip (they skate on their tips), and little side grip anywhere. No heat to speak of.
     // (they shovel the ground rather than grip it: the quickest sand pass is 2.16 s @ 156 mph in 300 ft, ~4 g)
-    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487,
+    paddleTF: { name: 'Skat-Trak 36x17.5-16 paddle tyres', short: 'Paddles', width: 0.445, radius: 0.487, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 10, inertiaAdd: 0.5, finalK: 0.487 / 0.457 },
-    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468,
+    paddleTA: { name: 'Skat-Trak 34.5x17-16 paddle tyres', short: 'Paddles', width: 0.43, radius: 0.468, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.55, loose: 4.6, looseY: 1.4, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.35, relaxY: 0.5,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.6, 1.3, 1.2, 1.1, 1.0, 1.6], massAdd: 9, inertiaAdd: 0.45, finalK: 0.468 / 0.438 },
-    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3,
+    sandRib: { name: 'Ribbed sand fronts 24x6-12', short: 'Rib fronts', width: 0.15, radius: 0.3, sandKx: 1.0, sandKy: 1.5, sandCrr: 0.7,
       muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
       B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
       crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.08 },
-    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33,
+    sandRibFC: { name: 'Ribbed sand fronts 26x7-15', short: 'Rib fronts', width: 0.17, radius: 0.33, sandKx: 1.0, sandKy: 1.5, sandCrr: 0.7,
       muX: 1.0, muY: 0.85, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
       B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
       crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.1 },
     // Monster truck: the BKTs left full-depth (as moulded) instead of shaved and hand-cut for a stadium floor: ~1 in
     // more lug and ~100 lb more rubber each. More bite in mud, turf and loose dirt, about the same on the arena's
     // packed clay, less on pavement (the tall lugs squirm), and heavier to spin up
-    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858,
+    monsterMud: { name: 'BKT 66x43.00-25 full-depth', short: 'Full-depth lugs', width: 1.09, radius: 0.858, sandKx: 1.15, sandKy: 1.05,
       muX: 0.92, muY: 0.8, loose: 2.0, looseY: 1.45, looseKx: [1, 1.08, 1.25, 1.06, 1.35, 1], kappaPeak: 0.24, alphaPeak: 0.21, relaxX: 0.6, relaxY: 0.9,
       B: 1.65, C: 1.45, E: -0.25, heatCap: 30000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.05,
       crr: [1.8, 1.25, 1.1, 1.1, 1.0, 1.8], massAdd: 45, inertiaAdd: 30, finalK: 0.858 / 0.838 },
@@ -328,13 +329,13 @@
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // the rally cars' off-road package: mud tyres - big open lugs that bite in grass, dirt and mud (~1 g in the grass, twice
     // the gravel tyre's grip in mud), about the same on gravel, a lot less on tarmac; heavier, and they bite at more slip
-    rallyKnob: { name: '205/70R15 rally mud tyre', short: 'Rally mud', width: 0.205,
+    rallyKnob: { name: '205/70R15 rally mud tyre', short: 'Rally mud', width: 0.205, sandKx: 1.05, sandKy: 1.0,
       muX: 0.9, muY: 0.85, loose: 1.7, looseKx: [1, 1.0, 1.15, 1.08, 1.3, 1], looseKy: [1, 0.95, 1.1, 1.02, 1.25, 1], kappaPeak: 0.15, alphaPeak: 0.16, relaxX: 0.22, relaxY: 0.45,
       B: 1.5, C: 1.35, E: -0.05, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.3, 1.1, 1.1, 1.1, 1, 1.3], massAdd: 3, inertiaAdd: 0.15, lift: 0.02, tcTargets: [0.15, 0.18, 0.22] },
     // the Cybertruck's 35 in all-terrains on 20 in wheels: a road-biased AT tread - a truck tyre's grip on tarmac (~0.9 g
     // on 3 t), a lot more than a road tyre's in the loose stuff
-    cyberAT: { name: 'Goodyear Wrangler Territory RT LT285/65R20', short: '35 in all-terrain', width: 0.285, radius: 0.44,
+    cyberAT: { name: 'Goodyear Wrangler Territory RT LT285/65R20', short: '35 in all-terrain', width: 0.285, radius: 0.44, sandKx: 1.0, sandKy: 1.0,
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
@@ -354,12 +355,12 @@
       B: 2.2, C: 1.45, E: -0.15, heatCap: 2200, cold: 0.88, coldT: 20, warmT: 60, hotT: 120, overheat: 0.003, prep: 1.05 },
     // the trophy truck's: BFGoodrich Baja T/A KR3-type 39x13.5R17 desert racing tyres - a stiff 10-ply carcass, big
     // interlocking blocks: they hook on dirt and gravel nearly as well as on tarmac and shrug off rocks at 130 mph
-    ttKR3: { name: '39x13.50R17 desert racing (Baja KR3-type)', short: '39 in desert', width: 0.343, radius: 0.495,
+    ttKR3: { name: '39x13.50R17 desert racing (Baja KR3-type)', short: '39 in desert', width: 0.343, radius: 0.495, sandKx: 1.2, sandKy: 1.1,
       muX: 1.12, muY: 1.0, loose: 1.62, looseKx: [1, 1.05, 0.95, 1.05, 0.85, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.28, relaxY: 0.55,
       B: 1.8, C: 1.35, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.02,
       crr: [1.2, 1.1, 1.1, 1.05, 1.0, 1.2] },
     // (its off-road package: 40 in mud-terrains - open lugs for mud and grass, give-away grip on tarmac)
-    ttMud: { name: '40x13.50R17 mud-terrain', short: '40 in mud', width: 0.343, radius: 0.508,
+    ttMud: { name: '40x13.50R17 mud-terrain', short: '40 in mud', width: 0.343, radius: 0.508, sandKx: 1.1, sandKy: 1.0,
       muX: 0.98, muY: 0.86, loose: 1.9, looseKx: [1, 1.0, 1.1, 1.1, 1.25, 1], looseKy: [1, 0.95, 1.05, 1.05, 1.2, 1], kappaPeak: 0.16, alphaPeak: 0.17, relaxX: 0.3, relaxY: 0.58,
       B: 1.7, C: 1.32, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.0,
       crr: [1.35, 1.2, 1.2, 1.1, 1.0, 1.35], massAdd: 6, inertiaAdd: 0.6, finalK: 0.508 / 0.495 },
@@ -373,35 +374,61 @@
       B: 1.9, C: 1.35, E: -0.1, heatCap: 2400, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // (its off-road package: sand paddles on the back, ribbed sand fronts - dune tyres)
-    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381,
+    // (in sand they're at home: ~1.8 g of bite at ~30 % slip - so traction control lets them have that slip - and they
+    // float, rolling easier than any tyre that digs in)
+    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
       muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.3, relaxY: 0.45,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 8000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
-      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367 },
+      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367, tcTargets: [0.26, 0.32, 0.4] },
+    // (its other package: off-road knobbies - 27x8.50-15 fronts and 31x10.50R15 rears on the same five-spokes. They bite
+    // in dirt, gravel, grass and mud where the stock tyres slide, hold their own in sand (nothing like the paddles, but
+    // they don't skate on hard ground either), and give up grip on pavement, where the knobs squirm)
+    buggyKnobF: { name: '27x8.50-15 knobby front', short: 'Knobbies', width: 0.2, radius: 0.345, sandKx: 1.05, sandKy: 1.1, sandCrr: 1.0,
+      muX: 0.92, muY: 0.85, loose: 1.55, looseKx: [1, 1.08, 1.12, 1.15, 1.1, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.18, relaxY: 0.36,
+      B: 1.8, C: 1.32, E: -0.1, heatCap: 2000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 3, inertiaAdd: 0.1 },
+    buggyKnobR: { name: '31x10.50R15 knobby rear', short: 'Knobbies', width: 0.267, radius: 0.39, sandKx: 1.1, sandKy: 1.05, sandCrr: 0.9,
+      muX: 0.95, muY: 0.88, loose: 1.65, looseKx: [1, 1.08, 1.15, 1.15, 1.15, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.4,
+      B: 1.8, C: 1.32, E: -0.1, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 5, inertiaAdd: 0.2, finalK: 0.39 / 0.367, tcTargets: [0.15, 0.18, 0.22] },
     // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
     // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
     // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
-    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36,
+    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36, sandKx: 1.1, sandKy: 1.05, sandCrr: 0.4,
       muX: 0.95, muY: 0.62, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
     // (its off-road package: the rubber pads off - bare steel grousers dig into dirt, mud and grass, slide on tarmac)
-    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36,
+    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36, sandKx: 1.2, sandKy: 1.1, sandCrr: 0.4,
       muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
-    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
+    ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16, sandKx: 1.05, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
       B: 1.8, C: 1.3, E: -0.1, heatCap: 1500, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
       crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.02, lift: 0.02 },
   };
-  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them)
-  function OFFROAD_PKG(car, cls) {
+  // Sand (surface 7th in the per-surface lists): each tyre's bite in soft sand on top of its loose-ground grip, forwards
+  // (sandKx) and sideways (sandKy), and its rolling drag there (sandCrr). A narrow, hard tyre digs in and ploughs, a wide
+  // soft one floats on top - the drag defaults from the tread width; the tyres made for sand set their own (paddles
+  // scoop it, ribbed fronts steer in it)
+  for (const t of Object.values(TIRES)) {
+    const kx = t.sandKx !== undefined ? t.sandKx : 0.9, ky = t.sandKy !== undefined ? t.sandKy : 0.9;
+    const cr = t.sandCrr !== undefined ? t.sandCrr : clamp(0.26 / (t.width || 0.25), 0.55, 2.4);
+    t.looseKx = (t.looseKx || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([kx]);
+    t.looseKy = (t.looseKy || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([ky]);
+    t.crr = (t.crr || [1, 1, 1, 1, 1, 1]).slice(0, 6).concat([cr]);
+  }
+  // the off-road package each vehicle gets (road cars: the KO2s + lift; the More Cars: what suits each of them).
+  // kind: a package choice where a vehicle has more than one (the dune buggy: 'knobby' - off-road knobbies, else
+  // its dune tyres)
+  function OFFROAD_PKG(car, cls, kind) {
     if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
     if (car === 'monster' || car === 'avenger') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'trophy') return { front: 'ttMud', rear: 'ttMud' };
-    if (car === 'buggy') return { front: 'sandRib', rear: 'buggyPaddle' };
+    if (car === 'buggy') return kind === 'knobby' ? { front: 'buggyKnobF', rear: 'buggyKnobR' } : { front: 'sandRib', rear: 'buggyPaddle' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
@@ -426,6 +453,10 @@
     const c = s.torqueCurve, rEnd = c[c.length - 1][0] * (s.rpmStretch || 1);
     return rpm > rEnd ? 0.6 * Math.pow((rpm - rEnd) / 1000, 2) : 0;
   }
+  // sand on a steep face: past ~24 deg it's nearing its angle of repose (~34 deg) - a tyre biting into it just starts
+  // an avalanche under itself - so the bite falls away (to under a third by 40 deg): nothing climbs a slip face from
+  // standing, whatever it runs on (ny: the ground normal's up component)
+  function sandSlope(ny) { const a = Math.acos(clamp(ny, -1, 1)) * 57.2958; return a <= 24 ? 1 : Math.max(0.3, 1 - (a - 24) * 0.046); }
   function tempGrip(T, t) {
     if (T < t.warmT) return t.cold + (1 - t.cold) * clamp((T - t.coldT) / (t.warmT - t.coldT), 0, 1);
     if (T < t.hotT) return 1.0;
@@ -1082,7 +1113,7 @@
         let kd = fade * 0.03 / Lx;
         if (kd > 0) {
           const kpE = ty.kappaPeak * Math.pow(clamp(w.Fz / s.Fz0, 0.35, 2.5), 0.2);
-          const muE = (w.surface >= 1 && w.surface <= 4 ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : 1) * tempGrip(w.temp, ty) * (s.gripScale || 1);
+          const muE = ((w.surface >= 1 && w.surface <= 4) || w.surface === 6 ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : w.surface === 6 ? sandSlope(w.ny) : 1) * tempGrip(w.temp, ty) * (s.gripScale || 1);
           const gain = muE * w.Fz * ty.B * ty.C * kd / kpE * h * r * r / w.inertia;
           const cap = s.tireDampCap || 3;
           if (gain > cap) kd *= cap / gain;
@@ -1097,8 +1128,8 @@
         const loadF = clamp(1 - s.loadSens * (Fzn / s.Fz0 - 1), 0.72, 1.18);
         // burnout in a dragster (no front brakes to hold it): the slicks come out of the water box wet and spin up
         const wet = s.burnoutWet && this.lineLockActive && !w.front ? s.burnoutWet : 1;
-        const mu = s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : 1) * loadF * tempGrip(w.temp, ty) * (s.gripScale || 1) * wet;
-        const loose = w.surface >= 1 && w.surface <= 4;
+        const mu = s.surfMu[w.surface] * (w.surface === 5 ? ty.prep : w.surface === 6 ? sandSlope(w.ny) : 1) * loadF * tempGrip(w.temp, ty) * (s.gripScale || 1) * wet;
+        const loose = (w.surface >= 1 && w.surface <= 4) || w.surface === 6;
         let Fxt = 0, Fyt = 0;
         if (rho > 1e-7) {
           const f = mu * Fzn * MF(rho, ty) / rho;
