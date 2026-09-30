@@ -1111,7 +1111,7 @@
     // with its headers into a megaphone, a wheelie bar; Jet: stretched, lowered and widened, a turbojet on a cradle over
     // the back axle (bellmouth, spinning compressor face, afterburner can, a flame out of it), a tail fin, a nose cone
     B.golf = () => {
-      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa', JET = V === 'jet';
+      const V = ENGINE, STD = V === 'std' || V === 'ev', LSV = V === 'lsv', HOT = V === 'hot', REC = V === 'busa', JET = V === 'jet' || V === 'mega';
       WF = REC ? 0.22 : HOT ? 0.225 : JET ? 0.205 : 0.215; WR = REC ? 0.3 : HOT ? 0.27 : JET ? 0.225 : 0.215;
       wheelStyle = STD ? { rim: 'cart', rimR: 0.1, tread: 'road' } : LSV || JET ? { rim: 'alloy5', rimR: 0.152, tread: 'road' }
         : HOT ? { rim: 'deepdish', rimR: 0.165, tread: 'slick' } : { rim: 'steel5', rimR: 0.15, tread: 'slick' };
@@ -1263,10 +1263,10 @@
         // a bigger engine (s: its diameter against stock): fatter by s, longer by less, sat a little higher to clear the axle
         const up = V3(0, 1, 0), dv = V3(0, 0, 0);
         jetSize = (sz) => {
-          const sa = 1 + (sz - 1) * 0.6, y = ey + Math.max(0, sz - 1) * 0.07;
-          jg.scale.set(sz, sz, sa); jg.position.y = y;
+          const sa = 1 + (sz - 1) * 0.6, y = ey + Math.max(0, sz - 1) * 0.07, zb = ez0 + Math.max(0, sz - 1.4) * 0.3;
+          jg.scale.set(sz, sz, sa); jg.position.set(0, y, zb);
           for (const st of struts) {
-            const a = V3(st.sx * 0.3, 0.32, ez0 + st.dz), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, ez0 + (st.dz + 0.05) * sa);
+            const a = V3(st.sx * 0.3, 0.32, ez0 + st.dz), b = V3(st.sx * 0.1 * sz, y - (er - 0.02) * sz, zb + (st.dz + 0.05) * sa);
             dv.subVectors(b, a); const len = dv.length();
             st.m.position.addVectors(a, b).multiplyScalar(0.5); st.m.quaternion.setFromUnitVectors(up, dv.normalize()); st.m.scale.set(1, len, 1);
           }
@@ -1386,8 +1386,8 @@
 
     // ---------------------------------------------------------------- the display on the dash
     if (cluster) add(cluster.parent, new THREE.PlaneGeometry(cluster.w, cluster.h), M_cluster, cluster.pos.x, cluster.pos.y, cluster.pos.z + 0.002, cluster.rot, 0, 0, false);
-    const EV = CAR === 'golf' ? ENGINE !== 'busa' && ENGINE !== 'jet' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
-    const JETC = CAR === 'golf' && ENGINE === 'jet';
+    const EV = CAR === 'golf' ? ENGINE !== 'busa' && ENGINE !== 'jet' && ENGINE !== 'mega' : (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
+    const JETC = CAR === 'golf' && (ENGINE === 'jet' || ENGINE === 'mega');
 
     // ---------------------------------------------------------------- wheels
     function carcass(R, W, rim) {

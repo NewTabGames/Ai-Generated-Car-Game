@@ -2831,6 +2831,7 @@
   //   hot  - a hot rod: lowered, no roof, a 45 kW / 160 Nm AC motor and a lithium pack, fat 22 in tyres, ~84 mph
   //   busa - the record cart, built like the 118 mph world-record holder: a Suzuki Hayabusa 1,340 cc four (~190 hp) behind
   //          the seat, its 6-speed on a quickshifter, a chain to the axle, a stretched and lowered frame, wheelie bar
+  //   jet / mega - turbojet carts (thrust, no driven wheels): a drone turbojet, and a fighter-trainer one with an afterburner
   CARS.golf = { name: 'Golf Cart', short: 'Golf Cart', car: '48 V ELECTRIC', hp: 5, tq: 18, cc: true, kbLat: 5, spec: {
     name: 'Golf Cart',
     mass: 380, Ipitch: 180, Iyaw: 220, Iroll: 60, cgHeight: 0.58, wheelbase: 1.65, frontWeight: 0.42,
@@ -2904,6 +2905,30 @@
       CdA: 0.66, ClA: 0.22,
       bodyHalfW: 0.64, bodyFront: -1.75, bodyRear: 1.95, bodyBottom: -0.28, bodyTop: 1.0,
       bodyPts: ccPts(0.44, 0.47, 2.3, ccBox(0.64, 0.12, 0.8, -1.75, 1.95).concat([[0, 1.45, 1.5], [0, 1.05, 0.9]])),
+    } },
+    // mega - the jet cart with an engine half as big again as the Unhinged one (2.4 times the stock engine across): an
+    // afterburning fighter-trainer turbojet, ~3,300 lbf dry and ~4,600 lbf lit (thrust goes with the intake's area, so
+    // 2.25 times the Unhinged tune's). 700 kg with it and its fuel. The frame is longer and wider, the thrust line still
+    // runs through the CG, half its weight is on the nose, a big fin rides on the afterburner can (it and the body's
+    // yaw damping keep it straight when a 7 g shove meets a hard turn) and the body is shaped to be held down by the air
+    // (~1,800 lb at 150 mph) - 0-60 in 0.8 s once it's spooled, 0-200 in under 4 s, ~340 mph
+    mega: { label: 'Mega Jet', car: 'TURBOJET 4,600 LBF', hp: 0, tq: 0, kbLat: 4.5, spec: {
+      mass: 700, Ipitch: 640, Iyaw: 760, Iroll: 100, cgHeight: 0.46, wheelbase: 2.55, frontWeight: 0.5, trackF: 1.22, trackR: 1.32,
+      wheelRadius: 0.27, wheelRadiusF: 0.26, wheelRadiusR: 0.27, wheelInertiaF: 0.28, wheelInertiaR: 0.32,
+      frontTire: 'jetF', rearTire: 'jetR', Fz0: 2100,
+      springF: 46000, springR: 52000, dampBumpF: 2500, dampRebF: 3700, dampBumpR: 2800, dampRebR: 4100, travelUp: 0.05, travelDown: 0.05,
+      arbF: 21000, arbR: 7500, rearToe: 0.004,
+      brakeTorqueF: 2100, brakeTorqueR: 850, handbrakeTorque: 1100, noABS: false, noESC: false,
+      maxSteer: 0.5, steerRate: 3, steerRatio: 14,
+      electric: false, idleRpm: 3600, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+      torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
+      autoRatios: [1], autoRev: 2.2, autoFinal: 12.44, noCoastBlip: true, engineTc: true,
+      dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
+      jet: { thrust: 14600, ab: 0.4, idle: 0.36, rpm100: 10000, ram: 0.0025, y: 0, z: 1.4, revTq: 34, revRpm: 4000, size: 2.37 },
+      fin: { y: 0.3, z: 2.1, CyA: 1.3 }, aeroDamp: [1.2, 4, 1.2],
+      CdA: 0.84, ClA: 3.0,
+      bodyHalfW: 0.68, bodyFront: -1.85, bodyRear: 2.9, bodyBottom: -0.28, bodyTop: 1.25,
+      bodyPts: ccPts(0.46, 0.47, 2.55, ccBox(0.68, 0.12, 0.8, -1.85, 2.9).concat([[0, 1.7, 1.7], [0, 1.2, 0.9]])),
     } },
   }, 'std', 'Standard');
   // ---------------------------------------------------------------- rally cars
