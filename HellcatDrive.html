@@ -12184,6 +12184,23 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       // the headlamps, the bumper (black, up under the headlamps at the corners) with the fog lamps, the lower grille,
       // tow hooks and the skid plate
       const GZ = zN - 0.012;
+      const lampCurve = (u) => {
+        const L0 = 0.8 - 0.588, s1 = u * (L0 + 0.2 * 1.15);
+        if (s1 <= L0) return { x: 0.588 + s1, z: zN, nx: 0, nz: -1 };
+        const f = (s1 - L0) / 0.2; return { x: 0.8 + 0.2 * Math.sin(f), z: zN + 0.2 - 0.2 * Math.cos(f), nx: Math.sin(f), nz: -Math.cos(f) };
+      };
+      const lampYt = (u) => 1.243 - 0.022 * u * u, lampYb = (u) => 1.078 + 0.055 * u * u;
+      function lampStrip(sx, u0, u1, yb, yt, off) {
+        const pos = [], idx = [], n = 28;
+        for (let i = 0; i <= n; i++) { const u = u0 + (u1 - u0) * i / n, c = lampCurve(u), x = sx * (c.x + c.nx * off), z = c.z + c.nz * off; pos.push(x, yb(u), z, x, yt(u), z); }
+        for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+      }
+      M.lampBezel = new THREE.MeshPhysicalMaterial({ color: 0x08080a, roughness: 0.3, metalness: 0.2, clearcoat: 0.6, side: THREE.DoubleSide });
+      M.lampGlass = new THREE.MeshStandardMaterial({ color: 0x353a41, roughness: 0.16, metalness: 0.9, side: THREE.DoubleSide });
+      M.lampChrome = new THREE.MeshStandardMaterial({ color: 0xc8cdd3, roughness: 0.14, metalness: 1, side: THREE.DoubleSide });
+      M.drlD = Object.assign(M.drl.clone(), { side: THREE.DoubleSide });
+      M.amber.side = THREE.DoubleSide; M.amberD = M.amber;
       // (polygons in the front view, (x, y): a point-in test, a path, an inset of a convex anticlockwise one)
       const inPoly = (P, x, y) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
       const polyPath = (P, path) => { path.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) path.lineTo(P[i][0], P[i][1]); path.closePath(); return path; };
@@ -12221,19 +12238,20 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         // (the surround's top is a heavier beam than its sides)
         add(body, rbox(1.08, 0.046, 0.034, 0.012), M.clad, 0, 1.2, GZ - 0.05); }
       for (const sx of [-1, 1]) {
-        // headlamp: the housing swept back at its outer end, the grey inside, two projectors, the DRL strip
-        const hl = new THREE.Group(); hl.position.set(sx * 0.768, 1.15, zN + 0.022); hl.rotation.y = -sx * 0.19; body.add(hl);
-        add(hl, rbox(0.382, 0.2, 0.07, 0.02), M.frame, 0, 0, 0.025);
-        add(hl, new THREE.PlaneGeometry(0.356, 0.172), M.lampSmoke, 0, -0.004, -0.0115, 0, Math.PI, 0, false);
-        for (const px of [-0.105, 0.03]) {
-          add(hl, cylZ(0.056, 0.056, 0.012, 28), M.frame, sx * px, -0.016, -0.008);
-          add(hl, new THREE.TorusGeometry(0.048, 0.008, 8, 28), M.chrome, sx * px, -0.016, -0.016, 0, 0, 0, false);
-          add(hl, new THREE.SphereGeometry(0.044, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.45, 1).rotateX(-Math.PI / 2), M.lampLens, sx * px, -0.016, -0.012, 0, 0, 0, false);
-          add(hl, new THREE.CircleGeometry(0.016, 16), M.head, sx * px, -0.016, -0.033, 0, Math.PI, 0, false);
+        // headlamp: one piece wrapping the fender's rounded corner - a black bezel, the smoked lens, the LED light bar
+        // along its top all the way round, two projectors on the front, a chrome reflector and the amber signal round
+        // the corner (it narrows towards its outer end)
+        add(body, lampStrip(sx, 0, 1, (u) => lampYb(u) - 0.013, (u) => lampYt(u) + 0.011, 0.022), M.lampBezel, 0, 0, 0, 0, 0, 0, false);
+        add(body, lampStrip(sx, 0, 1, lampYb, lampYt, 0.027), M.lampGlass, 0, 0, 0, 0, 0, 0, false);
+        add(body, lampStrip(sx, 0, 1, (u) => lampYt(u) - 0.032, (u) => lampYt(u) - 0.008, 0.031), M.drlD, 0, 0, 0, 0, 0, 0, false);
+        add(body, lampStrip(sx, 0.52, 0.97, (u) => lampYb(u) + 0.036, (u) => lampYt(u) - 0.042, 0.03), M.lampChrome, 0, 0, 0, 0, 0, 0, false);
+        add(body, lampStrip(sx, 0.55, 0.95, (u) => lampYb(u) + 0.01, (u) => lampYb(u) + 0.028, 0.031), M.amberD, 0, 0, 0, 0, 0, 0, false);
+        for (const px of [0.648, 0.748]) {
+          add(body, cylZ(0.053, 0.053, 0.008, 28), M.lampBezel, sx * px, 1.142, zN - 0.031);
+          add(body, new THREE.TorusGeometry(0.044, 0.007, 8, 28), M.chrome, sx * px, 1.142, zN - 0.036, 0, 0, 0, false);
+          add(body, new THREE.SphereGeometry(0.04, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.4, 1).rotateX(-Math.PI / 2), M.lampLens, sx * px, 1.142, zN - 0.035, 0, 0, 0, false);
+          add(body, new THREE.CircleGeometry(0.014, 16), M.head, sx * px, 1.142, zN - 0.052, 0, Math.PI, 0, false);
         }
-        add(hl, new THREE.BoxGeometry(0.006, 0.15, 0.006), M.frame, sx * 0.1, -0.008, -0.014, 0, 0, 0, false);
-        add(hl, rbox(0.35, 0.024, 0.01, 0.008), M.drl, 0, 0.068, -0.016, 0, 0, 0, false);
-        add(hl, rbox(0.2, 0.014, 0.01, 0.005), M.amber, sx * 0.07, -0.078, -0.016, 0, 0, 0, false);
         add(body, rbox(0.22, 0.29, 0.04, 0.012), M.clad, sx * 0.69, 0.905, zN - 0.004);                                 // (the black under the lamp)
       }
       spots(0.72, 1.15, zN - 0.02);
