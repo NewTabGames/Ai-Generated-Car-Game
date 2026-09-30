@@ -332,6 +332,12 @@
       muX: 0.9, muY: 0.85, loose: 1.7, looseKx: [1, 1.0, 1.15, 1.08, 1.3, 1], looseKy: [1, 0.95, 1.1, 1.02, 1.25, 1], kappaPeak: 0.15, alphaPeak: 0.16, relaxX: 0.22, relaxY: 0.45,
       B: 1.5, C: 1.35, E: -0.05, heatCap: 3500, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.3, 1.1, 1.1, 1.1, 1, 1.3], massAdd: 3, inertiaAdd: 0.15, lift: 0.02, tcTargets: [0.15, 0.18, 0.22] },
+    // the Cybertruck's 35 in all-terrains on 20 in wheels: a road-biased AT tread - a truck tyre's grip on tarmac (~0.9 g
+    // on 3 t), a lot more than a road tyre's in the loose stuff
+    cyberAT: { name: 'Goodyear Wrangler Territory RT LT285/65R20', short: '35 in all-terrain', width: 0.285, radius: 0.44,
+      muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
+      B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
+      crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -2766,6 +2772,26 @@
     bodyHalfW: 0.8, bodyFront: -2.3, bodyRear: 2.3, bodyBottom: -0.28, bodyTop: 0.85,
     bodyPts: ccPts(0.42, 0.45, 2.3, ccBox(0.84, 0.16, 0.5, -1.4, 1.5).concat([[0, 0.55, -2.4], [0, 1.0, 2.3], [0, 1.2, 0.3], [-0.55, 1.12, 0.5], [0.55, 1.12, 0.5], [-0.6, 1.04, 2.3], [0.6, 1.04, 2.3]])),
   } };
+  // Cybertruck: the stainless-steel wedge - a 3.81 m wheelbase, 35 in all-terrains on 20 in wheels, air suspension,
+  // four-wheel steering (the rears up to 10 degrees against the fronts at low speed, a touch with them at speed) on a
+  // steer-by-wire rack, Cd ~0.34. Three versions (CARS.cyber.make): the base is the All-Wheel Drive - two motors, ~600 hp,
+  // 3,000 kg (6,603 lb), 0-60 in 4.1 s, governed to 112 mph
+  CARS.cyber = { name: 'Cybertruck', short: 'Cybertruck', car: 'DUAL MOTOR AWD', hp: 600, tq: 590, cc: true, kbLat: 6, spec: {
+    name: 'Cybertruck',
+    mass: 3000, Ipitch: 7200, Iyaw: 7800, Iroll: 1500, cgHeight: 0.72, wheelbase: 3.807, frontWeight: 0.5,
+    trackF: 1.72, trackR: 1.72, wheelRadius: 0.44, wheelInertiaF: 3.2, wheelInertiaR: 3.2,
+    frontTire: 'cyberAT', rearTire: 'cyberAT',
+    springF: 95000, springR: 100000, dampBumpF: 6500, dampRebF: 9500, dampBumpR: 6800, dampRebR: 10000,
+    arbF: 62000, arbR: 38000, travelUp: 0.1, travelDown: 0.12, suspS0: 0.3,
+    brakeTorqueF: 7000, brakeTorqueR: 4600, handbrakeTorque: 3500,
+    maxSteer: 0.6, steerRate: 5, steerRatio: 11, rearSteerMax: 0.175,
+    electric: true, idleRpm: 0, limiterRpm: 12150, redlineRpm: 12150, shiftRpm: 13000, engineInertia: 0.1, fricA: 3, fricB: 2, starterTorque: 0,
+    torqueCurve: evCurve(900, 447, 12800), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 11.0, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, awd: true, awdFront: 0.45, lsdPreload: 40, lsdPreloadF: 30, centerPreload: 300, lsdRamp: 0.1, driveEff: 0.92,
+    CdA: 1.07,
+    bodyHalfW: 1.01, bodyFront: -2.85, bodyRear: 2.84, bodyBottom: -0.33, bodyTop: 1.07,
+  } };
   // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
   // restarts to swap)
@@ -2997,6 +3023,16 @@
       CdA: 0.82, ClA: 0.45, bodyHalfW: 0.93, bodyFront: -1.95, bodyRear: 1.95,
     } },
   }, 'r4', 'Rally4');
+  // the Cybertruck's other two: the Long Range RWD - one motor at the back, ~350 hp, 2,850 kg, 0-60 ~6.2 s, 112 mph -
+  // and the Cyberbeast - three motors (one front, two at the back), 845 hp, 3,104 kg, 0-60 2.6 s, 130 mph
+  ccEngines('cyber', {
+    rwd: { label: 'Long Range RWD', car: 'SINGLE MOTOR RWD', hp: 350, tq: 360, ev: true, spec: {
+      mass: 2850, frontWeight: 0.49, awd: false, torqueCurve: evCurve(600, 275, 12800), lsdPreload: 60, lsdRamp: 0.15,
+    } },
+    beast: { label: 'Cyberbeast', car: 'TRI MOTOR AWD', hp: 845, tq: 930, ev: true, spec: {
+      mass: 3104, torqueCurve: evCurve(1500, 630, 14800), limiterRpm: 14100, redlineRpm: 14100, awdFront: 0.4, lsdPreload: 60,
+    } },
+  }, 'awd', 'All-Wheel Drive');
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)

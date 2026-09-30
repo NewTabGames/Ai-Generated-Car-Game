@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -175,6 +175,24 @@
         info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
         trans: '4-speed automatic',
         snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
+    cyber: { btn: 'CYBERTRUCK', sub: 'The stainless-steel electric pickup · Long Range RWD, All-Wheel Drive and the 845 hp Cyberbeast · 35 in all-terrains, four-wheel steering', paint: 'Stainless', tc: 1, cam: [1.25, 1.3],
+      hint: 'Cybertruck (All-Wheel Drive): shift up (E) for DRIVE - two motors, ~600 hp, 0-60 in 4.1 s, governed to 112 mph. The rear wheels steer too: against the fronts at low speed (a tight turn for 5.7 m of truck), a touch with them at speed. Stability control is on (Sport).',
+      info: 'The stainless-steel wedge: flat unpainted panels, a light bar across the nose and the tail, frameless glass, the vault over the bed · two motors, ~600 hp, all-wheel drive · adaptive air suspension, four-wheel steering (the rears up to 10 degrees), steer-by-wire · 35 in all-terrains on 20 in wheels · 5.68 m long, 3.81 m wheelbase · 3,000 kg (6,603 lb) · 0-60 4.1 s, 112 mph',
+      trans: 'Electric · single speed · AWD', tyres: '35 in all-terrain',
+      snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.07, whPure: 1, whine: 2.2, rpmRef: 12000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'cyberEng', optLabel: 'Version', options: [
+        ['rwd', 'Long Range RWD', 'One motor at the back · ~350 hp · 0-60 ~6.2 s · 112 mph · 2,850 kg'],
+        ['awd', 'All-Wheel Drive', 'Two motors · ~600 hp · 0-60 4.1 s · 112 mph · 3,000 kg'],
+        ['beast', 'Cyberbeast', 'Three motors · 845 hp · 0-60 2.6 s · an 11.2 s quarter mile · 130 mph · 3,104 kg'],
+      ],
+      eng: {
+        rwd: { hint: 'Cybertruck (Long Range RWD): shift up (E) for DRIVE - one motor at the back, ~350 hp, 0-60 in ~6.2 s, 112 mph. The rear wheels steer too. Stability control is on (Sport).',
+          info: 'The stainless-steel wedge with one motor, driving the back wheels · ~350 hp · adaptive air suspension, four-wheel steering, steer-by-wire · 35 in all-terrains on 20 in wheels · 2,850 kg · 0-60 ~6.2 s, 112 mph',
+          trans: 'Electric · single speed · RWD' },
+        beast: { hint: 'Cyberbeast: shift up (E) for DRIVE - three motors, 845 hp, 0-60 in 2.6 s and 130 mph, in a 3.1 t stainless pickup. The rear wheels steer too. Stability control is on (Sport).',
+          info: 'The stainless-steel wedge with three motors - one at the front, two at the back - 845 hp, all-wheel drive · adaptive air suspension, four-wheel steering, steer-by-wire · 35 in all-terrains on 20 in wheels · 3,104 kg (6,843 lb) · 0-60 2.6 s, an 11.2 s quarter mile, 130 mph',
+          trans: 'Electric · single speed · tri-motor AWD', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.08, whPure: 1, whine: 2.7, rpmRef: 14000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      } },
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
@@ -1088,6 +1106,10 @@
       else if (S.rsMode === 'manual') { G.rearMan = clamp(G.rearMan + man * dt * 1.1, -1, 1); rs = G.rearMan; }
       if (S.rsMode !== 'manual' && man) rs = clamp(rs + man, -1, 1);                // (the switch works in any mode)
       veh.input.rearSteer = rs;
+    } else if (sp.rearSteerMax) {
+      // (the Cybertruck: the rears steer against the fronts at low speed for a tight turn, and a touch with them at speed)
+      const v = Math.abs(veh.forwardSpeed), stv = input.state.steer;
+      veh.input.rearSteer = -stv * clamp(1 - (v - 4) / 12, 0, 1) + stv * 0.15 * clamp((v - 18) / 12, 0, 1);
     }
     // GTA-style flip: steering rolls a car that's on its roof or side back onto its wheels
     veh.input.flipAssist = true;
