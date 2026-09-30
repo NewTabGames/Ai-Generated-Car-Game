@@ -338,6 +338,20 @@
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
+    // the touring bagger's tyres: a 130/60B19 front and a 180/55B18 rear, touring compound
+    bikeF: { name: '130/60B19 touring front', short: 'Touring tyres', width: 0.13, radius: 0.335,
+      muX: 1.18, muY: 1.12, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.15, relaxY: 0.3,
+      B: 2.1, C: 1.4, E: -0.1, heatCap: 2200, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.0 },
+    bikeR: { name: '180/55B18 touring rear', short: 'Touring tyres', width: 0.18, radius: 0.33,
+      muX: 1.2, muY: 1.1, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.15, relaxY: 0.3,
+      B: 2.1, C: 1.4, E: -0.1, heatCap: 2600, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.0 },
+    // (the race bagger's: race slicks)
+    bikeRaceF: { name: '120/70R17 race slick', short: 'Race slicks', width: 0.12, radius: 0.305,
+      muX: 1.45, muY: 1.4, loose: 0.85, kappaPeak: 0.11, alphaPeak: 0.09, relaxX: 0.12, relaxY: 0.25,
+      B: 2.2, C: 1.45, E: -0.15, heatCap: 1800, cold: 0.88, coldT: 20, warmT: 60, hotT: 120, overheat: 0.003, prep: 1.05 },
+    bikeRaceR: { name: '200/60R17 race slick', short: 'Race slicks', width: 0.2, radius: 0.315,
+      muX: 1.5, muY: 1.4, loose: 0.85, kappaPeak: 0.11, alphaPeak: 0.09, relaxX: 0.12, relaxY: 0.25,
+      B: 2.2, C: 1.45, E: -0.15, heatCap: 2200, cold: 0.88, coldT: 20, warmT: 60, hotT: 120, overheat: 0.003, prep: 1.05 },
     // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
     // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
     // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
@@ -365,6 +379,7 @@
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
     if (car === 'tank') return { front: 'trackGrouser', rear: 'trackGrouser' };
+    if (car === 'bike') return { front: 'ccKnob', rear: 'ccKnob' };
     if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
@@ -805,6 +820,17 @@
         const aIn = ad + (inner - ad) * s.ackermann, aOut = ad + (outer - ad) * s.ackermann;
         if (d > 0) { dR = aIn * sg; dL = aOut * sg; } else { dL = aIn * sg; dR = aOut * sg; }
       }
+      // (a motorcycle: its steering tilts over with it, and a leaned bike's front wheel points further across the road
+      // than the bars are turned - the wheel steered here about the leaned body is given back what the lean takes off
+      // its angle on the ground)
+      // It also steers itself into a fall: leaned further than the rider wants (braking hard in a turn, a bump), the front
+      // wheel turns toward the lean and the turn stands it back up - the trail behind the steering axis, and how a bike
+      // balances at all
+      if (s.bike) {
+        const vv = Math.max(2, Math.abs(vFwd)), err = (this.lean || 0) - (this.leanT || 0);
+        this.steerSelf = clamp(s.bike.selfK * err * GRAV * s.wheelbase / (vv * vv), -0.2, 0.2) * Math.sign(vFwd || 1) * clamp((Math.abs(vFwd) - 1.5) / 2.5, 0, 1);
+        dL = dR = Math.atan(Math.tan(d + this.steerSelf) / Math.max(0.35, Math.cos(this.lean || 0)));
+      }
       W[0].steer = dL; W[1].steer = dR; W[2].steer = s.rearToe; W[3].steer = -s.rearToe;   // static rear toe-in
       // four-wheel steering (monster truck): the rear axle has its own hydraulic ram on its own switch (+ = pointing right)
       if (s.rearSteerMax) {
@@ -833,6 +859,10 @@
         const hz = pz + m20 * w.mx + m21 * w.my + m22 * w.mz;
         w.hx = hx; w.hy = hy; w.hz = hz;
         const r = w.radius;
+        // (a motorcycle tyre is round in section - a torus, its crown radius half its width: leaned over, the wheel
+        // touches down on its shoulder, lower and out to the side of the hub. rE: the hub's height over the road)
+        const rho = s.bike ? Math.min(r * 0.5, w.tire.width / 2) : 0;
+        const rEf = (nx, ny, nz) => { const na = nx * m00 + ny * m10 + nz * m20; return rho + (r - rho) * Math.sqrt(Math.max(0, 1 - na * na)); };
         if (s.tyreEnvelope) this._envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
         else {
           world.ground(hx, hz, g);
@@ -841,18 +871,23 @@
           let sl = 1e9;
           if (ndd > 0.2) {
             let hpN = (hy - g.h) * ny;
-            sl = (hpN - r) / ndd;
+            sl = (hpN - (rho ? rEf(nx, ny, nz) : r)) / ndd;
             if (sl < w.sMax + 0.35) {
               const cx = hx + dirX * sl - nx * r, cz = hz + dirZ * sl - nz * r;
               world.ground(cx, cz, g);
               nx = g.nx; ny = g.ny; nz = g.nz;
               ndd = -(nx * dirX + ny * dirY + nz * dirZ);
               hpN = nx * (hx - cx) + ny * (hy - g.h) + nz * (hz - cz);
-              sl = ndd > 0.2 ? (hpN - r) / ndd : 1e9;
+              sl = ndd > 0.2 ? (hpN - (rho ? rEf(nx, ny, nz) : r)) / ndd : 1e9;
             }
           }
           w.sRaw = sl;
           w.nx = nx; w.ny = ny; w.nz = nz; w.surface = g.surface; w.ndd = ndd;
+          // (where it touches, from the end of the strut: down the wheel's own plane to the crown, then down to the road)
+          if (rho) {
+            const na = nx * m00 + ny * m10 + nz * m20, ux = na * m00 - nx, uy = na * m10 - ny, uz = na * m20 - nz, ul = (r - rho) / (Math.sqrt(ux * ux + uy * uy + uz * uz) || 1);
+            w.cox = ux * ul - nx * rho; w.coy = uy * ul - ny * rho; w.coz = uz * ul - nz * rho;
+          }
         }
         const sl = w.sRaw, nx = w.nx, ny = w.ny, nz = w.nz, ndd = w.ndd;
         if (sl < w.sMax) {
@@ -899,12 +934,16 @@
         // apply along body up at the wheel centre
         let cx = w.hx + dirX * w.s, cy = w.hy + dirY * w.s, cz = w.hz + dirZ * w.s;
         let fx = upX * F, fy = upY * F, fz = upZ * F;
-        if (s.tyreEnvelope) {
+        if (s.tyreEnvelope || s.bike) {
+          // (a motorcycle too: leaned over, its forks and shock are tilted - the ground still pushes straight up at the
+          // tyre, and a spring pushing along the tilted strut mustn't hand it a sideways shove the tyres never made)
           // the whole contact force at the contact point: the spring sets its part along the strut, the links carry the
           // rest - so a tyre rolling into a step (a car's side, a ramp's toe) is pushed back by it, not just lifted
           const N = F / Math.max(0.35, w.ndd);
           w.Fz = N; fx = w.nx * N; fy = w.ny * N; fz = w.nz * N;
-          cx -= w.nx * w.radius; cy -= w.ny * w.radius; cz -= w.nz * w.radius;
+          // (a leaned motorcycle wheel touches down on its tyre's shoulder, out from under the hub)
+          if (s.bike) { cx += w.cox; cy += w.coy; cz += w.coz; }
+          else { cx -= w.nx * w.radius; cy -= w.ny * w.radius; cz -= w.nz * w.radius; }
         }
         Fx += fx; Fy += fy; Fz += fz;
         const rx = cx - px, ry = cy - py, rz = cz - pz;
@@ -995,7 +1034,8 @@
         const fl = 1 / Math.sqrt(fx * fx + fy * fy + fz * fz); fx *= fl; fy *= fl; fz *= fl;
         const lx = fy * nz - fz * ny, ly = fz * nx - fx * nz, lz = fx * ny - fy * nx;
         // contact point
-        const cpx = w.hx + dirX * w.sRaw - nx * r, cpy = w.hy + dirY * w.sRaw - ny * r, cpz = w.hz + dirZ * w.sRaw - nz * r;
+        // (a motorcycle's: on its leaned tyre's shoulder)
+        const cpx = w.hx + dirX * w.sRaw + (s.bike ? w.cox : -nx * r), cpy = w.hy + dirY * w.sRaw + (s.bike ? w.coy : -ny * r), cpz = w.hz + dirZ * w.sRaw + (s.bike ? w.coz : -nz * r);
         w.cpx = cpx; w.cpy = cpy; w.cpz = cpz;
         const rx = cpx - px, ry = cpy - py, rz = cpz - pz;
         const cvx = vx + (wy * rz - wz * ry), cvy = vy + (wz * rx - wx * rz), cvz = vz + (wx * ry - wy * rx);
@@ -1149,6 +1189,30 @@
         const wxB = wx * m00 + wy * m10 + wz * m20, wyB = wx * m01 + wy * m11 + wz * m21, wzB = wx * m02 + wy * m12 + wz * m22;
         const tbx = -kp * speed * wxB, tby = -ky * speed * wyB, tbz = -kr * speed * wzB;
         Tx += m00 * tbx + m01 * tby + m02 * tbz; Ty += m10 * tbx + m11 * tby + m12 * tbz; Tz += m20 * tbx + m21 * tby + m22 * tbz;
+      }
+
+      // a motorcycle (bike: each axle's two 'wheels' side by side under the tyre's centre line - no roll stiffness of its
+      // own): the rider balances it. Rolling on, it's leaned into a turn to where gravity and the turn balance
+      // (tan(lean) = speed x yaw rate / g, up to maxLean); at a walk it's held upright (feet down). The lean's error is
+      // corrected with a roll torque about the bike's own length
+      if (s.bike) {
+        const Bk = s.bike, fX = -m02, fY = -m12, fZ = -m22;
+        const lean = Math.asin(clamp(-m10, -1, 1)), rollRate = wx * fX + wy * fY + wz * fZ;          // (+ to the right)
+        const v = Math.abs(vFwd), ramp = clamp((v - Bk.vMin) / 2.5, 0, 1);
+        // (the turn the rider is steering - its yaw rate - and the one it's making, + to the right)
+        const rK = vFwd * Math.tan(this.steerAngle + (this.steerSelf || 0)) / s.wheelbase, rR = -wy;
+        const target = clamp(Math.atan2(vFwd * vFwd * Math.tan(this.steerAngle) / s.wheelbase, 9.81), -Bk.maxLean, Bk.maxLean) * ramp;
+        this.leanT = (this.leanT || 0) + (target - (this.leanT || 0)) * Math.min(1, h / 0.06);
+        const kp = Bk.kp * (1 + 2 * (1 - ramp)), kd = Bk.kd * (1 + (1 - ramp));
+        const Tr = s.Iroll * (kp * (this.leanT - lean) - kd * rollRate);
+        Tx += fX * Tr; Ty += fY * Tr; Tz += fZ * Tr;
+        this.lean = lean;
+        // and a bike's own straight-line stability (the trail behind its steering axis, and the rider): it yaws as its
+        // steering says - a yaw nobody asked for, the back stepping out under hard braking with the back light, is held -
+        // and a back axle sliding sideways off its path is brought back into line
+        const hr = 1 / Math.max(0.2, Math.hypot(m00, m20)), vRh = (vx * m00 + vz * m20) * hr;
+        const bR = Math.atan2(vRh - rR * s.cgToRear, Math.max(3, v)) * Math.sign(vFwd || 1);
+        Ty += s.Iyaw * (Bk.yawK * (rR - rK) - Bk.alignK * bR) * ramp;
       }
 
       // ---------------- body / ground penalty contacts (roll-overs, bottoming out)
@@ -2823,6 +2887,35 @@
     CdA: 1.07,
     bodyHalfW: 1.01, bodyFront: -2.85, bodyRear: 2.84, bodyBottom: -0.33, bodyTop: 1.07,
   } };
+  // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
+  // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
+  // an 18 in rear, 368 kg wet + a 90 kg rider. A motorcycle in a four-wheel world: each axle's two 'wheels' sit side by
+  // side under the tyre (half the load each, the rear pair locked together), and the rider balances it (bike: leaned
+  // into turns, held up at a stop). Its floorboards touch down past ~32 degrees, as the real one's do.
+  // Three versions (CARS.bike.make): stock, a King of the Baggers race bike, a turbo drag bagger
+  CARS.bike = { name: 'Touring Bagger', short: 'Bagger', car: '117 CI V-TWIN', hp: 105, tq: 130, cc: true, kbLat: 5.8, spec: {
+    name: 'Touring Bagger',
+    mass: 458, Ipitch: 190, Iyaw: 200, Iroll: 45, cgHeight: 0.66, wheelbase: 1.625, frontWeight: 0.46,
+    trackF: 0.02, trackR: 0.02, wheelRadius: 0.33, wheelRadiusF: 0.335, wheelRadiusR: 0.33, wheelInertiaF: 0.28, wheelInertiaR: 0.38,
+    frontTire: 'bikeF', rearTire: 'bikeR', Fz0: 1100, loadSens: 0.08,
+    springF: 14000, springR: 20000, dampBumpF: 800, dampRebF: 1200, dampBumpR: 1000, dampRebR: 1500,
+    arbF: 0, arbR: 0, travelUp: 0.1, travelDown: 0.09, suspS0: 0.2,
+    brakeTorqueF: 600, brakeTorqueR: 110, handbrakeTorque: 300, noESC: true,
+    maxSteer: 0.55, steerRate: 4, steerRatio: 1, ackermann: 0, rearToe: 0,
+    bike: { kp: 160, kd: 35, vMin: 1.5, maxLean: 0.56, yawK: 30, alignK: 20, selfK: 1 },
+    idleRpm: 950, limiterRpm: 5650, redlineRpm: 5500, shiftRpm: 5400, engineInertia: 0.09, fricA: 8, fricB: 5, starterTorque: 60,
+    torqueCurve: [[0, 60], [1000, 100], [2000, 118], [3000, 128], [3500, 130], [4000, 128], [4500, 122], [5000, 112], [5500, 100], [6000, 85]],
+    boostMax: 0, popScale: 0.6,
+    autoRatios: [3.34, 2.31, 1.72, 1.39, 1.19, 1.0], autoRev: 3.34, autoFinal: 2.875, shiftTimeWOT: 0.15, shiftTimePart: 0.25, shiftCutDepth: 0.5,
+    launchRpm: 2200, engineTc: true,
+    dragClutch: { rpm0: 1100, rpm1: 2100, kc: 0, base: [[0, 260]], muSlip: 0.2, slipRef: 200, rev: 100 },
+    lsdPreload: 400, lsdRamp: 0, driveEff: 0.9,
+    CdA: 0.62,
+    bodyHalfW: 0.47, bodyFront: -1.3, bodyRear: 1.25, bodyBottom: -0.54, bodyTop: 0.95,
+    // (the floorboards and the bags' bottom corners: where it touches down leaned over)
+    bodyPts: ccPts(0.66, 0.46, 1.625, [[-0.36, 0.26, -0.35], [0.36, 0.26, -0.35], [-0.36, 0.26, -0.05], [0.36, 0.26, -0.05], [-0.46, 0.36, 0.5], [0.46, 0.36, 0.5], [-0.46, 0.36, 1.05], [0.46, 0.36, 1.05],
+      [0, 0.12, 0], [0, 1.45, -0.9], [0, 1.6, 0.1], [0, 0.9, 1.1]]),
+  } };
   // Main battle tank, built like an M1A2 Abrams: ~62 t, a 1,500 hp gas turbine (3,950 lb-ft at its output shaft), a
   // 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering, seven dual road wheels a
   // side on torsion bars, rubber-padded steel tracks 635 mm wide ~4.2 m apart on the ground. It steers as tanks do
@@ -3081,6 +3174,33 @@
       CdA: 0.82, ClA: 0.45, bodyHalfW: 0.93, bodyFront: -1.95, bodyRear: 1.95,
     } },
   }, 'r4', 'Rally4');
+  // the bagger's other two: a King of the Baggers race bike - a 131 ci race motor (~190 hp), race suspension with the
+  // clearance to lean 50 degrees, slicks, 370 kg with the rider - and a turbo drag bagger: ~400 hp, a stretched swingarm,
+  // wheelie control
+  ccEngines('bike', {
+    race: { label: 'Race bagger', car: '131 CI RACE V-TWIN', hp: 190, tq: 155, kbLat: 9, spec: {
+      mass: 370, Ipitch: 150, Iyaw: 160, Iroll: 36, cgHeight: 0.68, frontWeight: 0.48,
+      frontTire: 'bikeRaceF', rearTire: 'bikeRaceR', wheelRadiusF: 0.305, wheelRadiusR: 0.315, wheelRadius: 0.315, Fz0: 950,
+      springF: 16000, springR: 22000, dampBumpF: 950, dampRebF: 1400, dampBumpR: 1150, dampRebR: 1700, travelDown: 0.1,
+      brakeTorqueF: 530, brakeTorqueR: 100,
+      bike: { kp: 170, kd: 35, vMin: 1.5, maxLean: 0.87, yawK: 30, alignK: 20, selfK: 1 },
+      idleRpm: 1100, limiterRpm: 7600, redlineRpm: 7400, shiftRpm: 7300, engineInertia: 0.07,
+      torqueCurve: [[0, 80], [2000, 140], [3000, 152], [4500, 155], [5500, 154], [6500, 150], [7000, 140], [7600, 120], [8000, 100]],
+      autoRatios: [2.9, 2.1, 1.65, 1.36, 1.17, 1.0], autoRev: 2.9, autoFinal: 2.7, shiftTimeWOT: 0.05, shiftTimePart: 0.12, shiftCutDepth: 0.4,
+      dragClutch: { rpm0: 1500, rpm1: 3000, kc: 0, base: [[0, 330]], muSlip: 0.2, slipRef: 200, rev: 100 }, wheelieCtl: 2,
+      CdA: 0.5,
+      bodyPts: ccPts(0.68, 0.48, 1.625, [[-0.3, 0.42, -0.3], [0.3, 0.42, -0.3], [-0.4, 0.5, 0.6], [0.4, 0.5, 0.6], [0, 0.14, 0], [0, 1.4, -0.9], [0, 1.55, 0.1], [0, 0.9, 1.1]]),
+    } },
+    turbo: { label: 'Turbo drag bagger', car: 'TURBO V-TWIN', hp: 400, tq: 280, kbLat: 5.8, spec: {
+      mass: 430, wheelbase: 1.85, frontWeight: 0.42, Ipitch: 240,
+      idleRpm: 1000, limiterRpm: 7000, redlineRpm: 6800, shiftRpm: 6700,
+      torqueCurve: [[0, 80], [2000, 150], [3000, 230], [4000, 275], [5000, 280], [6000, 265], [6800, 240], [7200, 200]],
+      turbo: { lag: 0.35, base: 0.5, rpm0: 2200, rpm1: 3800 }, boostMax: 16,
+      autoRatios: [2.9, 2.0, 1.55, 1.28, 1.12, 1.0], autoRev: 2.9, autoFinal: 2.4, shiftTimeWOT: 0.06, shiftTimePart: 0.12, shiftCutDepth: 0.4,
+      dragClutch: { rpm0: 3300, rpm1: 4800, kc: 0, base: [[0, 560]], muSlip: 0.2, slipRef: 200, rev: 100 }, wheelieCtl: 2,
+      rearTire: 'bikeRaceR', CdA: 0.6,
+    } },
+  }, 'stock', 'Stock 117');
   // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
   ccEngines('tank', {
     ungov: { label: 'Ungoverned', car: '1,500 HP TURBINE', spec: { autoFinal: 3.15 } },

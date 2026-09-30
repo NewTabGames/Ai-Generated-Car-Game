@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -175,6 +175,26 @@
         info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
         trans: '4-speed automatic',
         snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
+    bike: { btn: 'TOURING BAGGER', sub: 'A Street Glide-type touring bike · 117 ci V-twin · batwing fairing, hard bags · leans into the turns · stock, a 190 hp race bagger and a 400 hp turbo drag bagger', paint: 'Smoke Show', tc: 1, cam: [0.95, 1.25],
+      hint: 'Touring Bagger: shift up (E) for DRIVE - a 117 ci V-twin, 105 hp and 130 lb-ft through a 6-speed (it shifts for you, or E / Q). You ride it like a bike: steer and it leans into the turn, and a foot goes down when you stop. Lean it too far and the floorboards scrape. ~125 mph.',
+      info: 'Built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020, 130 lb-ft at 3,500 · a 6-speed and a belt final drive · the batwing fairing on the forks with its short smoked screen and LED headlamp · hard saddlebags, floorboards, black pipes · 130/60B19 front, 180/55B18 rear · 368 kg wet + the rider · leans ~32 degrees before the floorboards touch · 0-60 ~4.0 s, ~125 mph',
+      trans: '6-speed · belt drive', tyres: 'Touring tyres',
+      snd: { nEng: 1, cyl: 2, vt: 45, fmul: 1.3, deep: 0.35, loud: 0.55, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5500, race: 0.4, rough: 0.45 },
+      optKey: 'bikeEng', optLabel: 'Version', options: [
+        ['stock', 'Stock 117', '117 ci V-twin · 105 hp / 130 lb-ft · 6-speed · 0-60 ~4.0 s · ~125 mph'],
+        ['race', 'Race bagger', 'A King of the Baggers-type race bike · 131 ci, ~190 hp · race suspension, slicks, leans 50 degrees · 0-60 ~3.2 s · ~160 mph'],
+        ['turbo', 'Turbo drag bagger', 'A turbocharged V-twin, ~400 hp · stretched swingarm, wheelie control · 0-60 ~3.1 s · ~180 mph'],
+      ],
+      eng: {
+        race: { hint: 'Race bagger: shift up (E) for DRIVE - a 131 ci race V-twin, ~190 hp, on slicks with race suspension: it leans 50 degrees before anything touches. Squeeze the throttle out of the turns. ~160 mph.',
+          info: 'A King of the Baggers-type race bagger: the bags and the fairing kept, a 131 ci race motor (~190 hp, 155 lb-ft), a quickshifter, race forks and shocks for the clearance to lean 50 degrees, 17 in wheels on race slicks, big brakes · ~370 kg with the rider · 0-60 ~3.2 s, ~160 mph',
+          trans: '6-speed · quickshifter', tyres: 'Race slicks',
+          snd: { nEng: 1, cyl: 2, vt: 45, fmul: 1.2, deep: 0.25, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 7400, race: 0.8, rough: 0.35 } },
+        turbo: { hint: 'Turbo drag bagger: shift up (E) for DRIVE - a turbocharged V-twin, ~400 hp, a stretched swingarm and wheelie control to keep the front down. It launches on boost; hold on. 0-60 in ~3.1 s, ~180 mph.',
+          info: 'A turbo drag bagger: the V-twin with a turbo hung off the right side on 16 psi, ~400 hp and 280 lb-ft · a stretched swingarm (1.85 m wheelbase), a drag slick on the back, wheelie control · ~430 kg with the rider · 0-60 ~3.1 s, ~180 mph',
+          trans: '6-speed · air shifter', tyres: 'Touring front · drag slick rear',
+          snd: { nEng: 1, cyl: 2, vt: 45, fmul: 1.25, deep: 0.3, loud: 0.85, open: 1, whK: 0.5, whPure: 1, whine: 1.1, rpmRef: 6800, race: 0.7, rough: 0.35 } },
+      } },
     tank: { btn: 'MAIN BATTLE TANK', sub: 'A 62 t Abrams-type tank · 1,500 hp gas turbine · steers on its tracks, pivots in place · the turret follows where you look · governed, ungoverned and a 3,000 hp hot rod', paint: 'Sand', tc: 3, cam: [2.1, 2.0],
       hint: 'Main battle tank (governed): shift up (E) for DRIVE - a 1,500 hp gas turbine, 42 mph. It steers on its tracks: steer and one track runs faster than the other; at a stop in NEUTRAL it pivots on the spot. The turret and gun follow the camera - drag the mouse to look round (the view button puts the camera back behind). No shooting.',
       info: 'Built like an M1A2 Abrams: ~62 t · a 1,500 hp gas turbine, 3,950 lb-ft at its output shaft · a 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering · seven dual road wheels a side on torsion bars, rubber-padded steel tracks 635 mm wide · the 120 mm gun, the commander\'s .50 cal, the loader\'s M240 · 0-20 mph in ~6 s, governed to 42 mph',
@@ -242,6 +262,7 @@
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : S.car === 'bike' ? ['Knobbies', 'Dual-sport knobbies', 'Dual-sport knobby tyres: they bite in dirt, gravel and grass where the touring tyres just slide, and give up a lot of grip (and lean) on pavement']
     : S.car === 'tank' ? ['Steel grousers', 'Bare steel grousers', 'The rubber pads off the track shoes: bare steel grousers dig into dirt, mud and grass for more bite, and slide on pavement (and chew it up)']
     : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
       + 'and nearly twice the grip in mud - about the same on gravel, where the gravel tyres are made for it, and a lot less on tarmac. Heavier, and a touch of lift']
@@ -400,6 +421,7 @@
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
+    if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' ? MON.build(THREE, o) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
@@ -1224,7 +1246,7 @@
 
   // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
   // looks (drag the mouse to look round) at a real turret's ~40 deg/s, and the gun lifts with the view (-9 to +20 deg)
-  const TANK = S.car === 'tank';
+  const TANK = S.car === 'tank', BIKE = S.car === 'bike', _Z = new THREE.Vector3(0, 0, 1);
   const TUR = { yaw: 0, elev: 0 }, _tq = new THREE.Quaternion(), _td = new THREE.Vector3();
   function turretFollow(dt) {
     _td.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(_tq.set(veh.qx, veh.qy, veh.qz, veh.qw).invert());
@@ -1264,6 +1286,7 @@
     }
     if (TANK) turretFollow(dt);
     if (car.afterWheels) car.afterWheels();
+    if (car.setRider) car.setRider(veh.forwardSpeed);
     if (car.setJet) { car.setJetSize(jetSize()); car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt); }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
@@ -1322,8 +1345,10 @@
       car.root.localToWorld(_v);
       camera.position.copy(_v);
       yawQ.setFromAxisAngle(Y, cam.headYaw + cam.orbitYaw);
-      pitchQ.setFromAxisAngle(X, (KART ? -0.17 : -0.1) - cam.orbitPitch * 0.8);
+      pitchQ.setFromAxisAngle(X, (KART ? -0.17 : BIKE ? -0.2 : -0.1) - cam.orbitPitch * 0.8);
       camQ.copy(car.root.quaternion).multiply(yawQ).multiply(pitchQ);
+      // (a rider's head stays half upright as the bike leans under it)
+      if (BIKE) camQ.multiply(yawQ.setFromAxisAngle(_Z, (veh.lean || 0) * 0.5));
       camera.quaternion.copy(camQ);
       camera.fov = S.fov;
     } else {
@@ -2092,6 +2117,7 @@
         vw.spin.rotation.x = vw.left ? g.spin[i] : -g.spin[i];
       }
       if (m.afterWheels) m.afterWheels();
+      if (m.setRider) m.setRider(Math.hypot(A[8], A[10]));
       if (m.steerWheel) m.steerWheel.rotation.z = -steer * (gv.spec.steerRatio || 14);
       const fl = N[25] | 0;
       m.setLights({ brake: !!(fl & 1), reverse: !!(fl & 2), headlights: !!(fl & 4), night });
@@ -2503,7 +2529,8 @@
   function frame(now) {
     const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
     G.time += dt;
-    input.poll(dt, veh.forwardSpeed, (() => { const a = carAxes(); const vr = veh.vx * a.rx + veh.vz * a.rz, vf = veh.vx * a.fx + veh.vz * a.fz; return Math.abs(vf) > 3 ? clamp(Math.atan2(vr, Math.abs(vf)), -0.5, 0.5) : 0; })());
+    // (the keyboard countersteer help is for a car's slides: a bike balances itself)
+    input.poll(dt, veh.forwardSpeed, BIKE ? undefined : (() => { const a = carAxes(); const vr = veh.vx * a.rx + veh.vz * a.rz, vf = veh.vx * a.fx + veh.vz * a.fz; return Math.abs(vf) > 3 ? clamp(Math.atan2(vr, Math.abs(vf)), -0.5, 0.5) : 0; })());
     wzTick(dt);
     handleControls(dt);
     if (!G.paused) {
