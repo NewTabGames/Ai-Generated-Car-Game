@@ -1810,7 +1810,7 @@
       }
       // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
       // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
-      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
+      if (this.eOmega < 0 && !s.electric && !s.jet) this.eOmega = 0;   // (a jet cart's reverse is an electric motor: it turns either way)
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
@@ -1913,7 +1913,7 @@
       } else for (let i = 0; i < 4; i++) W[i].omega = brakeClamp(W[i].omega, W[i].brakeT + pk, W[i].inertia, h);
       // (an electric motor turns backwards with its wheels - rolling back in D, a wheel dragged backwards by the tyre -
       // and pushes against it; pinning it at 0 while the wheels ran backwards locked the driveline in a tug of war)
-      if (this.eOmega < 0 && !s.electric) this.eOmega = 0;
+      if (this.eOmega < 0 && !s.electric && !s.jet) this.eOmega = 0;   // (a jet cart's reverse is an electric motor: it turns either way)
       if (!this.running && !this.cranking && this.eOmega < 3 && !this.locked) this.eOmega *= 0.98;
     }
 
