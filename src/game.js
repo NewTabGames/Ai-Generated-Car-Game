@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -175,6 +175,45 @@
         info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
         trans: '4-speed automatic',
         snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
+    trophy: { btn: 'TROPHY TRUCK', sub: 'A Baja 1000-type desert racer · ~900 hp V8 · 27-33 in of wheel travel on bypass shocks · 39 in desert tyres · floats over whoops at 80 mph · Spec, Trophy Truck and an unlimited 4WD', paint: 'TorRed', tc: 1, cam: [1.35, 1.45],
+      hint: 'Trophy Truck: shift up (E) for DRIVE - a ~900 hp V8 through a 3-speed automatic, 0-60 in ~4.2 s, ~136 mph. Its suspension is the point: ~27 in of travel up front and ~33 in at the back on bypass shocks - take it off the road and flat out over the rough stuff (the Rally Stage, the country hills, the arena whoops): the wheels do the work and the body just floats.',
+      info: 'Built like a Baja 1000 Trophy Truck: a chromoly tube chassis under a fiberglass pickup body · ~900 hp, 850 lb-ft big-block V8 · Turbo 400 3-speed automatic, locked rear · long-travel A-arms (~27 in) and a 4-link solid axle (~33 in) on coil-overs and bypass shocks - soft in mid-stroke, stiff at the end · 39x13.5R17 desert tyres on beadlocks · ~2,900 kg, 3.3 m wheelbase, 2.2 m track · 0-60 ~4.2 s, ~136 mph',
+      trans: '3-speed automatic · locked rear', tyres: '39 in desert tyres',
+      snd: { nEng: 1, cyl: 8, fmul: 0.95, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 0.3, rpmRef: 7000, race: 0.9, rough: 0.2 },
+      optKey: 'trophyEng', optLabel: 'Version', options: [
+        ['spec', 'Trophy Truck Spec', 'The spec class: a sealed ~525 hp LS V8, the same long-travel suspension · 0-60 ~5.5 s · ~125 mph'],
+        ['tt', 'Trophy Truck', '~900 hp big-block V8 · rear drive · 0-60 ~4.2 s · ~136 mph'],
+        ['awd', 'Unlimited 4WD', '~1,050 hp and all-wheel drive · 0-60 ~3.1 s · ~142 mph'],
+      ],
+      eng: {
+        spec: { hint: 'Trophy Truck Spec: shift up (E) for DRIVE - the spec class: a sealed ~525 hp LS V8, 0-60 in ~5.5 s, ~125 mph, and the same long-travel suspension - flat out over the rough stuff, the body just floats.',
+          info: 'The Trophy Truck Spec class: the same tube chassis, long-travel suspension (~27 / 33 in) and 39 in desert tyres with a sealed ~525 hp, 500 lb-ft 6.2 L LS V8 · 3-speed automatic · ~2,800 kg · 0-60 ~5.5 s, ~125 mph',
+          snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.2, loud: 0.6, open: 1, whK: 0.19, whPure: 0, whine: 0.2, rpmRef: 6500, race: 0.7, rough: 0.15 } },
+        awd: { hint: 'Unlimited 4WD trophy truck: shift up (E) for DRIVE - ~1,050 hp to all four wheels, 0-60 in ~3.1 s, ~142 mph, on ~30 in of wheel travel - it pulls out of the corners and over the whoops like nothing else.',
+          info: 'An unlimited 4WD trophy truck (the new breed): ~1,050 hp, 960 lb-ft V8 · 3-speed automatic, all-wheel drive with a centre diff · long-travel suspension (~27 / 33 in), 39 in desert tyres · ~3,080 kg · 0-60 ~3.1 s, ~142 mph',
+          trans: '3-speed automatic · 4WD',
+          snd: { nEng: 1, cyl: 8, fmul: 0.92, deep: 0.4, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 0.4, rpmRef: 7000, race: 1, rough: 0.2 } },
+      } },
+    buggy: { btn: 'DUNE BUGGY', sub: 'A VW sand rail · tube frame, diamond-plate floor, two buckets and a roll cage · a 1600 VW, a built 2276 on dual Webers, or an LS V8', paint: 'Crimson', tc: 1, cam: [0.95, 1.05],
+      hint: 'Dune Buggy: shift up (E) for DRIVE - a stock 1600 VW flat-four, ~60 hp through the VW 4-speed (it shifts for you, or E / Q), 560 kg, ~80 mph. Light, rear-engined and loose on its skinny fronts - it slides in the dirt. Sand paddles are in the off-road package.',
+      info: 'A VW-based sand rail: a chromoly tube frame on a diamond-plate floor, a roll cage with two lamps, two high-back buckets, the battery on the nose · 1600 cc VW flat-four (dual-port), ~60 hp, 82 lb-ft · VW 4-speed transaxle · VW beam front end on coil-overs, trailing arms at the back · 5.60-15 fronts, 235/75R15 rears on polished five-spokes · ~560 kg with the driver, 38 / 62 · 0-60 ~10 s, ~80 mph',
+      trans: 'VW 4-speed', tyres: 'Buggy tyres',
+      snd: { nEng: 1, cyl: 4, fmul: 1.25, deep: 0.1, loud: 0.35, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5000, race: 0.3, rough: 0.35 },
+      optKey: 'buggyEng', optLabel: 'Engine', options: [
+        ['vw', '1600 VW', 'Stock 1600 flat-four · ~60 hp · VW 4-speed · 0-60 ~10 s · ~80 mph'],
+        ['built', 'Built 2276 VW', 'A 2276 cc stroker on dual Webers · ~150 hp · 0-60 ~4.8 s · ~110 mph'],
+        // (5th: it starts on STREET stability control - 480 hp in 790 kg on street tyres swaps ends at any real throttle)
+        ['ls', 'LS3 V8 sand rail', 'A 6.2 L LS3 V8, ~480 hp · sequential 4-speed · long-travel arms · 0-60 ~4.4 s · ~135 mph', undefined, 0],
+      ],
+      eng: {
+        built: { hint: 'Dune Buggy (built 2276 VW): shift up (E) for DRIVE - a stroked VW on dual Webers, ~150 hp in a 575 kg buggy: 0-60 in ~4.8 s, ~110 mph. Rear-engined and light - it slides in the dirt.',
+          info: 'The sand rail with a built VW: a 2276 cc stroker on dual Weber 48s, ~150 hp at 5,800, 150 lb-ft · VW 4-speed (4.125 ring and pinion) · ~575 kg · 0-60 ~4.8 s, ~110 mph',
+          snd: { nEng: 1, cyl: 4, fmul: 1.15, deep: 0.15, loud: 0.6, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6300, race: 0.7, rough: 0.3 } },
+        ls: { hint: 'LS3 V8 sand rail: shift up (E) for DRIVE - ~480 hp in 790 kg, a sequential 4-speed, long-travel arms: 0-60 in ~4.4 s (it spins its street tyres), ~135 mph. It starts on STREET stability control - switch it off for the full, sideways thing.',
+          info: 'A long-travel sand rail with an LS swap: a 6.2 L LS3 V8, ~480 hp, 475 lb-ft, the radiator up on the cage · 4-speed sequential race transaxle · long-travel trailing arms (~19 in at the back) · ~790 kg · 0-60 ~4.4 s, ~135 mph',
+          trans: '4-speed sequential',
+          snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.25, loud: 0.7, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6500, race: 0.8, rough: 0.2 } },
+      } },
     bike: { btn: 'TOURING BAGGER', sub: 'A Street Glide-type touring bike · 117 ci V-twin · batwing fairing, hard bags · leans into the turns · stock, a 190 hp race bagger and a 400 hp turbo drag bagger', paint: 'Smoke Show', tc: 1, cam: [0.95, 1.25],
       hint: 'Touring Bagger: shift up (E) for DRIVE - a 117 ci V-twin, 105 hp and 130 lb-ft through a 6-speed (it shifts for you, or E / Q). You ride it like a bike: steer and it leans into the turn, and a foot goes down when you stop. Lean it too far and the floorboards scrape. ~125 mph.',
       info: 'Built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020, 130 lb-ft at 3,500 · a 6-speed and a belt final drive · the batwing fairing on the forks with its short smoked screen and LED headlamp · hard saddlebags, floorboards, black pipes · 130/60B19 front, 180/55B18 rear · 368 kg wet + the rider · leans ~32 degrees before the floorboards touch · 0-60 ~4.0 s, ~125 mph',
@@ -231,9 +270,9 @@
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
-  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster', KART = S.car === 'kart', MOWER = S.car === 'mower';
+  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster' || S.car === 'avenger', KART = S.car === 'kart', MOWER = S.car === 'mower';
   const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;     // race engines: their own sound set-up, rumble and shake
-  const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS.monster
+  const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS[S.car]
     : KART ? VEH.CARS.kart.make(S.kartClass) : MOWER ? VEH.CARS.mower.make(S.mowerClass)
     : CC && VEH.CARS[S.car].make ? VEH.CARS[S.car].make(S[CCD.optKey])
     : (VEH.CARS[S.car] && !VEH.CARS[S.car].more ? VEH.CARS[S.car] : VEH.CARS.hellcat);
@@ -262,6 +301,8 @@
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : S.car === 'trophy' ? ['40 in mud-terrains', '40 in mud-terrains', '40x13.5R17 mud-terrains in place of the desert tyres: open lugs that dig into mud and grass, a touch more height, less grip on tarmac and a bit less in the gravel']
+    : S.car === 'buggy' ? ['Sand paddles', 'Sand paddles + rib fronts', 'Dune tyres: paddles on the back (rubber scoops across a smooth carcass - huge bite in sand, dirt and mud, next to none on pavement) and ribbed sand fronts']
     : S.car === 'bike' ? ['Knobbies', 'Dual-sport knobbies', 'Dual-sport knobby tyres: they bite in dirt, gravel and grass where the touring tyres just slide, and give up a lot of grip (and lean) on pavement']
     : S.car === 'tank' ? ['Steel grousers', 'Bare steel grousers', 'The rubber pads off the track shoes: bare steel grousers dig into dirt, mud and grass for more bite, and slide on pavement (and chew it up)']
     : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
@@ -421,9 +462,10 @@
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
+    if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
     if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
-      : id === 'monster' ? MON.build(THREE, o) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
+      : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
       : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius })) : CAR.build(THREE, o);
   }
@@ -434,7 +476,7 @@
     if (id === 'dragster') return C.dragster.make(opt || 'tf');
     if (id === 'kart') return C.kart.make(opt || 'tag');
     if (id === 'mower') return C.mower.make(opt || 'bp');
-    if (id === 'monster') return C.monster;
+    if (id === 'monster' || id === 'avenger') return C[id];
     if (C[id] && C[id].make) return C[id].make(opt || undefined);
     return C[id] && !C[id].more ? C[id] : C.hellcat;
   }
@@ -631,6 +673,10 @@
       sub: '12,000 lb · 1,500 hp blown 540 · 66 in tyres · 30 in of travel · 4-wheel drive & 4-wheel steering · its own stadium',
       desc: 'Built to the stadium freestyle spec: a chromoly tube chassis under a fiberglass body, the driver strapped in the middle, a supercharged methanol big-block behind them, planetary axles on nitrogen shocks with 30 inches of travel, and 66-inch tyres the crew hand-cuts into paddles. Both axles steer. It comes with the Monster Arena: a big gap jump, a tabletop, whoops and a pile of junk cars that really crush. Gas lifts the nose in the air, the brake drops it.',
       btn: 'MONSTER TRUCK', tc: 3 },
+    { id: 'avenger', name: 'AVENGER MONSTER TRUCK', paint: 'Avenger Green', map: 'arena',
+      sub: 'The same 12,000 lb stadium truck - 1,500 hp blown 540, 66 in tyres, 30 in of travel, 4WD and 4WS - in the lime-green Avenger body with its flames',
+      desc: 'The Avenger: a rounded hot-rod coupe body in lime green, yellow-to-orange flames licking back from the nose outlined in red, the name across the doors, a wall of stickers under it, dark windows, the zoomies out of the rear fenders - on the same chassis, engine, axles, shocks and tyres as the other truck, so it drives the same.',
+      btn: 'AVENGER', tc: 3 },
     // (the Car Crushers 2 cars, a card each - see CC_CARS)
     ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options })),
   ];
@@ -1403,7 +1449,7 @@
       : def.cls === 'sc' ? { nEng: 1, cyl: 4, fmul: 1.6, deep: 0, loud: 0.45, open: 1, whK: 0.155, whPure: 1, whine: 1.5, rpmRef: 13000, race: 0.8, rough: 0.08, surge: 1 }
       : def.cls === 'kz' ? { nEng: 1, cyl: 2, fmul: 2.2, deep: 0, loud: 0.45, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 13500, race: 1, rough: 0.15, pipe: [9000, 11500] }
       : { nEng: 1, cyl: 2, fmul: 2.4, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 15000, race: 1, rough: 0.15, pipe: [8500, 11000] })
-    : id === 'monster' ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
+    : id === 'monster' || id === 'avenger' ? { nEng: 1, cyl: 8, fmul: 0.85, deep: 0.55, loud: 0.9, open: 1, whK: 0.19, whPure: 0, whine: 1.9, rpmRef: 7000, race: 1, rough: 0.3 }
     : id === 'dragster' ? (def.cls !== 'tad' ? { nEng: 1, cyl: 8, fmul: 0.8, deep: 0.7, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.1, rpmRef: 8400, race: 1, rough: 0.9 }
     : { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.35, loud: 0.8, open: 1, whK: 0.19, whPure: 0, whine: 1.3, rpmRef: 9400, race: 1, rough: 0.35 })
     : id !== 'puller' ? { nEng: 1, cyl: 8, fmul: 1, deep: 0, loud: 0, open: 0, whK: 0.19, whPure: 0 }
@@ -1999,7 +2045,7 @@
       model.root.visible = false;
       scene.add(model.root);
       const flm = new FX.Flames(THREE, model.root, model.exhaustTips || []);
-      g = { uid, prof, key, def, gv, model, flm, snaps, spin: [0, 0, 0, 0], ev: null, voice: null, hitIn: null, hitQ: [], localHitT: 0, softT: 0, snd: engSndFor(prof.c, def), emit: [0, 0, 0, 0], big: !!CC_CARS[prof.c] || ['puller', 'dragster', 'monster', 'kart', 'mower'].includes(prof.c), dist: 1e9, box: null };
+      g = { uid, prof, key, def, gv, model, flm, snaps, spin: [0, 0, 0, 0], ev: null, voice: null, hitIn: null, hitQ: [], localHitT: 0, softT: 0, snd: engSndFor(prof.c, def), emit: [0, 0, 0, 0], big: !!CC_CARS[prof.c] || ['puller', 'dragster', 'monster', 'avenger', 'kart', 'mower'].includes(prof.c), dist: 1e9, box: null };
       setTag(g, prof.n);
       ONLINE.ghosts.set(uid, g);
     } catch (e) { console.warn('could not build the other car', prof, e); }

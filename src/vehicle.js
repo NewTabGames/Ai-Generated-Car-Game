@@ -352,6 +352,31 @@
     bikeRaceR: { name: '200/60R17 race slick', short: 'Race slicks', width: 0.2, radius: 0.315,
       muX: 1.5, muY: 1.4, loose: 0.85, kappaPeak: 0.11, alphaPeak: 0.09, relaxX: 0.12, relaxY: 0.25,
       B: 2.2, C: 1.45, E: -0.15, heatCap: 2200, cold: 0.88, coldT: 20, warmT: 60, hotT: 120, overheat: 0.003, prep: 1.05 },
+    // the trophy truck's: BFGoodrich Baja T/A KR3-type 39x13.5R17 desert racing tyres - a stiff 10-ply carcass, big
+    // interlocking blocks: they hook on dirt and gravel nearly as well as on tarmac and shrug off rocks at 130 mph
+    ttKR3: { name: '39x13.50R17 desert racing (Baja KR3-type)', short: '39 in desert', width: 0.343, radius: 0.495,
+      muX: 1.12, muY: 1.0, loose: 1.62, looseKx: [1, 1.05, 0.95, 1.05, 0.85, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.28, relaxY: 0.55,
+      B: 1.8, C: 1.35, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.02,
+      crr: [1.2, 1.1, 1.1, 1.05, 1.0, 1.2] },
+    // (its off-road package: 40 in mud-terrains - open lugs for mud and grass, give-away grip on tarmac)
+    ttMud: { name: '40x13.50R17 mud-terrain', short: '40 in mud', width: 0.343, radius: 0.508,
+      muX: 0.98, muY: 0.86, loose: 1.9, looseKx: [1, 1.0, 1.1, 1.1, 1.25, 1], looseKy: [1, 0.95, 1.05, 1.05, 1.2, 1], kappaPeak: 0.16, alphaPeak: 0.17, relaxX: 0.3, relaxY: 0.58,
+      B: 1.7, C: 1.32, E: -0.1, heatCap: 9000, cold: 0.97, coldT: 5, warmT: 30, hotT: 120, overheat: 0.002, prep: 1.0,
+      crr: [1.35, 1.2, 1.2, 1.1, 1.0, 1.35], massAdd: 6, inertiaAdd: 0.6, finalK: 0.508 / 0.495 },
+    // the dune buggy's: a narrow 5.60-15 up front, a fat 235/75R15 on the back (street / all-season - it's a VW)
+    buggyF: { name: '5.60-15 bias front', short: 'Buggy tyres', width: 0.145, radius: 0.335,
+      muX: 1.0, muY: 0.92, loose: 1.3, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.16, relaxY: 0.32,
+      B: 1.9, C: 1.35, E: -0.1, heatCap: 1600, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
+    buggyR: { name: '235/75R15 rear', short: 'Buggy tyres', width: 0.235, radius: 0.367,
+      muX: 1.05, muY: 0.98, loose: 1.4, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.18, relaxY: 0.36,
+      B: 1.9, C: 1.35, E: -0.1, heatCap: 2400, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
+    // (its off-road package: sand paddles on the back, ribbed sand fronts - dune tyres)
+    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381,
+      muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.3, relaxY: 0.45,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 8000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367 },
     // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
     // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
     // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
@@ -374,7 +399,9 @@
   function OFFROAD_PKG(car, cls) {
     if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
-    if (car === 'monster') return { front: 'monsterMud', rear: 'monsterMud' };
+    if (car === 'monster' || car === 'avenger') return { front: 'monsterMud', rear: 'monsterMud' };
+    if (car === 'trophy') return { front: 'ttMud', rear: 'ttMud' };
+    if (car === 'buggy') return { front: 'sandRib', rear: 'buggyPaddle' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
@@ -2452,6 +2479,8 @@
     bodyK: 900000, bodyC: 60000, bodyMu: 0.6,
     tyreEnvelope: true, wheelGyro: true,
   } };
+  // the AVENGER: the same stadium truck underneath - chassis, engine, axles, tyres, every number - under its own body
+  CARS.avenger = Object.assign({}, CARS.monster, { car: 'AVENGER', spec: Object.assign(JSON.parse(JSON.stringify(CARS.monster.spec)), { name: 'Monster Truck "AVENGER"' }) });
   // Karts. No suspension (the chassis flexes and the tyres are the springs), a solid rear axle (the inside rear tyre lifts
   // in a corner, so it's modelled as a loose coupling rather than a spool), direct steering, the driver sitting upright
   // on the floor tray. The engine sits beside the seat and drives the axle by chain. Pick a class with
@@ -3201,6 +3230,99 @@
       rearTire: 'bikeRaceR', CdA: 0.6,
     } },
   }, 'stock', 'Stock 117');
+
+  // Trophy truck, built like a Baja 1000 Trophy Truck: a chromoly tube chassis under a fiberglass pickup body, ~900 hp
+  // big-block V8 behind the front axle, a 3-speed Turbo 400 automatic, 39 in desert tyres, and the whole point of it:
+  // ~27 in of front wheel travel on long A-arms and ~33 in at the back on a 4-link, soft springs (~1 Hz) and bypass
+  // shocks that are soft through the middle of the stroke and harden toward the end - the body floats over whoops and
+  // rocks at 100 mph while the wheels do the work. ~2,900 kg, 3.3 m wheelbase, 2.2 m track.
+  // Three versions (CARS.trophy.make): a Spec (sealed ~525 hp LS), the Trophy Truck, and an unlimited 4WD.
+  const ttPts = (cg, fw) => ccPts(cg, fw, 3.3, [...ccBox(1.08, 0.72, 1.55, -2.85, 2.7), [-0.95, 2.05, -0.3], [0.95, 2.05, -0.3], [-0.95, 2.05, 0.75], [0.95, 2.05, 0.75],
+    [0, 0.62, -1.2], [0, 0.62, 1.2]]);
+  CARS.trophy = { name: 'Trophy Truck', short: 'Trophy Truck', car: '9.0 L V8', hp: 900, tq: 850, cc: true, kbLat: 7, spec: {
+    name: 'Trophy Truck',
+    mass: 2900, Ipitch: 4800, Iyaw: 5200, Iroll: 1150, cgHeight: 0.86, wheelbase: 3.3, frontWeight: 0.52,
+    trackF: 2.2, trackR: 2.2, wheelRadius: 0.495, wheelInertiaF: 6, wheelInertiaR: 6,
+    frontTire: 'ttKR3', rearTire: 'ttKR3', Fz0: 7000, loadSens: 0.08,
+    // (~1 Hz springs; bypass shocks: soft mid-stroke, the last 45 % of the bump stroke stiffening hard; hydraulic stops)
+    springF: 25000, springR: 23000, dampBumpF: 6500, dampRebF: 10000, dampBumpR: 6500, dampRebR: 10000, dampKnee: 0.45,
+    arbF: 6000, arbR: 2500, travelUp: 0.4, travelDown: 0.38, suspS0: 0.5, bumpStopK: 900000, fzMax: 220000,
+    suspProg: { x0: 0.55, k: 4, damp: 4 },
+    brakeTorqueF: 4600, brakeTorqueR: 3000, handbrakeTorque: 3200, noABS: true,
+    maxSteer: 0.55, steerRate: 3, steerRatio: 14, ackermann: 0.6,
+    idleRpm: 1000, limiterRpm: 7200, redlineRpm: 7000, shiftRpm: 6900, engineInertia: 0.28, fricA: 30, fricB: 20, starterTorque: 260,
+    // (lb-ft: 850 at 5,000, ~900 hp at 6,500)
+    torqueCurve: [[0, 380], [1000, 560], [2000, 690], [3000, 780], [4000, 830], [5000, 850], [6000, 810], [6500, 727], [7000, 640], [7500, 520]],
+    boostMax: 0, popScale: 1,
+    // Turbo 400 3-speed behind a ~3,500 rpm converter, no lockup
+    autoRatios: [2.48, 1.48, 1.0], autoRev: 2.08, autoFinal: 5.9, shiftTimeWOT: 0.18, shiftTimePart: 0.3, shiftCutDepth: 0.3,
+    noLockup: true, tcK: 0.0086, tcCouple: 0.88, tcStall: 2.0, driveEff: 0.88,
+    lsdPreload: 900, lsdRamp: 0.4, launchRpm: 3000, engineTc: true, tcRefBody: true, noCoastBlip: true, blipMax: 0.3,
+    CdA: 1.6,
+    bodyHalfW: 1.1, bodyFront: -2.85, bodyRear: 2.7, bodyBottom: -0.14, bodyTop: 1.2, bodyPts: ttPts(0.86, 0.52),
+    tyreEnvelope: true, wheelGyro: true,
+  } };
+  ccEngines('trophy', {
+    spec: { label: 'Trophy Truck Spec', car: '6.2 L LS V8', hp: 525, tq: 500, spec: {
+      mass: 2800, idleRpm: 900, limiterRpm: 6600, redlineRpm: 6400, shiftRpm: 6300, engineInertia: 0.2, fricA: 22, fricB: 15,
+      torqueCurve: [[0, 250], [1000, 360], [2000, 430], [3000, 470], [4000, 490], [4600, 500], [5500, 480], [6000, 455], [6500, 410], [7000, 350]],
+      tcK: 0.0068, lsdPreload: 700,
+    } },
+    awd: { label: 'Unlimited 4WD', car: '9.4 L V8 · 4WD', hp: 1050, tq: 960, spec: {
+      mass: 3080, Ipitch: 5000, Iyaw: 5400, frontWeight: 0.54, wheelInertiaF: 6.5,
+      torqueCurve: [[0, 430], [1000, 640], [2000, 790], [3000, 890], [4000, 945], [5000, 960], [6000, 925], [6500, 850], [7000, 740], [7500, 600]],
+      tcK: 0.0095, autoFinal: 5.7,
+      awd: true, awdFront: 0.42, fwd: false, lsdPreload: 700, lsdPreloadF: 350, centerPreload: 1500, lsdRamp: 0.4,
+      bodyPts: ttPts(0.86, 0.54),
+    } },
+  }, 'tt', 'Trophy Truck');
+
+  // Dune buggy: a VW-based sand rail - a tube frame on a diamond-plate floor, two high-back buckets, a VW beam front end on
+  // coil-over shocks, swing-axle rear, the engine hung out behind the seats over the transaxle. ~560 kg with its driver,
+  // 38/62 front/rear. Three versions (CARS.buggy.make): a stock 1600, a built 2276 on dual Webers, and an LS V8 swap
+  const bgPts = (cg, fw, wb) => ccPts(cg, fw, wb, [...ccBox(0.72, 0.28, 1.45, -1.85, 1.6), [-0.5, 1.62, -0.45], [0.5, 1.62, -0.45], [-0.55, 1.6, 0.35], [0.55, 1.6, 0.35], [0, 0.22, 0]]);
+  CARS.buggy = { name: 'Dune Buggy', short: 'Dune Buggy', car: '1600 VW FLAT FOUR', hp: 60, tq: 82, cc: true, kbLat: 7, spec: {
+    name: 'Dune Buggy',
+    mass: 560, Ipitch: 290, Iyaw: 330, Iroll: 120, cgHeight: 0.5, wheelbase: 2.3, frontWeight: 0.38,
+    trackF: 1.42, trackR: 1.5, wheelRadius: 0.367, wheelRadiusF: 0.335, wheelRadiusR: 0.367, wheelInertiaF: 0.7, wheelInertiaR: 1.1,
+    frontTire: 'buggyF', rearTire: 'buggyR', Fz0: 1500, loadSens: 0.1,
+    springF: 5600, springR: 9800, dampBumpF: 650, dampRebF: 950, dampBumpR: 950, dampRebR: 1400, dampKnee: 0.4,
+    arbF: 0, arbR: 0, travelUp: 0.16, travelDown: 0.14, suspS0: 0.25,
+    brakeTorqueF: 650, brakeTorqueR: 520, handbrakeTorque: 700, noABS: true,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 12, ackermann: 0.5,
+    idleRpm: 850, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4600, engineInertia: 0.08, fricA: 6, fricB: 4, starterTorque: 60,
+    // (lb-ft: 82 at 3,000, ~60 hp at 4,400)
+    torqueCurve: [[0, 40], [1000, 62], [2000, 74], [3000, 82], [3500, 81], [4000, 76], [4400, 71], [5000, 60], [5500, 48]],
+    boostMax: 0, popScale: 0.5,
+    // the VW 4-speed transaxle (3.80 / 2.06 / 1.26 / 0.89, 4.375 ring and pinion), shifted for you
+    autoRatios: [3.8, 2.06, 1.26, 0.89], autoRev: 3.88, autoFinal: 4.375, shiftTimeWOT: 0.35, shiftTimePart: 0.45, shiftCutDepth: 1,
+    launchRpm: 2200, engineTc: true,
+    dragClutch: { rpm0: 1100, rpm1: 2100, kc: 0, base: [[0, 180]], muSlip: 0.15, slipRef: 150, rev: 150 },
+    lsdPreload: 20, lsdRamp: 0, driveEff: 0.92,
+    CdA: 1.05,
+    bodyHalfW: 0.78, bodyFront: -1.85, bodyRear: 1.6, bodyBottom: -0.22, bodyTop: 1.12, bodyPts: bgPts(0.5, 0.38, 2.3),
+  } };
+  ccEngines('buggy', {
+    built: { label: 'Built 2276 VW', car: '2276 VW · DUAL WEBERS', hp: 150, tq: 150, spec: {
+      mass: 575, idleRpm: 950, limiterRpm: 6500, redlineRpm: 6300, shiftRpm: 6100, engineInertia: 0.085, fricA: 8, fricB: 5,
+      torqueCurve: [[0, 70], [1000, 95], [2000, 120], [3000, 138], [4200, 150], [5000, 145], [5800, 136], [6300, 118], [6800, 95]],
+      autoFinal: 4.125, shiftTimeWOT: 0.3,
+      dragClutch: { rpm0: 1300, rpm1: 2600, kc: 0, base: [[0, 280]], muSlip: 0.15, slipRef: 150, rev: 200 },
+      lsdPreload: 60, brakeTorqueF: 800, brakeTorqueR: 600,
+    } },
+    ls: { label: 'LS3 V8 sand rail', car: '6.2 L LS3 V8', hp: 480, tq: 475, spec: {
+      mass: 790, Ipitch: 380, Iyaw: 430, Iroll: 150, cgHeight: 0.52, frontWeight: 0.36,
+      // (long-travel arms: ~19 in at the back)
+      springF: 7200, springR: 14500, dampBumpF: 900, dampRebF: 1400, dampBumpR: 1500, dampRebR: 2200, travelUp: 0.26, travelDown: 0.22, suspS0: 0.34,
+      idleRpm: 800, limiterRpm: 6600, redlineRpm: 6400, shiftRpm: 6300, engineInertia: 0.16, fricA: 20, fricB: 14, starterTorque: 180,
+      torqueCurve: [[0, 250], [1000, 330], [2000, 400], [3000, 440], [4000, 465], [4700, 475], [5500, 450], [5900, 427], [6400, 380], [6800, 330]],
+      // (a 4-speed sequential race transaxle)
+      autoRatios: [2.93, 1.94, 1.39, 1.03], autoRev: 3.0, autoFinal: 3.89, shiftTimeWOT: 0.12, shiftTimePart: 0.2, shiftCutDepth: 0.5,
+      dragClutch: { rpm0: 1400, rpm1: 2800, kc: 0, base: [[0, 900]], muSlip: 0.15, slipRef: 150, rev: 500 },
+      lsdPreload: 250, lsdRamp: 0.3, brakeTorqueF: 1300, brakeTorqueR: 1100, handbrakeTorque: 1100,
+      bodyPts: bgPts(0.52, 0.36, 2.3),
+    } },
+  }, 'vw', '1600 VW');
   // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
   ccEngines('tank', {
     ungov: { label: 'Ungoverned', car: '1,500 HP TURBINE', spec: { autoFinal: 3.15 } },

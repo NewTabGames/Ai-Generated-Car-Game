@@ -261,7 +261,8 @@
       const corner = new THREE.Group(); corner.position.set(side * 0.01, (frontW ? RF : RR) - cgH, frontW ? -cgToFront : cgToRear); rootG.add(corner);
       const flip = new THREE.Group(); corner.add(flip); const spin = new THREE.Group(); spin.position.x = -side * 0.01; flip.add(spin);
       if (left) wheelGeo(spin, frontW ? RF : RR, frontW ? 0.13 : 0.18, frontW ? 0.24 : 0.23, frontW);
-      wheels.push({ corner, flip, spin, left, front: frontW, side, stock: [], pkg: [] });
+      // (left: false - the game spins a mirrored left wheel the other way, and these are drawn unmirrored)
+      wheels.push({ corner, flip, spin, left: false, front: frontW, side, stock: [], pkg: [] });
     }
     // (the calipers on the fork sliders; the swingarm pivots in the frame and follows the back axle)
     add(slide, rbox(0.04, 0.1, 0.07, 0.01), M.black, ...at(-0.07, RF + 0.12, zF + 0.08).toArray());
