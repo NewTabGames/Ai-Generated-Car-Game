@@ -11375,6 +11375,14 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         add(body, rbox(1.22, 0.24, 0.76, 0.06), M.paint, 0, wyR + 0.1, zR + 0.05);
       } else for (const sx of [-1, 1]) add(body, arcGeo(zR, RR, RR + 0.03, RR + 0.07, 0.15, Math.PI - 0.1, WR + 0.04), M.paint, sx * trackR / 2 - (WR + 0.04) / 2, 0, 0);
       add(body, rbox(1.1, 0.1, 0.12, 0.04), M.black, 0, 0.3 - low, zR + 0.45);          // rear bumper
+      if (JET) {
+        // the jet carts' back end, one piece with the seat pod: a deck in the body colour from the seat back to the
+        // bumper, out to just inside the back tyres (the fenders' ends sit on it), and two posts at the back carrying
+        // the tail lights - the engine's pylon stands on the deck
+        const dh = trackR / 2 - WR / 2 - 0.012, dz0 = zS1 - 0.03, dz1 = zR + 0.44;
+        add(body, rbox(dh * 2, 0.12, dz1 - dz0, 0.03), M.paint, 0, 0.3, (dz0 + dz1) / 2);
+        for (const sx of [-1, 1]) add(body, rbox(0.14, 0.27, 0.05, 0.015), M.paint, sx * 0.45, 0.43, zR + 0.42);
+      }
       for (const sx of [-1, 1]) { const t = add(body, rbox(0.12, 0.05, 0.02, 0.01), M.tail, sx * 0.45, 0.62 - low, zR + 0.44); t.castShadow = false; }
       // the steering column and wheel (on the left), the driver
       tubeAB(body, V3(-0.24, 0.32 - low, zD - 0.05), V3(-0.24, 0.9 - low, zD + 0.2), 0.025, M.black);
