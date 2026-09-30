@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -249,6 +249,24 @@
         hot: { hint: 'Main battle tank (3,000 hp hot rod): shift up (E) for DRIVE - the turbine turned up to 3,000 hp: 0-20 in 3 s and ~68 mph in 62 t. It steers on its tracks and pivots in NEUTRAL. The turret follows the camera - drag the mouse to look round.',
           info: 'The Abrams-type tank with its gas turbine turned up to 3,000 hp (7,900 lb-ft at the output shaft) and geared taller · ~62 t · 0-20 mph in ~3 s, ~68 mph', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.35, whPure: 1, whine: 1.5, rpmRef: 3000, open: 1, fmul: 1, deep: 0.6, loud: 1, race: 0 } },
       } },
+    ram: { btn: 'RAM 1500 HEMI', sub: 'The Rebel: crew cab, 5.7 HEMI V8, 8-speed, 4x4 on 33 in all-terrains, air suspension · the 5.7 HEMI, a supercharged 5.7 or a 6.2 Hellcat HEMI swap', paint: 'Diamond Black', tc: 0, cam: [1.2, 1.25], road: true,
+      hint: 'Ram 1500 Rebel: shift up (E) for DRIVE - the 5.7 HEMI V8, 395 hp through an 8-speed automatic, 4x4 in 4-Auto: 0-60 in ~6 s, governed at 106 mph. A big truck on air suspension and all-terrains - brake early, it weighs 5,500 lb.',
+      info: 'Ram 1500 Rebel (2019-24): crew cab, 5\'7" box · 5.7 L HEMI V8 with eTorque, 395 hp at 5,600, 410 lb-ft at 3,950 · 8-speed TorqueFlite automatic, 3.92 axles, on-demand 4WD (4-Auto) · 4-corner air suspension · 275/70R18 all-terrains (33 in) on black 18 in wheels · 5.92 m long, 3.67 m wheelbase · ~2,550 kg · 0-60 ~6 s, 106 mph governed',
+      trans: '8-speed auto · 4x4', tyres: '33 in all-terrain',
+      snd: { nEng: 1, cyl: 8, fmul: 1.0, deep: 0.3, loud: 0.5, open: 0.3, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.2, rough: 0.1 },
+      optKey: 'ramEng', optLabel: 'Engine', options: [
+        ['hemi', '5.7 HEMI', 'The Rebel\'s 5.7 HEMI V8 · 395 hp · 410 lb-ft · 0-60 ~6 s · 106 mph governed'],
+        ['blown', 'Supercharged 5.7', 'A bolt-on blower kit on the 5.7 HEMI · ~575 hp · 0-60 ~4.4 s · 120 mph'],
+        ['hellcat', '6.2 Hellcat swap', 'The Hellcat\'s 6.2 supercharged HEMI · ~710 hp · 650 lb-ft · 0-60 ~3.7 s · 118 mph'],
+      ],
+      eng: {
+        blown: { hint: 'Ram 1500 Rebel, supercharged 5.7 HEMI: shift up (E) for DRIVE - a bolt-on blower kit, ~575 hp, the 8-speed and 4x4: 0-60 in ~4.4 s, 120 mph. It whines.',
+          info: 'The Rebel with a supercharger kit on its 5.7 HEMI (~8 psi): ~575 hp, 540 lb-ft · 8-speed TorqueFlite, 4-Auto · ~2,580 kg · 0-60 ~4.4 s, 120 mph',
+          snd: { nEng: 1, cyl: 8, fmul: 1.0, deep: 0.35, loud: 0.65, open: 0.5, whK: 0.19, whPure: 0.4, whine: 1.2, rpmRef: 5800, race: 0.35, rough: 0.1 } },
+        hellcat: { hint: 'Ram 1500 Rebel, 6.2 Hellcat HEMI swap: shift up (E) for DRIVE - the Hellcat\'s supercharged 6.2, ~710 hp and 650 lb-ft through the 8-speed to all four wheels: 0-60 in ~3.7 s, 118 mph. Stability control is on (Street) - it\'ll light up the rears.',
+          info: 'The Rebel with the Hellcat\'s supercharged 6.2 HEMI: ~710 hp, 650 lb-ft · 2.4 L blower, 11.6 psi · 8-speed TorqueFlite, 4-Auto · ~2,590 kg · 0-60 ~3.7 s, 118 mph',
+          snd: { nEng: 1, cyl: 8, fmul: 0.97, deep: 0.35, loud: 0.8, open: 0.8, whK: 0.19, whPure: 0.5, whine: 1.6, rpmRef: 6200, race: 0.5, rough: 0.1 } },
+      } },
     cyber: { btn: 'CYBERTRUCK', sub: 'The stainless-steel electric pickup · Long Range RWD, All-Wheel Drive and the 845 hp Cyberbeast · 35 in all-terrains, four-wheel steering', paint: 'Stainless', tc: 1, cam: [1.25, 1.3],
       hint: 'Cybertruck (All-Wheel Drive): shift up (E) for DRIVE - two motors, ~600 hp, 0-60 in 4.1 s, governed to 112 mph. The rear wheels steer too: against the fronts at low speed (a tight turn for 5.7 m of truck), a touch with them at speed. Stability control is on (Sport).',
       info: 'The stainless-steel wedge: flat unpainted panels, a light bar across the nose and the tail, frameless glass, the vault over the bed · two motors, ~600 hp, all-wheel drive · adaptive air suspension, four-wheel steering (the rears up to 10 degrees), steer-by-wire · 35 in all-terrains on 20 in wheels · 5.68 m long, 3.81 m wheelbase · 3,000 kg (6,603 lb) · 0-60 4.1 s, 112 mph',
@@ -272,6 +290,7 @@
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
   const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster' || S.car === 'avenger', KART = S.car === 'kart', MOWER = S.car === 'mower';
   const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;     // race engines: their own sound set-up, rumble and shake
+  const ROADCC = CC && !!CCD.road;                                        // (...but a road car among them - the Ram - doesn't shake)
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS[S.car]
     : KART ? VEH.CARS.kart.make(S.kartClass) : MOWER ? VEH.CARS.mower.make(S.mowerClass)
     : CC && VEH.CARS[S.car].make ? VEH.CARS[S.car].make(S[CCD.optKey])
@@ -1434,7 +1453,7 @@
       if (camera.position.y < gh) camera.position.y = gh;
       _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
-      if (BIG && veh.running && !ENG_SND.ev) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      if (BIG && !ROADCC && veh.running && !ENG_SND.ev) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
     }
     if (G.shake > 0) { G.shake -= dt; camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; }
@@ -1515,7 +1534,7 @@
     }
     if (veh.fuelCut) strong = Math.max(strong, 0.45);
     weak += clamp(veh.rpm() / 6200, 0, 1) * 0.08 * (veh.running ? 1 : 0);
-    if (BIG && veh.running && !ENG_SND.ev) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
+    if (BIG && !ROADCC && veh.running && !ENG_SND.ev) { weak = Math.max(weak, 0.25 + 0.35 * clamp(veh.thrEff, 0, 1)); strong = Math.max(strong, 0.3 * clamp(veh.thrEff, 0, 1) + (DRAGSTER ? 0.4 * clamp(veh.gLong / 4, 0, 1) : 0)); }
     if (strong > 0.02 || weak > 0.05) input.rumble(strong, weak, 120);
   }
   function hudUpdate(dt) {

@@ -339,6 +339,12 @@
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
+    // the Ram Rebel's: Goodyear Wrangler DuraTrac-type LT275/70R18 all-terrains (33 in) - aggressive for an all-terrain:
+    // a truck tyre's grip on tarmac, plenty in the loose stuff and in snow and mud
+    ramAT: { name: 'Goodyear Wrangler DuraTrac 275/70R18', short: '33 in all-terrain', width: 0.279, radius: 0.418, sandKx: 1.0, sandKy: 1.0,
+      muX: 1.12, muY: 0.97, loose: 1.6, looseKx: [1, 1.05, 1.1, 1.1, 1.15, 1], kappaPeak: 0.12, alphaPeak: 0.135, relaxX: 0.21, relaxY: 0.44,
+      B: 2.4, C: 1.3, E: -0.1, heatCap: 5200, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
+      crr: [1.25, 0.8, 0.8, 0.8, 0.85, 1.25] },
     // the touring bagger's tyres: a 130/60B19 front and a 180/55B18 rear, touring compound
     bikeF: { name: '130/60B19 touring front', short: 'Touring tyres', width: 0.13, radius: 0.335,
       muX: 1.18, muY: 1.12, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.15, relaxY: 0.3,
@@ -2947,6 +2953,31 @@
     CdA: 1.07,
     bodyHalfW: 1.01, bodyFront: -2.85, bodyRear: 2.84, bodyBottom: -0.33, bodyTop: 1.07,
   } };
+  // Ram 1500 Rebel (DT, 2019-24): crew cab, 5'7" box, 144.5 in wheelbase, 4x4 (the on-demand transfer case in 4-Auto),
+  // air suspension, LT275/70R18 all-terrains (33 in). The 5.7 HEMI eTorque V8 - 395 hp at 5,600, 410 lb-ft at 3,950 -
+  // through the 8-speed TorqueFlite (8HP75) to 3.92 axles; ~2,550 kg with the driver, 56/44. 0-60 ~6.2 s, governed at
+  // 106 mph. Three versions (CARS.ram.make): the 5.7 HEMI, a supercharged 5.7 (a bolt-on blower kit, ~575 hp) and a 6.2
+  // supercharged Hellcat HEMI swap (~710 hp)
+  const ramPts = (cg, fw) => ccPts(cg, fw, 3.67, [...ccBox(1.02, 0.36, 1.37, -2.83, 3.07), [-0.8, 1.98, -0.3], [0.8, 1.98, -0.3], [-0.8, 1.98, 1.15], [0.8, 1.98, 1.15]]);
+  CARS.ram = { name: 'Ram 1500 Rebel', short: 'Ram 1500', car: '5.7 HEMI V8', hp: 395, tq: 410, cc: true, kbLat: 6.5, spec: {
+    name: 'Ram 1500 Rebel',
+    mass: 2550, Ipitch: 5700, Iyaw: 6100, Iroll: 1170, cgHeight: 0.74, wheelbase: 3.67, frontWeight: 0.56,
+    trackF: 1.74, trackR: 1.727, wheelRadius: 0.418, wheelInertiaF: 2.6, wheelInertiaR: 2.6,
+    frontTire: 'ramAT', rearTire: 'ramAT', Fz0: 6500, loadSens: 0.09,
+    springF: 52000, springR: 50000, dampBumpF: 3800, dampRebF: 5600, dampBumpR: 4000, dampRebR: 6000,
+    arbF: 36000, arbR: 12000, travelUp: 0.11, travelDown: 0.13, suspS0: 0.3,
+    brakeTorqueF: 4800, brakeTorqueR: 3000, handbrakeTorque: 3000,
+    maxSteer: 0.6, steerRate: 4.5, steerRatio: 15.7,
+    idleRpm: 650, limiterRpm: 5800, redlineRpm: 5800, shiftRpm: 5600, engineInertia: 0.3, fricA: 26, fricB: 20, starterTorque: 190,
+    // (lb-ft: 410 at 3,950, 395 hp at 5,600)
+    torqueCurve: [[0, 250], [1000, 300], [1500, 340], [2000, 368], [2500, 385], [3000, 396], [3500, 405], [3950, 410], [4500, 402], [5000, 390], [5600, 370], [6000, 340], [6500, 290]],
+    boostMax: 0, popScale: 0.5,
+    autoRatios: [4.71, 3.14, 2.10, 1.67, 1.29, 1.00, 0.84, 0.67], autoRev: 3.30, autoFinal: 3.92, tcK: 0.0095, tcStall: 1.8, lockupTorque: 1400,
+    awd: true, awdFront: 0.4, lsdPreload: 60, lsdPreloadF: 40, centerPreload: 600, lsdRamp: 0.2, driveEff: 0.84,
+    govSpeed: 106 / 2.23694, govGrace: 0.5,
+    CdA: 1.29,
+    bodyHalfW: 1.04, bodyFront: -2.8, bodyRear: 3.1, bodyBottom: -0.4, bodyTop: 1.24, bodyPts: ramPts(0.74, 0.56),
+  } };
   // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
   // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
   // an 18 in rear, 368 kg wet + a 90 kg rider. A motorcycle in a four-wheel world: each axle's two 'wheels' sit side by
@@ -3293,6 +3324,17 @@
     bodyHalfW: 1.1, bodyFront: -2.55, bodyRear: 2.7, bodyBottom: -0.14, bodyTop: 1.2, bodyPts: ttPts(0.86, 0.52),
     tyreEnvelope: true, wheelGyro: true,
   } };
+  ccEngines('ram', {
+    blown: { label: 'Supercharged 5.7 HEMI', car: '5.7 HEMI · SUPERCHARGED', hp: 575, tq: 540, spec: {
+      mass: 2580, torqueCurve: [[0, 300], [1000, 390], [1500, 450], [2000, 500], [2500, 525], [3000, 538], [4000, 540], [5000, 540], [5600, 539], [6000, 500], [6500, 420]],
+      boostMax: 8, tcK: 0.01, lockupTorque: 1700, popScale: 0.8, govSpeed: 120 / 2.23694,
+    } },
+    hellcat: { label: '6.2 Hellcat HEMI swap', car: '6.2 SUPERCHARGED HEMI', hp: 710, tq: 650, spec: {
+      mass: 2590, frontWeight: 0.57, idleRpm: 720, limiterRpm: 6200, redlineRpm: 6200, shiftRpm: 6100, engineInertia: 0.48, fricA: 30, fricB: 24,
+      torqueCurve: [[0, 200], [500, 280], [1000, 360], [1500, 440], [2000, 505], [2500, 555], [3000, 595], [3500, 622], [4000, 640], [4500, 648], [4800, 650], [5000, 649], [5500, 640], [6000, 622], [6200, 600], [6500, 555], [7000, 450]],
+      boostMax: 11.6, tcK: 0.0103, tcStall: 2.05, lockupTorque: 1650, popScale: 1, govSpeed: 118 / 2.23694, bodyPts: ramPts(0.74, 0.57),
+    } },
+  }, 'hemi', '5.7 HEMI');
   ccEngines('trophy', {
     spec: { label: 'Trophy Truck Spec', car: '6.2 L LS V8', hp: 525, tq: 500, spec: {
       mass: 2800, idleRpm: 900, limiterRpm: 6600, redlineRpm: 6400, shiftRpm: 6300, engineInertia: 0.2, fricA: 22, fricB: 15,

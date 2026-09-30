@@ -1,5 +1,5 @@
 // Sand (the Sand Dunes): on flat soft sand, 0-30 / 0-60 and the top speed it can hold; and from a standstill at the foot
-// of a sand slope, the steepest it can climb (30 m up it within 20 s). The dune buggy on its three tyre sets
+// of a sand slope, the steepest it can climb (60 m up it within 25 s - a run-up's momentum won't carry it that far). The dune buggy on its three tyre sets
 // (the paddles should run away from the rest), and a few others for scale. Env: TC (traction-control mode, default 1)
 const { Vehicle, CARS, OFFROAD_PKG } = require('../src/vehicle.js');
 const MPH = 2.23694;
@@ -24,7 +24,7 @@ function run(label, id, key, pkg) {
   let best = 0;
   for (const deg of [5, 10, 15, 20, 25, 30, 35, 40]) {
     const v = mk(id, key, pkg, slope(deg)); let ok = false;
-    for (let t = 0; t < 20; t += 1 / 120) { v.input.throttle = 1; v.step(1 / 120); if (-v.pz > 30) { ok = true; break; } }
+    for (let t = 0; t < 25; t += 1 / 120) { v.input.throttle = 1; v.step(1 / 120); if (-v.pz > 60) { ok = true; break; } }
     if (ok) best = deg; else break;
   }
   out.push(`pulls away up ${best ? best + ' deg' : 'nothing (not even 5 deg)'}`);
@@ -38,5 +38,6 @@ run('buggy LS3 · buggy tyres', 'buggy', 'ls', null);
 run('buggy LS3 · sand paddles', 'buggy', 'ls', true);
 run('trophy truck', 'trophy', 'tt', null);
 run('monster truck', 'monster', undefined, null);
+run('Ram 1500 · 5.7 HEMI', 'ram', 'hemi', null);
 run('Hellcat · P Zero', 'hellcat', undefined, null);
 run('Hellcat · KO2 package', 'hellcat', undefined, true);
