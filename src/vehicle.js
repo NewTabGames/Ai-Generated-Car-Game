@@ -3237,7 +3237,7 @@
   // shocks that are soft through the middle of the stroke and harden toward the end - the body floats over whoops and
   // rocks at 100 mph while the wheels do the work. ~2,900 kg, 3.3 m wheelbase, 2.2 m track.
   // Three versions (CARS.trophy.make): a Spec (sealed ~525 hp LS), the Trophy Truck, and an unlimited 4WD.
-  const ttPts = (cg, fw) => ccPts(cg, fw, 3.3, [...ccBox(1.08, 0.72, 1.55, -2.85, 2.7), [-0.95, 2.05, -0.3], [0.95, 2.05, -0.3], [-0.95, 2.05, 0.75], [0.95, 2.05, 0.75],
+  const ttPts = (cg, fw) => ccPts(cg, fw, 3.3, [...ccBox(1.08, 0.72, 1.55, -2.6, 2.7), [-0.95, 2.05, -0.3], [0.95, 2.05, -0.3], [-0.95, 2.05, 0.75], [0.95, 2.05, 0.75],
     [0, 0.62, -1.2], [0, 0.62, 1.2]]);
   CARS.trophy = { name: 'Trophy Truck', short: 'Trophy Truck', car: '9.0 L V8', hp: 900, tq: 850, cc: true, kbLat: 7, spec: {
     name: 'Trophy Truck',
@@ -3259,7 +3259,7 @@
     noLockup: true, tcK: 0.0086, tcCouple: 0.88, tcStall: 2.0, driveEff: 0.88,
     lsdPreload: 900, lsdRamp: 0.4, launchRpm: 3000, engineTc: true, tcRefBody: true, noCoastBlip: true, blipMax: 0.3,
     CdA: 1.6,
-    bodyHalfW: 1.1, bodyFront: -2.85, bodyRear: 2.7, bodyBottom: -0.14, bodyTop: 1.2, bodyPts: ttPts(0.86, 0.52),
+    bodyHalfW: 1.1, bodyFront: -2.55, bodyRear: 2.7, bodyBottom: -0.14, bodyTop: 1.2, bodyPts: ttPts(0.86, 0.52),
     tyreEnvelope: true, wheelGyro: true,
   } };
   ccEngines('trophy', {
