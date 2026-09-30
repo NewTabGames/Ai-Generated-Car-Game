@@ -45,6 +45,12 @@
   #resetCd.ready { border-color: rgba(125,255,138,0.45); color: #b9ffc0; }
   #resetCd.ready .rcBar i { background: #3fcf5a; }
   #carPick.locked button { opacity: 0.4; cursor: not-allowed; }
+  #raceCd { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; text-shadow: 0 3px 12px #000; }
+  #raceCd .cdBig { font-size: 40px; font-weight: 900; letter-spacing: 0.12em; font-style: italic; }
+  #raceCd .cdBig.num { font-size: 120px; line-height: 1; }
+  #raceCd .cdBig.go { font-size: 110px; line-height: 1; color: #6dff7a; }
+  #raceCd .cdSub { font-size: 14px; color: #dfe3e8; margin-top: 4px; }
+  #raceCd button { margin-top: 12px; pointer-events: auto; font-size: 18px; padding: 12px 30px; }
   #inputs { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: flex-end; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; }
   .bar { width: 14px; height: 60px; background: rgba(255,255,255,0.08); position: relative; border-radius: 2px; overflow: hidden; }
   .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; }
@@ -179,6 +185,7 @@
   <canvas id="minimap" width="380" height="380"></canvas>
   <div id="netBoard" class="hidden"><div class="nbMe"><span id="nbPts">0</span><span id="nbMul">×1.0</span></div><div id="nbSt"></div><div id="nbList"></div></div>
   <div id="resetCd" class="hidden"><div></div><div class="rcBar"><i></i></div></div>
+  <div id="raceCd" class="hidden"><div class="cdBig"></div><div class="cdSub"></div><button class="btn hidden" id="raceStartBtn">Start race</button></div>
   <div id="inputs">
     <div><div class="bar"><i id="ib-c" style="background:#3a8dff"></i></div><div class="blab">CLU</div></div>
     <div><div class="bar"><i id="ib-b" style="background:#e23"></i></div><div class="blab">BRK</div></div>
@@ -253,8 +260,8 @@
 
 <script>/* src/net.js */
 /* Hellcat Drive — online play over Firebase (Realtime Database + anonymous sign-in).
-   Rooms live at /rooms/<CODE>: meta { host, map, car, t, r } (the host's map and car are everyone's; r: when the round
-   started), players/<uid> { the car, its paint,
+   Rooms live at /rooms/<CODE>: meta { host, map, car, t, go } (the host's map and car are everyone's; go: when the race
+   starts, server time - 0 till the host starts one), players/<uid> { the car, its paint,
    the name - written when you join or change car }, states/<uid> [ the car's pose and what it's doing, ~10 times a
    second ]. Every browser runs its own car's physics and publishes it; the others are drawn from those states. The
    Firebase SDK only loads when you go online, so the single-player game never touches the network.
@@ -357,13 +364,14 @@
     return {
       connect, hostRoom, joinRoom, leaveRoom,
       // (throttled by the game: ~10 a second)
-      publish(state) { if (code) D.set(r('rooms/' + code + '/states/' + uid), state.map((v) => (Number.isFinite(v) ? v : 0))).catch(() => {}); },
+      publish(state) { if (code) D.set(r('rooms/' + code + '/states/' + uid), state.map((v) => (typeof v === 'number' && !Number.isFinite(v) ? 0 : v))).catch(() => {}); },
       setProfile(profile) { if (code) D.update(r('rooms/' + code + '/players/' + uid), clean(profile)).catch(() => {}); },
-      setMap(map) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map }).catch(() => {}); },
+      // (a new map: no race on it till the host starts one)
+      setMap(map) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map, go: 0 }).catch(() => {}); },
       // (the host's car and its setup: everyone drives it)
       setCar(car) { if (code && host) D.update(r('rooms/' + code + '/meta'), { car: clean(car) }).catch(() => {}); },
-      // (a new round: everyone's points back to 0, everyone on the start line)
-      newRound() { if (code && host) D.update(r('rooms/' + code + '/meta'), { r: D.serverTimestamp() }).catch(() => {}); },
+      // (the host starts a race: GO in 4 s, server time - a moment to get it round, then 3, 2, 1)
+      startRace() { if (code && host) D.update(r('rooms/' + code + '/meta'), { go: Math.round(Date.now() + offset + 4000) }).catch(() => {}); },
       serverNow() { return Date.now() + offset; },
       get uid() { return uid; }, get code() { return code; }, get meta() { return meta; }, get isHost() { return host; },
     };
@@ -3782,6 +3790,13 @@
     }
 
     // ------------------------------------------------------------------ static obstacles (trees, poles, rocks, buildings)
+    // online play: a bump another player's game worked out - world impulse (jx, 0, jz) at the world point (cx, cz)
+    pushAt(jx, jz, cx, cz) {
+      const { qx, qy, qz, qw } = this;
+      this._applyImpulse(jx, jz, cx - this.px, 0, cz - this.pz, 1 - 2 * (qy * qy + qz * qz), 2 * (qx * qz - qy * qw), 2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy));
+      const dv = Math.hypot(jx, jz) / this.spec.mass;
+      if (dv > this.events.impact) { this.events.impact = dv; this.events.impactX = cx; this.events.impactZ = cz; }
+    }
     _applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22) {
       // world impulse (jx, 0, jz) at offset r from CG
       const s = this.spec;
@@ -3828,10 +3843,35 @@
       const mu = ob && ob.mu !== undefined ? ob.mu : 0.45, jt = clamp(-vt / kt, -mu * j, mu * j);
       jx += tx * jt; jz += tz * jt;
       this._applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22);
+      // (another player's car: the impulse is kept on it, for the game to send them their share - and from here on it's
+      // taken to be moving off with that share, so the next steps don't hit it again for the same bump)
+      if (mv) { ob.jx = (ob.jx || 0) + jx; ob.jz = (ob.jz || 0) + jz; ob.cx = cx; ob.cz = cz; ob.vx -= jx / ob.m; ob.vz -= jz / ob.m; }
       const dv = j / s.mass;
       if (dv > this.events.impact) { this.events.impact = dv; this.events.impactX = cx; this.events.impactZ = cz; }
       // big hits stall/damage nothing, but they do upset the chassis a little
       if (dv > 6) { this.wx += (Math.random() - 0.5) * 0.3; this.wz += (Math.random() - 0.5) * 0.3; }
+    }
+
+    // our footprint (centre cx, cz; right rX, rZ; back bX, bZ; half sizes hw, hl) against another car's box: the axis of
+    // least overlap of the four is the contact normal (from us towards it); the contact point is midway between the two
+    // boxes' nearest points along it - the middle of a face when a face meets it square (no made-up spin from a corner)
+    _carBox(b, cx, cz, rX, rZ, bX, bZ, hw, hl, m00, m20, m02, m22) {
+      const dx = b.x - cx, dz = b.z - cz, ux = b.c, uz = -b.s, wx = b.s, wz = b.c;
+      const AX = [rX, bX, ux, wx], AZ = [rZ, bZ, uz, wz];
+      let best = 1e9, nx = 0, nz = 0;
+      for (let k = 0; k < 4; k++) {
+        const ax = AX[k], az = AZ[k];
+        const ra = hw * Math.abs(rX * ax + rZ * az) + hl * Math.abs(bX * ax + bZ * az);
+        const rb = b.hx * Math.abs(ux * ax + uz * az) + b.hz * Math.abs(wx * ax + wz * az);
+        const d = dx * ax + dz * az, o = ra + rb - Math.abs(d);
+        if (o <= 0) return;
+        if (o < best) { best = o; const sg = d >= 0 ? 1 : -1; nx = ax * sg; nz = az * sg; }
+      }
+      const pick = (v) => (Math.abs(v) < 0.25 ? 0 : Math.sign(v));
+      const r1 = pick(rX * nx + rZ * nz), b1 = pick(bX * nx + bZ * nz), u2 = pick(-(ux * nx + uz * nz)), w2 = pick(-(wx * nx + wz * nz));
+      const px = 0.5 * (cx + r1 * hw * rX + b1 * hl * bX + b.x + u2 * b.hx * ux + w2 * b.hz * wx);
+      const pz = 0.5 * (cz + r1 * hw * rZ + b1 * hl * bZ + b.z + u2 * b.hx * uz + w2 * b.hz * wz);
+      this._resolveContact(nx, nz, Math.min(best, 0.5), px, pz, m00, m20, m02, m22, b);
     }
 
     _obstacles(m00, m20, m02, m22) {
@@ -3863,6 +3903,9 @@
         this._resolveContact(nx, nz, pen, wpx, wpz, m00, m20, m02, m22);
       }
       for (const b of this._boxes) {
+        // (another player's car: two boxes the same size meet corner-on-edge, and the corner test read a rear-end hit as a
+        // sliver of sideways overlap - the hit car never moved. Separating axes instead: the real direction and depth)
+        if (b.m) { this._carBox(b, cx, cz, rX, rZ, bX, bZ, hw, hl, m00, m20, m02, m22); continue; }
         // car corners inside building box
         let best = null;
         for (let sx = -1; sx <= 1; sx += 2) for (let sz = -1; sz <= 1; sz += 2) {
@@ -14061,9 +14104,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
-  // (online rooms race on the two rally stages and the two mower tracks: the course's centre line, points every ~2 m -
-  // the track's own, or the Mower Track's oval)
-  const NET_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack'], COURSE = NET_MAPS.includes(S.map);
+  // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
+  // centre line, points every ~2 m - the track's own, or the Mower Track's oval)
+  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack'], COURSE = COURSE_MAPS.includes(S.map);
   function ovalLine() {
     const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
     for (let k = 0; k < n; k++) {
@@ -14092,9 +14135,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     o.x = T.x[i] + (T.x[j] - T.x[i]) * u; o.z = T.z[i] + (T.z[j] - T.z[i]) * u; o.tx = tx / tl; o.tz = tz / tl;
     return o;
   }
-  // a start-grid slot behind the line (k 0..7: two across, rows 8 m apart)
+  // a start-grid slot behind the line (k 0..7: two across, rows 10 m apart)
   function gridSpot(k) {
-    const p = coursePoint(-10 - 8 * (k >> 1), {}), lat = (k & 1 ? 1 : -1) * Math.min(2, CRS_T.W / 2 - 1.3);
+    const p = coursePoint(-10 - 10 * (k >> 1), {}), lat = (k & 1 ? 1 : -1) * Math.min(2, CRS_T.W / 2 - 1.3);
     const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
     return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
   }
@@ -14263,6 +14306,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // racing online: once every 30 s, back on the centre line where you are on the course (auto: thrown off the course -
     // that one's free)
     if (RACE.on) {
+      if (raceHolding()) return;
       if (!auto) {
         const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
         if (wait > 0) { hud.toast('Reset in ' + Math.ceil(wait) + ' s', 1.2); return; }
@@ -14293,7 +14337,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   $('startBtn').addEventListener('click', startGame);
   for (const b of document.querySelectorAll('#mapPick button')) {
     b.classList.toggle('on', b.dataset.map === S.map);
-    b.addEventListener('click', () => { if (b.dataset.map !== S.map) { if (mapLocked(b.dataset.map)) return; S.map = b.dataset.map; saveS(); location.reload(); } });
+    b.addEventListener('click', () => { if (b.dataset.map !== S.map) { if (mapLocked()) return; S.map = b.dataset.map; saveS(); location.reload(); } });
   }
   window.addEventListener('keydown', (e) => { if (!G.started && (e.code === 'Enter' || e.code === 'Space') && G.loadDone) startGame(); });
   async function startGame() {
@@ -14433,7 +14477,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
       const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
-      if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      if (inRoom()) { /* online: the host picks the map */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
@@ -14674,7 +14718,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       add(row('Paint', S.paint, sw));
       add(row('Map', 'Countryside: endless roads · All Road: the whole world is pavement, drive anywhere · Prepped: the same two with every road prepped like a drag strip (sticky, rubbered in) · Straightaway: flat straight road · Drag Strip: prepped strip with a Christmas tree & timing · Dirt Drag: the same on groomed dirt · Monster Arena: a stadium of dirt jumps and junk cars · All Ramps: the whole world is dirt covered in jumps (restarts)',
-        seg(Object.entries(MAP_NAMES).filter(([k]) => !inRoom() || NET_MAPS.includes(k)), S.map, (v) => { if (v !== S.map) { if (mapLocked(v)) return; S.map = v; saveS(); location.reload(); } })));
+        seg(Object.entries(MAP_NAMES), S.map, (v) => { if (v !== S.map) { if (mapLocked()) return; S.map = v; saveS(); location.reload(); } })));
       add(row('0-60 / ¼-mile timers', '1-ft rollout is how magazines & the NHRA time runs (their 0-60 figures use it)',
         seg([[true, '1-ft rollout'], [false, 'From standstill']], S.rollout, (v) => { S.rollout = v; perf.rollout = v; })));
       if (DRAGMAP) add(row('Christmas tree', 'Pro: all ambers, green 0.4 s later · Sportsman: ambers 0.5 s apart',
@@ -14693,6 +14737,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       add(row('View distance', '', slider(900, 2600, 100, S.viewDist, (v) => v + ' m', (v) => { S.viewDist = v; world.setQuality({ viewDist: v }); })));
       add(row('Tree density', 'Applies to newly loaded areas', slider(0.2, 1, 0.1, S.treeDensity, (v) => Math.round(v * 100) + '%', (v) => { S.treeDensity = v; world.setQuality({ treeDensity: v }); world.rebuildAll(); })));
       add(row('Shadows', '', seg([[true, 'On'], [false, 'Off']], S.shadows, (v) => { S.shadows = v; world.setQuality({ shadows: v }); })));
+      add(row('Tyre smoke & dust', 'Small: just a few little puffs at the tyres - no big drift smoke or dirt clouds to block the view (the other players\' cars too)',
+        seg([['full', 'Full'], ['small', 'Small']], S.dust || 'full', (v) => { S.dust = v; })));
       add(row('Resolution scale', 'Lower = faster', slider(0.5, 1, 0.05, S.resScale, (v) => Math.round(v * 100) + '%', (v) => { S.resScale = v; resize(); })));
       add(row('Cockpit field of view', '', slider(50, 95, 1, S.fov, (v) => v + '°', (v) => { S.fov = v; })));
       add(row('Seat height (cockpit)', 'Raise to see more of the gauges over the wheel', slider(-0.12, 0.12, 0.005, S.seatY, (v) => (v * 100).toFixed(1) + ' cm', (v) => { S.seatY = v; })));
@@ -14950,6 +14996,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     const top = sp.noLimiter ? Math.max(sp.limiterRpm, G.peakRpm * 1.08) : sp.limiterRpm;
     return Math.max(7000, Math.ceil((top + 400) / 1000) * 1000);
   }
+  // (Graphics → Tyre smoke & dust: Small keeps a few little puffs at the tyres - no drift smoke or dirt clouds to see through)
+  const DUST_SMALL = { rate: 0.35, alpha: 0.3, size: 0.4, grow: 0.9, life: 0.9, up: 0.6 };
   function effects(dt) {
     const a = carAxes();
     const speed = Math.hypot(veh.vx, veh.vy, veh.vz);
@@ -14985,6 +15033,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       } else skids.break(i);
       if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
       { const m = G.smk[i]; m[0] = rate * tune.smoke; m[1] = alpha; m[2] = size; m[3] = shade; m[4] = grow; m[5] = life; m[6] = up; }
+      if (S.dust === 'small') { rate *= DUST_SMALL.rate; alpha = Math.min(alpha, DUST_SMALL.alpha); size = Math.min(size, DUST_SMALL.size); grow = Math.min(grow, DUST_SMALL.grow); life = Math.min(life, DUST_SMALL.life); up = Math.min(up, DUST_SMALL.up); }
       // (a cloud already filling the screen many times over gets its new puffs fewer but denser: same look, a
       // fraction of the pixels to draw)
       const bud = smoke.budget;
@@ -15528,7 +15577,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // hiccup). They're solid - you can bump them (each game pushes its own car out) - their engines play from where they
   // are, and their names float over them
   const ONLINE = { net: null, ghosts: new Map(), pending: {}, sendT: 0, profT: 0, lastProf: '', boxes: [], busy: false, status: '', err: '', reloading: false,
-    hostMap: COURSE ? S.map : 'rally', carT: 0, lastCar: '' };
+    hostMap: S.map, carT: 0, lastCar: '', hitOut: {}, lastPub: 0 };
   const NET_DELAY = 130, NET_SEND = 0.1, VOICES = 4;
   if (!S.netName) { S.netName = 'Driver ' + Math.floor(100 + Math.random() * 900); saveS(); }
   const esc = (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15573,7 +15622,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (!inRoom() || !m) return;
     let why = '';
     if (ONLINE.net.isHost) {
-      if (m.map && m.map !== S.map) { if (COURSE) ONLINE.net.setMap(S.map); else { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); } }
+      if (m.map && m.map !== S.map) ONLINE.net.setMap(S.map);        // (the host's map is the room's)
     } else {
       if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
       const cs = m.car;
@@ -15603,12 +15652,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     hud.toast('Following the host: loading ' + why + '…', 3);
     setTimeout(() => location.reload(), 900);
   }
-  // (in a room the host picks the map - one of the four courses)
-  function mapLocked(v) {
-    if (!inRoom()) return false;
-    if (!ONLINE.net.isHost) { hud.toast('Online: the host picks the map', 2.5); return true; }
-    if (!NET_MAPS.includes(v)) { hud.toast('Online rooms race on the rally stages and the mower tracks', 2.5); return true; }
-    return false;
+  // (in a room the host picks the map)
+  function mapLocked() {
+    if (!inRoom() || ONLINE.net.isHost) return false;
+    hud.toast('Online: the host picks the map', 2.5);
+    return true;
   }
   const optOf = () => CARDEF.engine || CARDEF.cls || '';
   function carLabel(id, opt) {
@@ -15646,6 +15694,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const sn = g.snaps;
         if (sn.length && st[0] <= sn[sn.length - 1][0]) return;             // (out of order)
         sn.push(st); if (sn.length > 30) sn.splice(0, sn.length - 30);
+        hitsIn(g, st);
       },
     });
     return ONLINE.net;
@@ -15654,7 +15703,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (ONLINE.busy) return;
     ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
     try {
-      const net = netCreate(), map = NET_MAPS.includes(ONLINE.hostMap) ? ONLINE.hostMap : 'rally';
+      const net = netCreate(), map = MAP_NAMES[ONLINE.hostMap] ? ONLINE.hostMap : S.map;
       await net.hostRoom(map, netProfile());
       ONLINE.lastProf = JSON.stringify(netProfile());
       S.netRoom = net.code; saveS();
@@ -15686,7 +15735,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     ONLINE.busy = false; renderOnlineIfOpen(); netTitle();
   }
   async function onlineLeave() {
-    S.netRoom = null; saveS(); RACE.r = null; ONLINE.lastCar = '';
+    S.netRoom = null; saveS(); RACE.go = null; RACE.hold = null; ONLINE.lastCar = '';
     for (const uid of [...ONLINE.ghosts.keys()]) ghostRemove(uid, false);
     if (ONLINE.net) { try { await ONLINE.net.leaveRoom(); } catch (e) { /* offline */ } }
     ownCarBack();
@@ -15749,7 +15798,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       model.root.visible = false;
       scene.add(model.root);
       const flm = new FX.Flames(THREE, model.root, model.exhaustTips || []);
-      g = { uid, prof, key, def, gv, model, flm, snaps, spin: [0, 0, 0, 0], ev: null, voice: null, snd: engSndFor(prof.c, def), emit: [0, 0, 0, 0], big: !!CC_CARS[prof.c] || ['puller', 'dragster', 'monster', 'kart', 'mower'].includes(prof.c), dist: 1e9, box: null };
+      g = { uid, prof, key, def, gv, model, flm, snaps, spin: [0, 0, 0, 0], ev: null, voice: null, hitIn: null, hitQ: [], localHitT: 0, softT: 0, snd: engSndFor(prof.c, def), emit: [0, 0, 0, 0], big: !!CC_CARS[prof.c] || ['puller', 'dragster', 'monster', 'kart', 'mower'].includes(prof.c), dist: 1e9, box: null };
       setTag(g, prof.n);
       ONLINE.ghosts.set(uid, g);
     } catch (e) { console.warn('could not build the other car', prof, e); }
@@ -15767,7 +15816,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   }
 
   // ---- the pose we send: [t, x, y, z, qx, qy, qz, qw, vx, vy, vz, steer, rearSteer, s0-3, omega0-3, rpm, load, throttle,
-  // boost, flags, shifts, pops, jetN, afterburner, chute, points, (when there's smoke: 7 numbers a wheel)]
+  // boost, flags, shifts, pops, jetN, afterburner, chute, points, bumps given { uid: [impulse x, z (running totals), contact
+  // x, z, when] } or 0, (when there's smoke: 7 numbers a wheel)]
   const r2 = (x) => Math.round(x * 100) / 100, r3 = (x) => Math.round(x * 1000) / 1000, r4 = (x) => Math.round(x * 1e4) / 1e4;
   function netState() {
     const fl = (veh.input.brake > 0.04 || veh.lineLockActive ? 1 : 0) | (veh.gear < 0 && !veh.park ? 2 : 0) | (G.lightsOn || world.preset === 'night' ? 4 : 0)
@@ -15778,17 +15828,53 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     for (const w of veh.wheels) a.push(r3(w.s));
     for (const w of veh.wheels) a.push(Math.round(w.omega * 10) / 10);
     a.push(Math.round(veh.rpm()), r2(load), r2(veh.input.throttle), Math.round(veh.boost * 10) / 10, fl, veh.events.shift, veh.events.backfire, r2(veh.jetN || 0), r2(veh.jetAB || 0), r2(veh.chuteInfl || 0),
-      Math.round(RACE.pts));
+      Math.round(RACE.pts), Object.keys(ONLINE.hitOut).length ? ONLINE.hitOut : 0);
     if (G.smk.some((m) => m[0] > 0.5)) for (const m of G.smk) a.push(Math.round(m[0]), r2(m[1]), r2(m[2]), r2(m[3]), r2(m[4]), r2(m[5]), r2(m[6]));
     return a;
+  }
+
+  // ---- bumps between cars. Each game moves only its own car, and a car that hits another is stopped against it in its own
+  // game before the other game ever sees it arrive - so the car that was hit never got pushed. Now whichever game works
+  // a bump out sends the other car its share (equal and opposite, at the contact point) with its state: running totals
+  // per car, so a lost or merged update loses nothing. The other game gives it to its car when the hit shows on its
+  // screen (the same ~130 ms behind as the cars), unless it worked the same bump out itself (then it's already had it)
+  function hitsOut() {
+    for (const b of ONLINE.boxes) {
+      if (!b.jx && !b.jz) continue;
+      const g = ONLINE.ghosts.get(b.uid);
+      // (and till their car shows it moving off, it only keeps us out of it - one bump, one push)
+      if (g) { g.localHitT = 0.4; g.softT = Math.max(g.softT, 0.35); }
+      const h = ONLINE.hitOut[b.uid] || (ONLINE.hitOut[b.uid] = [0, 0, 0, 0, 0]);
+      h[0] = r2(h[0] - b.jx); h[1] = r2(h[1] - b.jz); h[2] = r2(b.cx); h[3] = r2(b.cz); h[4] = Math.round(ONLINE.net.serverNow());
+      if (performance.now() - ONLINE.lastPub > 40) ONLINE.sendT = 0;       // (out now, not at the next tick)
+    }
+  }
+  function hitsIn(g, st) {
+    const e = st[32] && typeof st[32] === 'object' ? st[32][ONLINE.net.uid] : null;
+    if (!e) { if (!g.hitIn) g.hitIn = [0, 0]; return; }
+    if (!g.hitIn) { g.hitIn = [e[0], e[1]]; return; }          // (first sight: what came before isn't ours to feel)
+    const dx = e[0] - g.hitIn[0], dz = e[1] - g.hitIn[1];
+    g.hitIn = [e[0], e[1]];
+    if (dx || dz) g.hitQ.push([dx, dz, e[2], e[3], e[4]]);
+  }
+  function hitsApply(g, dt) {
+    g.localHitT -= dt; g.softT -= dt;
+    const now = ONLINE.net.serverNow() - NET_DELAY;
+    while (g.hitQ.length && g.hitQ[0][4] <= now) {
+      const [jx, jz, cx, cz] = g.hitQ.shift();
+      if (g.localHitT > 0) continue;
+      veh.pushAt(jx, jz, cx, cz);
+      g.softT = 0.4;           // (and its box just keeps them apart for a moment - no second push for the same bump)
+    }
   }
 
   // ---- every frame: send ours, draw theirs
   const _gq = new THREE.Quaternion(), _gq2 = new THREE.Quaternion(), _gv = new THREE.Vector3(), _gu = new THREE.Vector3();
   function onlineTick(dt) {
+    if (inRoom()) hitsOut();
     if (inRoom()) {
       ONLINE.sendT -= dt;
-      if (ONLINE.sendT <= 0 && G.started) { ONLINE.sendT = NET_SEND; ONLINE.net.publish(netState()); }
+      if (ONLINE.sendT <= 0 && G.started) { ONLINE.sendT = NET_SEND; ONLINE.lastPub = performance.now(); ONLINE.net.publish(netState()); }
       ONLINE.profT -= dt;
       if (ONLINE.profT <= 0) { ONLINE.profT = 2; netProfileSync(); }
       ONLINE.carT -= dt;
@@ -15816,6 +15902,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       _gq.set(A[4], A[5], A[6], A[7]).normalize();
       if (B) _gq.slerp(_gq2.set(B[4], B[5], B[6], B[7]).normalize(), u);
       const m = g.model, gv = g.gv, cd = g.prof.cd || 0;
+      hitsApply(g, dt);
       m.root.visible = true;
       m.root.position.set(x, y, z); m.root.quaternion.copy(_gq);
       if (cd) m.root.position.add(_gv.set(0, cd, 0).applyQuaternion(_gq));
@@ -15850,14 +15937,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const fx = -2 * (_gq.x * _gq.z + _gq.y * _gq.w), fz = -(1 - 2 * (_gq.x * _gq.x + _gq.y * _gq.y)), fln = Math.hypot(fx, fz) || 1;
       if (Math.abs(y - veh.py) < 2.5) {
         const zc = (gv.spec.bodyFront + gv.spec.bodyRear) / 2;
-        ONLINE.boxes.push({ x: x - fx / fln * zc, z: z - fz / fln * zc, hx: gv.spec.bodyHalfW, hz: (gv.spec.bodyRear - gv.spec.bodyFront) / 2, c: fz / fln, s: fx / fln, vx: A[8], vz: A[10], m: gv.spec.mass, ghost: true });
+        const soft = g.softT > 0;
+        ONLINE.boxes.push({ x: x - fx / fln * zc, z: z - fz / fln * zc, hx: gv.spec.bodyHalfW, hz: (gv.spec.bodyRear - gv.spec.bodyFront) / 2, c: fz / fln, s: fx / fln,
+          vx: soft ? veh.vx : L(8), vz: soft ? veh.vz : L(10), m: gv.spec.mass, ghost: true, uid: g.uid });
       }
       dots.push({ x, z });
       // its tyre smoke
-      if (N.length > 32 && G.started) {
+      if (N.length > 33 && G.started) {
         const bud = smoke.budget;
         for (let i = 0; i < 4; i++) {
-          const k = 32 + i * 7, rate = N[k];
+          const k = 33 + i * 7, small = S.dust === 'small', rate = N[k] * (small ? DUST_SMALL.rate : 1);
           if (!(rate > 0.5)) continue;
           g.emit[i] += rate * dt * bud;
           if (g.emit[i] < 1) continue;
@@ -15866,12 +15955,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           while (g.emit[i] >= 1) {
             g.emit[i] -= 1;
             smoke.emit(_gv.x + (Math.random() - 0.5) * 0.3, gy + 0.15 + Math.random() * 0.1, _gv.z + (Math.random() - 0.5) * 0.3,
-              A[8] * 0.3 + (Math.random() - 0.5) * 1.2, 0.4 + Math.random() * (0.8 + N[k + 6]), A[10] * 0.3 + (Math.random() - 0.5) * 1.2,
-              N[k + 2] * (0.8 + Math.random() * 0.4), N[k + 4], N[k + 5] * (0.7 + Math.random() * 0.6), N[k + 1], N[k + 3]);
+              A[8] * 0.3 + (Math.random() - 0.5) * 1.2, 0.4 + Math.random() * (0.8 + (small ? Math.min(N[k + 6], DUST_SMALL.up) : N[k + 6])), A[10] * 0.3 + (Math.random() - 0.5) * 1.2,
+              (small ? Math.min(N[k + 2], DUST_SMALL.size) : N[k + 2]) * (0.8 + Math.random() * 0.4), small ? Math.min(N[k + 4], DUST_SMALL.grow) : N[k + 4],
+              (small ? Math.min(N[k + 5], DUST_SMALL.life) : N[k + 5]) * (0.7 + Math.random() * 0.6), small ? Math.min(N[k + 1], DUST_SMALL.alpha) : N[k + 1], N[k + 3]);
           }
         }
       }
-      g.st = { rpm: L(21), load: L(22), thr: L(23), boost: L(24), fl, ab: L(29), sq: N.length > 32 ? clamp(Math.max(N[32], N[39], N[46], N[53]) / 120, 0, 1) : 0 };
+      g.st = { rpm: L(21), load: L(22), thr: L(23), boost: L(24), fl, ab: L(29), sq: N.length > 33 ? clamp(Math.max(N[33], N[40], N[47], N[54]) / 120, 0, 1) : 0 };
     }
     hud.mmPlayers = dots;
     // their engines: the nearest few get a voice of their own, placed where the car is
@@ -15906,11 +15996,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // own bit of the course, so there's no cutting across to another bit of it: the car's place on the course is followed
   // along the centre line from where it was - never jumping to whichever bit is nearest - so a shortcut can't count
   const RACE = { on: false, i: -1, s: 0, sd: 0, px: 0, pz: 0, tx: 0, tz: -1, prevS: null, debt: 0, pts: 0, streak: 1, streakM: 0, road: true,
-    hayT: 0, hayOn: new Set(), flash: '', flashT: 0, resetT: -1e9, walls: [], r: null, saveT: 0, boardT: 0, savedP: -1 };
+    hayT: 0, hayOn: new Set(), flash: '', flashT: 0, resetT: -1e9, walls: [], go: null, hold: null, cd: '', goT: 0, saveT: 0, boardT: 0, savedP: -1,
+    wR: 0, wL: 0, bumpT: 0 };
   const RESET_WAIT = 30, HAY_PTS = 100, STREAK_M = 40, STREAK_MAX = 3, OFF_RATE = 0.25;
-  // (the walls: this far from the centre line - rally stages 4 m past the road's edge, the verge and the ditch, short of
-  // the woods; the mower tracks 2.5 m, just behind the bales)
-  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 4 : 2.5) : 0;
+  // (the walls: this far from the centre line - 10 m past the road's edge on the rally stages, well into the trees; 6 m
+  // on the mower tracks, well behind the bales. Far enough out that going off costs you - the trees, the grass, a quarter
+  // of the points - instead of being a guard rail to bounce along; still no way through to another bit of the course)
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : 6) : 0;
   function raceTrack(x, z) {
     const T = CRS_T, n = T.n, X = T.x, Z = T.z;
     const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
@@ -15941,14 +16033,42 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     RACE.sd = (x - RACE.px) * -RACE.tz + (z - RACE.pz) * RACE.tx;
   }
   // the walls either side, for the next physics step: 10 m thick, 60 m long, lined up with the course where the car is
-  // (the inside of a tight turn: closer in, short of the turn's middle)
+  // (the inside of a tight turn: closer in, short of the turn's middle). They grip what scrapes them (mu 0.8)
   function raceWalls() {
     const R = CRS_T.R[RACE.i] || 1e4, inner = Math.max(CRS_T.W / 2 + 1.5, Math.min(RACE_WD, Math.abs(R) - 3)), tx = RACE.tx, tz = RACE.tz, HX = 5;
     RACE.walls.length = 0;
     for (const side of [1, -1]) {                       // (+1: on the right)
-      const o = ((side > 0 ? R < 0 : R > 0) ? inner : RACE_WD) + HX;
-      RACE.walls.push({ x: RACE.px - tz * side * o, z: RACE.pz + tx * side * o, hx: HX, hz: 30, c: tz, s: tx, mu: 0.08, wall: true });
+      const w = (side > 0 ? R < 0 : R > 0) ? inner : RACE_WD, o = w + HX;
+      if (side > 0) RACE.wR = w; else RACE.wL = w;
+      RACE.walls.push({ x: RACE.px - tz * side * o, z: RACE.pz + tx * side * o, hx: HX, hz: 30, c: tz, s: tx, mu: 0.8, wall: true });
     }
+  }
+  // touching a wall is rough going - no riding along it: the speed bleeds off fast and the car's thrown about (hops,
+  // kicks in roll, pitch and yaw every ~0.2 s), the streak's gone
+  function raceBump(dt) {
+    RACE.bumpT -= dt;
+    const a = carAxes(), fl = Math.hypot(a.fx, a.fz) || 1, rl = Math.hypot(a.rx, a.rz) || 1;
+    const fX = a.fx / fl, fZ = a.fz / fl, rX = a.rx / rl, rZ = a.rz / rl;
+    const zc = 0.5 * (sp.bodyFront + sp.bodyRear), hl = 0.5 * (sp.bodyRear - sp.bodyFront), hw = sp.bodyHalfW;
+    const cx = veh.px - fX * zc, cz = veh.pz - fZ * zc;
+    let mx = -1e9, mn = 1e9;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const x = cx + rX * hw * sx + fX * hl * sz, z = cz + rZ * hw * sx + fZ * hl * sz;
+      const lat = (x - RACE.px) * -RACE.tz + (z - RACE.pz) * RACE.tx;
+      if (lat > mx) mx = lat; if (lat < mn) mn = lat;
+    }
+    if (mx < RACE.wR - 0.15 && mn > -RACE.wL + 0.15) return;
+    const v = Math.hypot(veh.vx, veh.vz), k = Math.exp(-1.6 * dt);
+    veh.vx *= k; veh.vz *= k;
+    raceLost();
+    if (RACE.bumpT > 0 || v < 2) return;
+    RACE.bumpT = 0.12 + Math.random() * 0.16;
+    const f = Math.min(1, v / 15);
+    veh.vy += (0.5 + Math.random() * 0.8) * f;
+    veh.wx += (Math.random() - 0.5) * 1.2 * f; veh.wz += (Math.random() - 0.5) * 1.2 * f; veh.wy += (Math.random() - 0.5) * 0.7 * f;
+    G.shake = Math.max(G.shake, 0.2 + 0.2 * f); input.rumble(0.9, 0.9, 110);
+    if (audio.ready) audio.event('impact', 0.4 + 0.8 * f);
+    raceFlash('Off the course - hit the wall', 1.5);
   }
   // back on the course: the centre line where you are on it, facing the way it runs
   const raceSpot = () => ({ x: RACE.px, y: groundH(RACE.px, RACE.pz), z: RACE.pz, tx: RACE.tx, tz: RACE.tz });
@@ -15994,6 +16114,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (!on) { RACE.on = false; RACE.i = -1; RACE.prevS = null; RACE.walls.length = 0; return; }
     RACE.on = true;
     RACE.flashT -= dt;
+    if (raceHold()) return;
     const was = RACE.i >= 0 ? [RACE.i, RACE.px, RACE.pz, RACE.tx, RACE.tz, RACE.s] : null;
     raceTrack(veh.px, veh.pz);
     // out past the walls (joined from off in the scenery, or somehow over them): back on the course - where it was on it
@@ -16003,6 +16124,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       resetCar(true); return;
     }
     raceWalls();
+    raceBump(dt);
     // on the road: the car's middle inside the road's edge (a wheel or two off still counts)
     const T = CRS_T, onRoad = Math.abs(RACE.sd) < T.W / 2 + 0.5;
     if (!onRoad && RACE.road) raceLost();
@@ -16026,33 +16148,83 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (RACE.saveT <= 0) { RACE.saveT = 3; raceSave(); }
   }
   function raceSave() {
-    if (!inRoom() || RACE.r === null || Math.round(RACE.pts) === RACE.savedP) return;
+    if (!inRoom() || RACE.go === null || Math.round(RACE.pts) === RACE.savedP) return;
     RACE.savedP = Math.round(RACE.pts);
     // (per tab, like the guest sign-in - two tabs are two players)
-    try { sessionStorage.setItem('hc_netPts', JSON.stringify({ code: ONLINE.net.code, r: RACE.r, p: RACE.savedP })); } catch (e) { /* storage unavailable */ }
+    try { sessionStorage.setItem('hc_netPts', JSON.stringify({ code: ONLINE.net.code, r: RACE.go, p: RACE.savedP })); } catch (e) { /* storage unavailable */ }
   }
   window.addEventListener('pagehide', raceSave);
-  // the room's round: the host can start a new one - everyone back to 0 points on the start line
+  $('raceStartBtn').addEventListener('click', () => { if (inRoom() && ONLINE.net.isHost) ONLINE.net.startRace(); });
+  // the race: meta.go is when it starts (server time) - 0 while the room waits for the host to start one. Each start is a
+  // new race: everyone back on the start grid with 0 points, held there (engine free to rev) till GO
   function raceMeta(m) {
-    const r = m.r || 0;
-    if (RACE.r === r) return;
-    const first = RACE.r === null; RACE.r = r;
-    if (first) {
-      // (back after a reload: the points you had in this round)
+    const go = m.go || 0;
+    if (RACE.go === go) return;
+    const first = RACE.go === null; RACE.go = go;
+    if (first && go && ONLINE.net.serverNow() >= go) {
+      // (back after a reload in a race that's on: the points you had in it)
       let k = null; try { k = JSON.parse(sessionStorage.getItem('hc_netPts')); } catch (e) { /* storage unavailable */ }
-      RACE.pts = k && k.code === ONLINE.net.code && k.r === r ? k.p : 0;
+      RACE.pts = k && k.code === ONLINE.net.code && k.r === go ? k.p : 0;
       RACE.savedP = Math.round(RACE.pts);
       return;
     }
-    RACE.pts = 0; RACE.debt = 0; RACE.resetT = -1e9; raceLost(); raceSave();
-    if (COURSE && G.started) { putCar(gridSpot(Math.floor(Math.random() * 8))); RACE.i = -1; RACE.prevS = null; LAP.armed = false; }
-    hud.toast('New round - everyone back to 0 points. Go!', 3);
+    RACE.pts = 0; RACE.debt = 0; RACE.resetT = -1e9; RACE.savedP = -1; raceLost(); raceSave();
+    if (COURSE && G.started) raceGrid();
+  }
+  function raceGrid() {
+    const ids = [ONLINE.net.uid].concat([...ONLINE.ghosts.keys()]).sort();
+    putCar(gridSpot(ids.indexOf(ONLINE.net.uid) % 8));
+    RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.hayOn.clear(); LAP.armed = false;
+  }
+  const raceHolding = () => RACE.on && (!RACE.go || ONLINE.net.serverNow() < RACE.go);
+  // (every frame of the hold: pinned where it stands - it can rev, in park / neutral, but not move; at GO, into drive)
+  function raceHold() {
+    if (raceHolding()) {
+      if (!RACE.hold) RACE.hold = { x: veh.px, z: veh.pz };
+      veh.px = RACE.hold.x; veh.pz = RACE.hold.z; veh.vx = 0; veh.vz = 0; veh.wy = 0;
+      if (veh.transType === 'auto') veh.park = true;
+      else if (veh.gear !== 0 && veh.pendingGear === null) veh._beginShift(0);
+      RACE.prevS = null; RACE.i = -1;
+      return true;
+    }
+    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; }
+    return false;
+  }
+  // (the countdown's beeps: a short low one for 3, 2, 1 and a long high one for GO)
+  function raceBeep(hi) {
+    if (!audio.ready) return;
+    const c = audio.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime, d = hi ? 0.6 : 0.18;
+    o.type = 'square'; o.frequency.value = hi ? 1320 : 660;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12 * S.vol * S.fxVol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g).connect(audio.master); o.start(t); o.stop(t + d + 0.05);
   }
   // ---- the HUD: the points board (top right) and the reset timer (bottom left, over the map)
   function raceHud(dt) {
-    const bd = $('netBoard'), rc = $('resetCd');
+    const bd = $('netBoard'), rc = $('resetCd'), cd = $('raceCd');
     bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on);
     $('perf').style.display = RACE.on ? 'none' : '';
+    // the start: waiting for the host (who gets the Start button), then 3, 2, 1, GO
+    let big = '', sub = '', btn = false;
+    if (RACE.on) {
+      const left = RACE.go ? RACE.go - ONLINE.net.serverNow() : Infinity;
+      if (!RACE.go) {
+        big = 'ON THE GRID';
+        sub = ONLINE.net.isHost ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : 'Waiting for the host to start the race - you can rev meanwhile';
+        btn = ONLINE.net.isHost;
+      } else if (left > 3000) { big = 'GET READY'; sub = 'The race starts in a moment'; }
+      else if (left > 0) big = String(Math.ceil(left / 1000));
+      else if (RACE.goT > 0) big = 'GO!';
+    }
+    RACE.goT -= dt;
+    if (big !== RACE.cd) {
+      if (/^[123]$/.test(big)) raceBeep(false); else if (big === 'GO!') raceBeep(true);
+      RACE.cd = big;
+      cd.classList.toggle('hidden', !big);
+      cd.querySelector('.cdBig').textContent = big;
+      cd.querySelector('.cdBig').className = 'cdBig' + (/^[123]$/.test(big) ? ' num' : big === 'GO!' ? ' go' : '');
+    }
+    cd.querySelector('.cdSub').textContent = sub;
+    cd.querySelector('button').classList.toggle('hidden', !btn);
     if (!RACE.on) return;
     const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
     rc.classList.toggle('ready', wait <= 0);
@@ -16083,12 +16255,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ---- the Online tab
   function renderOnline(add) {
-    const net = ONLINE.net, on = inRoom(), maps = NET_MAPS.map((k) => [k, MAP_NAMES[k]]);
-    add(row('Online play', 'Race your friends: one of you hosts a room and shares its code, the others join it. Everyone drives the host\'s car, set up the host\'s way, on the host\'s course: '
-      + 'the Windy Rally Stage, the Rally Stage, the Windy Mower Track or the Mower Track. Needs an internet connection.' + (ONLINE.status ? ' · <b>' + esc(ONLINE.status) + '</b>' : ''), el('<span></span>')));
-    add(row('Points', 'For ground covered along the course: on the road 1 a metre, times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
-      + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls keep everyone on the course - no shortcuts - '
-      + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s.', el('<span></span>')));
+    const net = ONLINE.net, on = inRoom(), maps = Object.entries(MAP_NAMES);
+    add(row('Online play', 'Drive with your friends: one of you hosts a room and shares its code, the others join it. Everyone drives the host\'s car, set up the host\'s way, on the host\'s map - any map. '
+      + 'Needs an internet connection.' + (ONLINE.status ? ' · <b>' + esc(ONLINE.status) + '</b>' : ''), el('<span></span>')));
+    add(row('Racing for points', 'On the race courses - the Windy Rally Stage, the Rally Stage, the Windy Mower Track and the Mower Track: points for ground covered along the course, on the road 1 a metre times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
+      + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls well off the road stop shortcuts, '
+      + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s. Everyone waits on the start grid till the host starts the race.', el('<span></span>')));
     const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
     const name = inp('Your name', S.netName, 16, 170);
     name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
@@ -16098,10 +16270,10 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     else if (net.isHost) add(row('Car', 'Everyone drives the car you\'re in, set up your way (version, tyres, transmission, package, Fun-tab tune). Change any of it and they follow', carNow));
     else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
     if (!on) {
-      add(row('Course', 'For a room you host', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      add(row('Map', 'For a room you host (the race courses score points)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
       const hb = el('<button class="btn small">Host a game</button>');
       hb.addEventListener('click', () => onlineHost());
-      add(row('Host', 'Opens a room on that course (loading it if you\'re not on it) and gives you its code to share', hb));
+      add(row('Host', 'Opens a room on that map (loading it if you\'re not on it) and gives you its code to share', hb));
       const code = inp('CODE', '', 5, 90); code.style.textTransform = 'uppercase'; code.style.letterSpacing = '0.15em';
       const jb = el('<button class="btn small">Join</button>');
       jb.addEventListener('click', () => onlineJoin(code.value));
@@ -16109,13 +16281,15 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const w = el('<div style="display:flex;gap:8px;align-items:center"></div>'); w.appendChild(code); w.appendChild(jb);
       add(row('Join a friend', 'Type the 5-letter code they give you', w));
     } else {
-      add(row('Room code', net.isHost ? 'You\'re the host: the course you pick is everyone\'s. Give your friends this code.' : 'The host picks the course and the car.',
+      add(row('Room code', net.isHost ? 'You\'re the host: the map and car you pick are everyone\'s. Give your friends this code.' : 'The host picks the map and the car.',
         el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
       if (net.isHost) {
-        add(row('Course', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
-        const rb = el('<button class="btn small">New round</button>');
-        rb.addEventListener('click', () => { net.newRound(); hud.toast('New round!', 1.5); });
-        add(row('New round', 'Everyone back to 0 points, on the start line', rb));
+        add(row('Map', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        if (COURSE) {
+          const rb = el('<button class="btn small">Start race</button>');
+          rb.addEventListener('click', () => { net.startRace(); openMenu(false); });
+          add(row('Start race', 'Everyone back on the start grid with 0 points, a 3 s countdown (engines can rev), then GO - everyone\'s put in drive', rb));
+        }
       }
       const pts = (p) => '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
       const list = [`<b>${esc(S.netName)}</b> (you) · ${esc(carLabel(S.car, optOf()))} · ${pts(RACE.pts)}`]

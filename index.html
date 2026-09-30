@@ -45,6 +45,12 @@
   #resetCd.ready { border-color: rgba(125,255,138,0.45); color: #b9ffc0; }
   #resetCd.ready .rcBar i { background: #3fcf5a; }
   #carPick.locked button { opacity: 0.4; cursor: not-allowed; }
+  #raceCd { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; text-shadow: 0 3px 12px #000; }
+  #raceCd .cdBig { font-size: 40px; font-weight: 900; letter-spacing: 0.12em; font-style: italic; }
+  #raceCd .cdBig.num { font-size: 120px; line-height: 1; }
+  #raceCd .cdBig.go { font-size: 110px; line-height: 1; color: #6dff7a; }
+  #raceCd .cdSub { font-size: 14px; color: #dfe3e8; margin-top: 4px; }
+  #raceCd button { margin-top: 12px; pointer-events: auto; font-size: 18px; padding: 12px 30px; }
   #inputs { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: flex-end; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; }
   .bar { width: 14px; height: 60px; background: rgba(255,255,255,0.08); position: relative; border-radius: 2px; overflow: hidden; }
   .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; }
@@ -179,6 +185,7 @@
   <canvas id="minimap" width="380" height="380"></canvas>
   <div id="netBoard" class="hidden"><div class="nbMe"><span id="nbPts">0</span><span id="nbMul">×1.0</span></div><div id="nbSt"></div><div id="nbList"></div></div>
   <div id="resetCd" class="hidden"><div></div><div class="rcBar"><i></i></div></div>
+  <div id="raceCd" class="hidden"><div class="cdBig"></div><div class="cdSub"></div><button class="btn hidden" id="raceStartBtn">Start race</button></div>
   <div id="inputs">
     <div><div class="bar"><i id="ib-c" style="background:#3a8dff"></i></div><div class="blab">CLU</div></div>
     <div><div class="bar"><i id="ib-b" style="background:#e23"></i></div><div class="blab">BRK</div></div>

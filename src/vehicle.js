@@ -1957,6 +1957,13 @@
     }
 
     // ------------------------------------------------------------------ static obstacles (trees, poles, rocks, buildings)
+    // online play: a bump another player's game worked out - world impulse (jx, 0, jz) at the world point (cx, cz)
+    pushAt(jx, jz, cx, cz) {
+      const { qx, qy, qz, qw } = this;
+      this._applyImpulse(jx, jz, cx - this.px, 0, cz - this.pz, 1 - 2 * (qy * qy + qz * qz), 2 * (qx * qz - qy * qw), 2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy));
+      const dv = Math.hypot(jx, jz) / this.spec.mass;
+      if (dv > this.events.impact) { this.events.impact = dv; this.events.impactX = cx; this.events.impactZ = cz; }
+    }
     _applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22) {
       // world impulse (jx, 0, jz) at offset r from CG
       const s = this.spec;
@@ -2003,10 +2010,35 @@
       const mu = ob && ob.mu !== undefined ? ob.mu : 0.45, jt = clamp(-vt / kt, -mu * j, mu * j);
       jx += tx * jt; jz += tz * jt;
       this._applyImpulse(jx, jz, rx, ry, rz, m00, m20, m02, m22);
+      // (another player's car: the impulse is kept on it, for the game to send them their share - and from here on it's
+      // taken to be moving off with that share, so the next steps don't hit it again for the same bump)
+      if (mv) { ob.jx = (ob.jx || 0) + jx; ob.jz = (ob.jz || 0) + jz; ob.cx = cx; ob.cz = cz; ob.vx -= jx / ob.m; ob.vz -= jz / ob.m; }
       const dv = j / s.mass;
       if (dv > this.events.impact) { this.events.impact = dv; this.events.impactX = cx; this.events.impactZ = cz; }
       // big hits stall/damage nothing, but they do upset the chassis a little
       if (dv > 6) { this.wx += (Math.random() - 0.5) * 0.3; this.wz += (Math.random() - 0.5) * 0.3; }
+    }
+
+    // our footprint (centre cx, cz; right rX, rZ; back bX, bZ; half sizes hw, hl) against another car's box: the axis of
+    // least overlap of the four is the contact normal (from us towards it); the contact point is midway between the two
+    // boxes' nearest points along it - the middle of a face when a face meets it square (no made-up spin from a corner)
+    _carBox(b, cx, cz, rX, rZ, bX, bZ, hw, hl, m00, m20, m02, m22) {
+      const dx = b.x - cx, dz = b.z - cz, ux = b.c, uz = -b.s, wx = b.s, wz = b.c;
+      const AX = [rX, bX, ux, wx], AZ = [rZ, bZ, uz, wz];
+      let best = 1e9, nx = 0, nz = 0;
+      for (let k = 0; k < 4; k++) {
+        const ax = AX[k], az = AZ[k];
+        const ra = hw * Math.abs(rX * ax + rZ * az) + hl * Math.abs(bX * ax + bZ * az);
+        const rb = b.hx * Math.abs(ux * ax + uz * az) + b.hz * Math.abs(wx * ax + wz * az);
+        const d = dx * ax + dz * az, o = ra + rb - Math.abs(d);
+        if (o <= 0) return;
+        if (o < best) { best = o; const sg = d >= 0 ? 1 : -1; nx = ax * sg; nz = az * sg; }
+      }
+      const pick = (v) => (Math.abs(v) < 0.25 ? 0 : Math.sign(v));
+      const r1 = pick(rX * nx + rZ * nz), b1 = pick(bX * nx + bZ * nz), u2 = pick(-(ux * nx + uz * nz)), w2 = pick(-(wx * nx + wz * nz));
+      const px = 0.5 * (cx + r1 * hw * rX + b1 * hl * bX + b.x + u2 * b.hx * ux + w2 * b.hz * wx);
+      const pz = 0.5 * (cz + r1 * hw * rZ + b1 * hl * bZ + b.z + u2 * b.hx * uz + w2 * b.hz * wz);
+      this._resolveContact(nx, nz, Math.min(best, 0.5), px, pz, m00, m20, m02, m22, b);
     }
 
     _obstacles(m00, m20, m02, m22) {
@@ -2038,6 +2070,9 @@
         this._resolveContact(nx, nz, pen, wpx, wpz, m00, m20, m02, m22);
       }
       for (const b of this._boxes) {
+        // (another player's car: two boxes the same size meet corner-on-edge, and the corner test read a rear-end hit as a
+        // sliver of sideways overlap - the hit car never moved. Separating axes instead: the real direction and depth)
+        if (b.m) { this._carBox(b, cx, cz, rX, rZ, bX, bZ, hw, hl, m00, m20, m02, m22); continue; }
         // car corners inside building box
         let best = null;
         for (let sx = -1; sx <= 1; sx += 2) for (let sz = -1; sz <= 1; sz += 2) {
