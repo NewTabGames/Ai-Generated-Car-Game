@@ -2171,6 +2171,18 @@
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
+    // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
+    // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
+    // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
+    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36,
+      muX: 0.95, muY: 0.62, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
+    // (its off-road package: the rubber pads off - bare steel grousers dig into dirt, mud and grass, slide on tarmac)
+    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36,
+      muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -2185,6 +2197,7 @@
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
+    if (car === 'tank') return { front: 'trackGrouser', rear: 'trackGrouser' };
     if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
@@ -2893,7 +2906,8 @@
       // ---------------- wheels & driveline
       let L0 = 0;
       if (s.wheelGyro) for (let i = 0; i < 4; i++) L0 += W[i].inertia * W[i].omega;
-      if (s.awd) this._driveline4(h);
+      if (s.tracks) this._drivelineTracks(h);
+      else if (s.awd) this._driveline4(h);
       else {
         for (let i = 0; i < 2; i++) {
           const w = W[i];
@@ -3558,6 +3572,23 @@
         }
         if (this.clutchEng < 0.02) this.locked = false;
       }
+    }
+
+    // tracked (the tank): each track is one thing - its two 'wheels' (the ends of its ground contact) turn together. The
+    // engine drives both tracks through the transmission and an open differential, as a car's axle; the steering unit
+    // (hydrostatic, off the engine) pushes the tracks apart in speed - the steer input asks for a difference, tracks.dv
+    // m/s at a crawl, fading to dvMin of it by vFade - so it turns by driving one track faster than the other, and pivots
+    // in place (the tracks counter-rotate) with no drive at all. Backing up it steers the way a car does
+    _drivelineTracks(h) {
+      const s = this.spec, W = this.wheels, T = s.tracks, inp = this.input;
+      const road = (w) => -w.fx * w.radius + (w.contact ? w.rrT : 0);
+      const v = this.forwardSpeed, r = W[2].radius, dir = this.gear < 0 || v < -0.5 ? -1 : 1;
+      const dvMax = T.dv * clamp(1 - Math.abs(v) / T.vFade, T.dvMin, 1);
+      const want = dir * clamp(inp.steer || 0, -1, 1) * dvMax / r;         // (left minus right, rad/s: + turns right)
+      const Tst = this.running ? clamp(T.kp * (want - (W[2].omega - W[3].omega)), -T.tMax, T.tMax) : 0;
+      this.trackSteerT = Tst;
+      this._driveline(h, road(W[2]) + road(W[0]) + Tst, road(W[3]) + road(W[1]) - Tst, W[2].brakeT + W[0].brakeT, W[3].brakeT + W[1].brakeT);
+      W[0].omega = W[2].omega; W[1].omega = W[3].omega;
     }
 
     _driveline(h, TL, TR, TbL, TbR) {
@@ -4625,6 +4656,33 @@
     CdA: 1.07,
     bodyHalfW: 1.01, bodyFront: -2.85, bodyRear: 2.84, bodyBottom: -0.33, bodyTop: 1.07,
   } };
+  // Main battle tank, built like an M1A2 Abrams: ~62 t, a 1,500 hp gas turbine (3,950 lb-ft at its output shaft), a
+  // 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering, seven dual road wheels a
+  // side on torsion bars, rubber-padded steel tracks 635 mm wide ~4.2 m apart on the ground. It steers as tanks do
+  // (tracks: one track driven faster than the other) and pivots in place; no ABS or stability control. Three versions
+  // (CARS.tank.make): governed to 42 mph, the governor off (~58 mph), and a hot-rodded 3,000 hp turbine (~71 mph)
+  CARS.tank = { name: 'Main Battle Tank', short: 'Tank', car: '1,500 HP TURBINE', hp: 1500, tq: 3950, cc: true, kbLat: 50, spec: {
+    name: 'Main Battle Tank',
+    // (wheelbase: the two 'wheels' of a track stand in for 4.2 m of ground contact under even pressure - a turn has to
+    // scrub it sideways, and its resistance acts a quarter of the length out, not at the ends: at +-1.2 m they carry
+    // the load and resist a turn as the whole track does)
+    mass: 62000, Ipitch: 330000, Iyaw: 380000, Iroll: 95000, cgHeight: 1.15, wheelbase: 2.4, frontWeight: 0.5,
+    trackF: 2.95, trackR: 2.95, wheelRadius: 0.36, wheelInertiaF: 1, wheelInertiaR: 450,
+    frontTire: 'track', rearTire: 'track', Fz0: 150000, loadSens: 0.04,
+    springF: 1.6e6, springR: 1.6e6, dampBumpF: 110000, dampRebF: 150000, dampBumpR: 110000, dampRebR: 150000,
+    arbF: 0, arbR: 0, travelUp: 0.2, travelDown: 0.18, suspS0: 0.45, bumpStopK: 8e6, fzMax: 1.5e6,
+    brakeTorqueF: 36000, brakeTorqueR: 36000, handbrakeTorque: 40000, noABS: true, noESC: true,
+    maxSteer: 1e-4, steerRate: 1, steerRatio: 1, ackermann: 0, rearToe: 0,
+    tracks: { dv: 2.4, dvMin: 0.3, vFade: 22, kp: 150000, tMax: 220000 },
+    idleRpm: 1300, limiterRpm: 3000, redlineRpm: 3000, shiftRpm: 2950, engineInertia: 3, fricA: 60, fricB: 40, starterTorque: 900,
+    torqueCurve: [[0, 3500], [1000, 3950], [1500, 3800], [2000, 3500], [2500, 3150], [3000, 2626], [3300, 2000]],
+    boostMax: 0, popScale: 0,
+    autoRatios: [3.9, 2.45, 1.72, 1.4], autoRev: 3.9, autoFinal: 4.3, tcK: 0.15, tcStall: 2.1, lockupTorque: 9000,
+    shiftTimeWOT: 0.6, shiftTimePart: 0.8, launchRpm: 1800, engineTc: false,
+    lsdPreload: 0, lsdRamp: 0, driveEff: 0.75,
+    CdA: 6.4,
+    bodyHalfW: 1.83, bodyFront: -3.95, bodyRear: 3.95, bodyBottom: -0.67, bodyTop: 1.25,
+  } };
   // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
   // restarts to swap)
@@ -4856,6 +4914,13 @@
       CdA: 0.82, ClA: 0.45, bodyHalfW: 0.93, bodyFront: -1.95, bodyRear: 1.95,
     } },
   }, 'r4', 'Rally4');
+  // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
+  ccEngines('tank', {
+    ungov: { label: 'Ungoverned', car: '1,500 HP TURBINE', spec: { autoFinal: 3.15 } },
+    hot: { label: '3,000 hp hot rod', car: '3,000 HP TURBINE', hp: 3000, tq: 7900, spec: {
+      torqueCurve: [[0, 7000], [1000, 7900], [1500, 7600], [2000, 7000], [2500, 6300], [3000, 5252], [3300, 4000]], autoFinal: 2.55, tcK: 0.3, lockupTorque: 18000,
+    } },
+  }, 'gov', 'Governed');
   // the Cybertruck's other two: the Long Range RWD - one motor at the back, ~350 hp, 2,850 kg, 0-60 ~6.2 s, 112 mph -
   // and the Cyberbeast - three motors (one front, two at the back), 845 hp, 3,104 kg, 0-60 2.6 s, 130 mph
   ccEngines('cyber', {
@@ -5981,7 +6046,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
     // (the Car Crushers 2 cars' colours)
-    'Stainless': 0xaeb2b6, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020,
+    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020,
   };
 
   // ------------------------------------------------------------------ builder
@@ -12037,6 +12102,330 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
+<script>/* src/tank.js */
+/* Hellcat Drive — procedural main battle tank, built like an M1A2 Abrams: the long, low hull with its shallow upper
+   glacis, armoured side skirts over seven dual road wheels a side, the drive sprocket at the back and the idler at the
+   front, rubber-padded tracks that run at each track's own speed (the physics drives them apart to steer); the flat-
+   faced turret with the bustle rack behind, the commander's cupola with a .50 cal, the loader's M240, the gunner's
+   sight and the commander's viewer on the roof, smoke dischargers on the cheeks, and the 120 mm gun with its thermal
+   sleeve and fume extractor. Three-tone camouflage laid on in the tank's own space (the paint colour is its base
+   tone). setTurret(yaw, elevation): the game turns the turret and lifts the gun - it follows where you look.
+   Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
+   Returns the same interface as HCCarModel.build, plus afterWheels() and setTurret(). */
+(function (root) {
+  'use strict';
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+  function build(THREE, opts) {
+    opts = opts || {};
+    const cgH = opts.cgHeight || 1.15, zOff = opts.zOff || 0;
+    const cgToFront = opts.cgToFront || 1.2, cgToRear = opts.cgToRear || 1.2;
+    const trackX = (opts.trackF || 2.95) / 2, RW = opts.wheelRadius || 0.36;
+    const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || {};
+    const rootG = new THREE.Group(); rootG.name = 'tank';
+    const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const toRoot = (v) => v.clone().add(V3(0, -cgH, zOff));
+    const add = (parent, geo, mat, x, y, z, rx, ry, rz, cast) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = cast !== false; m.receiveShadow = true;
+      parent.add(m); return m;
+    };
+    const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+    const cylX = (r0, r1, len, seg) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24); g.rotateZ(Math.PI / 2); return g; };
+    const cylZ = (r0, r1, len, seg) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24); g.rotateX(Math.PI / 2); return g; };
+    const tubeAB = (parent, a, b, r, mat, seg) => {
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = add(parent, new THREE.CylinderGeometry(r, r, len, seg || 8), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      return m;
+    };
+    // a (z, y) side profile extruded across the tank, w wide, centred on x
+    function profile(pts, w) {
+      const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]);
+      const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false });
+      g.rotateY(-Math.PI / 2); g.translate(w / 2, 0, 0);
+      return g;
+    }
+    // a prism from a convex outline at the bottom and another at the top (both [x, z], the same count), heights y0 / y1
+    function prism(bot, top, y0, y1) {
+      const n = bot.length, pos = [];
+      const B = bot.map(([x, z]) => [x, y0, z]), T = top.map(([x, z]) => [x, y1, z]);
+      const tri = (a, b, c) => pos.push(...a, ...b, ...c);
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; tri(B[i], T[j], B[j]); tri(B[i], T[i], T[j]); }
+      for (let i = 1; i < n - 1; i++) { tri(T[0], T[i + 1], T[i]); tri(B[0], B[i], B[i + 1]); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+      return g;
+    }
+
+    // ---------------------------------------------------------------- materials
+    // camouflage: the base tone (the paint) with brown and black-green blobs, laid on in the hull's (or the turret's)
+    // own space, so it stays put on the armour as the tank drives and the turret turns
+    const base = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : 0xbfa07e;
+    const hullInv = { value: new THREE.Matrix4() }, turInv = { value: new THREE.Matrix4() };
+    function camoMat(inv, rough) {
+      const m = new THREE.MeshStandardMaterial({ color: base, roughness: rough || 0.82, metalness: 0.06 });
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uInv = inv; sh.uniforms.uBrown = { value: new THREE.Color(0x5e412a) }; sh.uniforms.uDark = { value: new THREE.Color(0x23281d) };
+        sh.vertexShader = 'uniform mat4 uInv;\nvarying vec3 vCamo;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vCamo = (uInv * modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = 'uniform vec3 uBrown;\nuniform vec3 uDark;\nvarying vec3 vCamo;\n'
+          + 'float cH(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }\n'
+          + 'float cN(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);\n'
+          + '  return mix(mix(mix(cH(i), cH(i + vec3(1, 0, 0)), f.x), mix(cH(i + vec3(0, 1, 0)), cH(i + vec3(1, 1, 0)), f.x), f.y),\n'
+          + '             mix(mix(cH(i + vec3(0, 0, 1)), cH(i + vec3(1, 0, 1)), f.x), mix(cH(i + vec3(0, 1, 1)), cH(i + vec3(1, 1, 1)), f.x), f.y), f.z); }\n'
+          + 'float cF(vec3 p) { return cN(p) * 0.62 + cN(p * 2.3) * 0.28 + cN(p * 5.1) * 0.1; }\n'
+          + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n'
+            + '  float ca = cF(vCamo * 0.75), cb = cF(vCamo * 0.75 + vec3(17.3, 5.1, 9.7));\n'
+            + '  diffuseColor.rgb = mix(diffuseColor.rgb, uBrown, smoothstep(0.55, 0.57, ca));\n'
+            + '  diffuseColor.rgb = mix(diffuseColor.rgb, uDark, smoothstep(0.6, 0.62, cb));');
+      };
+      return m;
+    }
+    const M = {};
+    M.hull = camoMat(hullInv); M.tur = camoMat(turInv); M.paint = M.hull;
+    M.dark = new THREE.MeshStandardMaterial({ color: 0x1c1d1a, roughness: 0.7, metalness: 0.3 });
+    M.rubber = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.92 });
+    M.wheel = new THREE.MeshStandardMaterial({ color: 0x4a4d3c, roughness: 0.6, metalness: 0.3 });
+    M.steel = new THREE.MeshStandardMaterial({ color: 0x3e4040, roughness: 0.5, metalness: 0.7 });
+    M.gun = new THREE.MeshStandardMaterial({ color: 0x1a1b1c, roughness: 0.45, metalness: 0.6 });
+    M.glass = new THREE.MeshStandardMaterial({ color: 0x0c1418, roughness: 0.05, metalness: 0.8 });
+    M.grille = new THREE.MeshStandardMaterial({ map: (() => {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d');
+      g.fillStyle = '#121312'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#3a3c36'; for (let y = 0; y < 64; y += 8) g.fillRect(0, y, 64, 3);
+      const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 6); return t; })(), roughness: 0.7, metalness: 0.4 });
+    M.head = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2 });
+    M.tail = new THREE.MeshStandardMaterial({ color: 0x5a0808, emissive: 0xff1a10, emissiveIntensity: 0.4, roughness: 0.3 });
+    M.suit = new THREE.MeshStandardMaterial({ color: 0x6b6247, roughness: 0.85 });
+    M.helmet = new THREE.MeshStandardMaterial({ color: 0x5b5a3e, roughness: 0.7 });
+    M.skin = new THREE.MeshStandardMaterial({ color: 0xc89478, roughness: 0.6 });
+    // the track links: steel shoes, a rubber pad down each, the end connectors
+    function trackTex() {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
+      // (u runs along the track - one link a tile - v across it)
+      g.fillStyle = '#2a2c2e'; g.fillRect(0, 0, 64, 128);
+      g.fillStyle = '#0e0f10'; g.fillRect(0, 0, 6, 128);
+      g.fillStyle = '#18191a'; g.fillRect(12, 10, 46, 50); g.fillRect(12, 68, 46, 50);
+      g.fillStyle = '#50535a'; g.fillRect(0, 0, 64, 7); g.fillRect(0, 121, 64, 7); g.fillRect(0, 60, 64, 8);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+    }
+
+    const body = new THREE.Group(); model.add(body);
+    const tips = [], spots = [];
+
+    // ---------------------------------------------------------------- the hull
+    // (between the tracks: the lower hull, its lower glacis down to the belly; over them: the upper hull and fenders, the
+    // long shallow upper glacis, the vertical rear with its exhaust grille)
+    add(body, profile([[-3.35, 0.5], [3.72, 0.5], [3.95, 0.62], [3.95, 1.1], [-3.95, 1.1], [-3.95, 1.02]], 2.24), M.hull, 0, 0, 0);
+    add(body, profile([[-3.95, 1.1], [3.95, 1.1], [3.95, 1.46], [-2.3, 1.46], [-3.95, 1.2]], 3.5), M.hull, 0, 0, 0);
+    // the engine deck grilles, the rear grille, the driver's hatch and periscopes
+    add(body, box(2.0, 0.02, 1.9), M.grille, 0, 1.47, 2.7);
+    add(body, box(1.2, 0.02, 0.7), M.grille, 0, 1.47, 1.35);
+    add(body, box(2.0, 0.6, 0.02), M.grille, 0, 1.05, 3.96);
+    add(body, cylX(0.34, 0.34, 0.04, 24), M.hull, 0, 1.47, -2.55, 0, 0, Math.PI / 2);
+    for (const dx of [-0.2, 0, 0.2]) { const p = add(body, box(0.14, 0.08, 0.1), M.dark, dx, 1.51, -2.86 + Math.abs(dx) * 0.25, 0, -dx * 1.2, 0); add(p, box(0.12, 0.05, 0.005), M.glass, 0, 0.005, -0.051); }
+    // fenders' front lights and the rear lights, tow shackles, the rear stowage
+    for (const sx of [-1, 1]) {
+      const hl = add(body, box(0.26, 0.14, 0.12), M.dark, sx * 1.52, 1.23, -3.86);
+      add(hl, new THREE.CircleGeometry(0.045, 16), M.head, sx * 0.06, 0.01, -0.061); add(hl, new THREE.CircleGeometry(0.03, 12), M.head, -sx * 0.07, 0.01, -0.061);
+      add(body, box(0.2, 0.12, 0.06), M.dark, sx * 1.52, 1.34, 3.97); add(body, box(0.16, 0.06, 0.01), M.tail, sx * 1.52, 1.34, 4.0, 0, 0, 0, false);
+      add(body, new THREE.TorusGeometry(0.07, 0.022, 8, 16), M.steel, sx * 0.85, 0.82, -3.98, Math.PI / 2, 0, 0);
+      add(body, box(0.5, 0.36, 0.5), M.hull, sx * 1.45, 1.64, 3.2);
+    }
+    const spot = (sx) => {
+      const sl = new THREE.SpotLight(0xf2f4ff, 0, 90, 0.5, 0.45, 1.4);
+      sl.position.copy(toRoot(V3(sx * 1.52, 1.23, -3.95))); sl.target.position.copy(toRoot(V3(sx * 1.8, 0, -45)));
+      rootG.add(sl); rootG.add(sl.target); sl.visible = false; spots.push(sl);
+    };
+    spot(-1); spot(1);
+    for (const x of [-0.55, 0.55]) tips.push(toRoot(V3(x, 1.05, 4.0)));
+
+    // ---------------------------------------------------------------- the running gear (each side its own group: it
+    // follows that side's suspension, and its track runs at that track's speed)
+    const RWZ = [-2.2, -1.48, -0.76, -0.04, 0.68, 1.4, 2.12], RWR = 0.32, TT = 0.07, TW = 0.635;
+    const IDL = { z: -2.95, y: 0.6, r: 0.29 }, SPR = { z: 3.08, y: 0.66, r: 0.33 }, RET = [-1.2, 0.3, 1.8];
+    // the track's loop: the convex hull round the road wheels, the idler, the sprocket and the return rollers (outer skin)
+    const loop = (() => {
+      const pts = [], circ = (z, y, r) => { for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2; pts.push([z + Math.cos(a) * r, y + Math.sin(a) * r]); } };
+      for (const z of RWZ) circ(z, TT + RWR, RWR + TT);
+      circ(IDL.z, IDL.y, IDL.r + TT); circ(SPR.z, SPR.y, SPR.r + TT);
+      for (const z of RET) circ(z, 0.9, 0.11 + TT);
+      pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const lo = [], up = [];
+      for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+      for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+      const hull = lo.slice(0, -1).concat(up.slice(0, -1));
+      // (evenly spaced along it)
+      const L = [0]; for (let i = 1; i <= hull.length; i++) { const a = hull[i - 1], b = hull[i % hull.length]; L.push(L[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+      const tot = L[hull.length], n = Math.round(tot / 0.05), out = [];
+      for (let k = 0, j = 0; k < n; k++) {
+        const s = k * tot / n; while (L[j + 1] < s) j++;
+        const a = hull[j], b = hull[(j + 1) % hull.length], f = (s - L[j]) / (L[j + 1] - L[j] || 1);
+        out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, s]);
+      }
+      return { pts: out, len: tot };
+    })();
+    function trackGeo() {
+      const P = loop.pts, n = P.length, pos = [], uv = [], idx = [], h = TW / 2;
+      // outward normal at each point (the loop runs anticlockwise in (z, y))
+      const N = P.map((p, i) => { const a = P[(i - 1 + n) % n], b = P[(i + 1) % n], dz = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dz, dy) || 1; return [dy / l, -dz / l]; });
+      const ring = (off, uAt) => { const s = pos.length / 3; for (let i = 0; i <= n; i++) { const p = P[i % n], nn = N[i % n], u = (i === n ? loop.len : p[2]) / 0.19;
+        for (const x of [-h, h]) { pos.push(x, p[1] - nn[1] * off, p[0] - nn[0] * off); uv.push(u, x < 0 ? uAt[0] : uAt[1]); } } return s; };
+      const o = ring(0, [0, 1]), ii = ring(TT, [0, 1]);
+      for (let i = 0; i < n; i++) {
+        const a = o + i * 2, b = a + 2, c = ii + i * 2, d = c + 2;
+        idx.push(a, b, a + 1, b, b + 1, a + 1);                         // the tread (outside)
+        idx.push(c, c + 1, d, d, c + 1, d + 1);                         // the inside (the wheels' path)
+        idx.push(a, c, b, b, c, d); idx.push(a + 1, b + 1, c + 1, b + 1, d + 1, c + 1);     // the edges
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+    const tGeo = trackGeo(), sides = [];
+    for (const sx of [-1, 1]) {
+      const sg = new THREE.Group(); sg.position.x = sx * trackX; body.add(sg);
+      const tex = trackTex(); tex.repeat.set(1, 1);
+      const tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.45, side: THREE.DoubleSide });
+      add(sg, tGeo, tm, 0, 0, 0);
+      const spin = [];
+      // seven dual road wheels (two tyred discs a wheel, the track's guide horns run between them)
+      for (const z of RWZ) {
+        const wg = new THREE.Group(); wg.position.set(0, TT + RWR, z); sg.add(wg); spin.push({ g: wg, r: RWR });
+        for (const dx of [-0.17, 0.17]) {
+          add(wg, cylX(RWR, RWR, 0.2, 28), M.rubber, dx, 0, 0);
+          add(wg, cylX(RWR - 0.05, RWR - 0.05, 0.205, 28), M.wheel, dx, 0, 0);
+          add(wg, cylX(0.08, 0.08, 0.22, 12), M.steel, dx, 0, 0);
+          for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; add(wg, cylX(0.03, 0.03, 0.21, 8), M.dark, dx, Math.cos(a) * 0.17, Math.sin(a) * 0.17); }
+        }
+      }
+      // the idler (front) and the drive sprocket (rear, toothed), the return rollers
+      { const ig = new THREE.Group(); ig.position.set(0, IDL.y, IDL.z); sg.add(ig); spin.push({ g: ig, r: IDL.r });
+        for (const dx of [-0.17, 0.17]) { add(ig, cylX(IDL.r, IDL.r, 0.2, 28), M.wheel, dx, 0, 0); add(ig, cylX(0.07, 0.07, 0.22, 12), M.steel, dx, 0, 0); } }
+      { const pg = new THREE.Group(); pg.position.set(0, SPR.y, SPR.z); sg.add(pg); spin.push({ g: pg, r: SPR.r });
+        for (const dx of [-0.2, 0.2]) {
+          add(pg, cylX(SPR.r - 0.04, SPR.r - 0.04, 0.08, 28), M.steel, dx, 0, 0);
+          for (let k = 0; k < 11; k++) { const a = k * 2 * Math.PI / 11, t = add(pg, box(0.08, 0.07, 0.06), M.steel, dx, Math.cos(a) * (SPR.r - 0.02), Math.sin(a) * (SPR.r - 0.02)); t.rotation.x = -a; }
+        }
+        add(pg, cylX(0.14, 0.14, 0.5, 16), M.dark, 0, 0, 0); }
+      for (const z of RET) { const rg = new THREE.Group(); rg.position.set(0, 0.9, z); sg.add(rg); spin.push({ g: rg, r: 0.11 }); add(rg, cylX(0.11, 0.11, 0.3, 16), M.wheel, 0, 0, 0); }
+      sides.push({ g: sg, tex, spin, travel: 0, prev: null, sx });
+    }
+    // the armoured side skirts: over the tops of the road wheels and the top run, thicker ballistic panels at the front
+    for (const sx of [-1, 1]) {
+      add(body, profile([[-3.62, 1.1], [3.2, 1.1], [3.2, 0.64], [-2.9, 0.64], [-3.62, 0.86]], 0.07), M.hull, sx * 1.8, 0, 0);
+      add(body, profile([[-3.6, 1.1], [-1.4, 1.1], [-1.4, 0.62], [-2.9, 0.62]], 0.1), M.hull, sx * 1.86, 0, 0);
+      for (let k = 0; k < 6; k++) add(body, box(0.012, 0.44, 0.012), M.dark, sx * 1.84, 0.87, -1.4 + k * 0.76);
+    }
+
+    // ---------------------------------------------------------------- the turret (turns about its ring) and the gun
+    const turG = new THREE.Group(); turG.position.set(0, 1.46, -0.35); body.add(turG);
+    const outline = [[0.44, -2.05], [1.56, -1.45], [1.8, -0.86], [1.8, 1.02], [1.62, 1.28], [1.58, 2.22], [-1.58, 2.22], [-1.62, 1.28], [-1.8, 1.02], [-1.8, -0.86], [-1.56, -1.45], [-0.44, -2.05]];
+    const top = outline.map(([x, z]) => [x * 0.93, z < -1 ? z * 0.95 + 0.04 : z - 0.04]);
+    add(turG, prism(outline, top, 0, 0.84), M.tur, 0, 0, 0);
+    // the mantlet, and the gun on its trunnions
+    add(turG, box(0.86, 0.56, 0.3), M.tur, 0, 0.44, -2.02);
+    const gunG = new THREE.Group(); gunG.position.set(0, 0.46, -2.1); turG.add(gunG);
+    add(gunG, cylZ(0.13, 0.15, 0.45, 20), M.tur, 0, 0, -0.2);
+    add(gunG, cylZ(0.088, 0.09, 5.0, 20), M.tur, 0, 0, -2.9);
+    for (const z of [-0.9, -1.3, -2.9, -3.6, -4.3]) add(gunG, cylZ(0.097, 0.097, 0.05, 20), M.tur, 0, 0, z);
+    add(gunG, cylZ(0.13, 0.15, 0.55, 20), M.tur, 0, 0, -2.0);                         // the fume extractor
+    add(gunG, cylZ(0.1, 0.098, 0.3, 20), M.gun, 0, 0, -5.3);                           // the muzzle
+    add(gunG, box(0.08, 0.06, 0.12), M.dark, 0, 0.12, -5.2);                             // (muzzle reference sensor)
+    add(gunG, new THREE.CircleGeometry(0.06, 16), M.dark, 0, 0, -5.452, 0, Math.PI, 0);
+    // the commander's cupola (right, with the .50 cal), the loader's hatch (left, with the M240)
+    const roof = 0.84;
+    add(turG, cylX(0.4, 0.42, 0.16, 28), M.tur, 0.62, roof + 0.08, 0.55, 0, 0, Math.PI / 2);
+    for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k - 2.5) * 0.45; add(turG, box(0.12, 0.08, 0.04), M.glass, 0.62 + Math.cos(a) * 0.4, roof + 0.1, 0.55 + Math.sin(a) * 0.4, 0, -a - Math.PI / 2, 0); }
+    add(turG, box(0.18, 0.2, 0.18), M.tur, 0.62, roof + 0.28, 0.2);
+    { const mg = new THREE.Group(); mg.position.set(0.62, roof + 0.4, 0.2); turG.add(mg);
+      add(mg, box(0.12, 0.14, 0.56), M.gun, 0, 0, 0); add(mg, cylZ(0.022, 0.022, 1.1, 10), M.gun, 0, 0, -0.8); add(mg, box(0.2, 0.2, 0.1), M.gun, 0.11, -0.05, 0.05); }
+    add(turG, cylX(0.36, 0.36, 0.06, 24), M.tur, -0.64, roof + 0.03, 0.48, 0, 0, Math.PI / 2);
+    tubeAB(turG, V3(-0.64, roof, 0.1), V3(-0.64, roof + 0.36, 0.1), 0.03, M.gun);
+    { const mg = new THREE.Group(); mg.position.set(-0.64, roof + 0.4, 0.1); turG.add(mg);
+      add(mg, box(0.1, 0.12, 0.44), M.gun, 0, 0, 0); add(mg, cylZ(0.018, 0.018, 0.62, 10), M.gun, 0, 0, -0.52); }
+    // the gunner's primary sight (right front), the commander's independent viewer (left front)
+    { const s = add(turG, box(0.44, 0.34, 0.6), M.tur, 0.74, roof + 0.17, -0.98); add(s, box(0.3, 0.14, 0.01), M.glass, 0, 0.03, -0.306); }
+    tubeAB(turG, V3(-0.46, roof, -0.72), V3(-0.46, roof + 0.22, -0.72), 0.1, M.tur);
+    { const s = add(turG, box(0.34, 0.28, 0.34), M.tur, -0.46, roof + 0.36, -0.72); add(s, box(0.22, 0.12, 0.01), M.glass, 0, 0.02, -0.176); }
+    // smoke dischargers on the cheeks, whip antennas at the back
+    for (const sx of [-1, 1]) for (let k = 0; k < 6; k++) {
+      const t = add(turG, cylZ(0.045, 0.045, 0.24, 10), M.dark, sx * (1.68 + (k % 3) * 0.02), 0.5 + Math.floor(k / 3) * 0.1, -1.05 + (k % 3) * 0.1, -0.3, sx * 0.5, 0);
+      t.castShadow = false;
+    }
+    for (const sx of [-1, 1]) tubeAB(turG, V3(sx * 1.4, roof, 1.9), V3(sx * 1.45, roof + 1.8, 1.95), 0.008, M.dark, 5);
+    // the bustle rack behind: a basket of bars with the crew's kit in it
+    for (const sx of [-1, 1]) { tubeAB(turG, V3(sx * 1.52, 0.3, 2.22), V3(sx * 1.52, 0.3, 2.78), 0.02, M.gun); tubeAB(turG, V3(sx * 1.52, 0.86, 2.22), V3(sx * 1.52, 0.86, 2.78), 0.02, M.gun);
+      tubeAB(turG, V3(sx * 1.52, 0.3, 2.78), V3(sx * 1.52, 0.86, 2.78), 0.02, M.gun); }
+    tubeAB(turG, V3(-1.52, 0.3, 2.78), V3(1.52, 0.3, 2.78), 0.02, M.gun); tubeAB(turG, V3(-1.52, 0.86, 2.78), V3(1.52, 0.86, 2.78), 0.02, M.gun);
+    for (let k = -3; k <= 3; k++) tubeAB(turG, V3(k * 0.42, 0.3, 2.78), V3(k * 0.42, 0.86, 2.78), 0.012, M.gun, 5);
+    const kit = [new THREE.MeshStandardMaterial({ color: 0x4d4a33, roughness: 0.9 }), new THREE.MeshStandardMaterial({ color: 0x3a3f2c, roughness: 0.9 })];
+    add(turG, box(0.9, 0.36, 0.44), kit[0], -0.7, 0.5, 2.5); add(turG, box(0.7, 0.3, 0.4), kit[1], 0.4, 0.46, 2.5);
+    add(turG, cylX(0.16, 0.16, 1.1, 14), kit[0], 0.9, 0.62, 2.52);
+    // the commander, head and shoulders out of the cupola
+    const cmdr = new THREE.Group(); turG.add(cmdr);
+    add(cmdr, box(0.42, 0.32, 0.26), M.suit, 0.62, roof + 0.3, 0.6);
+    add(cmdr, new THREE.SphereGeometry(0.13, 18, 12), M.helmet, 0.62, roof + 0.58, 0.6);
+    add(cmdr, box(0.16, 0.06, 0.04), M.dark, 0.62, roof + 0.55, 0.47);
+
+    // ---------------------------------------------------------------- the four physics wheels (nothing drawn: the
+    // tracks stand in for them), the driver's periscope eye, a hidden steering handle
+    const wheels = [];
+    for (let i = 0; i < 4; i++) {
+      const front = i < 2, left = (i & 1) === 0, side = left ? -1 : 1;
+      const corner = new THREE.Group(); corner.position.set(side * trackX, RW - cgH, front ? -cgToFront : cgToRear); rootG.add(corner);
+      const flip = new THREE.Group(); corner.add(flip); const spin = new THREE.Group(); flip.add(spin);
+      wheels.push({ corner, flip, spin, left, front, side, stock: [], pkg: [] });
+    }
+    const rest = wheels.map((w) => w.corner.position.y);
+    const steerG = new THREE.Group(); body.add(steerG);
+
+    // ---------------------------------------------------------------- per frame
+    const _m = new THREE.Matrix4();
+    function afterWheels() {
+      // (the camouflage's frames: the hull's and the turret's)
+      model.updateMatrixWorld(true);
+      hullInv.value.copy(_m.copy(model.matrixWorld).invert());
+      turInv.value.copy(_m.copy(turG.matrixWorld).invert());
+      for (const s of sides) {
+        // each track follows its side's suspension, and runs at its side's speed (the physics wheels' turning)
+        const f = wheels[s.sx < 0 ? 0 : 1], r = wheels[s.sx < 0 ? 2 : 3];
+        const dF = f.corner.position.y - rest[s.sx < 0 ? 0 : 1], dR = r.corner.position.y - rest[s.sx < 0 ? 2 : 3];
+        s.g.position.y = (dF + dR) / 2; s.g.rotation.x = Math.atan2(dF - dR, cgToFront + cgToRear);
+        const a = s.sx < 0 ? f.spin.rotation.x : -f.spin.rotation.x;
+        if (s.prev !== null) { let d = a - s.prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; s.travel += d * RW; }
+        s.prev = a;
+        s.tex.offset.x = -s.travel / 0.19;
+        for (const w of s.spin) w.g.rotation.x = -s.travel / w.r;
+      }
+    }
+    // the turret turned to yaw (radians, + to the left of the hull's nose, as three.js turns things) and the gun lifted
+    // to elevation (radians, + up)
+    function setTurret(yaw, elev) { turG.rotation.y = yaw; gunG.rotation.x = elev; }
+    function setPaint(name) { const c = PAINTS[name]; if (c === undefined) return; M.hull.color.setHex(c); M.tur.color.setHex(c); }
+    function setLights(o) {
+      M.tail.emissiveIntensity = o.brake ? 4 : (o.headlights ? 1.4 : 0.4);
+      M.head.emissiveIntensity = o.headlights ? 3.5 : 0;
+      for (const s of spots) { s.visible = !!o.headlights; s.intensity = o.headlights ? 220 : 0; }
+    }
+    function setInteriorVisible(v, cockpit) { cmdr.visible = !cockpit; }
+    const noop = () => {};
+    afterWheels();
+    return {
+      root: rootG, model, exterior: model, interior: model, wheels, steerWheel: steerG, eye: toRoot(V3(0, 1.66, -2.62)),
+      exhaustTips: tips, materials: M, headlights: spots, tailLens: [], mirrors: [],
+      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      afterWheels, setTurret, variant: 'tank', cls: 'tank',
+    };
+  }
+
+  root.HCTank = { build };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
 <script>/* src/worldrender.js */
 /* Hellcat Drive — world rendering: streamed LOD terrain chunks (roads drawn per-pixel in the terrain shader),
    instanced vegetation / rocks, farm buildings, power lines, signs, water, sky and lighting presets. */
@@ -14113,7 +14502,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -14130,7 +14519,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -14286,6 +14675,21 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
         trans: '4-speed automatic',
         snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
+    tank: { btn: 'MAIN BATTLE TANK', sub: 'A 62 t Abrams-type tank · 1,500 hp gas turbine · steers on its tracks, pivots in place · the turret follows where you look · governed, ungoverned and a 3,000 hp hot rod', paint: 'Sand', tc: 3, cam: [2.1, 2.0],
+      hint: 'Main battle tank (governed): shift up (E) for DRIVE - a 1,500 hp gas turbine, 42 mph. It steers on its tracks: steer and one track runs faster than the other; at a stop in NEUTRAL it pivots on the spot. The turret and gun follow the camera - drag the mouse to look round (the view button puts the camera back behind). No shooting.',
+      info: 'Built like an M1A2 Abrams: ~62 t · a 1,500 hp gas turbine, 3,950 lb-ft at its output shaft · a 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering · seven dual road wheels a side on torsion bars, rubber-padded steel tracks 635 mm wide · the 120 mm gun, the commander\'s .50 cal, the loader\'s M240 · 0-20 mph in ~6 s, governed to 42 mph',
+      trans: 'Turbine · 4-speed automatic · skid steer', tyres: 'Steel tracks',
+      snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.35, whPure: 1, whine: 1.3, rpmRef: 3000, open: 1, fmul: 1, deep: 0.5, loud: 0.9, race: 0 },
+      optKey: 'tankEng', optLabel: 'Version', options: [
+        ['gov', 'Governed', 'As it serves: the turbine governed to 42 mph · 0-20 mph in ~6 s'],
+        ['ungov', 'Ungoverned', 'The governor off and the final drive taller · ~55 mph'],
+        ['hot', '3,000 hp hot rod', 'A turbine turned up to 3,000 hp · 0-20 mph in 3 s · ~68 mph'],
+      ],
+      eng: {
+        ungov: { hint: 'Main battle tank (ungoverned): shift up (E) for DRIVE - the governor off and taller gearing, ~55 mph. It steers on its tracks and pivots in NEUTRAL. The turret follows the camera - drag the mouse to look round.' },
+        hot: { hint: 'Main battle tank (3,000 hp hot rod): shift up (E) for DRIVE - the turbine turned up to 3,000 hp: 0-20 in 3 s and ~68 mph in 62 t. It steers on its tracks and pivots in NEUTRAL. The turret follows the camera - drag the mouse to look round.',
+          info: 'The Abrams-type tank with its gas turbine turned up to 3,000 hp (7,900 lb-ft at the output shaft) and geared taller · ~62 t · 0-20 mph in ~3 s, ~68 mph', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.35, whPure: 1, whine: 1.5, rpmRef: 3000, open: 1, fmul: 1, deep: 0.6, loud: 1, race: 0 } },
+      } },
     cyber: { btn: 'CYBERTRUCK', sub: 'The stainless-steel electric pickup · Long Range RWD, All-Wheel Drive and the 845 hp Cyberbeast · 35 in all-terrains, four-wheel steering', paint: 'Stainless', tc: 1, cam: [1.25, 1.3],
       hint: 'Cybertruck (All-Wheel Drive): shift up (E) for DRIVE - two motors, ~600 hp, 0-60 in 4.1 s, governed to 112 mph. The rear wheels steer too: against the fronts at low speed (a tight turn for 5.7 m of truck), a touch with them at speed. Stability control is on (Sport).',
       info: 'The stainless-steel wedge: flat unpainted panels, a light bar across the nose and the tail, frameless glass, the vault over the bed · two motors, ~600 hp, all-wheel drive · adaptive air suspension, four-wheel steering (the rears up to 10 degrees), steer-by-wire · 35 in all-terrains on 20 in wheels · 5.68 m long, 3.81 m wheelbase · 3,000 kg (6,603 lb) · 0-60 4.1 s, 112 mph',
@@ -14338,6 +14742,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : S.car === 'tank' ? ['Steel grousers', 'Bare steel grousers', 'The rubber pads off the track shoes: bare steel grousers dig into dirt, mud and grass for more bite, and slide on pavement (and chew it up)']
     : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
       + 'and nearly twice the grip in mud - about the same on gravel, where the gravel tyres are made for it, and a lot less on tarmac. Heavier, and a touch of lift']
     : CC ? ['Knobbies', 'Knobby tyres', 'Knobby off-road tyres in the car\'s own size and a touch of lift: far more bite on dirt, gravel and grass, a lot less on pavement, where the knobs squirm']
@@ -14494,6 +14899,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // play are built by the same
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
+    if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' ? MON.build(THREE, o) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
@@ -14640,7 +15046,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ mouse orbit / zoom
   canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) { cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY; } });
-  window.addEventListener('pointerup', () => { cam.dragging = false; cam.orbitT = 1.2; });
+  window.addEventListener('pointerup', () => { cam.dragging = false; cam.orbitT = TANK ? Infinity : 1.2; });
   window.addEventListener('pointermove', (e) => {
     if (!cam.dragging) return;
     cam.orbitYaw -= (e.clientX - cam.lx) * 0.006; cam.orbitPitch = clamp(cam.orbitPitch + (e.clientY - cam.ly) * 0.004, -0.5, 0.9);
@@ -15186,7 +15592,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     const st = input.state, P = input.pressed, A = input.actions;
     if (P.pause) { if (input.wizard) return; if (!G.started) return; openMenu(!G.menu); }
     if (G.menu || !G.started || input.wizard) return;
-    if (P.camera) { cam.mode = (cam.mode + 1) % 3; S.camMode = cam.mode; saveS(); cam.init = false; hud.toast(VIEW_NAMES[cam.mode], 1.2); }
+    if (P.camera) { cam.mode = (cam.mode + 1) % 3; S.camMode = cam.mode; saveS(); cam.init = false; hud.toast(VIEW_NAMES[cam.mode], 1.2); if (TANK) { cam.orbitYaw = 0; cam.orbitPitch = 0; } }
     if (P.shiftUp) veh.shiftUp();
     if (P.shiftDown) veh.shiftDown();
     if (P.reverse) veh.selectReverse();
@@ -15316,6 +15722,17 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     flames.update(dt);
   }
 
+  // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
+  // looks (drag the mouse to look round) at a real turret's ~40 deg/s, and the gun lifts with the view (-9 to +20 deg)
+  const TANK = S.car === 'tank';
+  const TUR = { yaw: 0, elev: 0 }, _tq = new THREE.Quaternion(), _td = new THREE.Vector3();
+  function turretFollow(dt) {
+    _td.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(_tq.set(veh.qx, veh.qy, veh.qz, veh.qw).invert());
+    const want = Math.atan2(-_td.x, -_td.z), eWant = clamp(Math.asin(clamp(_td.y, -1, 1)) + 0.16, -0.16, 0.35);
+    let d = want - TUR.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    TUR.yaw += clamp(d, -0.7 * dt, 0.7 * dt); TUR.elev += clamp(eWant - TUR.elev, -0.45 * dt, 0.45 * dt);
+    car.setTurret(TUR.yaw, TUR.elev);
+  }
   // ------------------------------------------------------------------ per-frame: car visuals
   function updateCarVisual(dt) {
     car.root.position.set(veh.px, veh.py, veh.pz);
@@ -15345,6 +15762,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       vw.corner.getWorldPosition(_v); _v2.set(1, 0, 0).applyQuaternion(vw.corner.getWorldQuaternion(_q));
       smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
+    if (TANK) turretFollow(dt);
     if (car.afterWheels) car.afterWheels();
     if (car.setJet) { car.setJetSize(jetSize()); car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt); }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);

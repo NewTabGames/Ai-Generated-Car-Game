@@ -338,6 +338,18 @@
       muX: 1.3, muY: 1.06, loose: 1.5, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.2, relaxY: 0.42,
       B: 2.6, C: 1.3, E: -0.1, heatCap: 5000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.02,
       crr: [1.2, 0.8, 0.8, 0.8, 0.85, 1.2] },
+    // the tank's tracks: rubber-padded steel, 635 mm wide - each 'wheel' is one end of a track's ground contact. A long,
+    // stiff footprint (bites at little slip, no heat to speak of), grousers that dig into soft ground, and a tracked
+    // vehicle's rolling resistance (~3.5 % on tarmac, a lot less than a tyre's in mud)
+    track: { name: 'T-158 steel track, rubber pads', short: 'Steel tracks', width: 0.635, radius: 0.36,
+      muX: 0.95, muY: 0.62, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
+    // (its off-road package: the rubber pads off - bare steel grousers dig into dirt, mud and grass, slide on tarmac)
+    trackGrouser: { name: 'T-158 steel track, bare grousers', short: 'Steel grousers', width: 0.635, radius: 0.36,
+      muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -352,6 +364,7 @@
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
+    if (car === 'tank') return { front: 'trackGrouser', rear: 'trackGrouser' };
     if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
@@ -1060,7 +1073,8 @@
       // ---------------- wheels & driveline
       let L0 = 0;
       if (s.wheelGyro) for (let i = 0; i < 4; i++) L0 += W[i].inertia * W[i].omega;
-      if (s.awd) this._driveline4(h);
+      if (s.tracks) this._drivelineTracks(h);
+      else if (s.awd) this._driveline4(h);
       else {
         for (let i = 0; i < 2; i++) {
           const w = W[i];
@@ -1725,6 +1739,23 @@
         }
         if (this.clutchEng < 0.02) this.locked = false;
       }
+    }
+
+    // tracked (the tank): each track is one thing - its two 'wheels' (the ends of its ground contact) turn together. The
+    // engine drives both tracks through the transmission and an open differential, as a car's axle; the steering unit
+    // (hydrostatic, off the engine) pushes the tracks apart in speed - the steer input asks for a difference, tracks.dv
+    // m/s at a crawl, fading to dvMin of it by vFade - so it turns by driving one track faster than the other, and pivots
+    // in place (the tracks counter-rotate) with no drive at all. Backing up it steers the way a car does
+    _drivelineTracks(h) {
+      const s = this.spec, W = this.wheels, T = s.tracks, inp = this.input;
+      const road = (w) => -w.fx * w.radius + (w.contact ? w.rrT : 0);
+      const v = this.forwardSpeed, r = W[2].radius, dir = this.gear < 0 || v < -0.5 ? -1 : 1;
+      const dvMax = T.dv * clamp(1 - Math.abs(v) / T.vFade, T.dvMin, 1);
+      const want = dir * clamp(inp.steer || 0, -1, 1) * dvMax / r;         // (left minus right, rad/s: + turns right)
+      const Tst = this.running ? clamp(T.kp * (want - (W[2].omega - W[3].omega)), -T.tMax, T.tMax) : 0;
+      this.trackSteerT = Tst;
+      this._driveline(h, road(W[2]) + road(W[0]) + Tst, road(W[3]) + road(W[1]) - Tst, W[2].brakeT + W[0].brakeT, W[3].brakeT + W[1].brakeT);
+      W[0].omega = W[2].omega; W[1].omega = W[3].omega;
     }
 
     _driveline(h, TL, TR, TbL, TbR) {
@@ -2792,6 +2823,33 @@
     CdA: 1.07,
     bodyHalfW: 1.01, bodyFront: -2.85, bodyRear: 2.84, bodyBottom: -0.33, bodyTop: 1.07,
   } };
+  // Main battle tank, built like an M1A2 Abrams: ~62 t, a 1,500 hp gas turbine (3,950 lb-ft at its output shaft), a
+  // 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering, seven dual road wheels a
+  // side on torsion bars, rubber-padded steel tracks 635 mm wide ~4.2 m apart on the ground. It steers as tanks do
+  // (tracks: one track driven faster than the other) and pivots in place; no ABS or stability control. Three versions
+  // (CARS.tank.make): governed to 42 mph, the governor off (~58 mph), and a hot-rodded 3,000 hp turbine (~71 mph)
+  CARS.tank = { name: 'Main Battle Tank', short: 'Tank', car: '1,500 HP TURBINE', hp: 1500, tq: 3950, cc: true, kbLat: 50, spec: {
+    name: 'Main Battle Tank',
+    // (wheelbase: the two 'wheels' of a track stand in for 4.2 m of ground contact under even pressure - a turn has to
+    // scrub it sideways, and its resistance acts a quarter of the length out, not at the ends: at +-1.2 m they carry
+    // the load and resist a turn as the whole track does)
+    mass: 62000, Ipitch: 330000, Iyaw: 380000, Iroll: 95000, cgHeight: 1.15, wheelbase: 2.4, frontWeight: 0.5,
+    trackF: 2.95, trackR: 2.95, wheelRadius: 0.36, wheelInertiaF: 1, wheelInertiaR: 450,
+    frontTire: 'track', rearTire: 'track', Fz0: 150000, loadSens: 0.04,
+    springF: 1.6e6, springR: 1.6e6, dampBumpF: 110000, dampRebF: 150000, dampBumpR: 110000, dampRebR: 150000,
+    arbF: 0, arbR: 0, travelUp: 0.2, travelDown: 0.18, suspS0: 0.45, bumpStopK: 8e6, fzMax: 1.5e6,
+    brakeTorqueF: 36000, brakeTorqueR: 36000, handbrakeTorque: 40000, noABS: true, noESC: true,
+    maxSteer: 1e-4, steerRate: 1, steerRatio: 1, ackermann: 0, rearToe: 0,
+    tracks: { dv: 2.4, dvMin: 0.3, vFade: 22, kp: 150000, tMax: 220000 },
+    idleRpm: 1300, limiterRpm: 3000, redlineRpm: 3000, shiftRpm: 2950, engineInertia: 3, fricA: 60, fricB: 40, starterTorque: 900,
+    torqueCurve: [[0, 3500], [1000, 3950], [1500, 3800], [2000, 3500], [2500, 3150], [3000, 2626], [3300, 2000]],
+    boostMax: 0, popScale: 0,
+    autoRatios: [3.9, 2.45, 1.72, 1.4], autoRev: 3.9, autoFinal: 4.3, tcK: 0.15, tcStall: 2.1, lockupTorque: 9000,
+    shiftTimeWOT: 0.6, shiftTimePart: 0.8, launchRpm: 1800, engineTc: false,
+    lsdPreload: 0, lsdRamp: 0, driveEff: 0.75,
+    CdA: 6.4,
+    bodyHalfW: 1.83, bodyFront: -3.95, bodyRear: 3.95, bodyBottom: -0.67, bodyTop: 1.25,
+  } };
   // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
   // restarts to swap)
@@ -3023,6 +3081,13 @@
       CdA: 0.82, ClA: 0.45, bodyHalfW: 0.93, bodyFront: -1.95, bodyRear: 1.95,
     } },
   }, 'r4', 'Rally4');
+  // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
+  ccEngines('tank', {
+    ungov: { label: 'Ungoverned', car: '1,500 HP TURBINE', spec: { autoFinal: 3.15 } },
+    hot: { label: '3,000 hp hot rod', car: '3,000 HP TURBINE', hp: 3000, tq: 7900, spec: {
+      torqueCurve: [[0, 7000], [1000, 7900], [1500, 7600], [2000, 7000], [2500, 6300], [3000, 5252], [3300, 4000]], autoFinal: 2.55, tcK: 0.3, lockupTorque: 18000,
+    } },
+  }, 'gov', 'Governed');
   // the Cybertruck's other two: the Long Range RWD - one motor at the back, ~350 hp, 2,850 kg, 0-60 ~6.2 s, 112 mph -
   // and the Cyberbeast - three motors (one front, two at the back), 845 hp, 3,104 kg, 0-60 2.6 s, 130 mph
   ccEngines('cyber', {

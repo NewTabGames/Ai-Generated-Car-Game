@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -175,6 +175,21 @@
         info: 'The glass wedge on its golf-cart frame with the cart builder\'s favourite swap: a junkyard 5.3 L LS V8, 285 hp at 5,200, 325 lb-ft at 4,000, behind the bench · 4L60E 4-speed automatic, a 9-inch rear axle on 3.08 gears · 18 x 8.50-8 cart tyres · 690 kg · 0-60 ~4.2 s, ~165 mph',
         trans: '4-speed automatic',
         snd: { nEng: 1, cyl: 8, fmul: 1.05, deep: 0.1, loud: 0.3, open: 0, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5800, race: 0.55, rough: 0.12 } } } },
+    tank: { btn: 'MAIN BATTLE TANK', sub: 'A 62 t Abrams-type tank · 1,500 hp gas turbine · steers on its tracks, pivots in place · the turret follows where you look · governed, ungoverned and a 3,000 hp hot rod', paint: 'Sand', tc: 3, cam: [2.1, 2.0],
+      hint: 'Main battle tank (governed): shift up (E) for DRIVE - a 1,500 hp gas turbine, 42 mph. It steers on its tracks: steer and one track runs faster than the other; at a stop in NEUTRAL it pivots on the spot. The turret and gun follow the camera - drag the mouse to look round (the view button puts the camera back behind). No shooting.',
+      info: 'Built like an M1A2 Abrams: ~62 t · a 1,500 hp gas turbine, 3,950 lb-ft at its output shaft · a 4-speed automatic cross-drive transmission with a torque converter and hydrostatic steering · seven dual road wheels a side on torsion bars, rubber-padded steel tracks 635 mm wide · the 120 mm gun, the commander\'s .50 cal, the loader\'s M240 · 0-20 mph in ~6 s, governed to 42 mph',
+      trans: 'Turbine · 4-speed automatic · skid steer', tyres: 'Steel tracks',
+      snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.35, whPure: 1, whine: 1.3, rpmRef: 3000, open: 1, fmul: 1, deep: 0.5, loud: 0.9, race: 0 },
+      optKey: 'tankEng', optLabel: 'Version', options: [
+        ['gov', 'Governed', 'As it serves: the turbine governed to 42 mph · 0-20 mph in ~6 s'],
+        ['ungov', 'Ungoverned', 'The governor off and the final drive taller · ~55 mph'],
+        ['hot', '3,000 hp hot rod', 'A turbine turned up to 3,000 hp · 0-20 mph in 3 s · ~68 mph'],
+      ],
+      eng: {
+        ungov: { hint: 'Main battle tank (ungoverned): shift up (E) for DRIVE - the governor off and taller gearing, ~55 mph. It steers on its tracks and pivots in NEUTRAL. The turret follows the camera - drag the mouse to look round.' },
+        hot: { hint: 'Main battle tank (3,000 hp hot rod): shift up (E) for DRIVE - the turbine turned up to 3,000 hp: 0-20 in 3 s and ~68 mph in 62 t. It steers on its tracks and pivots in NEUTRAL. The turret follows the camera - drag the mouse to look round.',
+          info: 'The Abrams-type tank with its gas turbine turned up to 3,000 hp (7,900 lb-ft at the output shaft) and geared taller · ~62 t · 0-20 mph in ~3 s, ~68 mph', snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.35, whPure: 1, whine: 1.5, rpmRef: 3000, open: 1, fmul: 1, deep: 0.6, loud: 1, race: 0 } },
+      } },
     cyber: { btn: 'CYBERTRUCK', sub: 'The stainless-steel electric pickup · Long Range RWD, All-Wheel Drive and the 845 hp Cyberbeast · 35 in all-terrains, four-wheel steering', paint: 'Stainless', tc: 1, cam: [1.25, 1.3],
       hint: 'Cybertruck (All-Wheel Drive): shift up (E) for DRIVE - two motors, ~600 hp, 0-60 in 4.1 s, governed to 112 mph. The rear wheels steer too: against the fronts at low speed (a tight turn for 5.7 m of truck), a touch with them at speed. Stability control is on (Sport).',
       info: 'The stainless-steel wedge: flat unpainted panels, a light bar across the nose and the tail, frameless glass, the vault over the bed · two motors, ~600 hp, all-wheel drive · adaptive air suspension, four-wheel steering (the rears up to 10 degrees), steer-by-wire · 35 in all-terrains on 20 in wheels · 5.68 m long, 3.81 m wheelbase · 3,000 kg (6,603 lb) · 0-60 4.1 s, 112 mph',
@@ -227,6 +242,7 @@
       + 'More grip in mud, turf and loose dirt (it corners harder off the pavement), about the same bite on the arena clay, less on pavement, and a touch slower to spin up']
     : KART ? ['Knobbies', 'Knobbies + sprocket', 'Knobby off-road tyres on 6 in rims (12x5.00-6 front, 13x6.50-6 rear) with a bigger rear sprocket to match: an inch more ground clearance and three times the grip '
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
+    : S.car === 'tank' ? ['Steel grousers', 'Bare steel grousers', 'The rubber pads off the track shoes: bare steel grousers dig into dirt, mud and grass for more bite, and slide on pavement (and chew it up)']
     : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
       + 'and nearly twice the grip in mud - about the same on gravel, where the gravel tyres are made for it, and a lot less on tarmac. Heavier, and a touch of lift']
     : CC ? ['Knobbies', 'Knobby tyres', 'Knobby off-road tyres in the car\'s own size and a touch of lift: far more bite on dirt, gravel and grass, a lot less on pavement, where the knobs squirm']
@@ -383,6 +399,7 @@
   // play are built by the same
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
+    if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' ? MON.build(THREE, o) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
@@ -529,7 +546,7 @@
 
   // ------------------------------------------------------------------ mouse orbit / zoom
   canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) { cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY; } });
-  window.addEventListener('pointerup', () => { cam.dragging = false; cam.orbitT = 1.2; });
+  window.addEventListener('pointerup', () => { cam.dragging = false; cam.orbitT = TANK ? Infinity : 1.2; });
   window.addEventListener('pointermove', (e) => {
     if (!cam.dragging) return;
     cam.orbitYaw -= (e.clientX - cam.lx) * 0.006; cam.orbitPitch = clamp(cam.orbitPitch + (e.clientY - cam.ly) * 0.004, -0.5, 0.9);
@@ -1075,7 +1092,7 @@
     const st = input.state, P = input.pressed, A = input.actions;
     if (P.pause) { if (input.wizard) return; if (!G.started) return; openMenu(!G.menu); }
     if (G.menu || !G.started || input.wizard) return;
-    if (P.camera) { cam.mode = (cam.mode + 1) % 3; S.camMode = cam.mode; saveS(); cam.init = false; hud.toast(VIEW_NAMES[cam.mode], 1.2); }
+    if (P.camera) { cam.mode = (cam.mode + 1) % 3; S.camMode = cam.mode; saveS(); cam.init = false; hud.toast(VIEW_NAMES[cam.mode], 1.2); if (TANK) { cam.orbitYaw = 0; cam.orbitPitch = 0; } }
     if (P.shiftUp) veh.shiftUp();
     if (P.shiftDown) veh.shiftDown();
     if (P.reverse) veh.selectReverse();
@@ -1205,6 +1222,17 @@
     flames.update(dt);
   }
 
+  // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
+  // looks (drag the mouse to look round) at a real turret's ~40 deg/s, and the gun lifts with the view (-9 to +20 deg)
+  const TANK = S.car === 'tank';
+  const TUR = { yaw: 0, elev: 0 }, _tq = new THREE.Quaternion(), _td = new THREE.Vector3();
+  function turretFollow(dt) {
+    _td.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(_tq.set(veh.qx, veh.qy, veh.qz, veh.qw).invert());
+    const want = Math.atan2(-_td.x, -_td.z), eWant = clamp(Math.asin(clamp(_td.y, -1, 1)) + 0.16, -0.16, 0.35);
+    let d = want - TUR.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    TUR.yaw += clamp(d, -0.7 * dt, 0.7 * dt); TUR.elev += clamp(eWant - TUR.elev, -0.45 * dt, 0.45 * dt);
+    car.setTurret(TUR.yaw, TUR.elev);
+  }
   // ------------------------------------------------------------------ per-frame: car visuals
   function updateCarVisual(dt) {
     car.root.position.set(veh.px, veh.py, veh.pz);
@@ -1234,6 +1262,7 @@
       vw.corner.getWorldPosition(_v); _v2.set(1, 0, 0).applyQuaternion(vw.corner.getWorldQuaternion(_q));
       smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
     }
+    if (TANK) turretFollow(dt);
     if (car.afterWheels) car.afterWheels();
     if (car.setJet) { car.setJetSize(jetSize()); car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt); }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
