@@ -3091,7 +3091,7 @@
   // lock-up converter, 3.54 axles, the transfer case in 2-Hi. ~3,300 kg with the driver, 60 % on the front (the iron six
   // sits over the front axle). The turbo takes a moment to spool, so the torque - and on a tuned truck the black smoke -
   // comes as the boost does. Three versions (CARS.diesel.make): stock, a built street truck on compound turbos, and the
-  // pulling truck (triple turbos, the weight box on the front, locked in 4WD)
+  // pulling truck (triple turbos, a stack through the hood, locked in 4WD)
   const dslPts = (cg, fw) => ccPts(cg, fw, 3.924, [...ccBox(1.0, 0.58, 1.4, -2.88, 3.42), [-0.9, 1.97, -0.42], [0.9, 1.97, -0.42], [-0.9, 1.97, 0.6], [0.9, 1.97, 0.6],
     [-1.21, 0.75, 1.75], [1.21, 0.75, 1.75], [-1.21, 0.75, 2.2], [1.21, 0.75, 2.2], [-0.78, 1.42, -2.75], [0.78, 1.42, -2.75]]);
   CARS.diesel = { name: 'Diesel Dually', short: 'Diesel Dually', car: '5.9 I6 TURBO DIESEL', hp: 235, tq: 460, cc: true, kbLat: 6, spec: {
@@ -3575,7 +3575,7 @@
   }, 'sport', '200 Sport');
   // the diesel's other two: a built street truck - the 5.9 with compound turbos, injectors and a tune, ~650 hp and 1,250
   // lb-ft, a built transmission and converter (~135 mph) - and the pulling truck: a billet-head 5.9 on triple turbos, ~1,600
-  // hp and 2,400 lb-ft to 5,000 rpm, the weight box hung on the front, locked in 4WD (~160 mph)
+  // hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD (~160 mph)
   ccEngines('diesel', {
     built: { label: 'Built street truck', car: '5.9 · COMPOUND TURBOS', hp: 650, tq: 1250, spec: {
       mass: 3270, idleRpm: 800, limiterRpm: 3800, redlineRpm: 3600, shiftRpm: 3500, engineInertia: 0.6,
@@ -3584,12 +3584,12 @@
       autoFinal: 3.54, tcK: 0.022, tcStall: 1.9, lockupTorque: 3800, shiftTimeWOT: 0.28, lsdPreload: 300, lsdRamp: 0.35, govSpeed: undefined,
     } },
     pull: { label: 'Pulling truck', car: '5.9 · TRIPLE TURBOS', hp: 1600, tq: 2400, spec: {
-      mass: 3450, frontWeight: 0.64, Ipitch: 10500, idleRpm: 900, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4700, engineInertia: 0.7, fricA: 40, fricB: 32,
+      mass: 3350, frontWeight: 0.61, idleRpm: 900, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4700, engineInertia: 0.7, fricA: 40, fricB: 32,
       torqueCurve: [[0, 500], [1000, 800], [1500, 1300], [2000, 1800], [2500, 2150], [3000, 2350], [3400, 2400], [3800, 2300], [4200, 2000], [4600, 1800], [5000, 1550], [5300, 1200]],
       turbo: { lag: 1.0, base: 0.3, rpm0: 1400, rpm1: 2800 }, boostMax: 110,
       autoFinal: 4.1, tcK: 0.035, tcStall: 1.8, lockupTorque: 7000, shiftTimeWOT: 0.25, govSpeed: undefined,
       awd: true, awdFront: 0.45, lsdPreload: 900, lsdPreloadF: 600, centerPreload: 4000, lsdRamp: 0.5,
-      bodyFront: -2.9, bodyPts: dslPts(0.82, 0.64).concat(ccPts(0.82, 0.64, 3.924, [[-0.55, 0.45, -3.45], [0.55, 0.45, -3.45], [-0.55, 1.0, -3.45], [0.55, 1.0, -3.45]])),
+      bodyPts: dslPts(0.82, 0.61),
     } },
   }, 'stock', 'Stock 5.9');
   // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine

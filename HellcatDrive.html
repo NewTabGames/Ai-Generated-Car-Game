@@ -4956,7 +4956,7 @@
   // lock-up converter, 3.54 axles, the transfer case in 2-Hi. ~3,300 kg with the driver, 60 % on the front (the iron six
   // sits over the front axle). The turbo takes a moment to spool, so the torque - and on a tuned truck the black smoke -
   // comes as the boost does. Three versions (CARS.diesel.make): stock, a built street truck on compound turbos, and the
-  // pulling truck (triple turbos, the weight box on the front, locked in 4WD)
+  // pulling truck (triple turbos, a stack through the hood, locked in 4WD)
   const dslPts = (cg, fw) => ccPts(cg, fw, 3.924, [...ccBox(1.0, 0.58, 1.4, -2.88, 3.42), [-0.9, 1.97, -0.42], [0.9, 1.97, -0.42], [-0.9, 1.97, 0.6], [0.9, 1.97, 0.6],
     [-1.21, 0.75, 1.75], [1.21, 0.75, 1.75], [-1.21, 0.75, 2.2], [1.21, 0.75, 2.2], [-0.78, 1.42, -2.75], [0.78, 1.42, -2.75]]);
   CARS.diesel = { name: 'Diesel Dually', short: 'Diesel Dually', car: '5.9 I6 TURBO DIESEL', hp: 235, tq: 460, cc: true, kbLat: 6, spec: {
@@ -5440,7 +5440,7 @@
   }, 'sport', '200 Sport');
   // the diesel's other two: a built street truck - the 5.9 with compound turbos, injectors and a tune, ~650 hp and 1,250
   // lb-ft, a built transmission and converter (~135 mph) - and the pulling truck: a billet-head 5.9 on triple turbos, ~1,600
-  // hp and 2,400 lb-ft to 5,000 rpm, the weight box hung on the front, locked in 4WD (~160 mph)
+  // hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD (~160 mph)
   ccEngines('diesel', {
     built: { label: 'Built street truck', car: '5.9 · COMPOUND TURBOS', hp: 650, tq: 1250, spec: {
       mass: 3270, idleRpm: 800, limiterRpm: 3800, redlineRpm: 3600, shiftRpm: 3500, engineInertia: 0.6,
@@ -5449,12 +5449,12 @@
       autoFinal: 3.54, tcK: 0.022, tcStall: 1.9, lockupTorque: 3800, shiftTimeWOT: 0.28, lsdPreload: 300, lsdRamp: 0.35, govSpeed: undefined,
     } },
     pull: { label: 'Pulling truck', car: '5.9 · TRIPLE TURBOS', hp: 1600, tq: 2400, spec: {
-      mass: 3450, frontWeight: 0.64, Ipitch: 10500, idleRpm: 900, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4700, engineInertia: 0.7, fricA: 40, fricB: 32,
+      mass: 3350, frontWeight: 0.61, idleRpm: 900, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4700, engineInertia: 0.7, fricA: 40, fricB: 32,
       torqueCurve: [[0, 500], [1000, 800], [1500, 1300], [2000, 1800], [2500, 2150], [3000, 2350], [3400, 2400], [3800, 2300], [4200, 2000], [4600, 1800], [5000, 1550], [5300, 1200]],
       turbo: { lag: 1.0, base: 0.3, rpm0: 1400, rpm1: 2800 }, boostMax: 110,
       autoFinal: 4.1, tcK: 0.035, tcStall: 1.8, lockupTorque: 7000, shiftTimeWOT: 0.25, govSpeed: undefined,
       awd: true, awdFront: 0.45, lsdPreload: 900, lsdPreloadF: 600, centerPreload: 4000, lsdRamp: 0.5,
-      bodyFront: -2.9, bodyPts: dslPts(0.82, 0.64).concat(ccPts(0.82, 0.64, 3.924, [[-0.55, 0.45, -3.45], [0.55, 0.45, -3.45], [-0.55, 1.0, -3.45], [0.55, 1.0, -3.45]])),
+      bodyPts: dslPts(0.82, 0.61),
     } },
   }, 'stock', 'Stock 5.9');
   // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
@@ -12567,7 +12567,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // front window's sill dropped at its leading corner, five amber cab lights on the roof, towing mirrors; the 8 ft box
     // between the dually fenders, tall tail lamps, a chrome step bumper; polished 16 in 8-lug wheels, duals at the back.
     // Versions: stock (its exhaust out the side ahead of the duals), the built street truck (twin stacks in the bed) and
-    // the pulling truck (a stack up through a primer-grey hood, the weight box hung off the front, the hitch)
+    // the pulling truck (a short stack up through a primer-grey hood, the hitch)
     B.diesel = () => {
       WF = 0.235; WR = 0.235;
       wheelStyle = { rim: 'dualF', rimRR: 0.2, rimR: 0.2, tread: 'hwy' };
@@ -12768,7 +12768,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         P.soot.push({ p: toRoot(V3(x, y1 + 0.1, z + 0.02)), d: V3(0, 1, 0.12).normalize() });
       };
       if (PULL) {
-        stack(0.42, 1.4, 2.32, zC - 0.25, 0.064);
+        stack(0.42, 1.4, 1.9, zC - 0.25, 0.064);
         add(body, new THREE.CylinderGeometry(0.085, 0.085, 0.02, 24), M.chrome, 0.42, hEdge(zC - 0.25) + 0.04, zC - 0.25);
       } else if (BUILT) for (const sx of [-1, 1]) {
         stack(sx * 0.8, 1.0, 2.45, zBF + 0.14, 0.076);
@@ -12778,15 +12778,6 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         P.soot.push({ p: toRoot(V3(1.02, 0.5, zR - 0.82)), d: V3(1, -0.25, 0.1).normalize() });
       }
       P.tips.push(...P.soot.map((t) => t.p));
-      // ---- the pulling truck's weight box: a steel frame off the front, the box on it with the weights stacked in
-      if (PULL) {
-        const z0 = zN - 0.12, z1 = zN - 0.72;
-        for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.45, 0.6, z0 + 0.1), V3(sx * 0.45, 0.6, z1 + 0.05), 0.035, M.black, 10);
-        add(body, rbox(1.24, 0.56, 0.58, 0.03), M.gloss, 0, 0.72, (z0 + z1) / 2 - 0.02);
-        add(body, rbox(1.12, 0.06, 0.5, 0.02), M.steel, 0, 1.02, (z0 + z1) / 2 - 0.02);
-        for (let k = 0; k < 4; k++) add(body, rbox(0.04, 0.4, 0.5, 0.01), M.steel, -0.42 + k * 0.28, 0.76, (z0 + z1) / 2 - 0.02);
-        add(body, rbox(0.3, 0.15, 0.01, 0.005), M.white, 0.32, 0.72, z1 - 0.045, 0, 0, 0, false);
-      }
       // ---- inside: the floor, door trims, headliner, the dash with its big cluster, the bench, the rear bench
       add(body, rbox(1.9, 0.04, 1.75, 0.01), M.trimIn, 0, 0.72, -0.25);
       for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(1.7, 0.75), M.trimIn, sx * 0.975, 1.08, -0.25, 0, sx * Math.PI / 2, 0, false);
@@ -17870,21 +17861,21 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     diesel: { btn: 'DIESEL DUALLY', sub: 'A 2nd-gen one-ton Quad Cab dually · 5.9 inline-six turbo diesel · stock, a built street truck or the pulling truck - black smoke out of the stack', paint: 'Patriot Blue', tc: 0, cam: [1.25, 1.3], road: true,
       hint: 'Diesel Dually (stock 5.9): shift up (E) for DRIVE - the inline-six turbo diesel, 235 hp and 460 lb-ft through a 4-speed automatic, ~3,300 kg on duals. It pulls from nothing and runs out of breath at 3,000; floor it from low revs and it puffs smoke until the turbo spools. 0-60 ~13 s, governed at 100 mph.',
       info: 'A 2nd-gen (1998-2002) one-ton Quad Cab long bed 4x4 dually: the big-rig hood, the crosshair grille, cab lights, towing mirrors, an 8 ft box between the dually fenders · 5.9 L inline-six turbo diesel (24-valve), 235 hp at 2,700, 460 lb-ft at 1,600 · 4-speed automatic, 4.10 axles, 2-Hi · LT235/85R16s, duals at the back, on polished 16 in wheels · 6.34 m long, 3.92 m wheelbase · ~3,300 kg · 0-60 ~13 s, 100 mph governed',
-      trans: '4-speed auto · 2WD', tyres: 'LT highway · duals', soot: 0.35,
+      trans: '4-speed auto · 2WD', tyres: 'LT highway · duals', soot: 0.25,
       snd: { nEng: 1, cyl: 6, fmul: 0.82, deep: 0.45, loud: 0.45, open: 0.2, whK: 0.19, whPure: 1, whine: 0.9, rpmRef: 3200, race: 0.15, rough: 0.2, turbo: 1, diesel: 1 },
       optKey: 'dieselEng', optLabel: 'Version', options: [
         ['stock', 'Stock 5.9', 'The 5.9 inline-six turbo diesel, 235 hp / 460 lb-ft · 4-speed auto · 0-60 ~13 s · 100 mph governed'],
         ['built', 'Built street truck', 'Compound turbos, injectors and a tune, ~650 hp / 1,250 lb-ft · built transmission · twin stacks in the bed, black smoke · 0-60 ~6.8 s · ~135 mph', undefined, 1],
-        ['pull', 'Pulling truck', 'Triple turbos, ~1,600 hp / 2,400 lb-ft · a stack through the hood, the weight box on the front · 4WD · 0-60 ~4.4 s · rolls coal', undefined, 1],
+        ['pull', 'Pulling truck', 'Triple turbos, ~1,600 hp / 2,400 lb-ft · a stack through the hood · 4WD · 0-60 ~4.4 s · rolls coal', undefined, 1],
       ],
       eng: {
         built: { hint: 'Diesel Dually (built street truck): shift up (E) for DRIVE - compound turbos, injectors and a tune, ~650 hp and 1,250 lb-ft, rear drive on duals: it rolls black smoke out of the twin bed stacks every time you floor it, and spins the duals if you let it. 0-60 ~6.8 s, ~135 mph. Stability control starts on Sport.',
           info: 'The dually built for the street: the 5.9 with compound turbos (~60 psi), big injectors and a tune - ~650 hp at 3,600, 1,250 lb-ft at 2,400 · a built 4-speed automatic and converter, 3.54 axles, 2WD · twin 6 in stacks in the bed · ~3,270 kg · 0-60 ~6.8 s, ~135 mph',
-          trans: '4-speed auto (built) · 2WD', soot: 1.0,
+          trans: '4-speed auto (built) · 2WD', soot: 0.65,
           snd: { nEng: 1, cyl: 6, fmul: 0.78, deep: 0.6, loud: 0.75, open: 0.8, whK: 0.19, whPure: 1, whine: 1.5, rpmRef: 3800, race: 0.45, rough: 0.25, turbo: 1, diesel: 0.85, surge: 1 } },
-        pull: { hint: 'Diesel Dually (pulling truck): shift up (E) for DRIVE - a billet-head 5.9 on triple turbos, ~1,600 hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD, the weight box hanging off the front - and a stack through the hood that rolls coal. 0-60 ~4.4 s, ~160 mph. Try the Dirt Drag strip. Stability control starts on Sport.',
-          info: 'A street-diesel-class pulling truck: a billet-head 5.9 on triple turbos (~110 psi), ~1,600 hp at 4,200, 2,400 lb-ft at 3,400, to 5,000 rpm · a built 4-speed automatic, locked 4WD · a 5 in stack straight up through the (primer-grey) hood, the hitch, the weight box on the front · ~3,450 kg · 0-60 ~4.4 s, ~160 mph',
-          trans: '4-speed auto (built) · 4WD', soot: 1.7,
+        pull: { hint: 'Diesel Dually (pulling truck): shift up (E) for DRIVE - a billet-head 5.9 on triple turbos, ~1,600 hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD - and a stack through the hood that rolls coal. 0-60 ~4.4 s, ~160 mph. Try the Dirt Drag strip. Stability control starts on Sport.',
+          info: 'A street-diesel-class pulling truck: a billet-head 5.9 on triple turbos (~110 psi), ~1,600 hp at 4,200, 2,400 lb-ft at 3,400, to 5,000 rpm · a built 4-speed automatic, locked 4WD · a 5 in stack straight up through the (primer-grey) hood, the hitch · ~3,350 kg · 0-60 ~4.4 s, ~160 mph',
+          trans: '4-speed auto (built) · 4WD', soot: 1.0,
           snd: { nEng: 1, cyl: 6, fmul: 0.74, deep: 0.8, loud: 1, open: 1, whK: 0.19, whPure: 1, whine: 2.1, rpmRef: 5000, race: 0.75, rough: 0.3, turbo: 1, diesel: 0.7, surge: 1 } },
       } },
   };
@@ -18943,7 +18934,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     const K = CCD.soot || 0.3, thr = clamp(veh.thrEff, 0, 1), lag = Math.max(0, thr - (veh.spool || 0));
     const amt = clamp((1.7 * lag + 0.3 * thr * thr * clamp(veh.rpm() / sp.redlineRpm + 0.3, 0, 1.2)) * K, 0, 2.4);
     const idle = K > 0.5 ? 0.04 : 0.015;
-    G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 6 + 45 * Math.min(1.6, amt) : 3) * smoke.budget * tune.smoke;
+    G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 3 + 17 * Math.min(1.3, amt) : 1.5) * smoke.budget * tune.smoke;
     if (G.sootAcc < 1) return;
     const a = Math.max(amt, idle), m = car.root.matrixWorld;
     smoke.setGround(groundH(car.root.position.x, car.root.position.z));
@@ -18954,7 +18945,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const v0 = 1.5 + 5 * thr * Math.min(1, 0.3 + a);
         smoke.emit(_sv.x + (Math.random() - 0.5) * 0.06, _sv.y + (Math.random() - 0.5) * 0.06, _sv.z + (Math.random() - 0.5) * 0.06,
           veh.vx + _sd.x * v0 + (Math.random() - 0.5) * 0.8, veh.vy + _sd.y * v0 + Math.random() * 0.5, veh.vz + _sd.z * v0 + (Math.random() - 0.5) * 0.8,
-          0.22 + 0.16 * Math.min(1.5, a), 1.0 + 1.4 * Math.min(1.6, a), (2 + 2.4 * Math.min(1.5, a)) * (0.8 + Math.random() * 0.4), clamp(0.16 + 0.32 * a, 0, 0.72), -clamp(0.3 + 0.55 * a, 0, 1));
+          0.18 + 0.1 * Math.min(1.3, a), 0.8 + 0.8 * Math.min(1.3, a), (1.2 + 1.2 * Math.min(1.3, a)) * (0.8 + Math.random() * 0.4), clamp(0.1 + 0.2 * a, 0, 0.4), -clamp(0.3 + 0.5 * a, 0, 0.9));
       }
     }
   }

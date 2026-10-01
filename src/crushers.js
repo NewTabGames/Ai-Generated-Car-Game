@@ -1406,7 +1406,7 @@
     // front window's sill dropped at its leading corner, five amber cab lights on the roof, towing mirrors; the 8 ft box
     // between the dually fenders, tall tail lamps, a chrome step bumper; polished 16 in 8-lug wheels, duals at the back.
     // Versions: stock (its exhaust out the side ahead of the duals), the built street truck (twin stacks in the bed) and
-    // the pulling truck (a stack up through a primer-grey hood, the weight box hung off the front, the hitch)
+    // the pulling truck (a short stack up through a primer-grey hood, the hitch)
     B.diesel = () => {
       WF = 0.235; WR = 0.235;
       wheelStyle = { rim: 'dualF', rimRR: 0.2, rimR: 0.2, tread: 'hwy' };
@@ -1607,7 +1607,7 @@
         P.soot.push({ p: toRoot(V3(x, y1 + 0.1, z + 0.02)), d: V3(0, 1, 0.12).normalize() });
       };
       if (PULL) {
-        stack(0.42, 1.4, 2.32, zC - 0.25, 0.064);
+        stack(0.42, 1.4, 1.9, zC - 0.25, 0.064);
         add(body, new THREE.CylinderGeometry(0.085, 0.085, 0.02, 24), M.chrome, 0.42, hEdge(zC - 0.25) + 0.04, zC - 0.25);
       } else if (BUILT) for (const sx of [-1, 1]) {
         stack(sx * 0.8, 1.0, 2.45, zBF + 0.14, 0.076);
@@ -1617,15 +1617,6 @@
         P.soot.push({ p: toRoot(V3(1.02, 0.5, zR - 0.82)), d: V3(1, -0.25, 0.1).normalize() });
       }
       P.tips.push(...P.soot.map((t) => t.p));
-      // ---- the pulling truck's weight box: a steel frame off the front, the box on it with the weights stacked in
-      if (PULL) {
-        const z0 = zN - 0.12, z1 = zN - 0.72;
-        for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.45, 0.6, z0 + 0.1), V3(sx * 0.45, 0.6, z1 + 0.05), 0.035, M.black, 10);
-        add(body, rbox(1.24, 0.56, 0.58, 0.03), M.gloss, 0, 0.72, (z0 + z1) / 2 - 0.02);
-        add(body, rbox(1.12, 0.06, 0.5, 0.02), M.steel, 0, 1.02, (z0 + z1) / 2 - 0.02);
-        for (let k = 0; k < 4; k++) add(body, rbox(0.04, 0.4, 0.5, 0.01), M.steel, -0.42 + k * 0.28, 0.76, (z0 + z1) / 2 - 0.02);
-        add(body, rbox(0.3, 0.15, 0.01, 0.005), M.white, 0.32, 0.72, z1 - 0.045, 0, 0, 0, false);
-      }
       // ---- inside: the floor, door trims, headliner, the dash with its big cluster, the bench, the rear bench
       add(body, rbox(1.9, 0.04, 1.75, 0.01), M.trimIn, 0, 0.72, -0.25);
       for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(1.7, 0.75), M.trimIn, sx * 0.975, 1.08, -0.25, 0, sx * Math.PI / 2, 0, false);
