@@ -2721,8 +2721,12 @@
         : 'Wheel users: press any button on your wheel so the browser can see it.';
       if (!G.loadDone) $('startBtn').textContent = 'Generating world…';
     }
-    // no tyre smoke in the cockpit view (it filled the cabin on burnouts); still shown from the chase cams
-    smoke.mesh.visible = !(G.started && cam.mode === 2);
+    // no tyre smoke in the cockpit view (it filled the cabin on burnouts); still shown from the chase cams. A diesel's
+    // smoke is the point of it, though: in its cockpit the smoke stays, only the puffs right round your head (in the cab)
+    // fading out - you see the stack's soot roll up past the windshield and trail off in the mirrors
+    const SOOTCAB = G.started && cam.mode === 2 && !!(car.sootTips && car.sootTips.length);
+    smoke.mesh.visible = !(G.started && cam.mode === 2) || SOOTCAB;
+    smoke.setNear(SOOTCAB ? 1.5 : 0);
     // live mirrors in the cockpit: one mirror per frame, round-robin
     if (G.started && cam.mode === 2 && car.mirrors.length && !G.debugCam) {
       const m = car.mirrors[frames % car.mirrors.length];

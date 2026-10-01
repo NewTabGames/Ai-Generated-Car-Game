@@ -39,7 +39,9 @@
       this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: smokeTexture(THREE) }, uLight: { value: new THREE.Color(0.9, 0.9, 0.9) }, uAmb: { value: new THREE.Color(0.55, 0.58, 0.62) },
         // the car's tyres (centre, axle direction, radius + half width) for soft intersections, see setWheel
         uWc: { value: [0, 1, 2, 3].map(() => new THREE.Vector3()) }, uWa: { value: [0, 1, 2, 3].map(() => new THREE.Vector3(1, 0, 0)) },
-        uWr: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) } }]);
+        uWr: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) },
+        // (cockpit view: puffs this close to the camera - in the cab with you - fade out; 0 = off)
+        uNear: { value: 0 } }]);
       this.mat = new THREE.ShaderMaterial({
         uniforms: this.uniforms, transparent: true, depthWrite: false, fog: true,
         // Soft particles: a flat billboard that slices through a tyre or the ground leaves a hard straight edge (it read
@@ -60,7 +62,7 @@ void main(){ vUv = uv; vA = iData.y; vShade = iData.w; vGnd = iGnd;
   #include <fog_vertex>
 }`,
         fragmentShader: `uniform sampler2D map; uniform vec3 uLight; uniform vec3 uAmb; varying vec2 vUv; varying float vA; varying float vShade;
-uniform vec3 uWc[4]; uniform vec3 uWa[4]; uniform vec2 uWr[4]; varying vec3 vWp; varying float vGnd; varying vec4 vNear;
+uniform vec3 uWc[4]; uniform vec3 uWa[4]; uniform vec2 uWr[4]; uniform float uNear; varying vec3 vWp; varying float vGnd; varying vec4 vNear;
 #include <fog_pars_fragment>
 // distance along the view ray from the camera to tyre k (a cylinder: tread + both sidewalls), 1e9 if the ray misses it
 float tyreHit(vec3 ro, vec3 rd, int k) {
@@ -81,6 +83,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // soft particles: fade a puff by how far it sits in front of whatever is behind it on this view ray - the pavement
   // or one of the car's tyres - so it never cuts a hard line through them
   vec3 rd = vWp - cameraPosition; float tf = length(rd); rd /= tf;
+  if (uNear > 0.0) a *= smoothstep(uNear * 0.6, uNear * 1.5, tf);
   if (rd.y < -1e-4) a *= smoothstep(0.0, 0.45, (vGnd - cameraPosition.y) / rd.y - tf);
   for (int k = 0; k < 4; k++) {
     if (vNear[k] < 0.5) continue;
@@ -112,6 +115,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     // the camera the puffs are seen from (screen coverage, the veil)
     setCamera(cam) { this.cam = cam; }
+    // seen from inside a cab: puffs within ~r m of the camera fade away (they'd be in the cab) and there's no veil
+    setNear(r) { this.uniforms.uNear.value = r || 0; }
     emit(x, y, z, vx, vy, vz, size, grow, life, alpha, shade) {
       let i;
       if (this.n < this.max) i = this.n++;
@@ -198,7 +203,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       this.budget = Math.max(0.08, Math.min(1, (90 - covAll) / 60));
       // (eased a little: the camera crossing a puff's edge shouldn't pop the whole view)
       const va = this.veilA = (this.veilA || 0) + (Math.min(0.85, 1 - clear) - (this.veilA || 0)) * Math.min(1, dt * 12);
-      this.veil.visible = va > 0.003;
+      this.veil.visible = va > 0.003 && !(this.uniforms.uNear.value > 0);
       if (this.veil.visible) {
         // the puffs' own colour (tyre smoke white-grey .. soil brown) under the same light, texture brightness ~0.8
         if (vw > 0) this.veilSh = vs / vw;
