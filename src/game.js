@@ -309,7 +309,7 @@
     diesel: { btn: 'DIESEL DUALLY', sub: 'A 2nd-gen one-ton Quad Cab dually · 5.9 inline-six turbo diesel · stock, a built street truck or the pulling truck - black smoke out of the stack', paint: 'Patriot Blue', tc: 0, cam: [1.25, 1.3], road: true,
       hint: 'Diesel Dually (stock 5.9): shift up (E) for DRIVE - the inline-six turbo diesel, 235 hp and 460 lb-ft through a 4-speed automatic, ~3,300 kg on duals. It pulls from nothing and runs out of breath at 3,000; floor it from low revs and it puffs smoke until the turbo spools. 0-60 ~13 s, governed at 100 mph.',
       info: 'A 2nd-gen (1998-2002) one-ton Quad Cab long bed 4x4 dually: the big-rig hood, the crosshair grille, cab lights, towing mirrors, an 8 ft box between the dually fenders · 5.9 L inline-six turbo diesel (24-valve), 235 hp at 2,700, 460 lb-ft at 1,600 · 4-speed automatic, 4.10 axles, 2-Hi · LT235/85R16s, duals at the back, on polished 16 in wheels · 6.34 m long, 3.92 m wheelbase · ~3,300 kg · 0-60 ~13 s, 100 mph governed',
-      trans: '4-speed auto · 2WD', tyres: 'LT highway · duals', soot: 0.25,
+      trans: '4-speed auto · 2WD', tyres: 'LT highway · duals', soot: 0.35,
       snd: { nEng: 1, cyl: 6, fmul: 0.82, deep: 0.45, loud: 0.45, open: 0.2, whK: 0.19, whPure: 1, whine: 0.9, rpmRef: 3200, race: 0.15, rough: 0.2, turbo: 1, diesel: 1 },
       optKey: 'dieselEng', optLabel: 'Version', options: [
         ['stock', 'Stock 5.9', 'The 5.9 inline-six turbo diesel, 235 hp / 460 lb-ft · 4-speed auto · 0-60 ~13 s · 100 mph governed'],
@@ -319,11 +319,11 @@
       eng: {
         built: { hint: 'Diesel Dually (built street truck): shift up (E) for DRIVE - compound turbos, injectors and a tune, ~650 hp and 1,250 lb-ft, rear drive on duals: it rolls black smoke out of the twin bed stacks every time you floor it, and spins the duals if you let it. 0-60 ~6.8 s, ~135 mph. Stability control starts on Sport.',
           info: 'The dually built for the street: the 5.9 with compound turbos (~60 psi), big injectors and a tune - ~650 hp at 3,600, 1,250 lb-ft at 2,400 · a built 4-speed automatic and converter, 3.54 axles, 2WD · twin 6 in stacks in the bed · ~3,270 kg · 0-60 ~6.8 s, ~135 mph',
-          trans: '4-speed auto (built) · 2WD', soot: 0.65,
+          trans: '4-speed auto (built) · 2WD', soot: 1.0,
           snd: { nEng: 1, cyl: 6, fmul: 0.78, deep: 0.6, loud: 0.75, open: 0.8, whK: 0.19, whPure: 1, whine: 1.5, rpmRef: 3800, race: 0.45, rough: 0.25, turbo: 1, diesel: 0.85, surge: 1 } },
         pull: { hint: 'Diesel Dually (pulling truck): shift up (E) for DRIVE - a billet-head 5.9 on triple turbos, ~1,600 hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD - and a stack through the hood that rolls coal. 0-60 ~4.4 s, ~160 mph. Try the Dirt Drag strip. Stability control starts on Sport.',
           info: 'A street-diesel-class pulling truck: a billet-head 5.9 on triple turbos (~110 psi), ~1,600 hp at 4,200, 2,400 lb-ft at 3,400, to 5,000 rpm · a built 4-speed automatic, locked 4WD · a 5 in stack straight up through the (primer-grey) hood, the hitch · ~3,350 kg · 0-60 ~4.4 s, ~160 mph',
-          trans: '4-speed auto (built) · 4WD', soot: 1.0,
+          trans: '4-speed auto (built) · 4WD', soot: 1.7,
           snd: { nEng: 1, cyl: 6, fmul: 0.74, deep: 0.8, loud: 1, open: 1, whK: 0.19, whPure: 1, whine: 2.1, rpmRef: 5000, race: 0.75, rough: 0.3, turbo: 1, diesel: 0.7, surge: 1 } },
       } },
   };
@@ -1382,7 +1382,7 @@
     const K = CCD.soot || 0.3, thr = clamp(veh.thrEff, 0, 1), lag = Math.max(0, thr - (veh.spool || 0));
     const amt = clamp((1.7 * lag + 0.3 * thr * thr * clamp(veh.rpm() / sp.redlineRpm + 0.3, 0, 1.2)) * K, 0, 2.4);
     const idle = K > 0.5 ? 0.04 : 0.015;
-    G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 3 + 17 * Math.min(1.3, amt) : 1.5) * smoke.budget * tune.smoke;
+    G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 6 + 45 * Math.min(1.6, amt) : 3) * smoke.budget * tune.smoke;
     if (G.sootAcc < 1) return;
     const a = Math.max(amt, idle), m = car.root.matrixWorld;
     smoke.setGround(groundH(car.root.position.x, car.root.position.z));
@@ -1393,7 +1393,7 @@
         const v0 = 1.5 + 5 * thr * Math.min(1, 0.3 + a);
         smoke.emit(_sv.x + (Math.random() - 0.5) * 0.06, _sv.y + (Math.random() - 0.5) * 0.06, _sv.z + (Math.random() - 0.5) * 0.06,
           veh.vx + _sd.x * v0 + (Math.random() - 0.5) * 0.8, veh.vy + _sd.y * v0 + Math.random() * 0.5, veh.vz + _sd.z * v0 + (Math.random() - 0.5) * 0.8,
-          0.18 + 0.1 * Math.min(1.3, a), 0.8 + 0.8 * Math.min(1.3, a), (1.2 + 1.2 * Math.min(1.3, a)) * (0.8 + Math.random() * 0.4), clamp(0.1 + 0.2 * a, 0, 0.4), -clamp(0.3 + 0.5 * a, 0, 0.9));
+          0.22 + 0.16 * Math.min(1.5, a), 1.0 + 1.4 * Math.min(1.6, a), (2 + 2.4 * Math.min(1.5, a)) * (0.8 + Math.random() * 0.4), clamp(0.16 + 0.32 * a, 0, 0.72), -clamp(0.3 + 0.55 * a, 0, 1));
       }
     }
   }
