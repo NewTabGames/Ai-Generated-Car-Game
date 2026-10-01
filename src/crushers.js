@@ -2482,7 +2482,7 @@
     // back curving down over the deck to the tail, bulbous rear fenders over the big tyres. Fenderless at the front: the
     // tall grille shell over the dropped axle on its transverse leaf, the frame rails, and the engine out in the open - a red
     // big-block, polished valve covers, a polished 8-71 blower with its drive belt, two carbs under a big flat hat - and the
-    // zoomies, four polished pipes a side swept down and back to flared tips ahead of the doors. Polished wheels
+    // zoomies, four polished pipes a side down from the ports and turning back and up into flared tips ahead of the cowl. Polished wheels
     B.hotrod = () => {
       WF = 0.225; WR = 0.42;
       wheelStyle = { rim: 'rod', rimR: 0.19, rimRR: 0.19, tread: 'road' };
@@ -2588,13 +2588,22 @@
         const hd = new THREE.Group(); hd.position.set(sx * 0.2, 0.7, 0); hd.rotation.z = -sx * 0.6; eg.add(hd);
         add(hd, rbox(0.16, 0.14, 0.7, 0.02), M.block, 0, 0, 0);
         add(hd, rbox(0.15, 0.09, 0.68, 0.03), M.polish, sx * 0.0, 0.1, 0);
-        // the zoomies: a polished pipe from each port, out, down and back to a flared tip ahead of the door
+        // the zoomies: a polished pipe from each port, out and down outboard of the frame rail, then turning back and UP into a
+        // flared tip - the front pipe the longest and outermost, each tip passing outside the next pipe's bend, so the four
+        // tips step up and back in a row ahead of the cowl
+        add(hd, rbox(0.014, 0.07, 0.6, 0.004), M.polish, sx * 0.084, -0.02, 0);
+        M.polish2 = M.polish2 || Object.assign(M.polish.clone(), { side: THREE.DoubleSide });
         for (let k = 0; k < 4; k++) {
-          const z0 = -0.27 + k * 0.18, a = V3(sx * 0.34, 0.66, ez + z0), b = V3(sx * 0.41, 0.6, ez + z0 + 0.05);
-          const c = V3(sx * 0.43, 0.32, ez + z0 + 0.36), d = V3(sx * 0.44, 0.15, ez + z0 + 0.55);
-          pipe(body, [a, b, c, d], 0.024, M.polish, 10);
-          const tip = add(body, cylZ(0.026, 0.034, 0.08, 14, true), M.polish, d.x, d.y - 0.02, d.z + 0.03, -0.9, 0, 0); void tip;
-          P.tips.push(toRoot(V3(d.x, d.y - 0.05, d.z + 0.06)));
+          const Z = ez - 0.21 + k * 0.115, xk = 0.47 + (3 - k) * 0.055, yb = 0.25 + k * 0.05;
+          const pts = [V3(sx * 0.255, 0.66, Z), V3(sx * 0.31, 0.626, Z), V3(sx * (xk - 0.02), 0.52, Z + 0.012), V3(sx * xk, yb + 0.07, Z + 0.032),
+            V3(sx * xk, yb, Z + 0.07), V3(sx * (xk + 0.04), yb + 0.035, Z + 0.14)];
+          const cv = new THREE.CatmullRomCurve3(pts), e = pts[5], d = cv.getTangent(1);
+          add(body, new THREE.TubeGeometry(cv, 72, 0.027, 14, false), M.polish, 0, 0, 0);
+          const tip = add(body, cylZ(0.042, 0.0275, 0.08, 18, true), M.polish2, e.x + d.x * 0.04, e.y + d.y * 0.04, e.z + d.z * 0.04);
+          tip.quaternion.setFromUnitVectors(V3(0, 0, 1), d);
+          const hole = add(body, new THREE.CircleGeometry(0.027, 14), M.black, e.x + d.x * 0.006, e.y + d.y * 0.006, e.z + d.z * 0.006, 0, 0, 0, false);
+          hole.quaternion.setFromUnitVectors(V3(0, 0, 1), d);
+          P.tips.push(toRoot(e.clone().addScaledVector(d, 0.11)));
         }
       }
       // (the intake, the blower case with its ribs, the drive belt and pulleys at the front, the carbs and the hat)
