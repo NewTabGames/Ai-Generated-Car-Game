@@ -15083,16 +15083,24 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       pipe(eng, [V3(0.22, 0.56, -0.14), V3(0.24, 0.66, -0.02), V3(0.12, 0.66, 0.1), V3(0.03, 0.6, 0.12)], 0.022, M.alu);
       add(eng, rbox(0.14, 0.1, 0.03, 0.01), M.black, 0.16, 0.48, 0.12);
     }
-    // the exhaust: down from the head, back along the right side, up into the silver muffler under the rack
+    // the exhaust: out of the head, back along the right side inside the plastics, then out behind the footwell into the
+    // silver muffler - a polished canister on the right above the front of the rear tyre (inboard of it), under the
+    // rear fender's leading edge, tipped up a little toward the back, strapped to the frame
     { const hp = V3(0.04, 0.6, -0.27);
-      const mz0 = fz(Lb - 0.05), mz1 = fz(Lb + 0.38), my = 0.58, mx = 0.2 + (RACE ? 0.02 : 0);
-      pipe(body, [hp.clone().add(V3(0, 0, fz(0.32))), V3(0.12, 0.45, fz(0.18)), V3(0.19, 0.36, fz(0.5)), V3(0.2, 0.44, fz(0.82)), V3(mx, my - 0.02, mz0)], 0.022, M.chrome);
-      const mf = new THREE.Group(); mf.position.set(mx, my, (mz0 + mz1) / 2); mf.rotation.x = -0.18; body.add(mf);
-      add(mf, cylZ(0.055, 0.055, mz1 - mz0, 24), M.muffler, 0, 0, 0);
-      add(mf, cylZ(0.058, 0.058, 0.02, 24), M.alu, 0, 0, -(mz1 - mz0) / 2);
-      add(mf, cylZ(0.058, 0.058, 0.02, 24), M.alu, 0, 0, (mz1 - mz0) / 2);
-      add(mf, cylZ(0.022, 0.022, 0.05, 14), M.chrome, 0, -0.01, (mz1 - mz0) / 2 + 0.03);
-      const tp = V3(mx, my + Math.sin(0.18) * (mz1 - mz0) / 2 - 0.01, mz1 + 0.06); tips.push(toRoot(tp)); }
+      const mz0 = fz(Lb - 0.46), mz1 = fz(Lb - 0.06), mr = 0.052, my = 0.585, mx = 0.245 + (RACE ? 0.02 : 0), tilt = 0.1, ml = mz1 - mz0;
+      const lift = (dz) => Math.sin(tilt) * dz;           // (the canister's centre line rising toward the back)
+      pipe(body, [hp.clone().add(V3(0, 0, fz(0.32))), V3(0.11, 0.52, fz(0.14)), V3(0.14, 0.5, fz(0.42)), V3(0.15, 0.52, mz0 - 0.07), V3(mx - 0.05, my + lift(-ml / 2) - 0.012, mz0 - 0.02), V3(mx, my + lift(-ml / 2) - 0.004, mz0 + 0.03)], 0.022, M.chrome);
+      const mf = new THREE.Group(); mf.position.set(mx, my, (mz0 + mz1) / 2); mf.rotation.x = -tilt; body.add(mf);
+      add(mf, cylZ(mr, mr, ml, 28), M.muffler, 0, 0, 0);
+      add(mf, cylZ(mr + 0.004, mr + 0.004, 0.024, 28), M.alu, 0, 0, -ml / 2);
+      add(mf, cylZ(mr + 0.004, mr + 0.004, 0.03, 28), M.engine, 0, 0, ml / 2);              // (the dark end cap)
+      add(mf, cylZ(0.021, 0.021, 0.05, 14), M.chrome, 0, -0.012, ml / 2 + 0.03);           // (the tip)
+      // (two straps round it to the frame)
+      for (const dz of [-0.1, 0.1]) {
+        add(mf, new THREE.TorusGeometry(mr + 0.003, 0.005, 6, 28), M.frame, 0, 0, dz, 0, 0, 0);
+        tubeAB(body, V3(0.14, my + lift(dz) + 0.01, (mz0 + mz1) / 2 + dz), V3(mx - mr, my + lift(dz) + 0.01, (mz0 + mz1) / 2 + dz), 0.008, M.frame);
+      }
+      const tp = V3(mx, my + lift(ml / 2) - 0.012, mz1 + 0.06); tips.push(toRoot(tp)); }
 
     // ---------------------------------------------------------------- the plastics
     // the nose and the tank: one red shell from the pointed nose back to the seat
@@ -15134,7 +15142,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     // the rear fenders and the tail between them under the rack
     const rx1 = HXR + WRr / 2 + 0.04 + wide * 0.4;
-    const rPath = [[zRb - 0.36, 0.34], [zRb - 0.33, 0.55], [zRb - 0.2, 0.69], [zRb + 0.06, 0.728], [zRb + 0.3, 0.71], [zRb + 0.42, 0.62], [zRb + 0.45, 0.5]];
+    // (their leading edges stop high, over the front of the tyres - the muffler, the frame and the shock show under them)
+    const rPath = [[zRb - 0.27, 0.645], [zRb - 0.22, 0.69], [zRb - 0.1, 0.72], [zRb + 0.06, 0.73], [zRb + 0.3, 0.71], [zRb + 0.42, 0.62], [zRb + 0.45, 0.5]];
     for (const sx of [-1, 1]) { const rg = fender(rPath, 0.16, rx1, 0.085, sx, 0.012); add(body, rg, M.paint, 0, 0, 0); add(body, rg, M.under, 0, 0, 0, 0, 0, 0, false); }
     add(body, rbox(0.34, 0.2, 0.05, 0.02), M.plastic, 0, 0.6, zRb + 0.4);
     for (const sx of [-1, 1]) {
@@ -15149,6 +15158,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       for (let k = 0; k < 5; k++) add(body, rbox(x1 - x0 - 0.04, 0.008, 0.012, 0.003), M.black, sx * (x0 + x1) / 2, 0.3, z0 + 0.06 + k * (z1 - z0 - 0.12) / 4);   // (the grip ribs)
       add(body, rbox(0.012, 0.05, z1 - z0, 0.004), M.plastic, sx * x1, 0.31, (z0 + z1) / 2);
       add(body, rbox(0.1, 0.022, 0.05, 0.008), M.alu, sx * (x0 + 0.08), 0.315, fz(0.62));              // (the footpeg)
+      // (the heel guard: a black plate standing up at the footwell's back end, slots through it)
+      add(body, rbox(x1 - x0 - 0.02, 0.2, 0.012, 0.004), M.plastic, sx * ((x0 + x1) / 2 + 0.01), 0.4, z1 + 0.005, 0.12, 0, 0);
+      for (let k = 0; k < 3; k++) add(body, rbox(0.035, 0.11, 0.004, 0.0015), M.black, sx * (x0 + 0.06 + k * (x1 - x0 - 0.1) / 2), 0.41, z1 - 0.004, 0.12, 0, 0, false);
       // the race quads' nerf bars: a tube loop outside each footwell, front fender to rear
       if (RACE) tubes(body, [V3(sx * 0.3, 0.42, z0 - 0.02), V3(sx * (x1 + 0.06), 0.36, z0 + 0.06), V3(sx * (x1 + 0.06), 0.36, z1 - 0.06), V3(sx * 0.3, 0.42, z1 + 0.02)], 0.014, M.frame);
     }
