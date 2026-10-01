@@ -297,6 +297,12 @@
       muX: 1.0, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.16, relaxY: 0.32,
       B: 1.8, C: 1.4, E: -0.2, heatCap: 2400, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
       crr: [0.75, 1, 1, 1, 1, 0.75] },
+    // Prius: 185/65R15 low-rolling-resistance all-seasons - hard, cool-running rubber for the mileage: it gives up early
+    // and gently (~0.78 g on the skidpad), rolls a long way
+    priusLRR: { name: '185/65R15 low-rolling-resistance all-season', short: 'LRR all-season', width: 0.185,
+      muX: 1.1, muY: 0.9, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.36,
+      B: 1.75, C: 1.4, E: -0.2, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
+      crr: [0.75, 1, 1, 1, 1, 0.75] },
     // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
     tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
       muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
@@ -575,7 +581,7 @@
       if (this.running === undefined) { this.running = false; this.eOmega = 0; }
       this.cranking = false; this.crankT = 0;
       this.thrEff = 0; this.fuelCut = false; this.idleI = 0.05; this.idleFlare = 0;
-      this.Te = 0; this.boost = 0;
+      this.Te = 0; this.boost = 0; this.motorT = 0;
       this.gear = this.transType === 'auto' ? 1 : 0;
       this.park = this.transType === 'auto';
       this.autoManual = false; this.manualTimer = 0; this.sinceUpshift = 9; this.kickArm = false;
@@ -1731,6 +1737,14 @@
       this.nosActive = !!(inp.nos && s.nosHp > 0 && this.running && !this.fuelCut && thr > 0.6 && rpm > 1500 && this.gear !== 0 && !this.launchHold);
       if (this.nosActive) Te += s.nosHp * 745.7 / Math.max(this.eOmega, 260) * this.tcCut * this.escCut * shiftCut;
       this.Te = Te;
+      // a hybrid (hybrid: the Prius): an electric motor on the front axle's final drive beside the engine's own path -
+      // full torque from a standstill, its power capped by what the battery gives (Nm, kW; ratio: motor turns per wheel
+      // turn). The engine's share reaches the wheels through the CVT. Nothing in neutral or park; reverse is the motor's
+      if (s.hybrid) {
+        const H = s.hybrid, wm = Math.abs(0.5 * (this.wheels[0].omega + this.wheels[1].omega)) * H.ratio, g = this.gear;
+        const on = this.running && !this.park && g !== 0 && !this.launchHold;
+        this.motorT = on ? (g < 0 ? -1 : 1) * this.thrEff * Math.min(H.Nm, H.kW * 1000 / Math.max(wm, 1)) * this.tcCut * this.escCut : 0;
+      }
       // supercharger boost (for gauge & whine). A roots / screw blower moves a fixed volume per turn - near full boost
       // from low revs; a centrifugal one (centrifugal: the supercharged kart's) builds it with the square of its speed
       const bShape = s.centrifugal ? Math.pow(clamp(rpm / s.redlineRpm, 0, 1), 2) : Math.pow(clamp((rpm - 900) / 3600, 0, 1), 0.65);
@@ -2062,9 +2076,11 @@
       const s = this.spec, W = this.wheels, Ie = s.engineInertia, eff = s.driveEff;
       const T = this._T4 || (this._T4 = [0, 0, 0, 0]), Ti = this._Ti4 || (this._Ti4 = [0, 0, 0, 0]);
       let Isum = 0, wc0 = 0, Tsum = 0;
+      // (a hybrid's motor drives the front wheels through its own reduction, half to each: see the engine's hybrid)
+      const Tm = s.hybrid ? (this.motorT || 0) * s.hybrid.ratio * eff : 0;
       for (let i = 0; i < 4; i++) {
         const w = W[i];
-        T[i] = -w.fx * w.radius + (w.contact ? w.rrT : 0);
+        T[i] = -w.fx * w.radius + (w.contact ? w.rrT : 0) + (i < 2 ? Tm / 2 : 0);
         Isum += w.inertia; wc0 += w.inertia * w.omega; Tsum += T[i];
       }
       wc0 /= Isum;
@@ -3113,6 +3129,90 @@
     govSpeed: 100 / 2.23694, govGrace: 0.5,
     CdA: 1.75,
     bodyHalfW: 1.2, bodyFront: -2.5, bodyRear: 3.8, bodyBottom: -0.3, bodyTop: 1.16, bodyPts: dslPts(0.82, 0.6),
+  } };
+  // Toyota Prius (XW20, 2004-09): the 1.5 L 1NZ-FXE Atkinson-cycle four (76 hp at 5,000, 82 lb-ft at 4,200) and the
+  // power-split hybrid drive - a planetary set ties the engine, a generator and the drive motor together, so the engine
+  // runs at whatever revs suit it while the car does any speed (it drones at ~5,000 floored, the speed coming up under
+  // it - the CVT here) and the 50 kW motor on the final drive adds its torque from a standstill, its power capped by the
+  // battery's ~21-25 kW (hybrid). 110 hp combined, front-wheel drive, 4.113 final, 185/65R15 low-rolling-resistance tyres,
+  // Cd 0.26; 1,390 kg with the driver, 60 / 40. 0-60 ~10 s, governed at 104 mph
+  const priusPts = (cg, fw) => ccPts(cg, fw, 2.7, [...ccBox(0.86, 0.18, 0.98, -2.27, 2.18), [-0.6, 1.49, 0.15], [0.6, 1.49, 0.15], [-0.56, 1.42, -0.3], [0.56, 1.42, -0.3], [-0.55, 1.18, 1.75], [0.55, 1.18, 1.75]]);
+  CARS.prius = { name: 'Toyota Prius', short: 'Prius', car: '1.5 HYBRID', hp: 110, tq: 82, cc: true, kbLat: 6.5, spec: {
+    name: 'Toyota Prius',
+    mass: 1390, Ipitch: 1900, Iyaw: 2050, Iroll: 470, cgHeight: 0.55, wheelbase: 2.7, frontWeight: 0.6,
+    trackF: 1.505, trackR: 1.48, wheelRadius: 0.31, wheelInertiaF: 0.85, wheelInertiaR: 0.75,
+    frontTire: 'priusLRR', rearTire: 'priusLRR',
+    springF: 30000, springR: 24000, dampBumpF: 1800, dampRebF: 2900, dampBumpR: 1400, dampRebR: 2300,
+    arbF: 16000, arbR: 6000, travelUp: 0.09, travelDown: 0.1, suspS0: 0.25,
+    brakeTorqueF: 2300, brakeTorqueR: 1000, handbrakeTorque: 1000,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 15.5,
+    idleRpm: 1000, limiterRpm: 5200, redlineRpm: 5000, shiftRpm: 5000, engineInertia: 0.1, fricA: 9, fricB: 5, starterTorque: 90,
+    // (lb-ft: 82 at 4,200, 76 hp at 5,000)
+    torqueCurve: [[0, 40], [1000, 56], [1500, 64], [2000, 70], [2500, 74], [3000, 77], [3600, 80], [4200, 82], [4600, 81], [5000, 80], [5400, 72], [5800, 60]],
+    boostMax: 0, popScale: 0,
+    // the engine's path: a CVT (the planetary set and the generator, 2.4:1 down to 0.75:1 against the final drive) that
+    // holds the revs the pedal asks for; pulling away it slips (the generator soaking up the difference) with the engine
+    // near its torque peak
+    autoRatios: [2.4], autoRev: 2.4, autoFinal: 4.113, cvt: { lo: 2.4, hi: 0.75, rpm0: 1100, rpm1: 4900, tau: 0.45 },
+    noLockup: true, noCoastBlip: true, blipMax: 0.1, engineTc: true, tcRefBody: true,
+    dragClutch: { rpm0: 1900, rpm1: 4400, kc: 0, base: [[0, 125]], muSlip: 0, slipRef: 150, rev: 1 },
+    hybrid: { Nm: 340, kW: 23, ratio: 4.113 },
+    awd: true, awdFront: 1, fwd: true, lsdPreload: 0, lsdPreloadF: 15, lsdRamp: 0.05, driveEff: 0.9,
+    govSpeed: 104 / 2.23694, govGrace: 0.5,
+    CdA: 0.58,
+    bodyHalfW: 0.86, bodyFront: -2.0, bodyRear: 2.45, bodyBottom: -0.37, bodyTop: 0.94, bodyPts: priusPts(0.55, 0.6),
+  } };
+  // 67: a custom supercar whose body is the numerals - a big rounded 6 at the front (its bowl over the front wheels, the
+  // hook curling back over the cabin) and a 7 behind it (its bar the roof, its stroke slanting down ahead of the rear
+  // wheels), the glass between them, a wing on two stalks. Under it a carbon tub with a 6.7 L twin-turbo V8 behind the
+  // seats - 670 hp from 5,250 to 6,400 and 670 lb-ft from 3,000 - a 7-speed dual-clutch, rear drive. 1,670 kg, 42 / 58;
+  // the numerals are no shape for the wind (~200 mph)
+  CARS.sixseven = { name: '67', short: '67', car: '6.7 TWIN-TURBO V8', hp: 670, tq: 670, cc: true, kbLat: 7, spec: {
+    name: '67',
+    mass: 1670, Ipitch: 2300, Iyaw: 2600, Iroll: 640, cgHeight: 0.52, wheelbase: 2.94, frontWeight: 0.42,
+    trackF: 1.7, trackR: 1.68, wheelRadius: 0.35, wheelInertiaF: 1.4, wheelInertiaR: 1.7,
+    frontTire: 'street', rearTire: 'street',
+    springF: 62000, springR: 70000, dampBumpF: 3600, dampRebF: 5600, dampBumpR: 4000, dampRebR: 6200,
+    arbF: 30000, arbR: 22000, travelUp: 0.06, travelDown: 0.08, suspS0: 0.22,
+    brakeTorqueF: 4600, brakeTorqueR: 3000, handbrakeTorque: 2500,
+    maxSteer: 0.56, steerRate: 5, steerRatio: 14,
+    idleRpm: 850, limiterRpm: 7400, redlineRpm: 7200, shiftRpm: 7000, engineInertia: 0.2, fricA: 26, fricB: 18, starterTorque: 170,
+    // (lb-ft: 670 from 3,000 to 5,250, then 670 hp to 6,400)
+    torqueCurve: [[0, 220], [1000, 300], [2000, 470], [2600, 600], [3000, 670], [5250, 670], [5800, 607], [6400, 550], [6900, 505], [7200, 470], [7600, 400]],
+    turbo: { lag: 0.28, base: 0.45, rpm0: 1800, rpm1: 3200 }, boostMax: 17, popScale: 1.5,
+    autoRatios: [3.6, 2.4, 1.78, 1.38, 1.1, 0.9, 0.74], autoRev: 3.3, autoFinal: 3.3, shiftTimeWOT: 0.08, shiftTimePart: 0.14, shiftCutDepth: 0.3,
+    launchRpm: 3800, engineTc: true, tcRefBody: true,
+    dragClutch: { rpm0: 2200, rpm1: 4200, kc: 0, base: [[0, 1300]], muSlip: 0.15, slipRef: 150, rev: 500 },
+    lsdPreload: 150, lsdRamp: 0.35, driveEff: 0.88,
+    CdA: 1.05, wings: [{ y: 1.45, z: 1.58, ClA: 0.55, CdA: 0.12 }],
+    bodyHalfW: 0.95, bodyFront: -2.46, bodyRear: 2.08, bodyBottom: -0.42, bodyTop: 1.01,
+    bodyPts: ccPts(0.52, 0.42, 2.94, ccBox(0.92, 0.12, 1.5, -2.2, 2.0).concat([[-0.85, 2.0, 1.85], [0.85, 2.0, 1.85], [0, 0.4, -2.23]])),
+  } };
+  // Silver Bullet: Sunbeam's 1930 land-speed car for Kaye Don - a long silver cigar with a pointed nose, the wheels out in
+  // the wind with discs over them, a long fairing down each side between them, the cockpit far back and two tall fins on
+  // the tail. A 24 L V12 with two superchargers, ~960 hp at 3,300 rpm, a 3-speed gearbox to the rear wheels, Dunlop 37 x 7
+  // tyres, ~2.4 t. Built to beat 231 mph; at Daytona in 1930 its blowers never ran right and it managed 186. Here the
+  // engine runs as designed: ~235 mph
+  CARS.silverbullet = { name: 'Silver Bullet', short: 'Silver Bullet', car: '24 L SUPERCHARGED V12', hp: 960, tq: 1700, cc: true, spec: {
+    name: 'Silver Bullet',
+    mass: 2400, Ipitch: 11000, Iyaw: 11500, Iroll: 800, cgHeight: 0.58, wheelbase: 4.0, frontWeight: 0.5,
+    trackF: 1.5, trackR: 1.45, wheelRadius: 0.47, wheelInertiaF: 6, wheelInertiaR: 7,
+    frontTire: 'lsr37', rearTire: 'lsr37', Fz0: 6000,
+    springF: 140000, springR: 150000, dampBumpF: 9000, dampRebF: 12000, dampBumpR: 10000, dampRebR: 13000,
+    arbF: 0, arbR: 0, travelUp: 0.06, travelDown: 0.06, suspS0: 0.15, rearToe: 0,
+    brakeTorqueF: 3200, brakeTorqueR: 2800, handbrakeTorque: 2800, noABS: true, noESC: true,
+    maxSteer: 0.18, steerRate: 1.4, steerRatio: 28, ackermann: 0.3,
+    idleRpm: 600, limiterRpm: 3700, redlineRpm: 3500, shiftRpm: 3400, engineInertia: 2.2, fricA: 80, fricB: 35, starterTorque: 900,
+    // (lb-ft: 1,700 at 2,800, ~960 hp at 3,300)
+    torqueCurve: [[0, 700], [800, 1000], [1500, 1350], [2000, 1560], [2500, 1680], [2800, 1700], [3300, 1528], [3600, 1320], [3900, 1000]],
+    centrifugal: true, boostMax: 10,
+    autoRatios: [2.25, 1.45, 1.0], autoRev: 2.25, autoFinal: 1.5, shiftTimeWOT: 0.5, shiftTimePart: 0.6, shiftCutDepth: 0.6,
+    launchRpm: 1500, noCoastBlip: true, blipMax: 0.2,
+    dragClutch: { rpm0: 1100, rpm1: 2500, kc: 0, base: [[0, 3300]], muSlip: 0.15, slipRef: 60, rev: 1500 },
+    lsdPreload: 300, lsdRamp: 0.2, driveEff: 0.9,
+    CdA: 0.85,
+    bodyHalfW: 0.62, bodyFront: -5.2, bodyRear: 3.3, bodyBottom: -0.38, bodyTop: 0.57,
+    bodyPts: ccPts(0.58, 0.5, 4.0, ccBox(0.5, 0.22, 1.1, -4.6, 3.2).concat([[0, 0.45, -5.2], [-0.32, 1.6, 3.1], [0.32, 1.6, 3.1]])),
   } };
   // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
   // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
