@@ -382,10 +382,26 @@
     // (its off-road package: sand paddles on the back, ribbed sand fronts - dune tyres)
     // (in sand they're at home: ~1.8 g of bite at ~30 % slip - so traction control lets them have that slip - and they
     // float, rolling easier than any tyre that digs in)
-    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.35, sandKy: 1.0, sandCrr: 0.6,
+    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.65, sandKy: 1.5, sandCrr: 0.6,
       muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.3, relaxY: 0.45,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 8000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367, tcTargets: [0.26, 0.32, 0.4] },
+    // (the buggy's ribbed sand fronts: three tall ribs that knife into the sand - they steer in it, and hold the nose in a
+    // turn against the paddles' push)
+    buggyRib: { name: '24x6-12 ribbed sand front', short: 'Rib fronts', width: 0.15, radius: 0.3, sandKx: 1.0, sandKy: 1.75, sandCrr: 0.7,
+      muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.16, relaxY: 0.34,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 1500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 3, inertiaAdd: 0.08 },
+    // the trophy truck's sand tyres: the same paddle and rib design in its own 39 in size (the same grip, on 2.9 t: big
+    // 17 in sand paddles on the back, ribbed fronts) - for the dunes
+    ttPaddle: { name: '39x15-17 sand paddles', short: 'Sand paddles', width: 0.38, sandKx: 1.65, sandKy: 1.5, sandCrr: 0.6,
+      muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.4, relaxY: 0.6,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 14000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 10, inertiaAdd: 0.8, tcTargets: [0.26, 0.32, 0.4] },
+    ttRib: { name: '39x12-17 ribbed sand front', short: 'Rib fronts', width: 0.3, sandKx: 1.0, sandKy: 1.75, sandCrr: 0.7,
+      muX: 0.95, muY: 0.9, loose: 1.3, kappaPeak: 0.1, alphaPeak: 0.11, relaxX: 0.28, relaxY: 0.55,
+      B: 1.6, C: 1.38, E: -0.3, heatCap: 9000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [0.8, 1, 1, 1, 1, 0.8], massAdd: 6, inertiaAdd: 0.4 },
     // (its other package: off-road knobbies - 27x8.50-15 fronts and 31x10.50R15 rears on the same five-spokes. They bite
     // in dirt, gravel, grass and mud where the stock tyres slide, hold their own in sand (nothing like the paddles, but
     // they don't skate on hard ground either), and give up grip on pavement, where the knobs squirm)
@@ -414,6 +430,41 @@
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
       B: 1.8, C: 1.3, E: -0.1, heatCap: 1500, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.02,
       crr: [1.3, 1.2, 1.2, 1.1, 1, 1.3], massAdd: 2, inertiaAdd: 0.02, lift: 0.02 },
+    // the ATV's: 21x7-10 fronts, 22x10-10 rears (the race quads: 20x11-9) - knobbies, square knobs that dig into dirt,
+    // grass and mud and squirm on pavement: ~0.8 g on tarmac, where a quad is at its tippiest
+    atvKnobF: { name: '21x7-10 ATV knobby front', short: 'ATV knobbies', width: 0.178, sandKx: 1.05, sandKy: 1.05,
+      muX: 0.84, muY: 0.74, loose: 1.3, looseKx: [1, 1.05, 1.1, 1.12, 1.1, 1], looseKy: [1, 0.95, 0.9, 0.88, 1.0, 1], kappaPeak: 0.13, alphaPeak: 0.16, relaxX: 0.15, relaxY: 0.24,
+      B: 1.7, C: 1.32, E: -0.1, heatCap: 900, cold: 0.97, coldT: 5, warmT: 25, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.5, 1.2, 1.15, 1.1, 1.0, 1.5] },
+    atvKnobR: { name: '22x10-10 ATV knobby rear', short: 'ATV knobbies', width: 0.254, sandKx: 1.1, sandKy: 1.05,
+      muX: 0.86, muY: 0.88, loose: 1.35, looseKx: [1, 1.05, 1.12, 1.14, 1.12, 1], looseKy: [1, 1.05, 1.0, 1.0, 1.05, 1], kappaPeak: 0.14, alphaPeak: 0.16, relaxX: 0.16, relaxY: 0.26,
+      B: 1.7, C: 1.32, E: -0.1, heatCap: 1200, cold: 0.97, coldT: 5, warmT: 25, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.5, 1.2, 1.15, 1.1, 1.0, 1.5], tcTargets: [0.14, 0.17, 0.21] },
+    // (the turbo drag quad's rears: 21x11-8 ATV drag slicks - a soft, wrinkly sidewall, a slick that hooks on pavement and
+    // is hopeless in the dirt)
+    atvDragR: { name: '21x11-8 ATV drag slick', short: 'Drag slicks', width: 0.28, sandKx: 0.8, sandKy: 0.8,
+      muX: 1.5, muY: 1.12, loose: 0.85, kappaPeak: 0.13, alphaPeak: 0.12, relaxX: 0.2, relaxY: 0.3,
+      B: 1.8, C: 1.4, E: -0.15, heatCap: 1500, cold: 0.88, coldT: 15, warmT: 45, hotT: 110, overheat: 0.003, prep: 1.08,
+      crr: [1.0, 1.1, 1.2, 1.2, 1.0, 1.0], tcTargets: [0.11, 0.14, 0.18] },
+    // (its off-road package: sand tyres - paddles on the back, ribbed fronts that steer in the sand)
+    atvRib: { name: '21x7-10 ribbed sand front', short: 'Sand paddles', width: 0.178, sandKx: 1.0, sandKy: 1.75, sandCrr: 0.7,
+      muX: 0.78, muY: 0.72, loose: 1.2, looseKx: [1, 1.0, 0.9, 1.0, 0.9, 1], looseKy: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.16, relaxX: 0.15, relaxY: 0.24,
+      B: 1.7, C: 1.32, E: -0.1, heatCap: 900, cold: 0.97, coldT: 5, warmT: 25, hotT: 110, overheat: 0.003, prep: 1.0,
+      crr: [1.4, 1.2, 1.15, 1.1, 1.0, 1.4] },
+    atvPaddle: { name: '22x11-10 sand paddles', short: 'Sand paddles', width: 0.28, sandKx: 1.65, sandKy: 1.5, sandCrr: 0.6,
+      muX: 0.7, muY: 0.58, loose: 3.0, looseY: 1.3, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.22, relaxY: 0.32,
+      B: 1.5, C: 1.4, E: -0.2, heatCap: 3000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
+      crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 2, inertiaAdd: 0.04, tcTargets: [0.26, 0.32, 0.4] },
+    // the diesel dually's: LT235/85R16 load-range-E highway tyres at 80 psi - tall, stiff, a work truck's grip (~0.85 g);
+    // at the back two of them each end of the axle (the duals), run here as one tyre twice as wide
+    dieselLT: { name: 'LT235/85R16 highway', short: 'LT highway', width: 0.235, sandKx: 0.85, sandKy: 0.9,
+      muX: 1.0, muY: 0.88, loose: 1.3, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.26, relaxY: 0.5,
+      B: 2.4, C: 1.3, E: -0.1, heatCap: 6000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [0.95, 0.85, 0.85, 0.85, 0.85, 0.95] },
+    dieselDual: { name: 'LT235/85R16 duals', short: 'LT highway', width: 0.47, sandKx: 0.9, sandKy: 0.95,
+      muX: 1.0, muY: 0.88, loose: 1.3, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.11, alphaPeak: 0.12, relaxX: 0.24, relaxY: 0.46,
+      B: 2.4, C: 1.3, E: -0.1, heatCap: 12000, cold: 0.95, coldT: 5, warmT: 35, hotT: 100, overheat: 0.004, prep: 1.0,
+      crr: [0.95, 0.85, 0.85, 0.85, 0.85, 0.95] },
   };
   // Sand (surface 7th in the per-surface lists): each tyre's bite in soft sand on top of its loose-ground grip, forwards
   // (sandKx) and sideways (sandKy), and its rolling drag there (sandCrr). A narrow, hard tyre digs in and ploughs, a wide
@@ -433,13 +484,14 @@
     if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
     if (car === 'monster' || car === 'avenger') return { front: 'monsterMud', rear: 'monsterMud' };
-    if (car === 'trophy') return { front: 'ttMud', rear: 'ttMud' };
-    if (car === 'buggy') return kind === 'knobby' ? { front: 'buggyKnobF', rear: 'buggyKnobR' } : { front: 'sandRib', rear: 'buggyPaddle' };
+    if (car === 'trophy') return kind === 'paddle' ? { front: 'ttRib', rear: 'ttPaddle' } : { front: 'ttMud', rear: 'ttMud' };
+    if (car === 'buggy') return kind === 'knobby' ? { front: 'buggyKnobF', rear: 'buggyKnobR' } : { front: 'buggyRib', rear: 'buggyPaddle' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
     if (car === 'mower') return { front: 'mowerBarF', rear: 'mowerBarR' };
     if (car === 'rally') return { front: 'rallyKnob', rear: 'rallyKnob' };
     if (car === 'tank') return { front: 'trackGrouser', rear: 'trackGrouser' };
     if (car === 'bike') return { front: 'ccKnob', rear: 'ccKnob' };
+    if (car === 'atv') return { front: 'atvRib', rear: 'atvPaddle' };
     if (CARS[car] && CARS[car].cc) return { front: 'ccKnob', rear: 'ccKnob' };
     return { front: 'offroad', rear: 'offroad' };
   }
@@ -552,6 +604,7 @@
       if (this.transType === 'auto') {
         if (g < 0) return -s.autoRev * s.autoFinal * fk;
         if (g === 0) return 0;
+        if (s.cvt) return (this.cvtR || s.cvt.lo) * s.autoFinal * fk;
         return s.autoRatios[g - 1] * s.autoFinal * fk;
       }
       if (g < 0) return -s.manualRev * s.manualFinal * fk;
@@ -1279,6 +1332,18 @@
         Ty += s.Iyaw * (Bk.yawK * (rR - rK) - Bk.alignK * bR) * ramp;
       }
 
+      // a quad's rider (riderShift): a third of its weight, and they ride it - hanging off the inside of a turn, their
+      // weight moved across the seat is a roll torque against the turn's (it's what keeps a quad, its CG ~0.6 m up over a
+      // ~0.9 m track, on four wheels; pushed past that it still lifts a wheel, or goes over). They follow the cornering
+      // force they feel (gLat) a moment behind it; the game leans the rider's model by the same amount (riderD, m, + right)
+      if (s.riderShift) {
+        const R = s.riderShift, fX = -m02, fY = -m12, fZ = -m22;
+        const want = clamp((this.gLat || 0) * R.k, -R.max, R.max) * clamp((Math.abs(vFwd) - 1) / 3, 0, 1) * (anyContact ? 1 : 0);
+        this.riderD = (this.riderD || 0) + (want - (this.riderD || 0)) * Math.min(1, h / R.tau);
+        const Tr = R.m * GRAV * (s.gravScale || 1) * this.riderD * clamp(m11, 0, 1);
+        Tx += fX * Tr; Ty += fY * Tr; Tz += fZ * Tr;
+      }
+
       // ---------------- body / ground penalty contacts (roll-overs, bottoming out)
       this._bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, (fx, fy, fz, rx, ry, rz) => {
         Fx += fx; Fy += fy; Fz += fz;
@@ -1773,6 +1838,16 @@
       if (this.transType === 'auto') {
         if (this.shiftTimer > 0) this.shiftTimer -= h;
         this.sinceUpshift += h;
+        // a CVT (the 200 quad's belt drive) has no steps: the drive pulley's flyweights close it up as the engine speeds
+        // up and the torque on the driven pulley's cam holds it down, so it runs at the revs the throttle asks for -
+        // floored, at its power peak, the ratio walking up as the speed comes (the drone); off the throttle it shifts
+        // all the way up
+        if (s.cvt) {
+          const C = s.cvt, cr = this.cvtR || C.lo;
+          const tgt = C.rpm0 + (C.rpm1 - C.rpm0) * Math.pow(clamp(inp.throttle, 0, 1), 0.7);
+          const want = this.gear >= 1 ? clamp(tgt * RPM2RAD / Math.max(0.5, Math.abs(wc) * s.autoFinal * (this.finalK || 1)), C.hi, C.lo) : C.lo;
+          this.cvtR = cr + (want - cr) * Math.min(1, h / C.tau);
+        }
         if (inp.throttle < 0.8) this.kickArm = true;
         // automatic shift schedule
         if (!this.park && this.gear >= 1 && !this.revHoldActive && !this.lineLockActive) {
@@ -1825,7 +1900,8 @@
         const lockTgt = wantLock ? (this.shiftTimer > 0 ? (this.tccOpenAtShift ? 0.25 * shP : 0.35 + 0.65 * shP) : 1) : 0;
         const rate = wantLock ? (inp.throttle > 0.6 ? 10 : 3.2) : 30;
         this.lockupEng += clamp(lockTgt - this.lockupEng, -rate * h, rate * h);
-        if (!wantLock && this.lockupEng < 0.02) this.locked = false;
+        // (a CVT's coupling is its centrifugal clutch, not a converter lock-up: it stays locked through the ratio's travel)
+        if (!wantLock && this.lockupEng < 0.02 && !s.cvt) this.locked = false;
       } else {
         // manual gearbox
         if (this.useClutchPedal) {
@@ -1892,7 +1968,7 @@
       const wc0 = 0.5 * (wl.omega + wr.omega);
       this._transLogic(h, wc0);
       const G = this._gEff();
-      const gliding = this.transType === 'auto' && this.shiftTimer > 0 && this.shiftFromG && this.gear >= 1;
+      const gliding = this.transType === 'auto' && this.gear >= 1 && ((this.shiftTimer > 0 && this.shiftFromG) || s.cvt);
       const Gdot = gliding && this._gPrev ? (G - this._gPrev) / h : 0;
       this._gPrev = G;
       const Te = this.Te;
@@ -1994,7 +2070,7 @@
       wc0 /= Isum;
       this._transLogic(h, wc0);
       const G = this._gEff();
-      const gliding = this.transType === 'auto' && this.shiftTimer > 0 && this.shiftFromG && this.gear >= 1;
+      const gliding = this.transType === 'auto' && this.gear >= 1 && ((this.shiftTimer > 0 && this.shiftFromG) || s.cvt);
       const Gdot = gliding && this._gPrev ? (G - this._gPrev) / h : 0;
       this._gPrev = G;
       const Te = this.Te, lt = s.lsdRamp * Math.abs(this.lastTin);
@@ -2978,6 +3054,66 @@
     CdA: 1.29,
     bodyHalfW: 1.04, bodyFront: -2.8, bodyRear: 3.1, bodyBottom: -0.4, bodyTop: 1.24, bodyPts: ramPts(0.74, 0.56),
   } };
+  // ATV (a quad), built like a full-size sport quad: a steel frame under the plastics, double A-arms on coil-overs up front,
+  // a swingarm and one shock on a solid rear axle - no differential: both back tyres turn together, so through a turn the
+  // inside one scrubs or lifts - handlebars, the rider astride the seat. The rider is ~30 % of the weight and rides it
+  // (riderShift). Three versions (CARS.atv.make): a 200 cc air-cooled sport quad on a CVT with a front bumper and a rear
+  // rack (the stock one), a 450 race quad, and a turbo drag quad on a stretched swingarm
+  const atvPts = (cg, fw, wb, zr) => ccPts(cg, fw, wb, [[-0.33, 0.26, -0.28], [0.33, 0.26, -0.28], [-0.33, 0.26, 0.2], [0.33, 0.26, 0.2],
+    [-0.27, 0.4, -0.92], [0.27, 0.4, -0.92], [-0.27, 0.65, -0.9], [0.27, 0.65, -0.9], [-0.47, 0.7, -0.55], [0.47, 0.7, -0.55], [-0.47, 0.74, 0.55], [0.47, 0.74, 0.55],
+    [-0.3, 0.82, zr], [0.3, 0.82, zr], [-0.3, 0.45, zr], [0.3, 0.45, zr], [-0.43, 1.06, -0.4], [0.43, 1.06, -0.4],
+    [0, 0.24, -0.1], [0, 0.88, 0.2], [0, 1.62, 0.1], [-0.24, 1.38, 0.12], [0.24, 1.38, 0.12], [-0.32, 0.86, -0.15], [0.32, 0.86, -0.15]]);
+  CARS.atv = { name: 'ATV', short: 'ATV', car: '200 CC SINGLE', hp: 12, tq: 9.6, cc: true, kbLat: 5.2, spec: {
+    name: 'ATV 200 Sport',
+    mass: 275, Ipitch: 78, Iyaw: 86, Iroll: 30, cgHeight: 0.6, wheelbase: 1.18, frontWeight: 0.42,
+    trackF: 0.94, trackR: 0.88, wheelRadius: 0.279, wheelRadiusF: 0.267, wheelRadiusR: 0.279, wheelInertiaF: 0.28, wheelInertiaR: 0.4,
+    frontTire: 'atvKnobF', rearTire: 'atvKnobR', Fz0: 800, loadSens: 0.1,
+    springF: 5200, springR: 7600, dampBumpF: 420, dampRebF: 620, dampBumpR: 560, dampRebR: 820, dampKnee: 0.4,
+    arbF: 2500, arbR: 3500, travelUp: 0.09, travelDown: 0.07, suspS0: 0.15,
+    brakeTorqueF: 180, brakeTorqueR: 75, handbrakeTorque: 200, noABS: true, noESC: true,
+    maxSteer: 0.6, steerRate: 4.5, steerRatio: 1, ackermann: 0.5,
+    riderShift: { m: 80, k: 0.75, max: 0.38, tau: 0.2 },
+    idleRpm: 1600, limiterRpm: 8600, redlineRpm: 8200, shiftRpm: 8000, engineInertia: 0.012, fricA: 1.2, fricB: 0.7, starterTorque: 6,
+    // (lb-ft: 9.6 at 6,000, ~12 hp at 7,000)
+    torqueCurve: [[0, 4.5], [2000, 6.5], [3000, 7.8], [4000, 8.7], [5000, 9.3], [6000, 9.6], [7000, 9.2], [7500, 8.7], [8000, 7.8], [8500, 6.4], [9000, 4.8]],
+    boostMax: 0, popScale: 0.3,
+    // a CVT behind a centrifugal clutch (2.4:1 to 0.8:1), a reduction box and a chain: 13.2 overall past the belt
+    autoRatios: [2.4], autoRev: 2.4, autoFinal: 13.2, cvt: { lo: 2.4, hi: 0.8, rpm0: 3600, rpm1: 7300, tau: 0.3 },
+    noLockup: true, noCoastBlip: true, blipMax: 0.2,
+    // (the centrifugal clutch: it grabs from ~3,400 rpm and slips the engine up to ~5,000 pulling away)
+    dragClutch: { rpm0: 3400, rpm1: 6000, kc: 0, base: [[0, 15]], muSlip: 0.2, slipRef: 150, rev: 20 },
+    lsdPreload: 60, lsdRamp: 0.3, driveEff: 0.82, tcRefBody: true, tcAxleMean: true,
+    CdA: 0.72,
+    bodyHalfW: 0.56, bodyFront: -0.92, bodyRear: 1.0, bodyBottom: -0.36, bodyTop: 1.02, bodyPts: atvPts(0.6, 0.42, 1.18, 0.98),
+  } };
+  // Diesel dually, built like a 2nd-gen ('98-'02) one-ton: a Quad Cab long bed 4x4 on duals - two tyres each end of the
+  // rear axle - with the 5.9 inline-six turbo diesel: 235 hp at 2,700, 460 lb-ft from 1,600, a 4-speed automatic with a
+  // lock-up converter, 3.54 axles, the transfer case in 2-Hi. ~3,300 kg with the driver, 60 % on the front (the iron six
+  // sits over the front axle). The turbo takes a moment to spool, so the torque - and on a tuned truck the black smoke -
+  // comes as the boost does. Three versions (CARS.diesel.make): stock, a built street truck on compound turbos, and the
+  // pulling truck (triple turbos, the weight box on the front, locked in 4WD)
+  const dslPts = (cg, fw) => ccPts(cg, fw, 3.924, [...ccBox(1.0, 0.58, 1.4, -2.88, 3.42), [-0.9, 1.97, -0.42], [0.9, 1.97, -0.42], [-0.9, 1.97, 0.6], [0.9, 1.97, 0.6],
+    [-1.21, 0.75, 1.75], [1.21, 0.75, 1.75], [-1.21, 0.75, 2.2], [1.21, 0.75, 2.2], [-0.78, 1.42, -2.75], [0.78, 1.42, -2.75]]);
+  CARS.diesel = { name: 'Diesel Dually', short: 'Diesel Dually', car: '5.9 I6 TURBO DIESEL', hp: 235, tq: 460, cc: true, kbLat: 6, spec: {
+    name: 'Diesel Dually',
+    mass: 3300, Ipitch: 9800, Iyaw: 10500, Iroll: 1650, cgHeight: 0.82, wheelbase: 3.924, frontWeight: 0.6,
+    trackF: 1.745, trackR: 1.925, wheelRadius: 0.395, wheelInertiaF: 2.4, wheelInertiaR: 4.6,
+    frontTire: 'dieselLT', rearTire: 'dieselDual', Fz0: 7000, loadSens: 0.09,
+    springF: 69000, springR: 80000, dampBumpF: 3900, dampRebF: 6000, dampBumpR: 3400, dampRebR: 5200,
+    arbF: 30000, arbR: 16000, travelUp: 0.1, travelDown: 0.12, suspS0: 0.3,
+    brakeTorqueF: 5400, brakeTorqueR: 3500, handbrakeTorque: 3500,
+    maxSteer: 0.58, steerRate: 3.5, steerRatio: 17,
+    idleRpm: 750, limiterRpm: 3200, redlineRpm: 3000, shiftRpm: 2900, engineInertia: 0.65, fricA: 30, fricB: 26, starterTorque: 300,
+    // (lb-ft: 460 from 1,600, ~235 hp at 2,700; the governor shuts the fuel off past ~3,100)
+    torqueCurve: [[0, 200], [700, 280], [1000, 350], [1200, 410], [1400, 445], [1600, 460], [2000, 460], [2400, 458], [2700, 457], [3000, 390], [3200, 300], [3400, 150]],
+    turbo: { lag: 0.6, base: 0.5, rpm0: 1000, rpm1: 1700 }, boostMax: 24, popScale: 0,
+    autoRatios: [2.45, 1.45, 1.0, 0.69], autoRev: 2.2, autoFinal: 4.1, tcK: 0.016, tcStall: 2.0, lockupTorque: 1500,
+    shiftTimeWOT: 0.35, shiftTimePart: 0.5, noCoastBlip: true,
+    lsdPreload: 120, lsdRamp: 0.25, driveEff: 0.87,
+    govSpeed: 100 / 2.23694, govGrace: 0.5,
+    CdA: 1.75,
+    bodyHalfW: 1.2, bodyFront: -2.5, bodyRear: 3.8, bodyBottom: -0.3, bodyTop: 1.16, bodyPts: dslPts(0.82, 0.6),
+  } };
   // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
   // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
   // an 18 in rear, 368 kg wet + a 90 kg rider. A motorcycle in a four-wheel world: each axle's two 'wheels' sit side by
@@ -3369,7 +3505,8 @@
     boostMax: 0, popScale: 0.5,
     // the VW 4-speed transaxle (3.80 / 2.06 / 1.26 / 0.89, 4.375 ring and pinion), shifted for you
     autoRatios: [3.8, 2.06, 1.26, 0.89], autoRev: 3.88, autoFinal: 4.375, shiftTimeWOT: 0.35, shiftTimePart: 0.45, shiftCutDepth: 1,
-    launchRpm: 2200, engineTc: true,
+    // (wheelie control - a game aid, off with TC Off: on the sand paddles a built buggy's nose comes up hard)
+    launchRpm: 2200, engineTc: true, wheelieCtl: 7,
     dragClutch: { rpm0: 1100, rpm1: 2100, kc: 0, base: [[0, 180]], muSlip: 0.15, slipRef: 150, rev: 150 },
     lsdPreload: 20, lsdRamp: 0, driveEff: 0.92,
     CdA: 1.05,
@@ -3396,6 +3533,65 @@
       bodyPts: bgPts(0.52, 0.36, 2.3),
     } },
   }, 'vw', '1600 VW');
+  // the ATV's other two: a 450 race quad - a 449 cc DOHC single, ~47 hp at 9,000, a 5-speed and a manual clutch (worked
+  // for you), long-travel race suspension, a wider stance, 20x11-9 rears, ~75 mph - and a turbo drag quad: the 450 turbocharged
+  // on race fuel (~140 hp), a swingarm stretched 10 in with a wheelie bar, lowered, an air shifter, ~120 mph
+  ccEngines('atv', {
+    race: { label: '450 race quad', car: '450 CC RACE SINGLE', hp: 47, tq: 30, kbLat: 5.8, spec: {
+      name: 'ATV 450 Race', mass: 265, Ipitch: 82, cgHeight: 0.58, wheelbase: 1.27, frontWeight: 0.43,
+      trackF: 1.05, trackR: 0.95, wheelRadius: 0.254, wheelRadiusF: 0.267, wheelRadiusR: 0.254, wheelInertiaF: 0.26, wheelInertiaR: 0.36,
+      springF: 6400, springR: 9000, dampBumpF: 560, dampRebF: 820, dampBumpR: 720, dampRebR: 1050, travelUp: 0.14, travelDown: 0.1, suspS0: 0.2, arbF: 4000, arbR: 4500,
+      brakeTorqueF: 240, brakeTorqueR: 85,
+      riderShift: { m: 80, k: 0.75, max: 0.4, tau: 0.18 },
+      idleRpm: 1800, limiterRpm: 10500, redlineRpm: 10200, shiftRpm: 10000, engineInertia: 0.016, fricA: 1.6, fricB: 0.9, starterTorque: 8,
+      // (lb-ft: 30 at 7,500, ~47 hp at 9,000)
+      torqueCurve: [[0, 12], [2000, 16], [3000, 20], [4000, 23], [5000, 25.5], [6000, 28], [7000, 29.5], [7500, 30], [8000, 29.6], [9000, 27.4], [10000, 23.5], [10500, 21], [11000, 17]],
+      popScale: 0.6, cvt: undefined,
+      // (the 5-speed - 2.385 / 1.750 / 1.380 / 1.136 / 0.955 - through its 2.9 primary and the chain: 8.2 overall past the box)
+      autoRatios: [2.385, 1.75, 1.38, 1.136, 0.955], autoRev: 2.385, autoFinal: 8.2, shiftTimeWOT: 0.12, shiftTimePart: 0.2, shiftCutDepth: 0.5,
+      launchRpm: 6500, engineTc: true,
+      dragClutch: { rpm0: 2400, rpm1: 4200, kc: 0, base: [[0, 90]], muSlip: 0.2, slipRef: 200, rev: 40 },
+      rearTire: 'atvKnobR', CdA: 0.7,
+      bodyPts: atvPts(0.58, 0.43, 1.27, 0.85),
+    } },
+    turbo: { label: 'Turbo drag quad', car: '450 TURBO · RACE FUEL', hp: 140, tq: 78, kbLat: 5.8, spec: {
+      name: 'ATV Turbo Drag', mass: 285, Ipitch: 105, Iyaw: 110, cgHeight: 0.54, wheelbase: 1.52, frontWeight: 0.4,
+      trackF: 1.08, trackR: 0.98, wheelRadius: 0.254, wheelRadiusF: 0.267, wheelRadiusR: 0.254, wheelInertiaF: 0.26, wheelInertiaR: 0.36,
+      springF: 7000, springR: 10500, dampBumpF: 600, dampRebF: 900, dampBumpR: 800, dampRebR: 1200, travelUp: 0.1, travelDown: 0.07, suspS0: 0.16, arbF: 4500, arbR: 5000,
+      brakeTorqueF: 250, brakeTorqueR: 90,
+      riderShift: { m: 80, k: 0.75, max: 0.4, tau: 0.18 },
+      idleRpm: 1900, limiterRpm: 10500, redlineRpm: 10200, shiftRpm: 10000, engineInertia: 0.02, fricA: 2, fricB: 1.1, starterTorque: 10,
+      // (lb-ft on full boost: 78 at 8,000-9,000, ~140 hp at 9,500)
+      torqueCurve: [[0, 25], [3000, 40], [4000, 52], [5000, 64], [6000, 72], [7000, 77], [8000, 78], [9000, 78], [9500, 77.4], [10000, 72], [10500, 65], [11000, 55]],
+      turbo: { lag: 0.3, base: 0.42, rpm0: 4000, rpm1: 6500 }, boostMax: 18, popScale: 1, cvt: undefined,
+      autoRatios: [2.385, 1.75, 1.38, 1.136, 0.955], autoRev: 2.385, autoFinal: 5.4, shiftTimeWOT: 0.06, shiftTimePart: 0.12, shiftCutDepth: 0.4,
+      launchRpm: 7500, engineTc: true,
+      // (a drag clutch: it lets the engine rev up into the boost before it bites)
+      dragClutch: { rpm0: 5200, rpm1: 7600, kc: 0, base: [[0, 160]], muSlip: 0.2, slipRef: 200, rev: 60 },
+      wheelieBar: { len: 0.95, clr: 0.07, halfW: 0.22, r: 0.04, k: 150000, damp: 4500, Fmax: 7000 }, wheelieCtl: 3,
+      rearTire: 'atvDragR', CdA: 0.66,
+      bodyFront: -0.95, bodyRear: 1.25, bodyPts: atvPts(0.54, 0.4, 1.52, 0.95),
+    } },
+  }, 'sport', '200 Sport');
+  // the diesel's other two: a built street truck - the 5.9 with compound turbos, injectors and a tune, ~650 hp and 1,250
+  // lb-ft, a built transmission and converter (~135 mph) - and the pulling truck: a billet-head 5.9 on triple turbos, ~1,600
+  // hp and 2,400 lb-ft to 5,000 rpm, the weight box hung on the front, locked in 4WD (~160 mph)
+  ccEngines('diesel', {
+    built: { label: 'Built street truck', car: '5.9 · COMPOUND TURBOS', hp: 650, tq: 1250, spec: {
+      mass: 3270, idleRpm: 800, limiterRpm: 3800, redlineRpm: 3600, shiftRpm: 3500, engineInertia: 0.6,
+      torqueCurve: [[0, 300], [800, 450], [1200, 700], [1600, 950], [2000, 1150], [2400, 1250], [2800, 1220], [3200, 1100], [3600, 950], [3800, 820], [4000, 600]],
+      turbo: { lag: 0.8, base: 0.38, rpm0: 1100, rpm1: 2200 }, boostMax: 60,
+      autoFinal: 3.54, tcK: 0.022, tcStall: 1.9, lockupTorque: 3800, shiftTimeWOT: 0.28, lsdPreload: 300, lsdRamp: 0.35, govSpeed: undefined,
+    } },
+    pull: { label: 'Pulling truck', car: '5.9 · TRIPLE TURBOS', hp: 1600, tq: 2400, spec: {
+      mass: 3450, frontWeight: 0.64, Ipitch: 10500, idleRpm: 900, limiterRpm: 5000, redlineRpm: 4800, shiftRpm: 4700, engineInertia: 0.7, fricA: 40, fricB: 32,
+      torqueCurve: [[0, 500], [1000, 800], [1500, 1300], [2000, 1800], [2500, 2150], [3000, 2350], [3400, 2400], [3800, 2300], [4200, 2000], [4600, 1800], [5000, 1550], [5300, 1200]],
+      turbo: { lag: 1.0, base: 0.3, rpm0: 1400, rpm1: 2800 }, boostMax: 110,
+      autoFinal: 4.1, tcK: 0.035, tcStall: 1.8, lockupTorque: 7000, shiftTimeWOT: 0.25, govSpeed: undefined,
+      awd: true, awdFront: 0.45, lsdPreload: 900, lsdPreloadF: 600, centerPreload: 4000, lsdRamp: 0.5,
+      bodyFront: -2.9, bodyPts: dslPts(0.82, 0.64).concat(ccPts(0.82, 0.64, 3.924, [[-0.55, 0.45, -3.45], [0.55, 0.45, -3.45], [-0.55, 1.0, -3.45], [0.55, 1.0, -3.45]])),
+    } },
+  }, 'stock', 'Stock 5.9');
   // the tank's other two: the governor off (the same turbine geared taller, ~58 mph) and a hot-rodded 3,000 hp turbine
   ccEngines('tank', {
     ungov: { label: 'Ungoverned', car: '1,500 HP TURBINE', spec: { autoFinal: 3.15 } },

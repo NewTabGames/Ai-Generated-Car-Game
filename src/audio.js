@@ -7,6 +7,8 @@
    Small engines: 4-stroke and 2-stroke singles, 90-deg V-twins (vt: fires 270 / 450 deg apart - the potato-potato),
    inline triples (every 240 deg, the off-beat thrum) and inline fours (flat-plane crank, 4-into-1), all into one pipe;
    even-fire V6s (a bank each side, every 120 deg); a centrifugal blower's surge chirp on a lift (surge).
+   Turbochargers (turbo): the whistle follows the boost - the turbine's speed - not the crank; diesels (diesel): the
+   injection knock, a hard tick through the block on every firing, loudest at idle and light load (the clatter).
    Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
    load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
    Turbojet (jet: the jet golf cart): no pistons - the compressor's whine (its blade-pass tone and a turbine tone above it,
@@ -35,7 +37,9 @@ class CarSynth {
       surge: 0,    // 1: centrifugal supercharger - lifting off at boost makes the compressor surge (a fluttering chirp)
       ev: 0,       // 1: an electric motor (whK = its whine Hz per rpm)
       jet: 0, ab: 0, jsz: 1,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1; jsz: its size
-      nos: 0 };    // nitrous spraying, 0..1
+      nos: 0,      // nitrous spraying, 0..1
+      turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
+      diesel: 0 }; // a diesel's injection knock, 0..1
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -147,6 +151,7 @@ class CarSynth {
     else if (k === this.strongIdx[e]) a *= 1 + 0.25 * idleN * (1 + 0.8 * race);
     // (a 2-stroke single fires the same cylinder every turn: no cylinder-to-cylinder pattern)
     a *= (1 + (this.cylAmp[e * 12 + (c.cyl === 2 && !(c.vt > 0) ? 0 : k)] - 1) * (1 - 0.75 * smoothN)) * (1 + (this.rnd() - 0.5) * (0.18 - 0.1 * smoothN + 0.25 * c.rough));
+    if (c.diesel > 0 && c.run > 0.5) this.knk = Math.min(3, (this.knk || 0) + a * c.diesel);
     if (c.cyl === 1 || c.cyl === 2 || c.cyl === 3 || c.cyl === 4) {
       // a single has one exhaust: every pulse goes down the same pipe (through both resonator banks, for width).
       // Handing alternate pulses to the two banks made a 2-stroke warble at half its firing rate, like a twin
@@ -163,7 +168,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -202,7 +207,8 @@ class CarSynth {
     const boostN = Math.min(1, c.boost / (c.boostRef || 11.6));
     const dRpm = (rpm - this.prevRpm) / (n / sr); this.prevRpm = rpm;
     this.revUp += (Math.min(1, Math.max(0, dRpm / 9000)) - this.revUp) * (dRpm > 0 ? 0.25 : 0.06);
-    const whF = rpm * (c.whK || 0.19) + 20, whPure = c.whPure > 0.5;
+    // (a turbo spins with the exhaust flow: its whistle rises with the boost, ~1.2 kHz spooling to ~6 kHz flat out)
+    const whF = c.turbo > 0.5 ? 1200 + 4600 * Math.sqrt(boostN) + 700 * Math.min(1, rpmN) : rpm * (c.whK || 0.19) + 20, whPure = c.whPure > 0.5;
     // centrifugal blower surge: shut the throttle at boost and the compressed air backs up through the impeller in
     // pulses - a fluttering chirp that dies away in a few tenths
     // (against a throttle trace lagging ~80 ms, so a pedal eased shut over a few frames counts as a lift too)
@@ -247,6 +253,11 @@ class CarSynth {
     }
     const aAB = 1 - Math.exp(-2 * Math.PI * 150 / sr);
     const aWind = 1 - Math.exp(-2 * Math.PI * (180 + spd * 22) / sr);
+    // diesel knock: each firing's tick rings a few bands of the block and head - sharp at idle and light load, buried
+    // under the exhaust and the turbo flat out
+    const dsl = c.diesel > 0.01 && c.run > 0.5, kDecay = Math.exp(-1 / (sr * 0.0011));
+    const kAmp = dsl ? c.diesel * (1.1 + 1.8 * (1 - load)) * (0.7 + 0.3 * Math.min(1, rpmN)) * c.engVol * (interior > 0.5 ? 0.7 : 1) : 0;
+    if (dsl && !this.kBP1) { this.kBP1 = this.bp(1700, 3); this.kBP2 = this.bp(3300, 4); this.kBP3 = this.bp(700, 2); }
     // watchdog: if the game loop stops feeding us (tab hidden, hitch), fade out instead of droning on one note
     const aliveTgt = this.t - this.lastSet < 0.3 ? 1 : 0;
     const vol = c.vol;
@@ -304,6 +315,11 @@ class CarSynth {
         const bm = this.boom * Math.sin(this.boomPh); this.boom *= 0.9992;
         const s = (cr * 0.35 + bm * 0.5) * c.engVol;
         oL += s; oR += s;
+      }
+      if (dsl && this.knk > 1e-4) {
+        const kx = this.knk * w2; this.knk *= kDecay;
+        const kn = (this.run(this.kBP1, kx) + 0.7 * this.run(this.kBP2, kx) + 0.5 * this.run(this.kBP3, kx)) * kAmp;
+        oL += kn; oR += kn * 0.9;
       }
       // interior muffling of exhaust
       this.lpInt += aInt * (oL - this.lpInt); this.lpIntR += aInt * (oR - this.lpIntR);

@@ -88,7 +88,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (th < 1e8) a *= smoothstep(0.0, 0.3, th - tf);
   }
   if (a < 0.004) discard;
-  vec3 base = mix(vec3(0.9, 0.9, 0.92), vec3(0.52, 0.43, 0.32), vShade);
+  // (shade: 0 tyre smoke white-grey .. 1 soil brown; below 0 a diesel's soot, -1 black)
+  vec3 base = vShade < 0.0 ? mix(vec3(0.9, 0.9, 0.92), vec3(0.07, 0.068, 0.066), min(1.0, -vShade)) : mix(vec3(0.9, 0.9, 0.92), vec3(0.52, 0.43, 0.32), vShade);
   vec3 col = base * (uAmb + uLight * (t.r * 0.6));
   gl_FragColor = vec4(col, a);
   #include <fog_fragment>
@@ -141,7 +142,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         }
         const drag = Math.exp(-dt * 1.6);
         V[i * 3] = V[i * 3] * drag + windX * (1 - drag);
-        V[i * 3 + 1] = V[i * 3 + 1] * drag + (0.35 + 0.25 * (1 - this.shade[i])) * dt * 3;
+        V[i * 3 + 1] = V[i * 3 + 1] * drag + (0.35 + 0.25 * Math.min(2, 1 - this.shade[i])) * dt * 3;
         V[i * 3 + 2] = V[i * 3 + 2] * drag + windZ * (1 - drag);
         P[i * 3] += V[i * 3] * dt; P[i * 3 + 1] += V[i * 3 + 1] * dt; P[i * 3 + 2] += V[i * 3 + 2] * dt;
         this.rot[i] += this.rv[i] * dt;
@@ -160,7 +161,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
         ip[i * 3] = x; ip[i * 3 + 1] = y; ip[i * 3 + 2] = z; ig[i] = this.gnd[i];
         const size = this.s0[i] + this.gr[i] * Math.pow(this.age[i], 0.65);
-        id[i * 4] = size; id[i * 4 + 1] = this.a0[i] * Math.min(1, this.age[i] * 6) * Math.pow(1 - this.age[i] / this.life[i], 1.6);
+        // (soot is thick right out of the pipe: it fades in at once)
+        id[i * 4] = size; id[i * 4 + 1] = this.a0[i] * Math.min(1, this.age[i] * (this.shade[i] < 0 ? 30 : 6)) * Math.pow(1 - this.age[i] / this.life[i], 1.6);
         id[i * 4 + 2] = this.rot[i]; id[i * 4 + 3] = this.shade[i];
         phA[i] = -1;
         const d = e ? -(e[2] * x + e[6] * y + e[10] * z + e[14]) : -1e9;
@@ -203,7 +205,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const sh = this.veilSh || 0, u = this.uniforms, col = this.veilU.uCol.value;
         const lit = this._lit || (this._lit = col.clone());
         lit.copy(u.uLight.value).multiplyScalar(0.48).add(u.uAmb.value);
-        col.setRGB(0.9 - 0.38 * sh, 0.9 - 0.47 * sh, 0.92 - 0.6 * sh).multiply(lit);
+        if (sh < 0) { const k = Math.min(1, -sh); col.setRGB(0.9 - 0.83 * k, 0.9 - 0.832 * k, 0.92 - 0.854 * k).multiply(lit); }
+        else col.setRGB(0.9 - 0.38 * sh, 0.9 - 0.47 * sh, 0.92 - 0.6 * sh).multiply(lit);
         this.veilU.uA.value = va;
       }
       void groundFn;

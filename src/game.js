@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -285,6 +285,47 @@
           info: 'The stainless-steel wedge with three motors - one at the front, two at the back - 845 hp, all-wheel drive · adaptive air suspension, four-wheel steering, steer-by-wire · 35 in all-terrains on 20 in wheels · 3,104 kg (6,843 lb) · 0-60 2.6 s, an 11.2 s quarter mile, 130 mph',
           trans: 'Electric · single speed · tri-motor AWD', snd: { nEng: 1, cyl: 8, ev: 1, whK: 0.08, whPure: 1, whine: 2.7, rpmRef: 14000, open: 0, fmul: 1, deep: 0, loud: 0, race: 0 } },
       } },
+    atv: { btn: 'ATV', sub: 'A sport quad · a 200 cc on a CVT, a 450 race quad or a 140 hp turbo drag quad · knobbies (or sand paddles) · you ride it: lean into the turns', paint: 'Crimson', tc: 1, cam: [0.62, 0.78],
+      hint: 'ATV (200 Sport): shift up (E) for DRIVE - an air-cooled 200 cc single on a CVT: twist and go, ~48 mph. A solid rear axle and a high seat: it pushes wide in a turn and the inside rear lifts - the rider hangs off the inside to keep it down, but turn hard enough on pavement and it will go over. Tyres (Esc → Drive): sand paddles for the dunes.',
+      info: 'A full-size sport quad: a steel frame under red plastics, a tube front bumper, a rear rack · 200 cc air-cooled 4-stroke single, ~12 hp · CVT automatic with reverse, a chain to a solid rear axle · double A-arms and a swingarm on red coil-overs · 21x7-10 / 22x10-10 knobbies on 10 in alloys · ~195 kg + the rider · 0-30 ~7 s, ~48 mph',
+      trans: 'CVT automatic', tyres: 'ATV knobbies',
+      snd: { nEng: 1, cyl: 1, fmul: 1.45, deep: 0, loud: 0.3, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 8000, race: 0.35, rough: 0.35 },
+      optKey: 'atvEng', optLabel: 'Version', options: [
+        ['sport', '200 Sport', 'Air-cooled 200 cc single, ~12 hp · CVT · front bumper and rear rack · 0-30 ~7 s · ~48 mph'],
+        ['race', '450 race quad', 'A 449 cc race single, ~47 hp · 5-speed · long-travel race suspension, a wider stance · 0-60 ~6 s · ~77 mph'],
+        // (5th: it starts on STREET traction control)
+        ['turbo', 'Turbo drag quad', 'The 450 turbocharged on race fuel, ~140 hp · a stretched swingarm, a wheelie bar, drag slicks · 0-60 ~3.6 s · ~117 mph', undefined, 0],
+      ],
+      eng: {
+        race: { hint: 'ATV (450 race quad): shift up (E) for DRIVE - a 449 cc race single, ~47 hp through a 5-speed (it shifts for you, or E / Q): 0-60 in ~6 s, ~77 mph. A wider stance and long-travel race suspension - it corners flat, and it will wheelie in first.',
+          info: 'A 450 race quad: a 449 cc DOHC single, ~47 hp at 9,000, 30 lb-ft · 5-speed, a manual clutch worked for you, a chain to a solid axle · long-travel A-arms and a swingarm on piggyback shocks (~9 / 10 in), a wider stance, nerf bars · 21x7-10 / 20x11-9 knobbies · ~185 kg + the rider · 0-60 ~6 s, ~77 mph',
+          trans: '5-speed', tyres: 'ATV knobbies',
+          snd: { nEng: 1, cyl: 1, fmul: 1.25, deep: 0.1, loud: 0.65, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 10500, race: 0.9, rough: 0.3 } },
+        turbo: { hint: 'ATV (turbo drag quad): shift up (E) for DRIVE - the 450 turbocharged on race fuel, ~140 hp, a swingarm stretched 10 in with a wheelie bar, drag slicks: 0-60 in ~3.6 s, ~117 mph. Hold SPACE to stage it on the boost. The slicks are hopeless in the dirt - fit the sand paddles (Esc → Drive) for that. Traction control starts on Street.',
+          info: 'A turbo drag quad: the 450 single with a turbo on race fuel, ~140 hp at 9,500, 78 lb-ft · 5-speed with an air shifter · the swingarm stretched 10 in, a wheelie bar, lowered · 21x7-10 front, 21x11-8 drag slicks · ~205 kg + the rider · 0-60 ~3.6 s, 1/4 mile ~11.5 s, ~117 mph',
+          trans: '5-speed · air shifter', tyres: 'Knobby fronts · drag slick rears',
+          snd: { nEng: 1, cyl: 1, fmul: 1.2, deep: 0.15, loud: 0.8, open: 1, whK: 0.19, whPure: 1, whine: 1.3, rpmRef: 10500, race: 1, rough: 0.3, turbo: 1, surge: 1 } },
+      } },
+    diesel: { btn: 'DIESEL DUALLY', sub: 'A 2nd-gen one-ton Quad Cab dually · 5.9 inline-six turbo diesel · stock, a built street truck or the pulling truck - black smoke out of the stack', paint: 'Patriot Blue', tc: 0, cam: [1.25, 1.3], road: true,
+      hint: 'Diesel Dually (stock 5.9): shift up (E) for DRIVE - the inline-six turbo diesel, 235 hp and 460 lb-ft through a 4-speed automatic, ~3,300 kg on duals. It pulls from nothing and runs out of breath at 3,000; floor it from low revs and it puffs smoke until the turbo spools. 0-60 ~13 s, governed at 100 mph.',
+      info: 'A 2nd-gen (1998-2002) one-ton Quad Cab long bed 4x4 dually: the big-rig hood, the crosshair grille, cab lights, towing mirrors, an 8 ft box between the dually fenders · 5.9 L inline-six turbo diesel (24-valve), 235 hp at 2,700, 460 lb-ft at 1,600 · 4-speed automatic, 4.10 axles, 2-Hi · LT235/85R16s, duals at the back, on polished 16 in wheels · 6.34 m long, 3.92 m wheelbase · ~3,300 kg · 0-60 ~13 s, 100 mph governed',
+      trans: '4-speed auto · 2WD', tyres: 'LT highway · duals', soot: 0.35,
+      snd: { nEng: 1, cyl: 6, fmul: 0.82, deep: 0.45, loud: 0.45, open: 0.2, whK: 0.19, whPure: 1, whine: 0.9, rpmRef: 3200, race: 0.15, rough: 0.2, turbo: 1, diesel: 1 },
+      optKey: 'dieselEng', optLabel: 'Version', options: [
+        ['stock', 'Stock 5.9', 'The 5.9 inline-six turbo diesel, 235 hp / 460 lb-ft · 4-speed auto · 0-60 ~13 s · 100 mph governed'],
+        ['built', 'Built street truck', 'Compound turbos, injectors and a tune, ~650 hp / 1,250 lb-ft · built transmission · twin stacks in the bed, black smoke · 0-60 ~6.8 s · ~135 mph', undefined, 1],
+        ['pull', 'Pulling truck', 'Triple turbos, ~1,600 hp / 2,400 lb-ft · a stack through the hood, the weight box on the front · 4WD · 0-60 ~4.4 s · rolls coal', undefined, 1],
+      ],
+      eng: {
+        built: { hint: 'Diesel Dually (built street truck): shift up (E) for DRIVE - compound turbos, injectors and a tune, ~650 hp and 1,250 lb-ft, rear drive on duals: it rolls black smoke out of the twin bed stacks every time you floor it, and spins the duals if you let it. 0-60 ~6.8 s, ~135 mph. Stability control starts on Sport.',
+          info: 'The dually built for the street: the 5.9 with compound turbos (~60 psi), big injectors and a tune - ~650 hp at 3,600, 1,250 lb-ft at 2,400 · a built 4-speed automatic and converter, 3.54 axles, 2WD · twin 6 in stacks in the bed · ~3,270 kg · 0-60 ~6.8 s, ~135 mph',
+          trans: '4-speed auto (built) · 2WD', soot: 1.0,
+          snd: { nEng: 1, cyl: 6, fmul: 0.78, deep: 0.6, loud: 0.75, open: 0.8, whK: 0.19, whPure: 1, whine: 1.5, rpmRef: 3800, race: 0.45, rough: 0.25, turbo: 1, diesel: 0.85, surge: 1 } },
+        pull: { hint: 'Diesel Dually (pulling truck): shift up (E) for DRIVE - a billet-head 5.9 on triple turbos, ~1,600 hp and 2,400 lb-ft to 5,000 rpm, locked in 4WD, the weight box hanging off the front - and a stack through the hood that rolls coal. 0-60 ~4.4 s, ~160 mph. Try the Dirt Drag strip. Stability control starts on Sport.',
+          info: 'A street-diesel-class pulling truck: a billet-head 5.9 on triple turbos (~110 psi), ~1,600 hp at 4,200, 2,400 lb-ft at 3,400, to 5,000 rpm · a built 4-speed automatic, locked 4WD · a 5 in stack straight up through the (primer-grey) hood, the hitch, the weight box on the front · ~3,450 kg · 0-60 ~4.4 s, ~160 mph',
+          trans: '4-speed auto (built) · 4WD', soot: 1.7,
+          snd: { nEng: 1, cyl: 6, fmul: 0.74, deep: 0.8, loud: 1, open: 1, whK: 0.19, whPure: 1, whine: 2.1, rpmRef: 5000, race: 0.75, rough: 0.3, turbo: 1, diesel: 0.7, surge: 1 } },
+      } },
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
@@ -312,7 +353,8 @@
   // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
   // (the dune buggy has two packages: its dune tyres - true - or off-road knobbies - 'knobby')
   const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
-  const PKG_KIND = () => (S.offroad && S.offroad[S.car] === 'knobby' ? 'knobby' : null);
+  // (the trophy truck too: its mud-terrains - true - or sand paddles - 'paddle')
+  const PKG_KIND = () => { const v = S.offroad && S.offroad[S.car]; return typeof v === 'string' ? v : null; };
   const pkg = () => VEH.OFFROAD_PKG(S.car, CARDEF.cls, PKG_KIND());
   const PKG_UI = PULLER ? ['R-2 deep lugs', 'R-2 deep lugs + lug fronts', 'Firestone R-2 30.5L-32 "cane & rice" rears left uncut (lugs twice as deep as a farm tyre, never sharpened) and lugged 11L-15 fronts. '
       + 'Off the pavement they out-dig the cut pullers everywhere - they paddle through mud, dig into turf and bite deeper into loose dirt (traction control lets them spin up to where they bite), and it steers in the soft stuff · on pavement the tall lugs squirm and thump. ~2 in taller (re-geared to match), ~130 lb heavier each']
@@ -324,6 +366,7 @@
       + 'on dirt and grass - and a lot less on pavement, where the knobs squirm and it slides']
     : S.car === 'trophy' ? ['40 in mud-terrains', '40 in mud-terrains', '40x13.5R17 mud-terrains in place of the desert tyres: open lugs that dig into mud and grass, a touch more height, less grip on tarmac and a bit less in the gravel']
     : S.car === 'buggy' ? ['Sand paddles', 'Sand paddles + rib fronts', 'Dune tyres: paddles on the back (rubber scoops across a smooth carcass - huge bite in sand, dirt and mud, next to none on pavement) and ribbed sand fronts']
+    : S.car === 'atv' ? ['Sand paddles', 'Sand paddles + rib fronts', 'ATV dune tyres: paddles on the back (rubber scoops across a smooth carcass - huge bite in sand, dirt and mud, next to none on pavement) and ribbed sand fronts that steer in the sand. Take it to the Sand Dunes']
     : S.car === 'bike' ? ['Knobbies', 'Dual-sport knobbies', 'Dual-sport knobby tyres: they bite in dirt, gravel and grass where the touring tyres just slide, and give up a lot of grip (and lean) on pavement']
     : S.car === 'tank' ? ['Steel grousers', 'Bare steel grousers', 'The rubber pads off the track shoes: bare steel grousers dig into dirt, mud and grass for more bite, and slide on pavement (and chew it up)']
     : S.car === 'rally' ? ['Mud tyres', 'Rally mud tyres', 'Rally mud tyres (205/70R15): big, open knobs that bite in grass, dirt and mud - ~1 g round a corner in the grass against ~0.75 g on the gravel tyres, '
@@ -487,6 +530,7 @@
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
+    if (id === 'atv') return ATVM.build(THREE, Object.assign(o, { engine: def.engine || 'sport', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
@@ -962,6 +1006,12 @@
           if (carLocked()) return;
           S.offroad = Object.assign({}, S.offroad, { buggy: v }); applyVehicleSettings();
         })));
+      else if (S.car === 'trophy') add(row('Tyres', 'Desert tyres: 39 in, interlocking blocks - made for the rough stuff at speed · Sand paddles: 39 in paddles on the back, ribbed fronts - '
+        + 'the dune buggy\'s sand tyres in the truck\'s size: huge bite in sand (and dirt and mud), they float over it, next to none on pavement · Mud-terrains: 40 in, open lugs for mud and grass',
+        seg([[false, 'Desert tyres'], ['paddle', 'Sand paddles'], [true, '40 in mud-terrains']], (S.offroad && S.offroad.trophy) || false, (v) => {
+          if (carLocked()) return;
+          S.offroad = Object.assign({}, S.offroad, { trophy: v }); applyVehicleSettings();
+        })));
       else add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
@@ -1313,12 +1363,39 @@
     }
     // nitro burns in the pipes: a Top Fuel engine under power lights all eight zoomies (alcohol burns nearly invisible)
     if (DRAGSTER) flames.burn(veh.running && !veh.fuelCut ? clamp(veh.thrEff * veh.tcCut * (veh.rpm() - 3000) / 4500, 0, 1) * (NITRO ? 1 : 0.35) : 0);
+    if (car.sootTips && car.sootTips.length) soot(dt);
     // (the smoke's fill budget follows the frame rate while the smoke is what's filling the screen: a slower GPU
     // draws fewer of the nearest puffs one by one and more of them as the flat veil)
     if (smoke.coverageAll > 0.6 * smoke.fill && G.fps) smoke.fill = clamp(smoke.fill * (G.fps < 50 ? 1 - dt * 0.8 : G.fps > 57 ? 1 + dt * 0.3 : 1), 4, 24);
     smoke.update(dt, 1.3, 0.5);
     smoke.setLight(world.sun.color, world.sun.intensity, world.preset === 'night' ? 0.08 : world.preset === 'sunset' ? 0.42 : 0.55);
     flames.update(dt);
+  }
+
+  // ------------------------------------------------------------------ a diesel's soot: black out of the stack as the fuel
+  // runs ahead of the air - floored before the turbo has spooled, and on a tuned truck (CCD.soot: how rich the tune
+  // runs) under any real load. It leaves the stack at the exhaust's speed on top of the truck's own, so at speed it
+  // trails back over the bed; a little grey haze at idle
+  const _sv = new THREE.Vector3(), _sd = new THREE.Vector3();
+  function soot(dt) {
+    if (!veh.running) return;
+    const K = CCD.soot || 0.3, thr = clamp(veh.thrEff, 0, 1), lag = Math.max(0, thr - (veh.spool || 0));
+    const amt = clamp((1.7 * lag + 0.3 * thr * thr * clamp(veh.rpm() / sp.redlineRpm + 0.3, 0, 1.2)) * K, 0, 2.4);
+    const idle = K > 0.5 ? 0.04 : 0.015;
+    G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 6 + 45 * Math.min(1.6, amt) : 3) * smoke.budget * tune.smoke;
+    if (G.sootAcc < 1) return;
+    const a = Math.max(amt, idle), m = car.root.matrixWorld;
+    smoke.setGround(groundH(car.root.position.x, car.root.position.z));
+    while (G.sootAcc >= 1) {
+      G.sootAcc -= 1;
+      for (const st of car.sootTips) {
+        _sv.copy(st.p).applyMatrix4(m); _sd.copy(st.d).transformDirection(m);
+        const v0 = 1.5 + 5 * thr * Math.min(1, 0.3 + a);
+        smoke.emit(_sv.x + (Math.random() - 0.5) * 0.06, _sv.y + (Math.random() - 0.5) * 0.06, _sv.z + (Math.random() - 0.5) * 0.06,
+          veh.vx + _sd.x * v0 + (Math.random() - 0.5) * 0.8, veh.vy + _sd.y * v0 + Math.random() * 0.5, veh.vz + _sd.z * v0 + (Math.random() - 0.5) * 0.8,
+          0.22 + 0.16 * Math.min(1.5, a), 1.0 + 1.4 * Math.min(1.6, a), (2 + 2.4 * Math.min(1.5, a)) * (0.8 + Math.random() * 0.4), clamp(0.16 + 0.32 * a, 0, 0.72), -clamp(0.3 + 0.55 * a, 0, 1));
+      }
+    }
   }
 
   // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
@@ -1363,7 +1440,7 @@
     }
     if (TANK) turretFollow(dt);
     if (car.afterWheels) car.afterWheels();
-    if (car.setRider) car.setRider(veh.forwardSpeed);
+    if (car.setRider) car.setRider(veh.forwardSpeed, veh);
     if (car.setJet) { car.setJetSize(jetSize()); car.setJet(veh.jetN || 0, veh.jetAB || 0, veh.thrEff || 0, dt); }
     const wheelDeg = S.cockpitWheel === 'real' ? veh.steerAngle * sp.steerRatio : (input.source === 'wheel' ? input.raw.steer * S.wheelDeg / 2 * Math.PI / 180 : veh.steerAngle / sp.maxSteer * S.wheelDeg / 2 * Math.PI / 180);
     car.steerWheel.rotation.z = -wheelDeg;
@@ -1422,7 +1499,7 @@
       car.root.localToWorld(_v);
       camera.position.copy(_v);
       yawQ.setFromAxisAngle(Y, cam.headYaw + cam.orbitYaw);
-      pitchQ.setFromAxisAngle(X, (KART ? -0.17 : BIKE ? -0.2 : -0.1) - cam.orbitPitch * 0.8);
+      pitchQ.setFromAxisAngle(X, (KART ? -0.17 : BIKE ? -0.2 : S.car === 'atv' ? -0.42 : -0.1) - cam.orbitPitch * 0.8);
       camQ.copy(car.root.quaternion).multiply(yawQ).multiply(pitchQ);
       // (a rider's head stays half upright as the bike leans under it)
       if (BIKE) camQ.multiply(yawQ.setFromAxisAngle(_Z, (veh.lean || 0) * 0.5));
@@ -1510,6 +1587,7 @@
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0,
     });
   }
   function processEvents() {
@@ -1565,7 +1643,7 @@
       { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER || CC ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
       { html: CC ? CCD.trans : MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
         : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_UI[0]) : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_KIND() === 'paddle' ? 'Sand paddles' : PKG_UI[0]) : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });
@@ -1918,7 +1996,7 @@
         if (cs.trans) S.trans = cs.trans;
         if (cs.rear) S.rearTire = cs.rear;
         if (cs.dp) S.dpRear = cs.dp;
-        S.offroad = Object.assign({}, S.offroad, { [cs.c]: cs.off === 'knobby' ? 'knobby' : !!cs.off });
+        S.offroad = Object.assign({}, S.offroad, { [cs.c]: typeof cs.off === 'string' ? cs.off : !!cs.off });
         if (restart) why = (why ? why + ' and ' : '') + 'the host\'s ' + carLabel(cs.c, cs.o);
         else if (!why && !ONLINE.reloading) { hostTune(cs.tune); applyVehicleSettings(); if (G.menu) renderMenu(); }
       }
@@ -2265,7 +2343,7 @@
       boostRef: Math.max(g.big ? bm : dp ? 24 : 11.6, bm), race: g.big ? snd.race : dp ? 1 : 0,
       nEng: snd.nEng, cyl: snd.cyl, fmul: snd.fmul, deep: snd.deep, loud: snd.loud, open: snd.open, whK: snd.whK, whPure: snd.whPure,
       pipe: snd.pipe ? clamp((st.rpm - snd.pipe[0]) / (snd.pipe[1] - snd.pipe[0]), 0, 1) : 0, vt: snd.vt || 0, surge: snd.surge || 0, ev: snd.ev || 0,
-      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1 };
+      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1, turbo: snd.turbo || 0, diesel: snd.diesel || 0 };
   }
   // ---- racing in a room: points, invisible walls, a reset every 30 s
   // Points come for ground covered along the course: on the road, 1 a metre times a streak that builds the longer you

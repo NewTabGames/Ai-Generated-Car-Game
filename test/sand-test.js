@@ -28,6 +28,13 @@ function run(label, id, key, pkg) {
     if (ok) best = deg; else break;
   }
   out.push(`pulls away up ${best ? best + ' deg' : 'nothing (not even 5 deg)'}`);
+  // cornering on flat sand: held at 25 mph, the steering wound on over 3 s - the most lateral g it pulls (measured, not yaw x speed: a spin isn't grip)
+  { const v = mk(id, key, pkg, slope(0)); let g = 0;
+    for (let i = 0; i < 120 * 30 && v.forwardSpeed * MPH < 25; i++) { v.input.throttle = 1; v.step(1 / 120); }
+    if (v.forwardSpeed * MPH >= 24) {
+      for (let t = 0; t < 3; t += 1 / 120) { v.input.throttle = Math.max(0, Math.min(1, 0.4 + (25 / MPH - v.forwardSpeed) * 0.5)); v.input.steer = Math.min(1, t / 3); v.step(1 / 120); g = Math.max(g, Math.abs(v.gLat)); }
+      out.push(`sand corner ${g.toFixed(2)} g`);
+    } }
   console.log(`== ${label}: ` + out.join(' · '));
 }
 run('buggy 1600 · buggy tyres', 'buggy', 'vw', null);
@@ -37,6 +44,11 @@ run('buggy 2276 · sand paddles', 'buggy', 'built', true);
 run('buggy LS3 · buggy tyres', 'buggy', 'ls', null);
 run('buggy LS3 · sand paddles', 'buggy', 'ls', true);
 run('trophy truck', 'trophy', 'tt', null);
+run('trophy truck · sand paddles', 'trophy', 'tt', 'paddle');
+run('ATV 200 · knobbies', 'atv', 'sport', null);
+run('ATV 200 · sand paddles', 'atv', 'sport', true);
+run('ATV 450 · sand paddles', 'atv', 'race', true);
+run('diesel dually', 'diesel', 'stock', null);
 run('monster truck', 'monster', undefined, null);
 run('Ram 1500 · 5.7 HEMI', 'ram', 'hemi', null);
 run('Hellcat · P Zero', 'hellcat', undefined, null);

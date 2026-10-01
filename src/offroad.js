@@ -424,8 +424,17 @@
       // wheels: 39 in desert tyres (interlocking blocks) on black 17 in beadlocks with red rings
       const TW = 0.343, rimR = 0.216;
       const tyG = carcass(RF, TW, rimR), trG = blocks(RF, TW, 30, [[0, 0.3, 0.55, 0], [0.3, 0.28, 0.5, 0.5], [-0.3, 0.28, 0.5, 0.5], [0.47, 0.12, 0.45, 0], [-0.47, 0.12, 0.45, 0]], 0.022, 1);
+      // (the sand tyres: a smooth carcass with 16 rubber paddles across it on the back, three ribs round the fronts)
+      const PW = 0.38, tyP = carcass(RR, PW, rimR);
+      const padT = []; for (let k = 0; k < 16; k++) { const b = new THREE.BoxGeometry(PW * 0.92, 0.04, 0.03); b.translate(0, RR + 0.016, 0); b.rotateX(k * Math.PI * 2 / 16); padT.push(b); }
+      const padTG = mergeGeos(padT), tyRib = carcass(RF, 0.3, rimR);
+      const ribT = []; for (const ox of [-0.32, 0, 0.32]) { const t = new THREE.TorusGeometry(RF + 0.004, 0.013, 6, 56); t.rotateY(Math.PI / 2); t.translate(ox * 0.3, 0, 0); ribT.push(t); }
+      const ribTG = mergeGeos(ribT);
       makeWheels((w, R) => {
-        add(w.spin, tyG, M.rubber, 0, 0, 0); add(w.spin, trG, M.rubber, 0, 0, 0);
+        w.stock.push(add(w.spin, tyG, M.rubber, 0, 0, 0), add(w.spin, trG, M.rubber, 0, 0, 0));
+        if (w.front) w.pkg.push(add(w.spin, tyRib, M.rubber, 0, 0, 0), add(w.spin, ribTG, M.rubber, 0, 0, 0));
+        else w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padTG, M.rubber, 0, 0, 0));
+        for (const m of w.pkg) m.visible = false;
         add(w.spin, cylX(rimR, rimR, TW * 0.85, 40, true), M.black, 0, 0, 0);
         add(w.spin, cylX(rimR * 0.98, rimR * 0.98, 0.02, 40), M.gloss, TW * 0.3, 0, 0);
         const ring = new THREE.TorusGeometry(rimR - 0.01, 0.022, 10, 48); ring.rotateY(Math.PI / 2); add(w.spin, ring, M.red, TW * 0.36, 0, 0);
@@ -646,7 +655,10 @@
       for (const s of spots) { s.visible = !!o.headlights; s.intensity = o.headlights ? 220 : 0; }
     }
     function setTires(front, rear) {
-      if (TT) return;
+      if (TT) {
+        for (const w of wheels) { const t = w.front ? front : rear, pkg = t === 'ttRib' || t === 'ttPaddle'; for (const m of w.stock) m.visible = !pkg; for (const m of w.pkg) m.visible = pkg; }
+        return;
+      }
       for (const w of wheels) {
         const t = w.front ? front : rear, knob = t === 'buggyKnobF' || t === 'buggyKnobR', pkg = !knob && t !== (w.front ? 'buggyF' : 'buggyR');
         for (const m of w.stock) m.visible = !pkg && !knob; for (const m of w.pkg) m.visible = pkg; for (const m of w.knob) m.visible = knob;
