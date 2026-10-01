@@ -303,6 +303,26 @@
       muX: 1.1, muY: 0.9, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.36,
       B: 1.75, C: 1.4, E: -0.2, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
       crr: [0.75, 1, 1, 1, 1, 0.75] },
+    // the hot rod: a fat street radial up front and huge bias-ply street tyres on the back (33x16.5-15: soft, they hook
+    // hard once they're warm, and go up in smoke when they're not)
+    rodF: { name: '225/70R15 street radial', short: 'Street radials', width: 0.225,
+      muX: 1.1, muY: 0.98, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.2, heatCap: 3200, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.05 },
+    rodR: { name: '33x16.5-15 bias-ply street tyre', short: '33x16.5 street', width: 0.42,
+      muX: 1.42, muY: 1.06, loose: 0.95, kappaPeak: 0.14, alphaPeak: 0.14, relaxX: 0.22, relaxY: 0.42,
+      B: 1.65, C: 1.42, E: -0.25, heatCap: 5200, cold: 0.82, coldT: 15, warmT: 60, hotT: 115, overheat: 0.0035, prep: 1.2 },
+    // the Chevelle: redline radials on 17 in wheels (a restomod's: modern rubber, the 1970 look)
+    chevF: { name: '235/60R17 redline radial', short: 'Redline radials', width: 0.235,
+      muX: 1.15, muY: 1.0, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.22, heatCap: 3400, cold: 0.96, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.05 },
+    chevR: { name: '255/60R17 redline radial', short: 'Redline radials', width: 0.255,
+      muX: 1.2, muY: 1.02, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.18, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.22, heatCap: 3600, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.08 },
+    // the unicycle: a 24 x 2.125 tyre on a 24 in wheel, round in section (it leans on it like a bike's)
+    uni24: { name: '24 x 2.125 unicycle tyre', short: '24 in tyre', width: 0.054,
+      muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [1.1, 1.1, 1.1, 1.05, 1, 1.1] },
     // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
     tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
       muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
@@ -930,7 +950,10 @@
       const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
 
       // ---------------- steering rack + Ackermann
-      const target = clamp(inp.steer || 0, -1, 1) * s.maxSteer;   // (|| 0: a NaN input must never poison the state)
+      let target = clamp(inp.steer || 0, -1, 1) * s.maxSteer;   // (|| 0: a NaN input must never poison the state)
+      // (steerAMax: the most cornering the rider can ride - the unicycle's 10 cm 'wheelbase' would ask for a turn no tyre
+      // or rider can make from any steering at speed: the lock is held to what makes steerAMax m/s^2 at this speed)
+      if (s.steerAMax) { const lim = Math.atan(s.wheelbase * s.steerAMax / Math.max(0.25, vFwd * vFwd)); target = clamp(target, -lim, lim); }
       const mr = s.steerRate * h;
       this.steerAngle += clamp(target - this.steerAngle, -mr, mr);
       const d = this.steerAngle;
@@ -1336,6 +1359,14 @@
         const hr = 1 / Math.max(0.2, Math.hypot(m00, m20)), vRh = (vx * m00 + vz * m20) * hr;
         const bR = Math.atan2(vRh - rR * s.cgToRear, Math.max(3, v)) * Math.sign(vFwd || 1);
         Ty += s.Iyaw * (Bk.yawK * (rR - rK) - Bk.alignK * bR) * ramp;
+      }
+      // a unicycle (uni): one wheel - nothing ahead of it or behind it to stand on. The rider balances it fore and aft as
+      // they do on the real thing (pedalling the wheel back under themselves), here a pitch torque that holds the frame
+      // upright; side to side it balances as a bike does (bike). Off the ground it lets go
+      if (s.uni && anyContact) {
+        const U = s.uni, pitch = Math.asin(clamp(-m12, -1, 1)), pRate = wx * m00 + wy * m10 + wz * m20;   // (+ nose up)
+        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate);
+        Tx += m00 * Tp; Ty += m10 * Tp; Tz += m20 * Tp;
       }
 
       // a quad's rider (riderShift): a third of its weight, and they ride it - hanging off the inside of a turn, their
@@ -3214,6 +3245,83 @@
     bodyHalfW: 0.62, bodyFront: -5.2, bodyRear: 3.3, bodyBottom: -0.38, bodyTop: 0.57,
     bodyPts: ccPts(0.58, 0.5, 4.0, ccBox(0.5, 0.22, 1.1, -4.6, 3.2).concat([[0, 0.45, -5.2], [-0.32, 1.6, 3.1], [0.32, 1.6, 3.1]])),
   } };
+  // Hot rod: a chopped 1934 Ford five-window coupe, fenderless at the front, the engine out in the open - a 540 ci
+  // big-block under an 8-71 blower and two four-barrels, ~900 hp on pump gas, its zoomie headers (a pipe from every port,
+  // swept down and back) - a TH400 3-speed behind a 3,500 rpm converter, a 9-inch with 3.89 gears, fat street tyres on
+  // the back. 1,330 kg with the driver, half on each axle; it lights the tyres up in any of its gears, ~164 mph at the
+  // limiter
+  CARS.hotrod = { name: 'Hot Rod', short: 'Hot Rod', car: 'BLOWN 540 BIG-BLOCK', hp: 900, tq: 820, cc: true, kbLat: 6.5, spec: {
+    name: 'Hot Rod',
+    mass: 1330, Ipitch: 1700, Iyaw: 1850, Iroll: 420, cgHeight: 0.55, wheelbase: 2.845, frontWeight: 0.5,
+    trackF: 1.42, trackR: 1.5, wheelRadius: 0.42, wheelRadiusF: 0.348, wheelRadiusR: 0.42, wheelInertiaF: 1.0, wheelInertiaR: 2.6,
+    frontTire: 'rodF', rearTire: 'rodR',
+    springF: 36000, springR: 42000, dampBumpF: 2400, dampRebF: 3600, dampBumpR: 3000, dampRebR: 4400,
+    arbF: 12000, arbR: 0, travelUp: 0.07, travelDown: 0.08, suspS0: 0.2,
+    brakeTorqueF: 2600, brakeTorqueR: 1600, handbrakeTorque: 1600, noABS: true,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 16,
+    idleRpm: 950, limiterRpm: 6800, redlineRpm: 6500, shiftRpm: 6300, engineInertia: 0.32, fricA: 30, fricB: 22, starterTorque: 220,
+    // (lb-ft: 820 at 4,500, 900 hp at 6,200)
+    torqueCurve: [[0, 300], [1000, 420], [2000, 600], [3000, 740], [4000, 805], [4500, 820], [5000, 812], [5500, 790], [6200, 762], [6600, 700], [7000, 600]],
+    boostMax: 12, popScale: 2.5,
+    autoRatios: [2.48, 1.48, 1.0], autoRev: 2.08, autoFinal: 3.89, tcK: 0.0078, tcStall: 2.2, noLockup: true,
+    shiftTimeWOT: 0.25, shiftTimePart: 0.4, launchRpm: 3500,
+    lsdPreload: 300, lsdRamp: 0.4, driveEff: 0.85,
+    CdA: 0.95,
+    bodyHalfW: 0.92, bodyFront: -2.0, bodyRear: 2.3, bodyBottom: -0.38, bodyTop: 0.8,
+    bodyPts: ccPts(0.55, 0.5, 2.845, ccBox(0.8, 0.22, 1.0, -0.45, 2.25).concat(ccBox(0.36, 0.3, 1.0, -1.95, -0.45)).concat([[-0.6, 1.35, 0.35], [0.6, 1.35, 0.35]])),
+  } };
+  // Chevrolet Chevelle SS 454 (1970), the sport coupe: the LS6 454 - 450 hp at 5,600, 500 lb-ft at 3,600 - a Turbo
+  // Hydra-Matic 400 3-speed, a 12-bolt posi on 3.77s; on 17 in wheels with redline radials (a restomod's), 1,830 kg with
+  // the driver, 56 / 44. 0-60 ~5.5 s, a ~13.6 s quarter, ~125 mph where the 3.77s run out of revs
+  const chevPts = (cg, fw) => ccPts(cg, fw, 2.845, [...ccBox(0.95, 0.2, 0.96, -2.4, 2.6), [-0.66, 1.33, 0.4], [0.66, 1.33, 0.4], [-0.66, 1.3, -0.05], [0.66, 1.3, -0.05], [-0.6, 1.0, 1.65], [0.6, 1.0, 1.65]]);
+  CARS.chevelle = { name: 'Chevrolet Chevelle SS 454', short: 'Chevelle SS', car: '454 LS6 V8', hp: 450, tq: 500, cc: true, kbLat: 6.5, spec: {
+    name: 'Chevrolet Chevelle SS 454',
+    mass: 1830, Ipitch: 3300, Iyaw: 3500, Iroll: 640, cgHeight: 0.53, wheelbase: 2.845, frontWeight: 0.56,
+    trackF: 1.524, trackR: 1.524, wheelRadius: 0.369, wheelRadiusF: 0.357, wheelRadiusR: 0.369, wheelInertiaF: 1.3, wheelInertiaR: 1.4,
+    frontTire: 'chevF', rearTire: 'chevR',
+    springF: 38000, springR: 30000, dampBumpF: 2600, dampRebF: 3900, dampBumpR: 2400, dampRebR: 3600,
+    arbF: 22000, arbR: 8000, travelUp: 0.09, travelDown: 0.11, suspS0: 0.28,
+    brakeTorqueF: 3200, brakeTorqueR: 1500, handbrakeTorque: 1500, noABS: true,
+    maxSteer: 0.6, steerRate: 3.8, steerRatio: 17,
+    idleRpm: 750, limiterRpm: 6200, redlineRpm: 6000, shiftRpm: 5800, engineInertia: 0.3, fricA: 28, fricB: 20, starterTorque: 200,
+    // (lb-ft: 500 at 3,600, 450 hp at 5,600)
+    torqueCurve: [[0, 280], [1000, 380], [2000, 450], [3000, 490], [3600, 500], [4000, 497], [4500, 485], [5000, 460], [5600, 422], [6000, 390], [6400, 350]],
+    boostMax: 0, popScale: 1,
+    autoRatios: [2.48, 1.48, 1.0], autoRev: 2.08, autoFinal: 3.77, tcK: 0.0105, tcStall: 2.0, noLockup: true,
+    shiftTimeWOT: 0.3, shiftTimePart: 0.45,
+    lsdPreload: 150, lsdRamp: 0.35, driveEff: 0.85,
+    CdA: 0.95,
+    bodyHalfW: 0.96, bodyFront: -2.24, bodyRear: 2.77, bodyBottom: -0.35, bodyTop: 0.8, bodyPts: chevPts(0.53, 0.56),
+  } };
+  // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
+  // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
+  // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
+  // (bike: leaned into the turns, a foot down at a stop), fore and aft held upright (uni). The physics' two 'axles' are the
+  // two ends of the one tyre's contact. 81 kg with the rider. The jet version (CARS.unicycle.make): a model-aircraft-class
+  // turbojet strapped behind the saddle - ~550 N (124 lbf), ~85 mph
+  const uniPts = (cg, wb) => ccPts(cg, 0.5, wb, [[-0.12, 0.5, -0.05], [0.12, 0.5, -0.05], [0, 1.8, 0], [-0.22, 1.4, 0], [0.22, 1.4, 0], [-0.2, 0.25, 0], [0.2, 0.25, 0], [0, 1.1, -0.25], [0, 1.1, 0.25]]);
+  CARS.unicycle = { name: 'Unicycle', short: 'Unicycle', car: 'LEG POWER', hp: 0.7, tq: 52, cc: true, kbLat: 3.5, spec: {
+    name: 'Unicycle',
+    mass: 81, Ipitch: 18, Iyaw: 3.5, Iroll: 18, cgHeight: 1.0, wheelbase: 0.1, frontWeight: 0.5,
+    trackF: 0.02, trackR: 0.02, wheelRadius: 0.305, wheelInertiaF: 0.06, wheelInertiaR: 0.06,
+    frontTire: 'uni24', rearTire: 'uni24', Fz0: 220, loadSens: 0.06,
+    springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
+    brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAMax: 4,
+    bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
+    uni: { kp: 300, kd: 35 },
+    // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
+    electric: true, idleRpm: 0, limiterRpm: 480, redlineRpm: 200, shiftRpm: 480, engineInertia: 0.05, fricA: 0.6, fricB: 0.3, starterTorque: 0,
+    // (lb-ft at the cranks against cadence: what legs give, the most at a standstill)
+    torqueCurve: [[0, 52], [60, 45], [100, 38], [140, 28], [180, 15], [200, 6], [220, 0]], boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 1, noCoastBlip: true, engineTc: true,
+    // (the two 'axles' are one tyre: no couplings between them - the road keeps them together; locking them through a
+    // stiff centre coupling on these tiny inertias wound them up against each other)
+    dragClutch: EV_CLUTCH, awd: true, awdFront: 0.5, lsdPreload: 0, lsdPreloadF: 0, centerPreload: 0, lsdRamp: 0, driveEff: 0.95,
+    CdA: 0.55,
+    bodyHalfW: 0.25, bodyFront: -0.3, bodyRear: 0.3, bodyBottom: -0.75, bodyTop: 0.8, bodyPts: uniPts(1.0, 0.1),
+  } };
   // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
   // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
   // an 18 in rear, 368 kg wet + a 90 kg rider. A motorcycle in a four-wheel world: each axle's two 'wheels' sit side by
@@ -3709,6 +3817,18 @@
       mass: 3104, torqueCurve: evCurve(1500, 630, 14800), limiterRpm: 14100, redlineRpm: 14100, awdFront: 0.4, lsdPreload: 60,
     } },
   }, 'awd', 'All-Wheel Drive');
+  // the jet unicycle: a model-aircraft-class turbojet (~550 N, 124 lbf, on the jet cart's spool) strapped on a frame
+  // behind the saddle, its thrust line through the CG; the legs only push it backwards (reverse: they still pedal).
+  // 95 kg with the engine and its fuel; ~85 mph, where the rider's drag meets the thrust
+  ccEngines('unicycle', {
+    jet: { label: 'Jet', car: 'TURBOJET 124 LBF', hp: 0, tq: 0, kbLat: 3.5, spec: {
+      mass: 95, Ipitch: 21, Iroll: 21, Iyaw: 4,
+      idleRpm: 3300, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+      torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, noCoastBlip: true,
+      jet: { thrust: 550, ab: 0, idle: 0.33, rpm100: 10000, ram: 0.002, y: 0, z: 0.25, revTq: 40, revRpm: 100 },
+      steerAMax: 5, CdA: 0.58,
+    } },
+  }, 'pedal', 'Pedal');
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)

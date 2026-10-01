@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -341,6 +341,31 @@
       info: 'Sunbeam\'s 1930 land-speed car for Kaye Don: a long silver cigar with a pointed nose, the wheels out in the wind behind aluminium discs, a fairing down each side between them, the cockpit far back, two tall fins on the tail · 24 L V12 with two superchargers, ~960 hp at 3,300 rpm, ~1,700 lb-ft · 3-speed gearbox to the rear wheels · Dunlop 37 x 7 tyres · ~8.5 m long, ~2.4 t · built to beat 231 mph; at Daytona in March 1930 it managed 186',
       trans: '3-speed · multi-plate clutch', tyres: 'Dunlop 37 x 7',
       snd: { nEng: 1, cyl: 12, fmul: 0.6, deep: 0.85, loud: 1, open: 1, whK: 0.9, whPure: 1, whine: 0.9, rpmRef: 3500, race: 0.8, rough: 0.25 } },
+    hotrod: { btn: 'HOT ROD', sub: 'A chopped 1934 Ford five-window coupe · a blown 540 big-block out in the open, zoomie headers · ~900 hp · 3-speed automatic · fat street tyres', paint: 'Crimson', tc: 0, cam: [1.0, 1.0],
+      hint: 'Hot Rod: shift up (E) for DRIVE - a 540 ci big-block under an 8-71 blower, ~900 hp through a 3-speed automatic and a 3,500 rpm converter, straight out of the zoomies. It lights the rear tyres up in any gear: squeeze it on, or let traction control (Street) do it for you. Hold SPACE, floor it and let go to launch off the converter.',
+      info: 'A chopped 1934 Ford five-window coupe, fenderless up front: a 540 ci big-block Chevy under a polished 8-71 blower and two four-barrels, ~900 hp at 6,200, 820 lb-ft at 4,500 on pump gas, zoomie headers (a pipe from every port, swept down and back) · TH400 3-speed automatic behind a 3,500 rpm converter, a 9-inch rear on 3.89s · a dropped front axle on a transverse leaf · polished wheels, 225/70R15 fronts, 33x16.5-15 street tyres at the back · ~1,330 kg · 0-60 ~3.9 s, ~11.2 s quarter mile, ~150 mph',
+      trans: '3-speed auto (TH400)', tyres: '33x16.5-15 street · 225/70R15 fronts',
+      snd: { nEng: 1, cyl: 8, fmul: 0.92, deep: 0.55, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.7, rpmRef: 6800, race: 0.9, rough: 0.3 } },
+    chevelle: { btn: 'CHEVELLE SS', sub: 'A 1970 Chevelle SS 454 sport coupe · the LS6 454, 450 hp, 500 lb-ft · Turbo 400 3-speed · black with red stripes', paint: 'Pitch Black', tc: 0, cam: [1.08, 1.0], road: true,
+      hint: 'Chevelle SS: shift up (E) for DRIVE - the LS6 454, 450 hp and 500 lb-ft through a Turbo Hydra-Matic 400 and a posi rear on 3.77s: 0-60 in ~5.5 s, a ~13.7 s quarter mile. No ABS, no stability control in 1970 - traction control is the game\'s (Street), and it\'ll go up in smoke without it.',
+      info: '1970 Chevrolet Chevelle SS 454 sport coupe: the long hood with the cowl-induction bulge, the full-width grille with its quad headlamps and the bar across, a chrome bumper wrapping the corners with the parking lamps in it, the semi-fastback roof with its sail panels and black vinyl top, the rear wheels under the coke-bottle hips, tail lamps in the rear bumper, red stripes over the hood and the deck, a red interior · LS6 454 V8, 450 hp at 5,600, 500 lb-ft at 3,600 · TH400 3-speed automatic, 12-bolt posi on 3.77s · 17 in five-spokes on redline radials · 5.01 m long, 2.85 m wheelbase · ~1,830 kg · 0-60 ~5.4 s, ~13.8 s quarter mile, ~130 mph',
+      trans: '3-speed auto (TH400)', tyres: 'Redline radials',
+      snd: { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.5, loud: 0.75, open: 0.5, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6000, race: 0.35, rough: 0.15 } },
+    unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
+      hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
+      info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
+      trans: 'Direct drive (no gears)', tyres: '24 x 2.125',
+      snd: { nEng: 1, cyl: 1, ev: 1, whK: 0.1, whPure: 1, whine: 0, rpmRef: 200, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'uniEng', optLabel: 'Version', options: [
+        ['pedal', 'Pedal', 'Leg power: ~0.7 hp · no gears · ~14 mph'],
+        ['jet', 'Jet unicycle', 'A model-jet turbojet behind the saddle, 124 lbf of thrust · 0-60 ~9 s · ~85 mph'],
+      ],
+      eng: {
+        jet: { hint: 'Jet unicycle: shift up (E) for DRIVE and open the throttle - a model-aircraft turbojet on a rack behind the saddle, 124 lbf of thrust. It takes a couple of seconds to spool, then shoves: 0-60 in ~9 s, ~85 mph on a bicycle tyre. Turns are held to what the rider can lean into; the legs are the only brake. R pedals backwards.',
+          info: 'The 24 in unicycle with a model-aircraft-class turbojet strapped on a rack behind the saddle (~550 N, 124 lbf), a fuel tank under it, its thrust line through the rider\'s centre of gravity; the rider in a helmet and goggles · no brake but the legs · 95 kg · 0-60 ~9 s, ~84 mph',
+          trans: 'Jet thrust · pedals for reverse',
+          snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.2, rpmRef: 10000, open: 1, fmul: 1.4, deep: 0, loud: 0.5, race: 0 } },
+      } },
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
@@ -546,6 +571,7 @@
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
     if (id === 'atv') return ATVM.build(THREE, Object.assign(o, { engine: def.engine || 'sport', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
+    if (id === 'unicycle') return UNIM.build(THREE, Object.assign(o, { engine: def.engine || 'pedal', wheelRadiusF: s.wheelRadiusF || s.wheelRadius }));
     if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
@@ -1415,7 +1441,7 @@
 
   // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
   // looks (drag the mouse to look round) at a real turret's ~40 deg/s, and the gun lifts with the view (-9 to +20 deg)
-  const TANK = S.car === 'tank', BIKE = S.car === 'bike', _Z = new THREE.Vector3(0, 0, 1);
+  const TANK = S.car === 'tank', BIKE = S.car === 'bike' || S.car === 'unicycle', _Z = new THREE.Vector3(0, 0, 1);
   const TUR = { yaw: 0, elev: 0 }, _tq = new THREE.Quaternion(), _td = new THREE.Vector3();
   function turretFollow(dt) {
     _td.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(_tq.set(veh.qx, veh.qy, veh.qz, veh.qw).invert());

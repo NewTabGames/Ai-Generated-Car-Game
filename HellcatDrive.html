@@ -2168,6 +2168,26 @@
       muX: 1.1, muY: 0.9, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.36,
       B: 1.75, C: 1.4, E: -0.2, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0,
       crr: [0.75, 1, 1, 1, 1, 0.75] },
+    // the hot rod: a fat street radial up front and huge bias-ply street tyres on the back (33x16.5-15: soft, they hook
+    // hard once they're warm, and go up in smoke when they're not)
+    rodF: { name: '225/70R15 street radial', short: 'Street radials', width: 0.225,
+      muX: 1.1, muY: 0.98, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.2, heatCap: 3200, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.05 },
+    rodR: { name: '33x16.5-15 bias-ply street tyre', short: '33x16.5 street', width: 0.42,
+      muX: 1.42, muY: 1.06, loose: 0.95, kappaPeak: 0.14, alphaPeak: 0.14, relaxX: 0.22, relaxY: 0.42,
+      B: 1.65, C: 1.42, E: -0.25, heatCap: 5200, cold: 0.82, coldT: 15, warmT: 60, hotT: 115, overheat: 0.0035, prep: 1.2 },
+    // the Chevelle: redline radials on 17 in wheels (a restomod's: modern rubber, the 1970 look)
+    chevF: { name: '235/60R17 redline radial', short: 'Redline radials', width: 0.235,
+      muX: 1.15, muY: 1.0, loose: 1.0, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.17, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.22, heatCap: 3400, cold: 0.96, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.05 },
+    chevR: { name: '255/60R17 redline radial', short: 'Redline radials', width: 0.255,
+      muX: 1.2, muY: 1.02, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.18, relaxY: 0.38,
+      B: 1.75, C: 1.4, E: -0.22, heatCap: 3600, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.08 },
+    // the unicycle: a 24 x 2.125 tyre on a 24 in wheel, round in section (it leans on it like a bike's)
+    uni24: { name: '24 x 2.125 unicycle tyre', short: '24 in tyre', width: 0.054,
+      muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
+      B: 1.7, C: 1.4, E: -0.2, heatCap: 500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
+      crr: [1.1, 1.1, 1.1, 1.05, 1, 1.1] },
     // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
     tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
       muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
@@ -2795,7 +2815,10 @@
       const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
 
       // ---------------- steering rack + Ackermann
-      const target = clamp(inp.steer || 0, -1, 1) * s.maxSteer;   // (|| 0: a NaN input must never poison the state)
+      let target = clamp(inp.steer || 0, -1, 1) * s.maxSteer;   // (|| 0: a NaN input must never poison the state)
+      // (steerAMax: the most cornering the rider can ride - the unicycle's 10 cm 'wheelbase' would ask for a turn no tyre
+      // or rider can make from any steering at speed: the lock is held to what makes steerAMax m/s^2 at this speed)
+      if (s.steerAMax) { const lim = Math.atan(s.wheelbase * s.steerAMax / Math.max(0.25, vFwd * vFwd)); target = clamp(target, -lim, lim); }
       const mr = s.steerRate * h;
       this.steerAngle += clamp(target - this.steerAngle, -mr, mr);
       const d = this.steerAngle;
@@ -3201,6 +3224,14 @@
         const hr = 1 / Math.max(0.2, Math.hypot(m00, m20)), vRh = (vx * m00 + vz * m20) * hr;
         const bR = Math.atan2(vRh - rR * s.cgToRear, Math.max(3, v)) * Math.sign(vFwd || 1);
         Ty += s.Iyaw * (Bk.yawK * (rR - rK) - Bk.alignK * bR) * ramp;
+      }
+      // a unicycle (uni): one wheel - nothing ahead of it or behind it to stand on. The rider balances it fore and aft as
+      // they do on the real thing (pedalling the wheel back under themselves), here a pitch torque that holds the frame
+      // upright; side to side it balances as a bike does (bike). Off the ground it lets go
+      if (s.uni && anyContact) {
+        const U = s.uni, pitch = Math.asin(clamp(-m12, -1, 1)), pRate = wx * m00 + wy * m10 + wz * m20;   // (+ nose up)
+        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate);
+        Tx += m00 * Tp; Ty += m10 * Tp; Tz += m20 * Tp;
       }
 
       // a quad's rider (riderShift): a third of its weight, and they ride it - hanging off the inside of a turn, their
@@ -5079,6 +5110,83 @@
     bodyHalfW: 0.62, bodyFront: -5.2, bodyRear: 3.3, bodyBottom: -0.38, bodyTop: 0.57,
     bodyPts: ccPts(0.58, 0.5, 4.0, ccBox(0.5, 0.22, 1.1, -4.6, 3.2).concat([[0, 0.45, -5.2], [-0.32, 1.6, 3.1], [0.32, 1.6, 3.1]])),
   } };
+  // Hot rod: a chopped 1934 Ford five-window coupe, fenderless at the front, the engine out in the open - a 540 ci
+  // big-block under an 8-71 blower and two four-barrels, ~900 hp on pump gas, its zoomie headers (a pipe from every port,
+  // swept down and back) - a TH400 3-speed behind a 3,500 rpm converter, a 9-inch with 3.89 gears, fat street tyres on
+  // the back. 1,330 kg with the driver, half on each axle; it lights the tyres up in any of its gears, ~164 mph at the
+  // limiter
+  CARS.hotrod = { name: 'Hot Rod', short: 'Hot Rod', car: 'BLOWN 540 BIG-BLOCK', hp: 900, tq: 820, cc: true, kbLat: 6.5, spec: {
+    name: 'Hot Rod',
+    mass: 1330, Ipitch: 1700, Iyaw: 1850, Iroll: 420, cgHeight: 0.55, wheelbase: 2.845, frontWeight: 0.5,
+    trackF: 1.42, trackR: 1.5, wheelRadius: 0.42, wheelRadiusF: 0.348, wheelRadiusR: 0.42, wheelInertiaF: 1.0, wheelInertiaR: 2.6,
+    frontTire: 'rodF', rearTire: 'rodR',
+    springF: 36000, springR: 42000, dampBumpF: 2400, dampRebF: 3600, dampBumpR: 3000, dampRebR: 4400,
+    arbF: 12000, arbR: 0, travelUp: 0.07, travelDown: 0.08, suspS0: 0.2,
+    brakeTorqueF: 2600, brakeTorqueR: 1600, handbrakeTorque: 1600, noABS: true,
+    maxSteer: 0.6, steerRate: 4, steerRatio: 16,
+    idleRpm: 950, limiterRpm: 6800, redlineRpm: 6500, shiftRpm: 6300, engineInertia: 0.32, fricA: 30, fricB: 22, starterTorque: 220,
+    // (lb-ft: 820 at 4,500, 900 hp at 6,200)
+    torqueCurve: [[0, 300], [1000, 420], [2000, 600], [3000, 740], [4000, 805], [4500, 820], [5000, 812], [5500, 790], [6200, 762], [6600, 700], [7000, 600]],
+    boostMax: 12, popScale: 2.5,
+    autoRatios: [2.48, 1.48, 1.0], autoRev: 2.08, autoFinal: 3.89, tcK: 0.0078, tcStall: 2.2, noLockup: true,
+    shiftTimeWOT: 0.25, shiftTimePart: 0.4, launchRpm: 3500,
+    lsdPreload: 300, lsdRamp: 0.4, driveEff: 0.85,
+    CdA: 0.95,
+    bodyHalfW: 0.92, bodyFront: -2.0, bodyRear: 2.3, bodyBottom: -0.38, bodyTop: 0.8,
+    bodyPts: ccPts(0.55, 0.5, 2.845, ccBox(0.8, 0.22, 1.0, -0.45, 2.25).concat(ccBox(0.36, 0.3, 1.0, -1.95, -0.45)).concat([[-0.6, 1.35, 0.35], [0.6, 1.35, 0.35]])),
+  } };
+  // Chevrolet Chevelle SS 454 (1970), the sport coupe: the LS6 454 - 450 hp at 5,600, 500 lb-ft at 3,600 - a Turbo
+  // Hydra-Matic 400 3-speed, a 12-bolt posi on 3.77s; on 17 in wheels with redline radials (a restomod's), 1,830 kg with
+  // the driver, 56 / 44. 0-60 ~5.5 s, a ~13.6 s quarter, ~125 mph where the 3.77s run out of revs
+  const chevPts = (cg, fw) => ccPts(cg, fw, 2.845, [...ccBox(0.95, 0.2, 0.96, -2.4, 2.6), [-0.66, 1.33, 0.4], [0.66, 1.33, 0.4], [-0.66, 1.3, -0.05], [0.66, 1.3, -0.05], [-0.6, 1.0, 1.65], [0.6, 1.0, 1.65]]);
+  CARS.chevelle = { name: 'Chevrolet Chevelle SS 454', short: 'Chevelle SS', car: '454 LS6 V8', hp: 450, tq: 500, cc: true, kbLat: 6.5, spec: {
+    name: 'Chevrolet Chevelle SS 454',
+    mass: 1830, Ipitch: 3300, Iyaw: 3500, Iroll: 640, cgHeight: 0.53, wheelbase: 2.845, frontWeight: 0.56,
+    trackF: 1.524, trackR: 1.524, wheelRadius: 0.369, wheelRadiusF: 0.357, wheelRadiusR: 0.369, wheelInertiaF: 1.3, wheelInertiaR: 1.4,
+    frontTire: 'chevF', rearTire: 'chevR',
+    springF: 38000, springR: 30000, dampBumpF: 2600, dampRebF: 3900, dampBumpR: 2400, dampRebR: 3600,
+    arbF: 22000, arbR: 8000, travelUp: 0.09, travelDown: 0.11, suspS0: 0.28,
+    brakeTorqueF: 3200, brakeTorqueR: 1500, handbrakeTorque: 1500, noABS: true,
+    maxSteer: 0.6, steerRate: 3.8, steerRatio: 17,
+    idleRpm: 750, limiterRpm: 6200, redlineRpm: 6000, shiftRpm: 5800, engineInertia: 0.3, fricA: 28, fricB: 20, starterTorque: 200,
+    // (lb-ft: 500 at 3,600, 450 hp at 5,600)
+    torqueCurve: [[0, 280], [1000, 380], [2000, 450], [3000, 490], [3600, 500], [4000, 497], [4500, 485], [5000, 460], [5600, 422], [6000, 390], [6400, 350]],
+    boostMax: 0, popScale: 1,
+    autoRatios: [2.48, 1.48, 1.0], autoRev: 2.08, autoFinal: 3.77, tcK: 0.0105, tcStall: 2.0, noLockup: true,
+    shiftTimeWOT: 0.3, shiftTimePart: 0.45,
+    lsdPreload: 150, lsdRamp: 0.35, driveEff: 0.85,
+    CdA: 0.95,
+    bodyHalfW: 0.96, bodyFront: -2.24, bodyRear: 2.77, bodyBottom: -0.35, bodyTop: 0.8, bodyPts: chevPts(0.53, 0.56),
+  } };
+  // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
+  // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
+  // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
+  // (bike: leaned into the turns, a foot down at a stop), fore and aft held upright (uni). The physics' two 'axles' are the
+  // two ends of the one tyre's contact. 81 kg with the rider. The jet version (CARS.unicycle.make): a model-aircraft-class
+  // turbojet strapped behind the saddle - ~550 N (124 lbf), ~85 mph
+  const uniPts = (cg, wb) => ccPts(cg, 0.5, wb, [[-0.12, 0.5, -0.05], [0.12, 0.5, -0.05], [0, 1.8, 0], [-0.22, 1.4, 0], [0.22, 1.4, 0], [-0.2, 0.25, 0], [0.2, 0.25, 0], [0, 1.1, -0.25], [0, 1.1, 0.25]]);
+  CARS.unicycle = { name: 'Unicycle', short: 'Unicycle', car: 'LEG POWER', hp: 0.7, tq: 52, cc: true, kbLat: 3.5, spec: {
+    name: 'Unicycle',
+    mass: 81, Ipitch: 18, Iyaw: 3.5, Iroll: 18, cgHeight: 1.0, wheelbase: 0.1, frontWeight: 0.5,
+    trackF: 0.02, trackR: 0.02, wheelRadius: 0.305, wheelInertiaF: 0.06, wheelInertiaR: 0.06,
+    frontTire: 'uni24', rearTire: 'uni24', Fz0: 220, loadSens: 0.06,
+    springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
+    arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
+    brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAMax: 4,
+    bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
+    uni: { kp: 300, kd: 35 },
+    // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
+    electric: true, idleRpm: 0, limiterRpm: 480, redlineRpm: 200, shiftRpm: 480, engineInertia: 0.05, fricA: 0.6, fricB: 0.3, starterTorque: 0,
+    // (lb-ft at the cranks against cadence: what legs give, the most at a standstill)
+    torqueCurve: [[0, 52], [60, 45], [100, 38], [140, 28], [180, 15], [200, 6], [220, 0]], boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 1, noCoastBlip: true, engineTc: true,
+    // (the two 'axles' are one tyre: no couplings between them - the road keeps them together; locking them through a
+    // stiff centre coupling on these tiny inertias wound them up against each other)
+    dragClutch: EV_CLUTCH, awd: true, awdFront: 0.5, lsdPreload: 0, lsdPreloadF: 0, centerPreload: 0, lsdRamp: 0, driveEff: 0.95,
+    CdA: 0.55,
+    bodyHalfW: 0.25, bodyFront: -0.3, bodyRear: 0.3, bodyBottom: -0.75, bodyTop: 0.8, bodyPts: uniPts(1.0, 0.1),
+  } };
   // Touring bagger, built like a Street Glide: a 117 ci (1,923 cc) 45-degree V-twin, 105 hp at 5,020 and 130 lb-ft at
   // 3,500, a 6-speed and a belt, the batwing fairing on the forks, hard saddlebags; 1,625 mm wheelbase, a 19 in front and
   // an 18 in rear, 368 kg wet + a 90 kg rider. A motorcycle in a four-wheel world: each axle's two 'wheels' sit side by
@@ -5574,6 +5682,18 @@
       mass: 3104, torqueCurve: evCurve(1500, 630, 14800), limiterRpm: 14100, redlineRpm: 14100, awdFront: 0.4, lsdPreload: 60,
     } },
   }, 'awd', 'All-Wheel Drive');
+  // the jet unicycle: a model-aircraft-class turbojet (~550 N, 124 lbf, on the jet cart's spool) strapped on a frame
+  // behind the saddle, its thrust line through the CG; the legs only push it backwards (reverse: they still pedal).
+  // 95 kg with the engine and its fuel; ~85 mph, where the rider's drag meets the thrust
+  ccEngines('unicycle', {
+    jet: { label: 'Jet', car: 'TURBOJET 124 LBF', hp: 0, tq: 0, kbLat: 3.5, spec: {
+      mass: 95, Ipitch: 21, Iroll: 21, Iyaw: 4,
+      idleRpm: 3300, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+      torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, noCoastBlip: true,
+      jet: { thrust: 550, ab: 0, idle: 0.33, rpm100: 10000, ram: 0.002, y: 0, z: 0.25, revTq: 40, revRpm: 100 },
+      steerAMax: 5, CdA: 0.58,
+    } },
+  }, 'pedal', 'Pedal');
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)
@@ -11480,7 +11600,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -11516,7 +11636,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       g.fillStyle = '#060607'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3c40'; g.lineWidth = 2;
       for (let x = -h; x < w; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke(); }
     }), roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
-    const SUITS = { prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
+    const SUITS = { hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
     M.suit = new THREE.MeshStandardMaterial({ color: SUITS[CAR] || 0x333333, roughness: 0.8 });
     M.pants = new THREE.MeshStandardMaterial({ color: CAR === 'bluebird' || CAR === 'silverbullet' || CAR === 'eggrod' || CAR === 'gtr' ? SUITS[CAR] : 0x2a3446, roughness: 0.85 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, silverbullet: 0x4a2a16, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' || CAR === 'silverbullet' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' || CAR === 'silverbullet' ? 0 : 1 });
@@ -13737,6 +13857,363 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         knee: { dx: 0.11, y: 0.66, z: 0.62 }, foot: { dx: 0.13, y: 0.42, z: 0.15 }, goggles: true });
     };
 
+    // ---------------------------------------------------------------- Hot Rod (a chopped 1934 Ford five-window coupe)
+    // The body from the firewall back: the rounded cowl, the doors hinged at the back (their handles at the front), the
+    // chopped top - a short near-upright windshield, door and quarter windows with round corners, a small back window - the
+    // back curving down over the deck to the tail, bulbous rear fenders over the big tyres. Fenderless at the front: the
+    // tall grille shell over the dropped axle on its transverse leaf, the frame rails, and the engine out in the open - a red
+    // big-block, polished valve covers, a polished 8-71 blower with its drive belt, two carbs under a big flat hat - and the
+    // zoomies, four polished pipes a side swept down and back to flared tips ahead of the doors. Polished wheels
+    B.hotrod = () => {
+      WF = 0.225; WR = 0.42;
+      wheelStyle = { rim: 'rod', rimR: 0.19, rimRR: 0.19, tread: 'road' };
+      M.paint.side = THREE.DoubleSide; M.paint.metalness = 0.2; M.paint.roughness = 0.2; M.paint.clearcoat = 1;
+      M.polish = M.polish || new THREE.MeshStandardMaterial({ color: 0xe6e8ec, roughness: 0.08, metalness: 1 });
+      M.block = new THREE.MeshStandardMaterial({ color: 0xa0161c, roughness: 0.35, metalness: 0.3 });
+      M.hose = new THREE.MeshStandardMaterial({ color: 0x111112, roughness: 0.7 });
+      M.trimIn = new THREE.MeshStandardMaterial({ color: 0x2a1a14, roughness: 0.8, side: THREE.DoubleSide });
+      M.linerB = Object.assign(M.black.clone(), { side: THREE.DoubleSide });
+      M.seam = new THREE.MeshStandardMaterial({ color: 0x220405, roughness: 0.6 });
+      const ZC = -0.45, ZT = 2.32, ZWT = -0.34, ZB = 0.62, ZD = 1.22;      // the cowl, the tail, the windshield's top, the roof's back, the deck
+      const sm = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+      // ---- the body: cross-sections from the cowl to the tail (the coupe's round-shouldered, tumbled-in sides)
+      const Wz = tbl([[ZC, 0.62], [-0.38, 0.66], [-0.2, 0.69], [0.6, 0.71], [1.4, 0.7], [1.9, 0.67], [2.15, 0.6], [2.27, 0.5], [ZT, 0.36]]);
+      const yBz = tbl([[ZC, 0.36], [1.6, 0.36], [2.0, 0.4], [2.25, 0.48], [ZT, 0.56]]);
+      const ySh = tbl([[ZC, 0.96], [-0.3, 0.99], [0.6, 1.0], [1.3, 0.99], [1.9, 0.9], [2.2, 0.76], [ZT, 0.66]]);
+      const yTop = tbl([[ZC, 1.0], [-0.42, 1.03], [-0.4, 1.06], [ZWT, 1.35], [-0.2, 1.375], [0.3, 1.385], [ZB, 1.355], [0.85, 1.27], [1.05, 1.13], [ZD, 1.06], [1.6, 1.0], [1.95, 0.9], [2.2, 0.76], [ZT, 0.66]]);
+      const Wtz = tbl([[ZC, 0.5], [ZWT, 0.56], [0.3, 0.58], [ZB, 0.56], [ZD, 0.52], [ZT, 0.3]]);
+      const section = (z) => {
+        const W = Wz(z), yb = yBz(z), ysh = Math.max(ySh(z), yb + 0.15), yt = Math.max(yTop(z), ysh + 0.02), Wb = W - 0.035, wt = Math.min(Wtz(z), Wb - 0.02);
+        const P = [[0, yb], [W * 0.6, yb], [W - 0.06, yb + 0.005], [W - 0.02, yb + 0.03]];
+        for (let k = 1; k <= 5; k++) { const t = k / 5; P.push([W - 0.02 * (1 - t) + 0.025 * Math.sin(Math.PI * t), yb + 0.03 + (ysh - yb - 0.03) * t]); }
+        P.push([W - 0.012, ysh + 0.012], [Wb, ysh + 0.03]);
+        for (let k = 1; k <= 4; k++) { const t = k / 4; P.push([Wb + (wt - Wb) * Math.pow(t, 0.8), ysh + 0.03 + (yt - 0.03 - ysh - 0.03) * (1 - Math.pow(1 - t, 1.8))]); }
+        P.push([wt * 0.55, yt - 0.006], [0, yt]);
+        return P;
+      };
+      // (the glass: the windshield, the door window, the quarter window; a small back window on the slope)
+      const ST = stationsOf(ZC, ZT, 0.05, [-0.42, -0.4, ZWT, -0.3, -0.26, 0.45, 0.52, 0.8, ZB, 0.92, 1.02]);
+      const g = carBody({
+        stations: ST, section, capMat: 0,
+        mat: (b, z) => {
+          if (b <= 2) return 2;
+          if (b <= 10) return 0;
+          if (b <= 13) return (z > -0.26 && z < 0.45) || (z > 0.52 && z < 0.8 - (b - 11) * 0.04) ? 1 : 0;   // door and quarter windows
+          if (z > -0.4 && z < ZWT - 0.01 && b >= 14) return 1;                                               // the windshield
+          if (z > 0.92 && z < 1.02 && b >= 15) return 1;                                                     // the back window
+          return 0;
+        },
+      });
+      add(body, g, [M.paint, M.tint, M.black], 0, 0, 0);
+      const surf0 = (z, t, sx) => { const P = section(z), i = Math.max(0, Math.min(P.length - 2, Math.floor(t))), f = t - i; return V3(sx * (P[i][0] + (P[i + 1][0] - P[i][0]) * f), P[i][1] + (P[i + 1][1] - P[i][1]) * f, z); };
+      const seamAlong = (sx, pts, r, mat) => { const Pp = pts.map(([z, t]) => surf0(z, t, sx).multiply(V3(1.004, 1, 1))); add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(Pp), Pp.length * 4, r || 0.0035, 5, false), mat || M.seam, 0, 0, 0, 0, 0, 0, false); };
+      // the windshield's frame, the doors (hinged at the back, the handles at the front), the drip rail
+      for (const sx of [-1, 1]) {
+        for (const z of [-0.3, 0.47]) seamAlong(sx, [[z, 3.5], [z, 6], [z, 9], [z, 11.5]]);
+        seamAlong(sx, [[-0.3, 3.4], [0.1, 3.4], [0.47, 3.4]]);
+        const p = surf0(-0.22, 9.4, sx); add(body, rbox(0.025, 0.02, 0.1, 0.008), M.chrome, p.x + sx * 0.014, p.y, -0.22);
+        seamAlong(sx, Array.from({ length: 12 }, (_, i) => [-0.33 + i * 1.12 / 11, 14.6]), 0.005, M.chrome);
+        tubeAB(body, surf0(-0.41, 13.9, sx), surf0(ZWT, 15, sx), 0.012, M.chrome);
+      }
+      // ---- the rear fenders: bulbous pontoons over the big tyres, the openings cut round them
+      for (const sx of [-1, 1]) {
+        const secs = [];
+        for (let i = 0; i <= 44; i++) {
+          const u = i / 44, z = 0.62 + 1.66 * u, top = 0.66 + 0.36 * Math.sin(Math.PI * Math.pow(u, 0.85)), w = 0.07 + 0.2 * Math.sin(Math.PI * Math.min(1, u * 1.05));
+          secs.push({ z, xc: sx * 0.78, w, yb: 0.34, yt: Math.max(0.4, top), n: 2.4, bw: 0.9 });
+        }
+        add(body, loft(secs, { seg: 64, mat: (x, y, z) => (Math.hypot(z - zR, y - RR) < RR + 0.04 ? -1 : 0) }), M.paint, 0, 0, 0);
+        // (a black rubber edging round the opening hides the cut's steps)
+        { const rim = new THREE.TorusGeometry(RR + 0.045, 0.014, 6, 48, Math.PI * 1.1); rim.rotateY(Math.PI / 2); rim.rotateX(-Math.PI * 0.05); add(body, rim, M.black, sx * 0.97, RR, zR, 0, 0, 0, false); }
+        const lg = new THREE.CylinderGeometry(RR + 0.04, RR + 0.04, 0.46, 28, 1, true, 0, Math.PI); lg.rotateZ(Math.PI / 2);
+        add(body, lg, M.linerB, sx * 0.76, RR, zR, 0, 0, 0, false);
+        // (a small teardrop tail lamp on each fender's back)
+        add(body, new THREE.SphereGeometry(0.045, 14, 10).scale(1, 0.75, 1.5), M.tail, sx * 0.78, 0.72, 2.18, 0, 0, 0, false);
+      }
+      // the nerf bar across the back, the plate under it
+      tubeAB(body, V3(-0.62, 0.42, ZT - 0.02), V3(0.62, 0.42, ZT - 0.02), 0.022, M.chrome, 12);
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.45, 0.42, ZT - 0.02), V3(sx * 0.45, 0.4, ZT - 0.3), 0.018, M.chrome, 10);
+      add(body, rbox(0.3, 0.15, 0.01, 0.005), M.white, 0, 0.6, ZT + 0.006, -0.35, 0, 0);
+      // ---- the frame rails and the front end: the dropped tube axle on its transverse leaf, hairpins back to the frame,
+      // the shocks; the grille shell over the axle (red, its chrome bars, the radiator behind it) and the hose to the engine
+      for (const sx of [-1, 1]) tubeAB(body, V3(sx * 0.38, 0.36, zF - 0.25), V3(sx * 0.42, 0.36, zR + 0.75), 0.04, M.black, 8);
+      for (const zz of [zF - 0.2, -0.6, 0.6]) tubeAB(body, V3(-0.38, 0.36, zz), V3(0.38, 0.36, zz), 0.03, M.black, 8);
+      tubeAB(body, V3(-0.62, RF - 0.04, zF), V3(0.62, RF - 0.04, zF), 0.03, M.chrome, 12);
+      for (const sx of [-1, 1]) {
+        tubeAB(body, V3(sx * 0.6, RF - 0.04, zF), V3(sx * 0.62, RF + 0.04, zF), 0.03, M.chrome, 10);
+        tubeAB(body, V3(sx * 0.6, RF - 0.03, zF + 0.02), V3(sx * 0.36, 0.37, zF + 0.75), 0.016, M.chrome, 8);
+        tubeAB(body, V3(sx * 0.6, RF - 0.06, zF + 0.02), V3(sx * 0.36, 0.33, zF + 0.75), 0.016, M.chrome, 8);
+        tubeAB(body, V3(sx * 0.55, RF - 0.02, zF - 0.05), V3(sx * 0.42, 0.62, zF + 0.05), 0.02, M.chrome, 10);
+      }
+      { const lf = new THREE.TorusGeometry(0.9, 0.025, 6, 40, 0.75); lf.rotateZ(Math.PI / 2 - 0.375); lf.scale(1.3, 0.12, 1); add(body, lf, M.black, 0, RF + 0.05 - 0.12 * 0.9 * 0.93, zF + 0.04, 0, 0, 0); }
+      { // the grille shell: tall, its top round, a chrome surround and bars; the radiator behind
+        const gz = zF + 0.08, sh = new THREE.Shape();
+        sh.moveTo(-0.2, 0.45); sh.lineTo(0.2, 0.45); sh.lineTo(0.235, 0.95); sh.quadraticCurveTo(0.235, 1.08, 0, 1.1); sh.quadraticCurveTo(-0.235, 1.08, -0.235, 0.95); sh.closePath();
+        const hole = new THREE.Path(); hole.moveTo(-0.16, 0.5); hole.lineTo(0.16, 0.5); hole.lineTo(0.19, 0.94); hole.quadraticCurveTo(0.19, 1.04, 0, 1.055); hole.quadraticCurveTo(-0.19, 1.04, -0.19, 0.94); hole.closePath();
+        sh.holes.push(hole);
+        const sg = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 3, curveSegments: 16 });
+        add(body, sg, M.paint, 0, 0, gz - 0.06);
+        const ins = new THREE.Shape(); ins.moveTo(-0.16, 0.5); ins.lineTo(0.16, 0.5); ins.lineTo(0.19, 0.94); ins.quadraticCurveTo(0.19, 1.04, 0, 1.055); ins.quadraticCurveTo(-0.19, 1.04, -0.19, 0.94); ins.closePath();
+        add(body, new THREE.ShapeGeometry(ins), M.linerB, 0, 0, gz - 0.03, 0, Math.PI, 0, false);
+        for (let k = -6; k <= 6; k++) { const x = k * 0.028, top = 1.04 - Math.pow(Math.abs(x) / 0.19, 2.2) * 0.1; add(body, new THREE.BoxGeometry(0.008, top - 0.52, 0.02), M.chrome, x, (top + 0.52) / 2, gz - 0.045); }
+        add(body, rbox(0.42, 0.5, 0.08, 0.02), M.black, 0, 0.78, gz + 0.12);
+        pipe(body, [V3(0.1, 0.98, gz + 0.16), V3(0.15, 1.0, gz + 0.32), V3(0.12, 0.92, gz + 0.5)], 0.03, M.hose, 10);
+      }
+      spots(0.15, 0.7, zF - 0.1);
+      // ---- the engine: the red block and heads, polished valve covers, the blower with its ribs and belt drive, two carbs
+      // under the flat hat
+      const ez = -0.82, eg = new THREE.Group(); eg.position.set(0, 0, ez); body.add(eg);
+      add(eg, rbox(0.42, 0.36, 0.74, 0.04), M.block, 0, 0.52, 0);
+      add(eg, rbox(0.46, 0.08, 0.6, 0.02), M.black, 0, 0.32, 0.02);
+      for (const sx of [-1, 1]) {
+        const hd = new THREE.Group(); hd.position.set(sx * 0.2, 0.7, 0); hd.rotation.z = -sx * 0.6; eg.add(hd);
+        add(hd, rbox(0.16, 0.14, 0.7, 0.02), M.block, 0, 0, 0);
+        add(hd, rbox(0.15, 0.09, 0.68, 0.03), M.polish, sx * 0.0, 0.1, 0);
+        // the zoomies: a polished pipe from each port, out, down and back to a flared tip ahead of the door
+        for (let k = 0; k < 4; k++) {
+          const z0 = -0.27 + k * 0.18, a = V3(sx * 0.34, 0.66, ez + z0), b = V3(sx * 0.41, 0.6, ez + z0 + 0.05);
+          const c = V3(sx * 0.43, 0.32, ez + z0 + 0.36), d = V3(sx * 0.44, 0.15, ez + z0 + 0.55);
+          pipe(body, [a, b, c, d], 0.024, M.polish, 10);
+          const tip = add(body, cylZ(0.026, 0.034, 0.08, 14, true), M.polish, d.x, d.y - 0.02, d.z + 0.03, -0.9, 0, 0); void tip;
+          P.tips.push(toRoot(V3(d.x, d.y - 0.05, d.z + 0.06)));
+        }
+      }
+      // (the intake, the blower case with its ribs, the drive belt and pulleys at the front, the carbs and the hat)
+      add(eg, rbox(0.3, 0.1, 0.55, 0.02), M.polish, 0, 0.84, 0);
+      add(eg, rbox(0.26, 0.2, 0.6, 0.04), M.polish, 0, 0.98, 0);
+      for (let k = 0; k < 9; k++) add(eg, rbox(0.29, 0.008, 0.6, 0.003), M.alu, 0, 0.9 + k * 0.022, 0, 0, 0, 0, false);
+      add(eg, cylX(0.07, 0.07, 0.05, 24), M.polish, 0, 0.98, -0.33, 0, Math.PI / 2, 0);
+      add(eg, cylZ(0.07, 0.07, 0.05, 24), M.polish, 0, 0.98, -0.33);
+      add(eg, cylZ(0.08, 0.08, 0.05, 24), M.polish, 0, 0.56, -0.4);
+      add(eg, rbox(0.06, 0.48, 0.02, 0.01), M.black, 0, 0.77, -0.39);
+      for (const dz of [-0.13, 0.13]) add(eg, rbox(0.17, 0.1, 0.18, 0.02), M.alu, 0, 1.12, dz);
+      add(eg, rbox(0.46, 0.09, 0.66, 0.04), M.polish, 0, 1.21, 0);
+      add(eg, rbox(0.42, 0.012, 0.62, 0.004), M.alu, 0, 1.256, 0);
+      // ---- the firewall (red, the cowl's front), the seat, the dash and the wheel, the driver in a helmet
+      add(body, rbox(1.2, 0.6, 0.03, 0.02), M.paint, 0, 0.68, ZC + 0.01);
+      add(body, rbox(1.2, 0.04, 2.0, 0.01), M.trimIn, 0, 0.4, 0.5);
+      add(body, rbox(1.1, 0.14, 0.5, 0.05), M.trimIn, 0, 0.5, 0.45);
+      add(body, rbox(1.1, 0.6, 0.12, 0.05), M.trimIn, 0, 0.8, 0.72, 0.18, 0, 0);
+      add(body, rbox(1.2, 0.16, 0.2, 0.04), M.paint, 0, 0.94, -0.36);
+      SW = steering(V3(-0.32, 0.98, -0.1), 0.6, 0.17);
+      tubeAB(body, V3(-0.32, 0.98, -0.11), V3(-0.32, 0.86, -0.38), 0.022, M.chrome);
+      cluster = { parent: body, pos: V3(0.0, 0.97, -0.255), rot: -0.25, w: 0.2, h: 0.08 };
+      driver = person({ hip: V3(-0.32, 0.56, 0.42), lean: 0.25, hands: [V3(-0.46, 1.0, -0.08), V3(-0.18, 1.0, -0.08)],
+        knee: { dx: 0.1, y: 0.7, z: 0.0 }, foot: { dx: 0.12, y: 0.42, z: -0.38 }, helmet: false });
+      P.hideCockpit.push(driver);
+    };
+
+    // ---------------------------------------------------------------- Chevrolet Chevelle SS 454 (1970)
+    // The 1970 sport coupe to its real dimensions (5.01 m long, 1.92 wide, 1.34 tall, 2.85 m wheelbase): the long hood with
+    // the cowl-induction bulge (and the flap at its back), its leading edge overhanging the grille; the front fenders' ends
+    // holding the quad headlamps in deep chrome bezels under a brow; the full-width black grille with its chrome surround
+    // and the bar across; the chrome bumper wrapping the corners, the parking lamps in its ends, the plate under its middle;
+    // one crisp shoulder crease the whole length of the body; round wheel openings with bright lips, the rear one under the
+    // coke-bottle hips; the hardtop - no B-pillar, chrome round the glass - with the semi-fastback roof: the backlight set
+    // down between sail panels that run on to the deck, the black vinyl top over both; the tail lamps in the rear bumper;
+    // two red stripes over the hood bulge and the deck lid; a red interior. Polished five-spokes on redline radials
+    B.chevelle = () => {
+      WF = 0.235; WR = 0.255;
+      wheelStyle = { rim: 'chev', rimR: 0.216, tread: 'road' };
+      M.paint.side = THREE.DoubleSide; M.paint.metalness = 0.15; M.paint.roughness = 0.22; M.paint.clearcoat = 1;
+      M.vinyl = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.62, metalness: 0.05, side: THREE.DoubleSide });
+      M.stripe = new THREE.MeshPhysicalMaterial({ color: 0xe0141f, roughness: 0.25, metalness: 0.1, clearcoat: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+      M.redIn = new THREE.MeshStandardMaterial({ color: 0x9a0c12, roughness: 0.6, side: THREE.DoubleSide });
+      M.chromeD = M.chromeD || Object.assign(M.chrome.clone(), { side: THREE.DoubleSide });
+      M.seam = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.6 });
+      M.linerB = Object.assign(M.black.clone(), { side: THREE.DoubleSide });
+      M.lampLens = new THREE.MeshPhysicalMaterial({ color: 0xdfe6ee, roughness: 0.05, metalness: 0.3, clearcoat: 1 });
+      M.tint.color.setHex(0x1a2026);
+      const ZN = -2.4, ZT = 2.61, ZW = -0.62, ZH = 0.03, ZB0 = 1.0, ZB1 = 1.62, ZS1 = 2.0;
+      const sm = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }, lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+      const Wz = tbl([[ZN, 0.86], [-2.385, 0.905], [-2.35, 0.93], [-2.2, 0.943], [-1.4, 0.95], [-0.6, 0.945], [0.4, 0.94], [0.9, 0.948], [1.4, 0.958], [2.0, 0.953], [2.4, 0.94], [2.53, 0.918], [ZT, 0.88]]);
+      const yBz = archY(tbl([[ZN, 0.36], [-2.3, 0.27], [-2.12, 0.22], [2.2, 0.22], [2.45, 0.27], [ZT, 0.36]]), [zF, zR], RF, 0.415);
+      const ySh = tbl([[ZN, 0.79], [-2.33, 0.83], [-2.2, 0.845], [-1.4, 0.86], [ZW, 0.875], [0.4, 0.885], [1.2, 0.9], [1.9, 0.91], [2.45, 0.905], [ZT, 0.88]]);
+      const yH = tbl([[ZN, 0.835], [-2.33, 0.86], [-2.2, 0.872], [-1.6, 0.886], [ZW, 0.905]]);               // the hood
+      const bulge = (z) => 0.06 * sm((z + 2.27) / 0.28) * (z < ZW - 0.04 ? 1 : 0);                        // its cowl-induction bulge
+      const yRoof = tbl([[ZW, 0.91], [-0.3, 1.105], [ZH, 1.305], [0.5, 1.335], [ZB0, 1.31]]);                // windshield, roof
+      const yBL = tbl([[ZB0, 1.31], [1.3, 1.155], [ZB1, 0.98]]);                                          // the backlight
+      const ySail = tbl([[ZB0, 1.31], [ZB1, 1.12], [ZS1, 0.97]]);                                        // the sail panels
+      const yDeck = tbl([[ZB1, 0.975], [ZS1, 0.97], [2.45, 0.958], [2.56, 0.946], [ZT, 0.925]]);
+      // the section at z, right half, 20 points: underbody 0-3, the rocker 4, the side up to the crease 5-9, the crease
+      // 10-11, the shoulder 12, 13 the belt (the hood's edge ahead of the windshield), 14-19 by zone: the hood and its
+      // bulge / the glass up to the roof / the sail up its slope and the backlight set down inside it / the sail and the
+      // deck lid / the deck
+      const section = (z) => {
+        const W = Wz(z), yb = yBz(z), ysh = Math.max(ySh(z), yb + 0.09), ycr = ysh - 0.022, ybe = ysh + 0.022;   // (just clear of the wheel openings' tops)
+        const hip = 0.03 * sm((z - 0.65) / 0.55) * sm((2.35 - z) / 0.45);                    // (the rear hips swell a touch more)
+        const P = [[0, yb], [W * 0.55, yb], [W - 0.09, yb], [W - 0.04, yb + 0.015], [W - 0.012, yb + 0.05]];
+        for (let k = 1; k <= 5; k++) { const t = k / 5; P.push([W - 0.012 * (1 - t) + (0.016 + hip) * Math.sin(Math.PI * t * 0.9), yb + 0.05 + (ycr - yb - 0.05) * t]); }
+        P.push([W + 0.006, ycr + 0.006], [W - 0.004, ycr + 0.016], [W - 0.03, ysh + 0.012]);
+        if (z < ZW) {
+          const h = yH(z), bu = bulge(z);
+          P.push([W - 0.075, ybe - 0.005], [0.66, h + 0.004], [0.5, h + 0.008], [0.475, h + 0.01 + bu * 0.85], [0.445, h + 0.012 + bu], [0.3, h + 0.016 + bu], [0, h + 0.02 + bu]);
+        } else if (z < ZB0) {
+          const yt = yRoof(z), Wb = W - 0.1, Wt = 0.64;
+          P.push([Wb, ybe]);
+          for (let k = 1; k <= 4; k++) { const t = k / 4; P.push([Wb + (Wt - Wb) * Math.pow(t, 0.9), ybe + (yt - 0.02 - ybe) * (1 - Math.pow(1 - t, 1.6))]); }
+          P.push([0.56, yt - 0.006], [0, yt]);
+        } else {
+          // (the sail rising from the belt to its top, then down into the recess: the backlight, then the deck lid)
+          const ys = z < ZS1 ? ySail(z) : yDeck(z), yin = z < ZB1 ? yBL(z) : yDeck(z), Wb = W - 0.1, Ws = lerp(0.64, 0.66, (z - ZB0) / 1.0);
+          P.push([Wb, ybe]);
+          for (let k = 1; k <= 3; k++) { const t = k / 3; P.push([Wb + (Ws - Wb) * Math.pow(t, 0.9), ybe + (ys - 0.02 - ybe) * (1 - Math.pow(1 - t, 1.6))]); }
+          P.push([0.6, ys], [0.565, Math.min(ys, yin + 0.004)], [0, yin + 0.014]);
+        }
+        return P;
+      };
+      const quarterGlass = (z) => z > 0.645 && z < ZB0 - 0.02, doorGlass = (z) => z > ZW + 0.07 && z < 0.615;
+      const ST = stationsOf(ZN, ZT, 0.05, [ZW - 0.05, ZW - 0.01, ZW, ZW + 0.02, ZW + 0.07, ZH, 0.615, 0.645, ZB0 - 0.02, ZB0, ZB0 + 0.02, ZB1, ZB1 + 0.02, ZS1, ZS1 + 0.03,
+        zF - 0.43, zF + 0.43, zR - 0.43, zR + 0.43, -2.39, -2.37, -2.33, 2.55, 2.59]);
+      const g = carBody({
+        stations: ST, section,
+        mat: (b, z) => {
+          if (b <= 3) return 2;                                                   // underbody
+          if (b <= 12) return 0;                                                  // the sides, the crease, the shoulder
+          if (z < ZW) return 0;                                                   // the hood
+          if (z < ZB0) {
+            if (b <= 15) return doorGlass(z) || quarterGlass(z) ? 1 : z > 0.6 ? 4 : 0;  // the side glass (a vinyl sail behind it)
+            if (b === 16) return z < ZH ? 0 : 4;                                  // the A-pillar / the roof's edge
+            return z < ZH ? 3 : 4;                                                // windshield / the vinyl roof
+          }
+          if (z < ZS1 && b <= 17) return 4;                                       // the sail panels (vinyl), their inner walls
+          if (z < ZB1 && b >= 18) return 3;                                       // the backlight
+          return 0;                                                               // the deck lid, the tail
+        },
+      });
+      add(body, g, [M.paint, M.tint, M.black, M.glass, M.vinyl], 0, 0, 0);
+      // (a point on the skin at z, t round the section, side sx, and the outward normal; a line along the skin; the
+      // height of the top surface at (z, |x|) - for the stripes)
+      const surf0 = (z, t, sx) => { const P = section(z), i = Math.max(0, Math.min(P.length - 2, Math.floor(t))), f = t - i; return V3(sx * (P[i][0] + (P[i + 1][0] - P[i][0]) * f), P[i][1] + (P[i + 1][1] - P[i][1]) * f, z); };
+      const surfN = (z, t, sx) => {
+        const p = surf0(z, t, sx), dz = surf0(z + 0.01, t, sx).sub(p), dt = surf0(z, t + 0.05, sx).sub(p);
+        return (sx > 0 ? new THREE.Vector3().crossVectors(dt, dz) : new THREE.Vector3().crossVectors(dz, dt)).normalize();
+      };
+      const seamAlong = (sx, pts, r, mat) => {
+        const Pp = pts.map(([z, t]) => surf0(z, t, sx).addScaledVector(surfN(z, t, sx), 0.0015));
+        add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(Pp), Pp.length * 4, r || 0.0035, 5, false), mat || M.seam, 0, 0, 0, 0, 0, 0, false);
+      };
+      const topY = (z, x) => { const P = section(z); x = Math.abs(x); for (let i = 12; i < P.length - 1; i++) { const a = P[i], b = P[i + 1]; if (x <= a[0] && x >= b[0]) return a[1] + (b[1] - a[1]) * (a[0] - x) / Math.max(1e-6, a[0] - b[0]); } return P[P.length - 1][1]; };
+      // the stripes: two red ones over the hood's bulge and the deck lid, a thin black line between them
+      const stripe = (z0, z1, x0, x1) => {
+        const nz = Math.ceil((z1 - z0) / 0.025), nx = 6, pos = [], idx = [];
+        for (let i = 0; i <= nz; i++) { const z = z0 + (z1 - z0) * i / nz; for (let j = 0; j <= nx; j++) { const x = x0 + (x1 - x0) * j / nx; pos.push(x, topY(z, x) + 0.0025, z); } }
+        for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) { const a = i * (nx + 1) + j, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+        const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setIndex(idx); sg.computeVertexNormals();
+        add(body, sg, M.stripe, 0, 0, 0, 0, 0, 0, false);
+      };
+      for (const sx of [-1, 1]) {
+        stripe(-2.34, ZW - 0.05, sx > 0 ? 0.03 : -0.37, sx > 0 ? 0.37 : -0.03);
+        stripe(ZB1 + 0.04, 2.57, sx > 0 ? 0.03 : -0.37, sx > 0 ? 0.37 : -0.03);
+      }
+      // wheel-arch liners, and the bright lips round the openings
+      for (const [z, r] of [[zF, RF], [zR, RR]]) for (const sx of [-1, 1]) {
+        const lg = new THREE.CylinderGeometry(0.405, 0.405, 0.42, 28, 1, true, 0, Math.PI); lg.rotateZ(Math.PI / 2);
+        add(body, lg, M.linerB, sx * (Wz(z) - 0.24), RF, z, 0, 0, 0, false);
+        const lip = new THREE.TorusGeometry(0.415 * 0.97, 0.009, 6, 40, Math.PI * 0.92); lip.rotateY(Math.PI / 2); lip.rotateX(Math.PI * 0.04);
+        add(body, lip, M.chrome, sx * (Wz(z) + 0.004), RF, z, 0, 0, 0, false);
+      }
+      // ---- the front: the grille, the headlamps in their bezels under the fender brows, the hood's lip over the grille,
+      // the bumper and its lamps, the plate, the valance
+      const fz = ZN - 0.004;
+      { const sh = new THREE.Shape(); rrPath(sh, -0.5, 0.615, 0.5, 0.82, 0.02);
+        add(body, new THREE.ShapeGeometry(sh), M.mesh, 0, 0, fz - 0.002, 0, Math.PI, 0, false);
+        const fr = new THREE.Shape(); rrPath(fr, -0.515, 0.6, 0.515, 0.835, 0.025); fr.holes.push(rrPath(new THREE.Path(), -0.495, 0.62, 0.495, 0.815, 0.018));
+        add(body, new THREE.ExtrudeGeometry(fr, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.004, bevelSegments: 2 }), M.chrome, 0, 0, fz - 0.012);
+        add(body, rbox(1.0, 0.022, 0.03, 0.008), M.chrome, 0, 0.718, fz - 0.005);
+        add(body, rbox(1.0, 0.012, 0.012, 0.004), M.chrome, 0, 0.665, fz + 0.002);
+        add(body, rbox(1.0, 0.012, 0.012, 0.004), M.chrome, 0, 0.77, fz + 0.002); }
+      add(body, rbox(1.06, 0.03, 0.1, 0.012), M.paint, 0, 0.848, ZN - 0.025, 0.15, 0, 0);                       // the hood's lip
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.38, 0.05, 0.1, 0.02), M.paint, sx * 0.69, 0.81, ZN + 0.01);                           // the fender's brow
+        add(body, rbox(0.38, 0.2, 0.012, 0.006), M.black, sx * 0.69, 0.71, ZN - 0.008);
+        for (const x of [0.6, 0.79]) {
+          const hx = sx * x, hy = 0.715, hz = fz + 0.01;
+          add(body, cylZ(0.082, 0.088, 0.06, 32), M.chrome, hx, hy, hz);
+          add(body, new THREE.TorusGeometry(0.08, 0.008, 8, 32), M.chrome, hx, hy, hz - 0.03, 0, 0, 0, false);
+          add(body, new THREE.SphereGeometry(0.072, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 1, 0.25).rotateX(-Math.PI / 2), M.lampLens, hx, hy, hz - 0.03, 0, 0, 0, false);
+          add(body, new THREE.CircleGeometry(0.03, 18), M.head, hx, hy, hz - 0.05, 0, Math.PI, 0, false);
+        }
+      }
+      spots(0.7, 0.71, ZN - 0.05);
+      { // the bumper: a chrome blade across the front and round its corners back to the wheel openings, a dip in its middle
+        const bp = new THREE.Shape(), zf = ZN - 0.07, zc = ZN + 0.15, zb = zF - 0.46, bx = 0.95, bi = bx - 0.05;
+        bp.moveTo(-0.7, -zf); bp.lineTo(0.7, -zf); bp.quadraticCurveTo(bx, -zf, bx, -zc); bp.lineTo(bx, -zb); bp.lineTo(bi, -zb); bp.lineTo(bi, -(ZN + 0.03));
+        bp.lineTo(-bi, -(ZN + 0.03)); bp.lineTo(-bi, -zb); bp.lineTo(-bx, -zb); bp.lineTo(-bx, -zc); bp.quadraticCurveTo(-bx, -zf, -0.7, -zf); bp.closePath();
+        const bg = new THREE.ExtrudeGeometry(bp, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.055, bevelSize: 0.022, bevelSegments: 7, curveSegments: 12 });
+        bg.rotateX(-Math.PI / 2); add(body, bg, M.chrome, 0, 0.475, 0);
+        add(body, rbox(0.46, 0.07, 0.08, 0.03), M.chrome, 0, 0.425, ZN - 0.04); }
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.18, 0.05, 0.02, 0.012), M.amber, sx * 0.7, 0.465, ZN - 0.106, 0, 0, 0, false);             // parking lamps
+        add(body, rbox(0.012, 0.035, 0.12, 0.006), M.amber, sx * (Wz(-2.15) + 0.004), 0.535, -2.15, 0, 0, 0, false);   // side markers
+        add(body, rbox(0.012, 0.035, 0.1, 0.006), M.tail, sx * (Wz(2.42) + 0.004), 0.56, 2.42, 0, 0, 0, false);
+      }
+      add(body, rbox(0.31, 0.155, 0.01, 0.006), M.white, 0, 0.37, ZN - 0.08);
+      add(body, rbox(1.6, 0.08, 0.06, 0.02), M.black, 0, 0.33, ZN + 0.06);
+      // ---- the hood: the cowl-induction flap at the bulge's back, the shut lines; the wipers
+      add(body, rbox(0.7, 0.04, 0.05, 0.01), M.black, 0, yH(ZW - 0.07) + 0.04, ZW - 0.07, 0.25, 0, 0);
+      for (const sx of [-1, 1]) {
+        seamAlong(sx, Array.from({ length: 9 }, (_, i) => [-2.36 + i * (ZW - 0.02 + 2.36) / 8, 12.6]));
+        tubeAB(body, V3(sx * 0.06, yRoof(ZW + 0.05) + 0.01, ZW + 0.05), V3(sx * 0.6, yRoof(ZW + 0.08) + 0.01, ZW + 0.08), 0.008, M.black, 6);
+      }
+      seamAlong(1, [[ZW - 0.02, 12.9], [ZW - 0.02, 16], [ZW - 0.02, 19]]); seamAlong(-1, [[ZW - 0.02, 12.9], [ZW - 0.02, 16], [ZW - 0.02, 19]]);
+      // ---- the sides: the door's shut lines, its handle, the bright trim round the glass and up the A-pillars, the
+      // driver's mirror; the trunk lid's shut lines
+      for (const sx of [-1, 1]) {
+        for (const z of [-0.56, 0.72]) seamAlong(sx, [[z, 4.3], [z, 6.5], [z, 9.5], [z, 12.3]]);
+        seamAlong(sx, [[-0.56, 4.3], [0.1, 4.3], [0.72, 4.3]]);
+        { const p = surf0(0.6, 10.6, sx); add(body, rbox(0.024, 0.026, 0.13, 0.01), M.chrome, p.x + sx * 0.012, p.y - 0.02, 0.6); }
+        // (the glass's bright surround: along the belt, up the A-pillar and over along the roof's edge, down behind the
+        // quarter window, the post between the two)
+        seamAlong(sx, Array.from({ length: 14 }, (_, i) => { const z = ZW + 0.04 + i * (ZB0 - 0.06 - ZW) / 13; return [z, 13.02]; }), 0.006, M.chrome);
+        seamAlong(sx, Array.from({ length: 16 }, (_, i) => { const z = ZW + 0.03 + i * (ZB0 - 0.05 - ZW) / 15; return [z, 15.95]; }), 0.006, M.chrome);
+        seamAlong(sx, [[0.63, 13.05], [0.63, 14.5], [0.63, 15.9]], 0.007, M.chrome);
+        seamAlong(sx, [[ZB0 - 0.04, 13.05], [ZB0 - 0.05, 15.0], [ZB0 - 0.08, 15.9]], 0.006, M.chrome);
+        seamAlong(sx, Array.from({ length: 8 }, (_, i) => [ZB1 + 0.02 + i * (2.57 - ZB1 - 0.02) / 7, 17.6]));
+      }
+      { const mz = -0.48, by = ySh(mz) + 0.06, mx = -(Wz(mz) - 0.05);
+        tubeAB(body, V3(mx, by - 0.03, mz), V3(mx - 0.06, by + 0.03, mz + 0.01), 0.01, M.chrome);
+        const mh = new THREE.Group(); mh.position.set(mx - 0.08, by + 0.05, mz + 0.02); mh.rotation.y = 0.12; body.add(mh);
+        add(mh, new THREE.SphereGeometry(0.06, 18, 12).scale(1.2, 0.85, 0.6), M.chrome, 0, 0, 0);
+        add(mh, new THREE.CircleGeometry(0.058, 20).scale(1.18, 0.82, 1), M.glass, 0, 0, 0.037, 0, 0, 0, false); }
+      // ---- the tail: the bumper with the tail lamps in it, the trunk's lock, the plate, the valance and the exhaust tips
+      { const bp = new THREE.Shape(), zf = ZT + 0.07, zc = ZT - 0.14, zb = zR + 0.5, bx = 0.935, bi = bx - 0.05;
+        bp.moveTo(-0.7, -zf); bp.lineTo(0.7, -zf); bp.quadraticCurveTo(bx, -zf, bx, -zc); bp.lineTo(bx, -zb); bp.lineTo(bi, -zb); bp.lineTo(bi, -(ZT - 0.03));
+        bp.lineTo(-bi, -(ZT - 0.03)); bp.lineTo(-bi, -zb); bp.lineTo(-bx, -zb); bp.lineTo(-bx, -zc); bp.quadraticCurveTo(-bx, -zf, -0.7, -zf); bp.closePath();
+        const bg = new THREE.ExtrudeGeometry(bp, { depth: 0.09, bevelEnabled: true, bevelThickness: 0.055, bevelSize: 0.022, bevelSegments: 7, curveSegments: 12 });
+        bg.rotateX(-Math.PI / 2); add(body, bg, M.chrome, 0, 0.475, 0); }
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.4, 0.08, 0.012, 0.006), M.black, sx * 0.55, 0.53, ZT + 0.097);
+        add(body, rbox(0.3, 0.06, 0.012, 0.008), M.tail, sx * 0.58, 0.53, ZT + 0.104, 0, 0, 0, false);
+        add(body, rbox(0.08, 0.06, 0.012, 0.008), M.lampLens, sx * 0.39, 0.53, ZT + 0.104, 0, 0, 0, false);
+        add(body, cylZ(0.04, 0.04, 0.12, 16, true), M.chrome, sx * 0.55, 0.3, ZT - 0.02); P.tips.push(toRoot(V3(sx * 0.55, 0.3, ZT + 0.05)));
+      }
+      add(body, rbox(0.33, 0.17, 0.012, 0.006), M.black, 0, 0.52, ZT + 0.097);
+      add(body, rbox(0.3, 0.15, 0.01, 0.006), M.white, 0, 0.52, ZT + 0.104);
+      add(body, rbox(0.05, 0.05, 0.01, 0.02), M.chrome, 0, 0.86, ZT + 0.004);
+      add(body, rbox(1.62, 0.08, 0.05, 0.02), M.black, 0, 0.34, ZT - 0.05);
+      // ---- inside: red - the buckets and the rear bench, the door panels, the console with its shifter; a black dash
+      // with its round gauges and the wheel
+      add(body, rbox(1.66, 0.04, 2.0, 0.01), M.redIn, 0, 0.3, 0.3);
+      for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(1.4, 0.45), M.redIn, sx * 0.84, 0.7, 0.05, 0, sx * Math.PI / 2, 0, false);
+      add(body, rbox(1.66, 0.22, 0.4, 0.06), M.black, 0, 0.83, -0.66);
+      add(body, rbox(0.5, 0.12, 0.08, 0.03), M.black, -0.4, 0.88, -0.48);
+      for (const dx of [-0.13, 0.0, 0.13]) { add(body, new THREE.TorusGeometry(0.045, 0.006, 6, 20), M.chrome, -0.4 + dx, 0.89, -0.437, 0, 0, 0, false); add(body, new THREE.CircleGeometry(0.042, 20), M.black, -0.4 + dx, 0.89, -0.438, 0, 0, 0, false); }
+      add(body, rbox(0.22, 0.2, 0.7, 0.04), M.black, 0, 0.42, -0.05);
+      tubeAB(body, V3(0, 0.52, 0.0), V3(0, 0.62, 0.04), 0.012, M.chrome); add(body, new THREE.SphereGeometry(0.022, 12, 8), M.black, 0, 0.63, 0.045);
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.5, 0.12, 0.5, 0.05), M.redIn, sx * 0.42, 0.4, 0.02);
+        add(body, rbox(0.5, 0.62, 0.12, 0.05), M.redIn, sx * 0.42, 0.74, 0.3, 0.3, 0, 0);
+      }
+      add(body, rbox(1.4, 0.12, 0.5, 0.05), M.redIn, 0, 0.47, 0.88);
+      add(body, rbox(1.4, 0.5, 0.12, 0.05), M.redIn, 0, 0.75, 1.1, 0.3, 0, 0);
+      SW = steering(V3(-0.4, 0.92, -0.38), 0.45, 0.2);
+      tubeAB(body, V3(-0.4, 0.92, -0.39), V3(-0.4, 0.83, -0.6), 0.03, M.black, 10);
+      driver = person({ hip: V3(-0.42, 0.48, 0.06), lean: 0.32, hands: [V3(-0.58, 0.93, -0.36), V3(-0.22, 0.93, -0.36)],
+        knee: { dx: 0.08, y: 0.62, z: -0.45 }, foot: { dx: 0.1, y: 0.32, z: -0.85 }, helmet: false });
+      P.hideCockpit.push(driver);
+    };
+
     (B[CAR] || B.couch)();
     model.add(driver);
     const eye = driver.userData.eye;
@@ -13818,6 +14295,38 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         add(g, latheX([[0.001, fx + 0.03], [rimR * 0.4, fx + 0.025], [rimR * 0.95, fx + 0.004], [rimR, fx]], 36), dm, 0, 0, 0);
         add(g, cylX(0.05, 0.06, 0.04, 20), M.chrome, fx + 0.04, 0, 0);
         if (style === 'discAlu') add(g, new THREE.TorusGeometry(0.075, 0.008, 8, 28), M.black, fx + 0.03, 0, 0, 0, Math.PI / 2, 0);
+        return;
+      }
+      if (style === 'rod') {
+        // a polished drag wheel: a dished face with a ring of ten round holes, the lip and the centre polished
+        const m = M.polish || (M.polish = new THREE.MeshStandardMaterial({ color: 0xe6e8ec, roughness: 0.08, metalness: 1 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.95, 0, Math.PI * 2, false);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5, hole = new THREE.Path(); hole.absellipse(Math.cos(a) * rimR * 0.6, Math.sin(a) * rimR * 0.6, rimR * 0.2, rimR * 0.13, 0, Math.PI * 2, true, a); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.005, bevelSegments: 2, curveSegments: 18 });
+        fg.rotateY(Math.PI / 2); add(g, fg, m, fx - 0.05, 0, 0);
+        add(g, latheX([[rimR, fx + 0.004], [rimR * 0.97, fx - 0.015], [rimR * 0.94, fx - 0.04]], 44), M.chromeD || (M.chromeD = Object.assign(M.chrome.clone(), { side: THREE.DoubleSide })), 0, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.985, 0.012, 8, 44), m, fx + 0.004, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.92, rimR * 0.92, 0.01, 36), M.black, fx - 0.09, 0, 0);
+        add(g, latheX([[rimR * 0.3, fx - 0.04], [rimR * 0.24, fx - 0.01], [rimR * 0.12, fx + 0.005], [0.001, fx + 0.01]], 24), m, 0, 0, 0);
+        return;
+      }
+      if (style === 'chev') {
+        // polished five-spokes: the spokes and the lip bright, dark between them, a centre cap on five lugs
+        const m = M.chevRim || (M.chevRim = new THREE.MeshStandardMaterial({ color: 0xd8dce0, roughness: 0.12, metalness: 1 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.94, 0, Math.PI * 2, false);
+        for (let j = 0; j < 5; j++) {
+          const c = j * 2 * Math.PI / 5 + Math.PI / 5, hole = new THREE.Path();
+          hole.absarc(0, 0, rimR * 0.82, c - 0.42, c + 0.42, false); hole.absarc(0, 0, rimR * 0.36, c + 0.24, c - 0.24, true); hole.closePath(); face.holes.push(hole);
+        }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.006, bevelSegments: 3, curveSegments: 20 });
+        fg.rotateY(Math.PI / 2);
+        add(g, fg, m, fx - 0.04, 0, 0);
+        add(g, latheX([[rimR, fx + 0.005], [rimR * 0.97, fx - 0.012], [rimR * 0.93, fx - 0.03]], 44), M.chromeD || (M.chromeD = Object.assign(M.chrome.clone(), { side: THREE.DoubleSide })), 0, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.985, 0.011, 8, 44), m, fx + 0.004, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.92, rimR * 0.92, 0.01, 36), new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.5, metalness: 0.4 }), fx - 0.07, 0, 0);
+        add(g, cylX(rimR * 0.2, rimR * 0.22, 0.03, 24), m, fx - 0.012, 0, 0);
+        for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5; add(g, cylX(0.009, 0.009, 0.022, 8), M.chrome, fx + 0.006, Math.cos(a) * rimR * 0.14, Math.sin(a) * rimR * 0.14); }
+        add(g, cylX(0.028, 0.028, 0.012, 16), M.black, fx + 0.01, 0, 0);
         return;
       }
       if (style === 'prius') {
@@ -13978,6 +14487,11 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         add(spin, cylX(0.075, 0.075, 0.03, 20), M.black, -0.03, 0, 0);
         const ph = left ? Math.PI - 0.8 : 0.8, cal = add(flip, rbox(0.055, 0.13, 0.08, 0.018), M.caliper || (M.caliper = new THREE.MeshStandardMaterial({ color: 0xc01818, roughness: 0.4 })), -0.012, 0.12 * Math.sin(ph), 0.12 * Math.cos(ph));
         cal.rotation.x = -ph;
+      }
+      if (CAR === 'chevelle') {
+        // (redline radials: a thin red ring round the outer sidewall)
+        const rl = new THREE.TorusGeometry(G.R - 0.055, 0.0045, 4, 48); rl.rotateY(Math.PI / 2);
+        stock.push(add(spin, rl, M.redline || (M.redline = new THREE.MeshStandardMaterial({ color: 0xb01018, roughness: 0.6 })), G.W / 2 + 0.001, 0, 0, 0, 0, 0, false));
       }
       if (CAR === 'gtr' || CAR === 'sixseven') {
         // the big brakes behind the spokes: a drilled-look disc turning with the wheel, the caliper fixed at its trailing top
@@ -15976,6 +16490,289 @@ registerProcessor('hellcat-synth', HellcatProcessor);
   }
 
   root.HCAtv = { build };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>/* src/unicycle.js */
+/* Hellcat Drive — procedural unicycle and its rider (no badges): a 24 in wheel (a silver rim on 36 spokes, a black
+   treaded tyre), the black frame - its crown over the tyre, a leg down each side to the bearings - the seat post with its
+   clamp, the saddle with its yellow bumpers fore and aft, the cranks straight on the hub (no gears, no freewheel) and the
+   platform pedals, kept level. The rider sits up on it, arms out for balance, the legs following the pedals round.
+   The jet version: a model-aircraft-class turbojet on a rack behind the saddle, its flame out of the back, a fuel tank
+   under it; the rider in goggles.
+   The physics runs the one tyre as four wheels (two 'axles' 10 cm apart, two side by side at each): one wheel is drawn
+   at their middle, turning with them.
+   Model space: origin on the ground under the hub, +X right, +Y up, forward = -Z.
+   Returns the same interface as HCCarModel.build, plus afterWheels(), setRider(speed), setJet() and setJetSize(). */
+(function (root) {
+  'use strict';
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+  function build(THREE, opts) {
+    opts = opts || {};
+    const JET = opts.engine === 'jet';
+    const cgH = opts.cgHeight || 1.0, zOff = opts.zOff || 0;
+    const cgToFront = opts.cgToFront || 0.05, cgToRear = opts.cgToRear || 0.05;
+    const R = opts.wheelRadiusF || opts.wheelRadius || 0.305;
+    const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || {};
+    const rootG = new THREE.Group(); rootG.name = 'unicycle';
+    const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const toRoot = (v) => v.clone().add(V3(0, -cgH, zOff));
+    const add = (parent, geo, mat, x, y, z, rx, ry, rz, cast) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = cast !== false; m.receiveShadow = true;
+      parent.add(m); return m;
+    };
+    function rbox(w, h, d, r) {
+      r = Math.max(0.002, Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3));
+      const s = new THREE.Shape(), x0 = -w / 2 + r, y0 = -h / 2 + r, x1 = w / 2 - r, y1 = h / 2 - r;
+      s.moveTo(x0, -h / 2 + r); s.lineTo(x0, y1); s.lineTo(x1, y1); s.lineTo(x1, y0); s.lineTo(x0, y0);
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(1e-3, d - 2 * r), bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+      g.translate(0, 0, -(d - 2 * r) / 2); return g;
+    }
+    const cylX = (r0, r1, len, seg) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 20); g.rotateZ(Math.PI / 2); return g; };
+    const cylZ = (r0, r1, len, seg, open) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 20, 1, !!open); g.rotateX(Math.PI / 2); return g; };
+    const tubeAB = (parent, a, b, r, mat, seg) => {
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = add(parent, new THREE.CylinderGeometry(r, r, len, seg || 10), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      return m;
+    };
+    // a body from sections along z (superellipse), half-width w, from yb to yt
+    function loft(secs, seg) {
+      const N = seg || 24, pos = [], idx = [];
+      for (const s of secs) {
+        const e = 2 / (s.n || 2.5), yc = (s.yb + s.yt) / 2, hh = (s.yt - s.yb) / 2;
+        for (let k = 0; k < N; k++) { const a = k / N * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a); pos.push((s.xc || 0) + s.w * Math.sign(c) * Math.pow(Math.abs(c), e), yc + hh * Math.sign(sn) * Math.pow(Math.abs(sn), e), s.z); }
+      }
+      for (let r = 0; r < secs.length - 1; r++) for (let k = 0; k < N; k++) { const a = r * N + k, b = r * N + (k + 1) % N, c = a + N, d = b + N; idx.push(a, b, c, b, d, c); }
+      const c0 = pos.length / 3; pos.push(secs[0].xc || 0, (secs[0].yb + secs[0].yt) / 2, secs[0].z);
+      const c1 = pos.length / 3; const S = secs[secs.length - 1]; pos.push(S.xc || 0, (S.yb + S.yt) / 2, S.z);
+      for (let k = 0; k < N; k++) { idx.push(c0, (k + 1) % N, k); idx.push(c1, (secs.length - 1) * N + k, (secs.length - 1) * N + (k + 1) % N); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+
+    // ---------------------------------------------------------------- materials
+    const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : 0x101012;
+    const M = {};
+    M.paint = new THREE.MeshPhysicalMaterial({ color: paintHex, metalness: 0.3, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.1 });
+    M.black = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.55, metalness: 0.2 });
+    M.seat = new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.6 });
+    M.yellow = new THREE.MeshStandardMaterial({ color: 0xe8c40e, roughness: 0.45 });
+    M.rim = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, roughness: 0.22, metalness: 0.9 });
+    M.spoke = new THREE.MeshStandardMaterial({ color: 0xd6d9dd, roughness: 0.3, metalness: 0.9 });
+    M.alu = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.28, metalness: 0.9 });
+    M.rubber = new THREE.MeshStandardMaterial({ color: 0x1a1918, roughness: 0.92 });
+    M.shirt = new THREE.MeshStandardMaterial({ color: JET ? 0x22262c : 0x2f6aa8, roughness: 0.8 });
+    M.jeans = new THREE.MeshStandardMaterial({ color: 0x2b3a55, roughness: 0.85 });
+    M.shoe = new THREE.MeshStandardMaterial({ color: 0xe8e8e4, roughness: 0.6 });
+    M.skin = new THREE.MeshStandardMaterial({ color: 0xc89478, roughness: 0.6 });
+    M.helmet = new THREE.MeshPhysicalMaterial({ color: JET ? 0xd01818 : 0xf0f0ee, roughness: 0.25, clearcoat: 1 });
+    M.visor = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.05, metalness: 0.8 });
+    M.tail = new THREE.MeshStandardMaterial({ color: 0x5a0808, emissive: 0xff1a10, emissiveIntensity: 0.4, roughness: 0.3 });
+    M.head = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2 });
+    const body = new THREE.Group(); model.add(body);
+    const dyn = new THREE.Group(); model.add(dyn);
+    const tips = [];
+
+    // ---------------------------------------------------------------- the frame: the crown over the tyre, a leg down
+    // each side to the bearing housings (drawn each frame to the hub, which rides the tyre's give), the seat post and its
+    // clamp, the saddle with its bumpers
+    const crownY = R + 0.36, legX = 0.055;
+    add(body, rbox(0.15, 0.035, 0.05, 0.012), M.paint, 0, crownY, 0);
+    const legs = [-1, 1].map((sx) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), M.paint); m.castShadow = true; dyn.add(m); return { m, sx }; });
+    const bearings = [-1, 1].map((sx) => { const m = add(dyn, rbox(0.035, 0.05, 0.05, 0.01), M.paint, 0, 0, 0); return { m, sx }; });
+    tubeAB(body, V3(0, crownY, 0), V3(0, 0.94, -0.01), 0.0145, M.paint, 14);
+    add(body, new THREE.CylinderGeometry(0.019, 0.019, 0.03, 16), M.alu, 0, crownY + 0.21, -0.004);
+    add(body, rbox(0.01, 0.02, 0.025, 0.004), M.alu, 0.022, crownY + 0.21, 0);
+    // (the saddle: a long, narrow, upswept seat on its base, yellow bumpers front and back, the handle under its nose)
+    const saddle = loft([{ z: -0.15, w: 0.035, yb: 0.975, yt: 1.005, n: 2.2 }, { z: -0.12, w: 0.05, yb: 0.955, yt: 0.995, n: 2.4 }, { z: -0.04, w: 0.055, yb: 0.948, yt: 0.982, n: 2.6 },
+      { z: 0.04, w: 0.075, yb: 0.948, yt: 0.982, n: 2.6 }, { z: 0.1, w: 0.075, yb: 0.955, yt: 0.995, n: 2.6 }, { z: 0.135, w: 0.06, yb: 0.97, yt: 1.008, n: 2.4 }]);
+    add(body, saddle, M.seat, 0, 0, 0);
+    add(body, rbox(0.09, 0.03, 0.04, 0.012), M.yellow, 0, 0.99, -0.16);
+    add(body, rbox(0.12, 0.035, 0.04, 0.014), M.yellow, 0, 0.995, 0.145);
+    add(body, rbox(0.11, 0.012, 0.24, 0.005), M.black, 0, 0.942, 0.0);
+
+    // ---------------------------------------------------------------- the wheel: hub, 36 spokes, the rim, the tyre - drawn
+    // at the middle of the physics' four, turning with them; the cranks and pedals on the hub (the pedals kept level)
+    const hub = new THREE.Group(); dyn.add(hub);
+    const spin = new THREE.Group(); hub.add(spin);
+    const W = 0.054, rimR = R - 0.04;
+    { const tyre = new THREE.TorusGeometry(R - W * 0.5, W * 0.5, 14, 64); tyre.rotateY(Math.PI / 2); add(spin, tyre, M.rubber, 0, 0, 0);
+      // (a block tread round the crown)
+      const N = 72; for (let k = 0; k < N; k++) for (const ox of (k & 1 ? [-0.012, 0.012] : [0])) { const b = add(spin, new THREE.BoxGeometry(0.012, 0.005, 0.014), M.rubber, ox, 0, 0, 0, 0, 0, false); b.geometry.translate(0, R - 0.002, 0); b.rotation.x = k * 2 * Math.PI / N; }
+      const rim = new THREE.TorusGeometry(rimR, 0.008, 6, 64); rim.rotateY(Math.PI / 2); rim.scale(2.2, 1, 1); add(spin, rim, M.rim, 0, 0, 0);
+      add(spin, cylX(0.022, 0.022, 0.1, 16), M.alu, 0, 0, 0);
+      for (const sx of [-1, 1]) add(spin, cylX(0.032, 0.032, 0.005, 20), M.alu, sx * 0.035, 0, 0);
+      // 36 spokes, laced from the two hub flanges to the rim, crossing
+      const sp = [];
+      for (let k = 0; k < 36; k++) {
+        const sx = k & 1 ? 1 : -1, a = k * 2 * Math.PI / 36, a0 = a + (k % 4 < 2 ? 0.35 : -0.35);
+        const p0 = V3(sx * 0.035, Math.cos(a0) * 0.03, Math.sin(a0) * 0.03), p1 = V3(sx * 0.006, Math.cos(a) * (rimR - 0.005), Math.sin(a) * (rimR - 0.005));
+        const d = p1.clone().sub(p0), g = new THREE.CylinderGeometry(0.0012, 0.0012, d.length(), 4);
+        g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d.clone().normalize())); g.translate((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2); sp.push(g);
+      }
+      for (const g of sp) add(spin, g, M.spoke, 0, 0, 0, 0, 0, 0, false);
+    }
+    const CR = 0.125, pedals = [];
+    for (const sx of [-1, 1]) {
+      // (the cranks opposite each other, the left one down at the start)
+      const arm = add(spin, rbox(0.018, CR + 0.03, 0.014, 0.006), M.black, sx * 0.075, sx < 0 ? -CR / 2 : CR / 2, 0);
+      void arm;
+      const pd = new THREE.Group(); dyn.add(pd);
+      add(pd, rbox(0.1, 0.018, 0.09, 0.006), M.black, sx * 0.05, 0, 0);
+      for (const dz of [-0.04, 0.04]) add(pd, rbox(0.1, 0.006, 0.006, 0.002), M.alu, sx * 0.05, 0.01, dz, 0, 0, 0, false);
+      add(pd, cylX(0.007, 0.007, 0.03, 8), M.alu, -sx * 0.005, 0, 0);
+      pedals.push({ g: pd, sx, a0: sx < 0 ? Math.PI : 0 });
+    }
+
+    // ---------------------------------------------------------------- the jet: a small turbojet on a rack behind the
+    // saddle, its thrust line through the rider's centre of gravity; a fuel tank under it, the flame out of the back
+    let jetFan = null, jetFx = null, jg = null;
+    if (JET) {
+      jg = new THREE.Group(); jg.position.set(0, 1.0, 0.24); body.add(jg);
+      const er = 0.06, eL = 0.36;
+      const bell = new THREE.LatheGeometry([[0.085, 0], [0.08, 0.01], [0.072, 0.03], [0.065, 0.06]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+      bell.rotateX(Math.PI / 2); add(jg, bell, Object.assign(M.alu.clone(), { side: THREE.DoubleSide }), 0, 0, 0);
+      jetFan = new THREE.Group(); jetFan.position.set(0, 0, 0.055); jg.add(jetFan);
+      add(jetFan, new THREE.CircleGeometry(0.06, 24), M.black, 0, 0, 0.003);
+      add(jetFan, cylZ(0.001, 0.02, 0.03, 12), M.alu, 0, 0, -0.012, Math.PI, 0, 0);
+      for (let k = 0; k < 11; k++) { const b = add(jetFan, new THREE.BoxGeometry(0.005, 0.048, 0.012), M.alu, 0, 0, 0); b.geometry.translate(0, 0.035, 0); b.rotation.set(0, 0.5, k * 2 * Math.PI / 11, 'ZYX'); }
+      add(jg, cylZ(er, er, eL, 28), M.alu, 0, 0, 0.06 + eL / 2);
+      for (const dz of [0.04, 0.2, 0.34]) add(jg, new THREE.TorusGeometry(er + 0.003, 0.004, 6, 28), M.black, 0, 0, 0.06 + dz);
+      const heat = new THREE.MeshStandardMaterial({ color: 0x7a6a78, roughness: 0.3, metalness: 1 });
+      const zN = 0.06 + eL;
+      add(jg, cylZ(er - 0.006, 0.042, 0.1, 24, true), heat, 0, 0, zN + 0.05);
+      add(jg, new THREE.CircleGeometry(0.04, 20), M.black, 0, 0, zN + 0.02, 0, Math.PI, 0);
+      // (the rack: two struts down to the frame's crown, two to the seat post; the fuel tank strapped under the engine)
+      for (const sx of [-1, 1]) { tubeAB(body, V3(sx * 0.05, 0.935, 0.2), V3(sx * 0.03, crownY + 0.02, 0.02), 0.008, M.black); tubeAB(body, V3(sx * 0.05, 0.935, 0.5), V3(sx * 0.015, 0.86, 0.0), 0.007, M.black); }
+      add(body, rbox(0.1, 0.012, 0.42, 0.004), M.black, 0, 0.935, 0.43);
+      add(body, cylZ(0.04, 0.04, 0.24, 18), M.paint, 0, 0.89, 0.4);
+      for (const dz of [0.33, 0.47]) add(body, new THREE.TorusGeometry(0.042, 0.004, 6, 18), M.alu, 0, 0.89, dz);
+      const flameMat = (core) => new THREE.ShaderMaterial({
+        uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 } },
+        vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+        fragmentShader: `uniform float uAB; uniform float uThr; uniform float uT; uniform float uCore; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+          void main() {
+            float t = 1.0 - vUv.y;
+            float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
+            float flick = 0.85 + 0.15 * sin(uT * 53.0 + t * 9.0) * sin(uT * 31.0 + 1.3);
+            vec3 hot = mix(vec3(1.0, 0.93, 0.78), vec3(1.0, 0.52, 0.14), smoothstep(0.0, 0.45, t));
+            hot = mix(hot, vec3(0.85, 0.2, 0.06), smoothstep(0.45, 1.0, t));
+            float a = edge * (1.0 - smoothstep(0.15, 1.0, t)) * flick * (uCore > 0.5 ? 1.5 : 0.8) * (0.08 + uThr * 0.7);
+            gl_FragColor = vec4(hot * a, 1.0);
+            #include <colorspace_fragment>
+          }`,
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+      });
+      const plumeGeo = (r0, r1) => { const g = new THREE.CylinderGeometry(r0, r1, 1, 20, 6, true); g.translate(0, -0.5, 0); g.rotateX(-Math.PI / 2); return g; };
+      jetFx = { outer: add(jg, plumeGeo(0.045, 0.025), flameMat(false), 0, 0, zN + 0.1, 0, 0, 0, false), core: add(jg, plumeGeo(0.032, 0.006), flameMat(true), 0, 0, zN + 0.1, 0, 0, 0, false), t: 0 };
+      jetFx.outer.renderOrder = 5; jetFx.core.renderOrder = 6;
+      tips.push(toRoot(V3(0, 1.0, 0.24 + zN + 0.12)));
+    }
+
+    // ---------------------------------------------------------------- the rider: sat up on the saddle, arms out for balance
+    // (or, on the jet, holding on to the saddle's handle with one hand), the legs following the pedals round
+    const rider = new THREE.Group(); body.add(rider);
+    const hip = V3(0, 1.04, 0.025), lean = 0.12;
+    const tor = (x, y, z) => V3(hip.x + x, hip.y + y * Math.cos(lean) + z * Math.sin(lean), hip.z - y * Math.sin(lean) + z * Math.cos(lean));
+    { const torso = [[-0.04, 0.15, 0.09, 0.1], [0.1, 0.145, 0.09, 0.09], [0.26, 0.16, 0.1, 0.09], [0.4, 0.19, 0.09, 0.09], [0.48, 0.18, 0.07, 0.08], [0.53, 0.08, 0.05, 0.05]];
+      const tg = loft(torso.map(([hh, w, dF, dB]) => ({ z: hh, w, yb: -dB, yt: dF, n: 2.6 })), 24); tg.rotateX(-Math.PI / 2); tg.rotateX(-lean);
+      add(rider, tg, M.shirt, hip.x, hip.y, hip.z);
+      add(rider, loft([{ z: -0.08, w: 0.15, yb: -0.09, yt: 0.09, n: 2.4 }, { z: 0.08, w: 0.16, yb: -0.1, yt: 0.1, n: 2.4 }], 20).rotateX(-Math.PI / 2), M.jeans, hip.x, hip.y + 0.02, hip.z); }
+    const neck = tor(0, 0.58, 0), hd = tor(0, 0.71, -0.01);
+    add(rider, new THREE.CylinderGeometry(0.045, 0.05, 0.12, 12), M.skin, neck.x, neck.y, neck.z, -lean, 0, 0);
+    add(rider, new THREE.SphereGeometry(0.1, 20, 14), M.skin, hd.x, hd.y, hd.z);
+    { const hm = add(rider, new THREE.SphereGeometry(0.118, 22, 14, 0, Math.PI * 2, 0, 1.75), M.helmet, hd.x, hd.y + 0.012, hd.z + 0.01); hm.scale.set(0.95, 1, 1.1); }
+    if (JET) { for (const sx of [-1, 1]) add(rider, cylZ(0.026, 0.026, 0.03, 14), M.visor, hd.x + sx * 0.04, hd.y + 0.01, hd.z - 0.095); add(rider, new THREE.TorusGeometry(0.104, 0.007, 6, 24), M.black, hd.x, hd.y + 0.01, hd.z, 0, 0, 0); }
+    const limb = (a, c, l1, l2, pole, r0, r1, r2, mat) => {
+      const d = c.clone().sub(a), len = Math.min(d.length(), l1 + l2 - 1e-3), dir = d.normalize();
+      const x = (l1 * l1 - l2 * l2 + len * len) / (2 * len), h = Math.sqrt(Math.max(0, l1 * l1 - x * x));
+      const pp = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+      return { j: a.clone().add(dir.clone().multiplyScalar(x)).add(pp.multiplyScalar(h)), e: a.clone().add(dir.multiplyScalar(len)) };
+    };
+    const seg = (parent, p, q, ra, rb, mat) => { const v = q.clone().sub(p), m = add(parent, new THREE.CylinderGeometry(rb, ra, v.length(), 12), mat, (p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2); m.quaternion.setFromUnitVectors(V3(0, 1, 0), v.normalize()); return m; };
+    for (const sx of [-1, 1]) {
+      const sh = tor(sx * 0.18, 0.46, 0);
+      add(rider, new THREE.SphereGeometry(0.052, 12, 10), M.shirt, sh.x, sh.y, sh.z);
+      const hand = JET && sx < 0 ? V3(-0.02, 1.0, -0.2) : V3(sx * 0.62, 1.33 + (sx > 0 ? 0.05 : -0.02), hip.z - 0.12);
+      const L = limb(sh, hand, 0.3, 0.29, JET && sx < 0 ? V3(-0.6, 0, 0.6) : V3(0, -0.5, 0.4));
+      seg(rider, sh, L.j, 0.045, 0.04, M.shirt); seg(rider, L.j, L.e, 0.038, 0.032, M.skin);
+      add(rider, new THREE.SphereGeometry(0.038, 10, 8), M.skin, L.e.x, L.e.y, L.e.z);
+    }
+    // legs: rods placed each frame, hip to knee to the pedal
+    const rodGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
+    const legRig = [-1, 1].map((sx) => {
+      const mk = (mat) => { const m = new THREE.Mesh(rodGeo, mat); m.castShadow = true; rider.add(m); return m; };
+      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), M.jeans); knee.castShadow = true; rider.add(knee);
+      const shoe = new THREE.Mesh(rbox(0.1, 0.07, 0.26, 0.03), M.shoe); shoe.castShadow = true; rider.add(shoe);
+      return { sx, thigh: mk(M.jeans), shin: mk(M.jeans), knee, shoe };
+    });
+    const _u = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
+    const place = (m, a, b, r) => { _d.subVectors(b, a); const l = _d.length(); m.position.addVectors(a, b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(_u, _d.multiplyScalar(1 / Math.max(l, 1e-6))); m.scale.set(r, l, r); };
+    // (the first-person eye: the rider's, looking a touch down the road)
+    const eye = toRoot(V3(hd.x, hd.y + 0.01, hd.z - 0.08));
+
+    // ---------------------------------------------------------------- the wheels the game drives (nothing drawn on
+    // them: the one wheel above follows their middle)
+    const wheels = [];
+    for (let i = 0; i < 4; i++) {
+      const frontW = i < 2, left = (i & 1) === 0, side = left ? -1 : 1;
+      const corner = new THREE.Group(); corner.position.set(side * 0.01, R - cgH, frontW ? -cgToFront : cgToRear); rootG.add(corner);
+      const flip = new THREE.Group(); corner.add(flip); const sp = new THREE.Group(); flip.add(sp);
+      wheels.push({ corner, flip, spin: sp, left: false, front: frontW, side, stock: [], pkg: [] });
+    }
+
+    // ---------------------------------------------------------------- per frame
+    const _a = new THREE.Vector3(), _p = new THREE.Vector3();
+    function afterWheels() {
+      // the hub at the middle of the four (in model space), turning with them
+      _a.set(0, 0, 0); for (const w of wheels) _a.add(w.corner.position); _a.multiplyScalar(0.25).add(V3(0, cgH, -zOff));
+      hub.position.copy(_a);
+      spin.rotation.x = wheels[0].spin.rotation.x;
+      // the frame's legs from the crown to the bearings on the hub
+      for (const L of legs) { const top = V3(L.sx * legX, crownY - 0.01, 0), bot = V3(L.sx * legX, _a.y, _a.z); place(L.m, top, bot, 0.011); }
+      for (const b of bearings) b.m.position.set(b.sx * legX, _a.y, _a.z);
+      // the pedals round on their cranks, kept level; the legs follow them (knees forward and out a little)
+      for (let k = 0; k < 2; k++) {
+        const P = pedals[k], a = spin.rotation.x + P.a0;
+        _p.set(P.sx * 0.1, _a.y + Math.cos(a) * CR, _a.z + Math.sin(a) * CR);
+        P.g.position.copy(_p);
+        const G = legRig[k], hp = V3(P.sx * 0.09, hip.y, hip.z), ft = _p.clone().add(V3(P.sx * 0.03, 0.045, -0.02));
+        const L = limb(hp, ft, 0.43, 0.42, V3(P.sx * 0.15, 0.2, -1));
+        place(G.thigh, hp, L.j, 0.068); place(G.shin, L.j, L.e, 0.05);
+        G.knee.position.copy(L.j); G.shoe.position.copy(L.e).add(V3(0, -0.01, -0.02));
+      }
+    }
+    function setRider() {}
+    function setPaint(name) { const c = PAINTS[name]; if (c !== undefined) M.paint.color.setHex(c); }
+    function setLights(o) { M.tail.emissiveIntensity = o.brake ? 4 : 0.4; }
+    function setInteriorVisible(v, cockpit) { rider.visible = !cockpit; }
+    function setJetSize(sz) { if (jg) jg.scale.setScalar(clamp(sz, 0.6, 2)); }
+    function setJet(N, ab, thr, dt) {
+      if (!jetFx) return;
+      jetFx.t += dt;
+      jetFan.rotation.z += N * 45 * dt;
+      const on = thr > 0.05;
+      jetFx.outer.visible = jetFx.core.visible = on;
+      if (!on) return;
+      jetFx.outer.scale.z = 0.3 + 0.9 * thr; jetFx.core.scale.z = 0.2 + 0.5 * thr;
+      for (const m of [jetFx.outer.material, jetFx.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = jetFx.t; }
+    }
+    const noop = () => {};
+    afterWheels();
+    return {
+      root: rootG, model, exterior: model, interior: model, wheels, steerWheel: new THREE.Group(), eye,
+      exhaustTips: tips, materials: M, headlights: [], tailLens: [], mirrors: [],
+      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      afterWheels, setRider, setJet: JET ? setJet : undefined, setJetSize: JET ? setJetSize : undefined, variant: 'unicycle', cls: JET ? 'jet' : 'pedal',
+    };
+  }
+
+  root.HCUnicycle = { build };
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
@@ -18130,7 +18927,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -18147,7 +18944,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -18469,6 +19266,31 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       info: 'Sunbeam\'s 1930 land-speed car for Kaye Don: a long silver cigar with a pointed nose, the wheels out in the wind behind aluminium discs, a fairing down each side between them, the cockpit far back, two tall fins on the tail · 24 L V12 with two superchargers, ~960 hp at 3,300 rpm, ~1,700 lb-ft · 3-speed gearbox to the rear wheels · Dunlop 37 x 7 tyres · ~8.5 m long, ~2.4 t · built to beat 231 mph; at Daytona in March 1930 it managed 186',
       trans: '3-speed · multi-plate clutch', tyres: 'Dunlop 37 x 7',
       snd: { nEng: 1, cyl: 12, fmul: 0.6, deep: 0.85, loud: 1, open: 1, whK: 0.9, whPure: 1, whine: 0.9, rpmRef: 3500, race: 0.8, rough: 0.25 } },
+    hotrod: { btn: 'HOT ROD', sub: 'A chopped 1934 Ford five-window coupe · a blown 540 big-block out in the open, zoomie headers · ~900 hp · 3-speed automatic · fat street tyres', paint: 'Crimson', tc: 0, cam: [1.0, 1.0],
+      hint: 'Hot Rod: shift up (E) for DRIVE - a 540 ci big-block under an 8-71 blower, ~900 hp through a 3-speed automatic and a 3,500 rpm converter, straight out of the zoomies. It lights the rear tyres up in any gear: squeeze it on, or let traction control (Street) do it for you. Hold SPACE, floor it and let go to launch off the converter.',
+      info: 'A chopped 1934 Ford five-window coupe, fenderless up front: a 540 ci big-block Chevy under a polished 8-71 blower and two four-barrels, ~900 hp at 6,200, 820 lb-ft at 4,500 on pump gas, zoomie headers (a pipe from every port, swept down and back) · TH400 3-speed automatic behind a 3,500 rpm converter, a 9-inch rear on 3.89s · a dropped front axle on a transverse leaf · polished wheels, 225/70R15 fronts, 33x16.5-15 street tyres at the back · ~1,330 kg · 0-60 ~3.9 s, ~11.2 s quarter mile, ~150 mph',
+      trans: '3-speed auto (TH400)', tyres: '33x16.5-15 street · 225/70R15 fronts',
+      snd: { nEng: 1, cyl: 8, fmul: 0.92, deep: 0.55, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.7, rpmRef: 6800, race: 0.9, rough: 0.3 } },
+    chevelle: { btn: 'CHEVELLE SS', sub: 'A 1970 Chevelle SS 454 sport coupe · the LS6 454, 450 hp, 500 lb-ft · Turbo 400 3-speed · black with red stripes', paint: 'Pitch Black', tc: 0, cam: [1.08, 1.0], road: true,
+      hint: 'Chevelle SS: shift up (E) for DRIVE - the LS6 454, 450 hp and 500 lb-ft through a Turbo Hydra-Matic 400 and a posi rear on 3.77s: 0-60 in ~5.5 s, a ~13.7 s quarter mile. No ABS, no stability control in 1970 - traction control is the game\'s (Street), and it\'ll go up in smoke without it.',
+      info: '1970 Chevrolet Chevelle SS 454 sport coupe: the long hood with the cowl-induction bulge, the full-width grille with its quad headlamps and the bar across, a chrome bumper wrapping the corners with the parking lamps in it, the semi-fastback roof with its sail panels and black vinyl top, the rear wheels under the coke-bottle hips, tail lamps in the rear bumper, red stripes over the hood and the deck, a red interior · LS6 454 V8, 450 hp at 5,600, 500 lb-ft at 3,600 · TH400 3-speed automatic, 12-bolt posi on 3.77s · 17 in five-spokes on redline radials · 5.01 m long, 2.85 m wheelbase · ~1,830 kg · 0-60 ~5.4 s, ~13.8 s quarter mile, ~130 mph',
+      trans: '3-speed auto (TH400)', tyres: 'Redline radials',
+      snd: { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.5, loud: 0.75, open: 0.5, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6000, race: 0.35, rough: 0.15 } },
+    unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
+      hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
+      info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
+      trans: 'Direct drive (no gears)', tyres: '24 x 2.125',
+      snd: { nEng: 1, cyl: 1, ev: 1, whK: 0.1, whPure: 1, whine: 0, rpmRef: 200, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'uniEng', optLabel: 'Version', options: [
+        ['pedal', 'Pedal', 'Leg power: ~0.7 hp · no gears · ~14 mph'],
+        ['jet', 'Jet unicycle', 'A model-jet turbojet behind the saddle, 124 lbf of thrust · 0-60 ~9 s · ~85 mph'],
+      ],
+      eng: {
+        jet: { hint: 'Jet unicycle: shift up (E) for DRIVE and open the throttle - a model-aircraft turbojet on a rack behind the saddle, 124 lbf of thrust. It takes a couple of seconds to spool, then shoves: 0-60 in ~9 s, ~85 mph on a bicycle tyre. Turns are held to what the rider can lean into; the legs are the only brake. R pedals backwards.',
+          info: 'The 24 in unicycle with a model-aircraft-class turbojet strapped on a rack behind the saddle (~550 N, 124 lbf), a fuel tank under it, its thrust line through the rider\'s centre of gravity; the rider in a helmet and goggles · no brake but the legs · 95 kg · 0-60 ~9 s, ~84 mph',
+          trans: 'Jet thrust · pedals for reverse',
+          snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.2, rpmRef: 10000, open: 1, fmul: 1.4, deep: 0, loud: 0.5, race: 0 } },
+      } },
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
@@ -18674,6 +19496,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
     if (id === 'atv') return ATVM.build(THREE, Object.assign(o, { engine: def.engine || 'sport', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
+    if (id === 'unicycle') return UNIM.build(THREE, Object.assign(o, { engine: def.engine || 'pedal', wheelRadiusF: s.wheelRadiusF || s.wheelRadius }));
     if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
@@ -19543,7 +20366,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ------------------------------------------------------------------ the tank's turret: it turns to wherever the camera
   // looks (drag the mouse to look round) at a real turret's ~40 deg/s, and the gun lifts with the view (-9 to +20 deg)
-  const TANK = S.car === 'tank', BIKE = S.car === 'bike', _Z = new THREE.Vector3(0, 0, 1);
+  const TANK = S.car === 'tank', BIKE = S.car === 'bike' || S.car === 'unicycle', _Z = new THREE.Vector3(0, 0, 1);
   const TUR = { yaw: 0, elev: 0 }, _tq = new THREE.Quaternion(), _td = new THREE.Vector3();
   function turretFollow(dt) {
     _td.set(0, 0, -1).applyQuaternion(camera.quaternion).applyQuaternion(_tq.set(veh.qx, veh.qy, veh.qz, veh.qw).invert());
