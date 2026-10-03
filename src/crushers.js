@@ -219,7 +219,7 @@
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -255,7 +255,7 @@
       g.fillStyle = '#060607'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3c40'; g.lineWidth = 2;
       for (let x = -h; x < w; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke(); }
     }), roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
-    const SUITS = { superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
+    const SUITS = { coach: 0x22262e, busderby: 0x3a5a2a, rc: 0x2a3a6a, superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
     M.suit = new THREE.MeshStandardMaterial({ color: SUITS[CAR] || 0x333333, roughness: 0.8 });
     M.pants = new THREE.MeshStandardMaterial({ color: CAR === 'bluebird' || CAR === 'silverbullet' || CAR === 'eggrod' || CAR === 'gtr' ? SUITS[CAR] : 0x2a3446, roughness: 0.85 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, silverbullet: 0x4a2a16, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' || CAR === 'silverbullet' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' || CAR === 'silverbullet' ? 0 : 1 });
@@ -3205,6 +3205,550 @@
         knee: { dx: 0.08, y: 0.62, z: -0.5 }, foot: { dx: 0.1, y: 0.32, z: -0.9 }, helmet: false });
       P.hideCockpit.push(driver);
     };
+    // ---------------------------------------------------------------- RC monster truck (1/10)
+    // A 1/10 4WD basher to its real size (0.47 m long, 0.37 m wide over the 150 mm tyres): the pickup shell - the blue
+    // polycarbonate with its white flash and SAND STORM on the quarters, a black hood and grille with round red-ringed
+    // lamps, the cab's tinted glass with the banner across the windshield - over the black tub chassis: the bumpers with
+    // their two LED lamps, the shock towers, A-arms and dogbones, four oil-filled coil-overs that work with the wheels, the
+    // big wing on its struts; chunky chevron tyres on black spokes in blue beadlock rings. And inside the cab: two seats,
+    // the dash, a little wheel and a 1/12 driver - the camera rides in his head
+    B.rc = () => {
+      WF = 0.07; WR = 0.07;
+      wheelStyle = { rim: 'rcbl', rimR: 0.044, tread: 'rc' };
+      const cylY = (r0, r1, len, seg) => new THREE.CylinderGeometry(r0, r1, len, seg || 8);
+      M.rcBlack = new THREE.MeshStandardMaterial({ color: 0x121214, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
+      M.rcPlast = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.5, metalness: 0.1 });
+      M.rcHood = new THREE.MeshPhysicalMaterial({ color: 0x141518, roughness: 0.25, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.1, side: THREE.DoubleSide });
+      M.rcShock = new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 0.3, metalness: 0.6 });
+      M.rcSpring = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, roughness: 0.2, metalness: 1 });
+      M.led = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 1.6, roughness: 0.2 });
+      M.redRing = new THREE.MeshStandardMaterial({ color: 0xc81820, emissive: 0x600808, emissiveIntensity: 0.4, roughness: 0.35 });
+      M.tint.color.setHex(0x101418);
+      // ---- the shell: sections along z with a livery mapped onto its sides (painted on a canvas - the paint colour is
+      // its base, redrawn when the paint changes)
+      const ZN = -0.222, ZT = 0.215, ZW = -0.075, ZH = -0.02, ZB0 = 0.066, ZB1 = 0.082;
+      const Wz = tbl([[ZN, 0.106], [-0.212, 0.116], [-0.2, 0.121], [-0.165, 0.128], [-0.12, 0.126], [-0.06, 0.121], [0.06, 0.121], [0.12, 0.126], [0.165, 0.131], [0.2, 0.126], [ZT, 0.116]]);
+      const yBase = tbl([[ZN, 0.118], [-0.2, 0.112], [0.2, 0.112], [ZT, 0.12]]);
+      // (the arches: 88 mm high, the front one's leading edge drawn in short of the nose - the shell comes down to a bumper
+      // line there, just clear of the tyre, with the grille in it)
+      const yBz = (z) => { let y = yBase(z); for (const zc of [zF, zR]) { const d = z - zc, rz = zc === zF && d < 0 ? 0.066 : 0.088; if (Math.abs(d) < rz) y = Math.max(y, RF + 0.012 + 0.088 * Math.sqrt(1 - (d / rz) * (d / rz))); } return y; };
+      const ySh = tbl([[ZN, 0.18], [-0.205, 0.188], [-0.165, 0.197], [ZW, 0.205], [0.06, 0.209], [0.11, 0.221], [0.19, 0.222], [ZT, 0.213]]);
+      const yT = tbl([[ZN, 0.188], [-0.21, 0.196], [-0.17, 0.203], [ZW, 0.213], [-0.045, 0.248], [ZH, 0.277], [0.0, 0.283], [0.05, 0.284], [ZB0, 0.277], [ZB1, 0.229], [0.12, 0.23], [0.2, 0.228], [ZT, 0.221]]);
+      const WtT = tbl([[ZN, 0.085], [-0.2, 0.1], [ZW, 0.108], [ZH, 0.097], [ZB0, 0.097], [ZB1, 0.11], [ZT, 0.1]]);
+      const section = (z) => {
+        const W = Wz(z), yb = yBz(z), ysh = Math.max(ySh(z), yb + 0.012), ybe = ysh + 0.006, yt = Math.max(yT(z), ybe + 0.005);
+        const cab = z > ZW && z < ZB1, Wb = W - (cab ? 0.009 : 0.006), Wt = Math.min(WtT(z), Wb - 0.004);
+        const P = [[0, yb], [W * 0.6, yb], [W - 0.006, yb], [W, yb + 0.006]];
+        for (let k = 1; k <= 4; k++) { const t = k / 4; P.push([W + 0.003 * Math.sin(Math.PI * t), yb + 0.006 + (ysh - yb - 0.006) * t]); }
+        P.push([W - 0.004, ysh + 0.004], [Wb, ybe]);
+        for (let k = 1; k <= 2; k++) { const t = k / 3; P.push([Wb + (Wt - Wb) * t, ybe + (yt - 0.004 - ybe) * (1 - Math.pow(1 - t, 1.6))]); }
+        P.push([Wt, yt - 0.004], [Wt - 0.009, yt - 0.0014], [Wt * 0.45, yt - 0.0004], [0, yt]);
+        return P;
+      };
+      // (the side glass runs forward to the windshield's edge - that strip is the A-pillar, sloping up with the glass)
+      const sideGlass = (z, b) => { const t = (b - 9 + 0.5) / 3; return z > ZW + 0.004 && z < ZB1 - 0.012 - t * (ZB1 - ZB0 - 0.01) && !(z > 0.0 && z < 0.008); };
+      const ST = stationsOf(ZN, ZT, 0.006, [ZW, ZH, ZB0, ZB1, zF - 0.066, zF + 0.088, zR - 0.088, zR + 0.088]);
+      const shellMat = (b, z) => {
+        if (b <= 1) return -1;                                                  // (open underneath, like the real shell)
+        if (b <= 2) return 3;                                                   // the shell's edge, black round the arches
+        if (b <= 7) return 0;                                                   // the sides: the livery
+        if (z < ZW) return 3;                                                   // the black hood and fender tops
+        if (z > ZB1) return b <= 8 ? 0 : 2;                                     // the bed
+        if (b === 8) return 0;
+        if (b <= 11) return sideGlass(z, b) ? 1 : 2;                             // the side windows, the pillars
+        if (b === 12) return 2;                                                 // the A- and C-pillars' edge strip
+        if (z < ZH || z > ZB0) return 1;                                        // the windshield, the back window
+        return 2;                                                               // the roof
+      };
+      const pos = [], uv = [], buckets = [], secs = ST.map((z) => ({ z, P: section(z) })), nP = secs[0].P.length;
+      const vid = (r, i, sd) => r * nP * 2 + (sd > 0 ? i : nP + i);
+      for (const s of secs) for (const sd of [1, -1]) for (const [x, y] of s.P) { pos.push(sd * x, y, s.z); uv.push(sd > 0 ? (ZT - s.z) / (ZT - ZN) : (s.z - ZN) / (ZT - ZN), (y - 0.105) / 0.125); }
+      for (let r = 0; r < secs.length - 1; r++) {
+        const zm = (secs[r].z + secs[r + 1].z) / 2;
+        for (let i = 0; i < nP - 1; i++) {
+          const m0 = shellMat(i, zm); if (m0 < 0) continue;
+          for (const sd of [1, -1]) {
+            const m = m0 === 0 && sd < 0 ? 4 : m0, B2 = buckets[m] || (buckets[m] = []);   // (each side its own livery)
+            const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd); if (sd > 0) B2.push(a, b, c, b, d, c); else B2.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      // (the tail's end panel; the nose is the grille, built below)
+      { const r = secs.length - 1, ci = pos.length / 3; pos.push(0, (secs[r].P[2][1] + secs[r].P[nP - 1][1]) / 2, ZT); uv.push(0, 0.5);
+        const B2 = buckets[2] || (buckets[2] = []);
+        for (const sd of [1, -1]) for (let i = 2; i < nP - 1; i++) { const a = vid(r, i, sd), b = vid(r, i + 1, sd); if (sd > 0) B2.push(ci, a, b); else B2.push(ci, b, a); }
+        B2.push(ci, vid(r, 2, -1), vid(r, 2, 1)); }                             // (closed along the bottom too)
+      const sg = new THREE.BufferGeometry(), idx = [];
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      let st0 = 0; buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); sg.addGroup(st0, b.length, m); st0 += b.length; });
+      sg.setIndex(idx); sg.computeVertexNormals();
+      const livCv = [0, 1].map(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 256; return c; });
+      const livTex = livCv.map((c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; });
+      // (a side as you see it - the right side's rear at the left, the left side's at the right, so the graphics sit in the
+      // same places on both and the lettering reads: the base colour, a black sill, the white-and-silver flash from the
+      // front fender back across the door, black slashes through it, SAND STORM in red on a white box on the quarter)
+      const drawLivery = (hex) => { for (let k = 0; k < 2; k++) drawSide(livCv[k].getContext('2d'), hex, k === 1); for (const t of livTex) t.needsUpdate = true; };
+      const drawSide = (g, hex, mir) => {
+        const w = 1024, h = 256, base = '#' + new THREE.Color(hex).getHexString();
+        g.setTransform(1, 0, 0, 1, 0, 0); if (mir) g.setTransform(-1, 0, 0, 1, w, 0);
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        const grd = g.createLinearGradient(0, h, 0, 0); grd.addColorStop(0, 'rgba(0,0,0,0.45)'); grd.addColorStop(0.5, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(255,255,255,0.12)'); g.fillStyle = grd; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#0d0d10'; g.fillRect(0, 0, w, 12);
+        // (the black of the hood dipping onto the front fender's top)
+        g.beginPath(); g.moveTo(w, 12); g.lineTo(w, 70); g.lineTo(900, 40); g.lineTo(840, 12); g.closePath(); g.fill();
+        const flash = (fill, d) => { g.fillStyle = fill; g.beginPath(); g.moveTo(940 + d, 150 - d); g.lineTo(760, 200); g.lineTo(560, 236); g.lineTo(700, 170); g.lineTo(520, 150); g.lineTo(690, 130);
+          g.lineTo(600, 62); g.lineTo(760, 118); g.lineTo(925 + d, 100 + d); g.closePath(); g.fill(); };
+        flash('#0b0b0e', 10); flash('#e8ebef', 0);
+        const sv = g.createLinearGradient(560, 0, 1000, 0); sv.addColorStop(0, 'rgba(150,160,175,0.7)'); sv.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = sv;
+        g.beginPath(); g.moveTo(560, 236); g.lineTo(700, 170); g.lineTo(760, 200); g.closePath(); g.fill();
+        g.fillStyle = '#0b0b0e'; for (const [x, y] of [[640, 150], [720, 120], [830, 160]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 70, y - 22); g.lineTo(x + 76, y - 14); g.lineTo(x + 6, y + 8); g.closePath(); g.fill(); }
+        // (SAND STORM across the bed side, over the rear arch - the panel there runs 0.18-0.22 m up, canvas rows ~20-100)
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.save(); g.translate(mir ? w - 226 : 226, 62); g.rotate(mir ? 0.05 : -0.05);
+        g.fillStyle = '#f4f4f4'; g.fillRect(-150, -32, 300, 64); g.strokeStyle = '#0b0b0e'; g.lineWidth = 5; g.strokeRect(-150, -32, 300, 64);
+        g.font = 'italic 900 52px Impact, "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 5; g.strokeStyle = '#fff'; g.fillStyle = '#d4151c';
+        g.strokeText('SAND STORM', 0, 3); g.fillText('SAND STORM', 0, 3); g.restore();
+        g.fillStyle = '#fff'; g.font = 'bold 22px Arial, sans-serif'; g.textAlign = 'center'; g.fillText('4WD', mir ? w - 470 : 470, 200); g.fillText(ENGINE === 'brushed' ? 'BRUSHED 2S' : ENGINE === 'bl6s' ? 'BRUSHLESS 6S' : 'BRUSHLESS 3S', mir ? w - 440 : 440, 228);
+      };
+      drawLivery(paintHex);
+      M.rcLivery = livTex.map((t) => new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.22, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 }));
+      // (the sides' inner face plain - from the cab or through the glass the lettering mustn't show through backwards)
+      M.shellIn = new THREE.MeshStandardMaterial({ color: 0x0d1430, roughness: 0.7, side: THREE.BackSide });
+      const noDraw = new THREE.MeshBasicMaterial({ visible: false });
+      P.repaint = (hex) => drawLivery(hex);
+      add(body, sg, [M.rcLivery[0], M.tint, M.paint, M.rcHood, M.rcLivery[1]], 0, 0, 0);
+      add(body, sg, [M.shellIn, noDraw, noDraw, noDraw, M.shellIn], 0, 0, 0, 0, 0, 0, false);
+      M.paint.side = THREE.DoubleSide;
+      // (the windshield banner)
+      { const bt = canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#0c0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#e8e8e8'; g.font = 'bold 38px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SANDSTORM', w / 2, h / 2 + 2); });
+        const zb = ZH - 0.008, yb = yT(zb) + 0.0006, bw = WtT(zb) * 1.6;
+        const pl = add(body, new THREE.PlaneGeometry(bw, 0.012), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.4 }), 0, yb, zb, 0, 0, 0, false);   // (a sticker on the outside: from the cab you look through it)
+        // (lying on the glass, its face out and forward - so it reads from the front)
+        const sl = (yT(zb + 0.004) - yT(zb - 0.004)) / 0.008;
+        pl.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(-1, 0, 0), V3(0, sl, 1).normalize(), V3(0, 1, -sl).normalize())); }
+      // ---- the nose: the fender fronts in the body colour, the grille between them - a black frame, two lamps in red rings
+      // at its outer corners (dark lenses, a bulb that lights with the headlights), slats between, a badge over it
+      { const S0 = section(ZN), sh = new THREE.Shape();
+        sh.moveTo(S0[2][0], S0[2][1]); for (let i = 3; i < S0.length; i++) sh.lineTo(S0[i][0], S0[i][1]);
+        for (let i = S0.length - 2; i >= 2; i--) sh.lineTo(-S0[i][0], S0[i][1]);
+        sh.closePath();
+        add(body, new THREE.ShapeGeometry(sh, 4), M.paint, 0, 0, ZN - 0.0004, 0, 0, 0, false);
+        const gf = new THREE.Shape(); rrPath(gf, -0.076, 0.136, 0.076, 0.182, 0.008);
+        add(body, new THREE.ExtrudeGeometry(gf, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.0015, bevelSize: 0.0015, bevelSegments: 2, curveSegments: 6 }), M.rcHood, 0, 0, ZN - 0.0045, 0, 0, 0, false);
+        M.rcLens = M.rcLens || new THREE.MeshPhysicalMaterial({ color: 0x15171b, roughness: 0.1, metalness: 0.4, clearcoat: 1 });
+        for (const sx of [-1, 1]) {
+          const lx = sx * 0.055, ly = 0.159, lz = ZN - 0.008;
+          add(body, new THREE.TorusGeometry(0.0145, 0.0034, 10, 28), M.redRing, lx, ly, lz, 0, 0, 0, false);
+          add(body, new THREE.CircleGeometry(0.0125, 24), M.rcLens, lx, ly, lz + 0.0012, 0, Math.PI, 0, false);
+          add(body, new THREE.CircleGeometry(0.0045, 16), M.head, lx, ly, lz + 0.0006, 0, Math.PI, 0, false);
+        }
+        for (let k = -3; k <= 3; k++) add(body, rbox(0.0045, 0.03, 0.003, 0.0015), M.rcPlast, k * 0.0085, 0.159, ZN - 0.0075, 0, 0, 0, false);
+        for (const y of [0.143, 0.175]) add(body, rbox(0.068, 0.003, 0.003, 0.0012), M.rcPlast, 0, y, ZN - 0.0075, 0, 0, 0, false);
+        add(body, rbox(0.03, 0.009, 0.003, 0.002), M.chrome, 0, 0.187, ZN + 0.004, -0.3, 0, 0, false); }
+      // (the tail: a black panel across it, red lamps at its corners)
+      add(body, rbox(0.17, 0.03, 0.003, 0.004), M.rcHood, 0, 0.175, ZT + 0.0012, 0, 0, 0, false);
+      for (const sx of [-1, 1]) add(body, rbox(0.03, 0.016, 0.003, 0.003), M.tail, sx * 0.07, 0.178, ZT + 0.0028, 0, 0, 0, false);
+      // ---- the chassis: the tub, the bumpers with their skid plates and two LED lamps up front, the shock towers, the
+      // motor and its heat-sink fan, the servo, the battery strap
+      add(body, rbox(0.1, 0.03, 0.38, 0.008), M.rcPlast, 0, 0.06, 0);
+      add(body, rbox(0.075, 0.024, 0.13, 0.006), M.rcBlack, 0, 0.087, 0.04);
+      add(body, cylZ(0.019, 0.019, 0.05, 20), M.alu, 0.0, 0.092, 0.11);
+      add(body, cylZ(0.016, 0.016, 0.008, 16), M.rcPlast, 0.0, 0.092, 0.08);
+      add(body, rbox(0.046, 0.026, 0.14, 0.005), new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5 }), -0.07, 0.083, -0.02);      // the LiPo in its tray
+      add(body, rbox(0.05, 0.004, 0.012, 0.002), M.rcBlue || (M.rcBlue = new THREE.MeshStandardMaterial({ color: 0x1f4fd8, roughness: 0.3, metalness: 0.35 })), -0.07, 0.097, -0.06);   // its strap
+      add(body, rbox(0.04, 0.022, 0.05, 0.005), M.rcBlack, 0.068, 0.08, -0.05);                                          // the speed controller
+      add(body, cylX(0.009, 0.009, 0.006, 16), M.alu, 0.09, 0.083, -0.05);                                               // its fan
+      for (const fz of [-1, 1]) {
+        const bz = fz * 0.235;
+        add(body, rbox(0.17, 0.026, 0.03, 0.008), M.rcPlast, 0, 0.075, bz);
+        const sk = add(body, rbox(0.11, 0.005, 0.05, 0.002), M.rcPlast, 0, 0.062, fz * 0.214); sk.rotation.x = -fz * 0.5;     // (the skid plate, angled up into the bumper)
+        add(body, rbox(0.15, 0.09, 0.008, 0.004), M.rcPlast, 0, 0.115, fz * 0.142);       // shock tower
+        add(body, rbox(0.04, 0.035, 0.05, 0.006), M.rcBlack, 0, 0.078, fz * 0.17);         // diff case
+      }
+      for (const sx of [-1, 1]) { add(body, rbox(0.022, 0.016, 0.01, 0.004), M.rcPlast, sx * 0.05, 0.08, -0.252); add(body, new THREE.CircleGeometry(0.006, 16), M.led, sx * 0.05, 0.08, -0.258, 0, Math.PI, 0, false); }
+      spots(0.05, 0.08, -0.26, 20);
+      // ---- the wing: on two struts off the rear of the chassis, end plates
+      { const wy = 0.288, wz = 0.215;
+        const wg = profile([[wz - 0.06, wy], [wz - 0.05, wy + 0.008], [wz + 0.01, wy + 0.012], [wz + 0.055, wy + 0.016], [wz + 0.06, wy + 0.004], [wz + 0.01, wy], [wz - 0.04, wy - 0.003]], 0.24, 0.002);
+        add(body, wg, M.rcBlack, 0, 0, 0);
+        for (const sx of [-1, 1]) {
+          add(body, profile([[wz - 0.065, wy - 0.012], [wz + 0.065, wy - 0.006], [wz + 0.07, wy + 0.03], [wz - 0.05, wy + 0.02]], 0.003, 0.0008), M.rcBlack, sx * 0.121, 0, 0);
+          tubeAB(body, V3(sx * 0.03, 0.1, 0.19), V3(sx * 0.04, wy - 0.002, wz + 0.005), 0.004, M.rcPlast, 8);
+        }
+        add(body, rbox(0.1, 0.004, 0.012, 0.002), M.rcPlast, 0, wy - 0.004, wz + 0.005); }
+      // ---- the suspension: per corner an upper and a lower A-arm, a dogbone to the hub and a coil-over from the tower to the
+      // lower arm - all following the wheel up and down (afterWheels)
+      const susp = [];
+      for (let i = 0; i < 4; i++) {
+        const fr = i < 2, sx = (i & 1) === 0 ? -1 : 1, z0 = fr ? zF : zR, fz = fr ? -1 : 1;
+        const mk = (r, len, mat) => { const gg = new THREE.Group(); body.add(gg); const m = add(gg, cylY(r, r, 1, 8), mat, 0, 0.5, 0); return { g: gg, m, len }; };
+        const s = {
+          i, sx, z0, fz,
+          lo: mk(0.006, 1, M.rcPlast), up: mk(0.004, 1, M.rcPlast), dog: mk(0.0035, 1, M.steel),
+          shBody: mk(0.0075, 1, M.rcShock), shRod: mk(0.0022, 1, M.chrome), spring: new THREE.Group(),
+          top: V3(sx * 0.068, 0.153, z0 + fz * 0.022),
+        };
+        // (the spring: a helix along its own y, scaled to the shock's length)
+        const hp = []; for (let k = 0; k <= 96; k++) { const a = k / 96 * Math.PI * 2 * 9; hp.push(V3(Math.cos(a) * 0.0105, k / 96, Math.sin(a) * 0.0105)); }
+        s.springM = add(s.spring, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hp), 300, 0.0016, 5, false), M.rcSpring, 0, 0, 0, 0, 0, 0, false);
+        body.add(s.spring);
+        susp.push(s);
+      }
+      const place = (o, a, b) => { const d = new THREE.Vector3().subVectors(b, a), l = d.length(); o.g.position.copy(a); o.g.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); o.g.scale.set(1, l, 1); };
+      const placeS = (g, a, b) => { const d = new THREE.Vector3().subVectors(b, a), l = d.length(); g.position.copy(a); g.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); g.scale.set(1, l, 1); };
+      const _hp = V3(0, 0, 0);
+      P.rcSusp = (wheels) => {
+        for (const s of susp) {
+          const c = wheels[s.i].corner.position; _hp.set(c.x, c.y + cgH, c.z - zOff);             // the hub, in model space
+          const inX = s.sx * 0.05, hubIn = V3(_hp.x - s.sx * 0.03, _hp.y, _hp.z);
+          place(s.lo, V3(inX, 0.058, s.z0), V3(hubIn.x, hubIn.y - 0.018, hubIn.z));
+          place(s.up, V3(s.sx * 0.045, 0.1, s.z0), V3(hubIn.x, hubIn.y + 0.016, hubIn.z));
+          place(s.dog, V3(s.sx * 0.02, 0.078, s.z0 + s.fz * 0.005), hubIn);
+          const low = V3(hubIn.x - s.sx * 0.012, hubIn.y - 0.014, hubIn.z + s.fz * 0.012);
+          const mid = s.top.clone().lerp(low, 0.45);
+          place(s.shBody, s.top, mid); place(s.shRod, mid, low); placeS(s.spring, s.top.clone().lerp(low, 0.06), low.clone().lerp(s.top, 0.12));
+        }
+      };
+      // ---- inside the cab: the floor under the windows, the dash, two seats, the wheel, the driver
+      add(body, rbox(0.2, 0.004, 0.15, 0.002), M.grey, 0, 0.184, -0.005);
+      add(body, rbox(0.21, 0.016, 0.018, 0.004), M.rcPlast, 0, 0.205, ZW + 0.012);
+      for (const dx of [-0.012, 0.012]) add(body, new THREE.CircleGeometry(0.005, 14), M.alu, -0.045 + dx, 0.207, ZW + 0.021, 0, Math.PI, 0, false);
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.06, 0.012, 0.05, 0.004), M.seat, sx * 0.045, 0.19, 0.03);
+        add(body, rbox(0.06, 0.06, 0.01, 0.004), M.seat, sx * 0.045, 0.222, 0.058, -0.2, 0, 0);
+      }
+      { const colG = new THREE.Group(); colG.position.set(-0.045, 0.222, -0.022); colG.rotation.x = -0.6; body.add(colG);
+        const sw = new THREE.Group(); colG.add(sw);
+        add(sw, new THREE.TorusGeometry(0.013, 0.0018, 8, 24), M.black, 0, 0, 0, 0, 0, 0, false);
+        for (let k = 0; k < 3; k++) { const sp = add(sw, new THREE.BoxGeometry(0.0018, 0.013, 0.0012), M.alu, 0, 0, 0, 0, 0, k * 2.094 + Math.PI, false); sp.geometry.translate(0, 0.0065, 0); }
+        tubeAB(body, V3(-0.045, 0.222, -0.021), V3(-0.045, 0.207, -0.045), 0.002, M.black, 6);
+        SW = { colG, sw }; }
+      { const SC = 0.085, dg = new THREE.Group(); dg.position.set(-0.045, 0.192, 0.026); dg.scale.setScalar(SC);
+        const pp = person({ hip: V3(0, 0.0, 0), lean: 0.22, hands: [V3(-0.15, 0.33, -0.52), V3(0.15, 0.33, -0.52)], knee: { dx: 0.1, y: 0.1, z: -0.42 }, foot: { dx: 0.12, y: -0.12, z: -0.7 }, helmet: true });
+        dg.add(pp); const e = pp.userData.eye; dg.userData.eye = V3(e.x * SC + dg.position.x, e.y * SC + dg.position.y, e.z * SC + dg.position.z);
+        driver = dg; P.hideCockpit.push(driver); }
+    };
+    // ---------------------------------------------------------------- the buses' shared helpers
+    // a body from sections along z - o.section(z): the right half's points, the same count at every station - mirrored,
+    // with uvs for a side livery (u along z as each side is seen, rear at the left; v up the height from o.y0 over o.yH)
+    // and a material slot per band (o.mat(b, z); below 0 leaves it open; o.leftSlot maps a right-side slot to the left's)
+    function shellGeo(o) {
+      const secs = o.stations.map((z) => ({ z, P: o.section(z) })), nP = secs[0].P.length, pos = [], uv = [], buckets = [];
+      const vid = (r, i, sd) => r * nP * 2 + (sd > 0 ? i : nP + i);
+      for (const s of secs) for (const sd of [1, -1]) for (const [x, y] of s.P) { pos.push(sd * x, y, s.z); uv.push(sd > 0 ? (o.z1 - s.z) / (o.z1 - o.z0) : (s.z - o.z0) / (o.z1 - o.z0), (y - o.y0) / o.yH); }
+      for (let r = 0; r < secs.length - 1; r++) {
+        const zm = (secs[r].z + secs[r + 1].z) / 2;
+        for (let i = 0; i < nP - 1; i++) {
+          const m0 = o.mat(i, zm); if (m0 < 0) continue;
+          for (const sd of [1, -1]) {
+            const m = sd < 0 && o.leftSlot ? o.leftSlot(m0) : m0, B2 = buckets[m] || (buckets[m] = []);
+            const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd); if (sd > 0) B2.push(a, b, c, b, d, c); else B2.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry(), idx = [];
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      let st0 = 0; buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); g.addGroup(st0, b.length, m); st0 += b.length; });
+      g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+    // the outline of a section (both halves) as a polygon, and that polygon clipped to the band y0..y1 - for the flat end
+    // faces, split into the glass, the panel and the header
+    const outlineOf = (P, from) => { const out = []; for (let i = from; i < P.length; i++) out.push([P[i][0], P[i][1]]); for (let i = P.length - 2; i >= from; i--) out.push([-P[i][0], P[i][1]]); return out; };
+    function clipY(poly, y0, y1) {
+      const half = (pts, keep, yc) => { const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ia = keep(a[1]), ib = keep(b[1]);
+        if (ia) out.push(a); if (ia !== ib) { const t = (yc - a[1]) / (b[1] - a[1]); out.push([a[0] + (b[0] - a[0]) * t, yc]); } } return out; };
+      return half(half(poly, (y) => y >= y0, y0), (y) => y <= y1, y1);
+    }
+    const polyGeo = (poly) => { const sh = new THREE.Shape(); poly.forEach(([x, y], i) => (i ? sh.lineTo(x, y) : sh.moveTo(x, y))); return new THREE.ShapeGeometry(sh, 1); };
+    // a livery canvas for each side, drawn in body coordinates (z, y): X / Y put a point where it lands on that side's
+    // canvas, so shapes sit at the same places on both sides and the lettering reads on both
+    function sideCanvas(wpx, hpx, z0, z1, y0, yH, draw) {
+      const cvs = [0, 1].map(() => { const c = document.createElement('canvas'); c.width = wpx; c.height = hpx; return c; });
+      const tex = cvs.map((c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; });
+      const redraw = (...a) => { cvs.forEach((c, k) => { const left = k === 1, X = (z) => (left ? (z - z0) : (z1 - z)) / (z1 - z0) * wpx, Y = (y) => (1 - (y - y0) / yH) * hpx;
+        draw(c.getContext('2d'), X, Y, left, wpx, hpx, ...a); }); tex.forEach((t) => { t.needsUpdate = true; }); };
+      return { tex, redraw };
+    }
+
+    // ---------------------------------------------------------------- Tour coach (MCI J4500 kind)
+    // A 45 ft three-axle motorcoach to its real size (13.84 m long, 2.59 m wide, 3.5 m tall): the white body with the black
+    // glass band from the window line up over the roof's edge, the front cap's curve over the big two-piece windshield and
+    // its header with the fleet number, the headlamp clusters in the white front, the rabbit-ear mirrors out on their arms,
+    // the entry door ahead of the front axle on the right, the baggage bays between the axles, the brush-stroke swoosh down
+    // each side - purple, red, orange, yellow - and the company's name on the quarters; polished aluminium wheels - the steer
+    // axle, the drive axle on duals, the tag axle behind it. Inside: the driver's seat, the dash and the wheel, rows of seats
+    B.coach = () => {
+      WF = 0.315; WR = 0.315;
+      wheelStyle = { rim: 'alcoa', rimR: 0.29, tread: 'hwy' };
+      const ZN = zF - 2.3, ZT = zR + 0.685 + 3.17, DZ = 0.685, zD = zR - DZ, zG = zR + DZ, YW = 1.86, YG0 = 1.5, YG1 = 2.98;
+      M.cWhite = new THREE.MeshPhysicalMaterial({ color: 0xf2f2ee, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.1 });
+      M.cBlack = new THREE.MeshPhysicalMaterial({ color: 0x0b0c0e, roughness: 0.2, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });
+      M.cIn = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.8, side: THREE.BackSide });
+      M.cSeat = new THREE.MeshStandardMaterial({ color: 0x24305a, roughness: 0.75 });
+      M.tint.color.setHex(0x182028);
+      const arch = (z) => { let y = 0.42; for (const [zc, r] of [[zF, 0.66], [zD, 0.64], [zG, 0.64]]) { const d = Math.abs(z - zc); if (d < r) y = Math.max(y, RF + Math.sqrt(r * r - d * d) * 0.95); } if (z > zD && z < zG) y = Math.max(y, RF + 0.64 * 0.95); return y; };
+      const section = (z) => {
+        const d = z - ZN, e = ZT - z, rF = 0.45, rR = 0.22;
+        let W = 1.295; if (d < rF) W -= rF - Math.sqrt(Math.max(0, rF * rF - (rF - d) * (rF - d))); if (e < rR) W -= rR - Math.sqrt(Math.max(0, rR * rR - (rR - e) * (rR - e)));
+        const yR = d < 0.45 ? 3.25 + 0.25 * Math.sqrt(Math.max(0, 1 - Math.pow((0.45 - d) / 0.45, 2))) : e < 0.3 ? 3.35 + 0.15 * Math.sqrt(Math.max(0, 1 - Math.pow((0.3 - e) / 0.3, 2))) : 3.5;
+        const yb = arch(z), top = (y) => (y <= 2.9 ? y : 2.9 + (y - 2.9) * (yR - 2.9) / 0.6);
+        const P = [[0, yb], [W - 0.1, yb], [W - 0.015, yb + 0.04], [W, yb + 0.12]];
+        for (let k = 1; k <= 3; k++) P.push([W, yb + 0.12 + (YW - yb - 0.12) * k / 4]);
+        P.push([W, YW], [W - 0.04, 2.5], [W - 0.08, top(3.15)], [W - 0.16, top(3.36)], [W - 0.32, top(3.45)], [W * 0.4, top(3.49)], [0, top(3.5)]);
+        return P;
+      };
+      const ST = stationsOf(ZN, ZT, 0.1, [...Array.from({ length: 12 }, (_, i) => ZN + i * 0.04), ...Array.from({ length: 8 }, (_, i) => ZT - i * 0.04),
+        ...[zF, zD, zG].flatMap((zc) => Array.from({ length: 15 }, (_, i) => zc - 0.7 + i * 0.1))].filter((z) => z >= ZN && z <= ZT));
+      const liv = sideCanvas(2048, 512, ZN, ZT, 0.3, 3.25, (g, X, Y, left, w, h, hex) => {
+        g.fillStyle = '#' + new THREE.Color(hex).getHexString(); g.fillRect(0, 0, w, h);
+        // the black glass band, down over the windshield's wrap at the front corner and (right side) the entry door's glass
+        g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, Y(YW));
+        const xa = X(ZN), xb = X(ZN + 0.5); g.fillRect(Math.min(xa, xb), Y(YW), Math.abs(xb - xa), Y(YG0) - Y(YW));
+        if (!left) { g.fillRect(Math.min(X(ZN + 0.62), X(zF - 0.72)), Y(2.98), Math.abs(X(zF - 0.72) - X(ZN + 0.62)), Y(0.95) - Y(2.98)); }
+        // (the window posts: faint dark-grey lines through the band)
+        g.strokeStyle = '#26282c'; g.lineWidth = 3; for (let z = ZN + 1.6; z < ZT - 0.6; z += 1.45) { g.beginPath(); g.moveTo(X(z), Y(YW + 0.05)); g.lineTo(X(z + 0.04), Y(3.15)); g.stroke(); }
+        // baggage bays and the shut lines round them, the entry door's outline (right), the fuel door
+        g.strokeStyle = '#9a9c9e'; g.lineWidth = 2;
+        for (let k = 0; k < 4; k++) { const za = zF + 0.85 + k * 1.52; g.strokeRect(Math.min(X(za), X(za + 1.42)), Y(1.62), Math.abs(X(za + 1.42) - X(za)), Y(0.55) - Y(1.62)); }
+        if (!left) { g.strokeRect(Math.min(X(ZN + 0.58), X(zF - 0.68)), Y(3.02), Math.abs(X(zF - 0.68) - X(ZN + 0.58)), Y(0.48) - Y(3.02)); }
+        // the swoosh: four fat brush strokes from the back - purple, red, orange, yellow - overlapping, tapering at their
+        // ends, riding a wave that peaks up at the window line and dips to the bays; a black shadow edge under each
+        const path = (t) => [ZT - 0.9 - t * 10.4, 1.22 + 0.28 * t + 0.33 * (0.35 + 0.65 * Math.min(1, t / 0.4)) * Math.sin(t * Math.PI * 4.3 - 0.5)];
+        const strokes = [['#5a2a8a', 0, 0.17, 0.12], ['#cf1d3a', 0.12, 0.46, 0.17], ['#f07a12', 0.42, 0.74, 0.17], ['#f8bc1c', 0.7, 1.0, 0.15]];
+        for (const [col, t0, t1, hw] of strokes) for (const [fill, dy, k] of [['#0b0c0e', -0.07, 1.0], [col, 0, 1.0]]) {
+          g.fillStyle = fill; g.beginPath();
+          const N = 60, hAt = (t) => hw * k * Math.pow(Math.sin(Math.PI * (t - t0) / (t1 - t0)), 0.45);
+          for (let n = 0; n <= N; n++) { const t = t0 + (t1 - t0) * n / N, [z, y] = path(t); g.lineTo(X(z), Y(y + dy + hAt(t))); }
+          for (let n = N; n >= 0; n--) { const t = t0 + (t1 - t0) * n / N, [z, y] = path(t); g.lineTo(X(z), Y(y + dy - hAt(t) * 0.8)); }
+          g.closePath(); g.fill();
+        }
+        g.fillStyle = 'rgba(255,255,255,0.22)';
+        for (let n = 0; n < 70; n++) { const t = n / 70, [z, y] = path(t); g.fillRect(X(z) - 22, Y(y + 0.05 - (n % 4) * 0.035), 34, 2); }   // (the brush's dry streaks)
+        // the name, on the quarter behind the swoosh
+        g.save(); g.translate(X(ZT - 1.85), Y(1.71)); g.transform(1, 0, -0.18, 1, 0, 0);
+        g.font = '900 50px "Arial Black", Impact, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#0b0c0e';
+        g.fillText('D&F TRAVEL', 0, 0); g.restore();
+        g.font = 'bold 15px Arial, sans-serif'; g.fillStyle = '#0b0c0e'; g.textAlign = 'center';
+        if (!left) g.fillText('SEATS 57', X(zF - 0.95), Y(1.72));
+      });
+      liv.redraw(paintHex); P.repaint = (hex) => { liv.redraw(hex); M.cWhite.color.setHex(hex); for (const m of M.cWhiteD) m.color.setHex(hex); };
+      M.cWhite.color.setHex(paintHex); M.cWhiteD = [];
+      M.cLiv = liv.tex.map((t) => new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.1 }));
+      // (the window band is real tinted glass - the seats show through it, and from the driver's seat you see out of it -
+      // from the windshield's wrap at the front corner back to the engine bay; the entry door's glass too)
+      const glassBand = (b, z) => (b === 7 || b === 8) && z < ZT - 0.75 || (b === 6 && z < ZN + 0.48);
+      const g0 = shellGeo({ stations: ST, section, z0: ZN, z1: ZT, y0: 0.3, yH: 3.25, leftSlot: (m) => (m === 0 ? 4 : m),
+        mat: (b, z) => (b === 0 ? 2 : glassBand(b, z) ? 1 : b <= 9 ? 0 : 3) });
+      add(body, g0, [M.cLiv[0], M.tint, M.black, M.cWhite, M.cLiv[1]], 0, 0, 0);
+      add(body, g0, [M.cIn, new THREE.MeshBasicMaterial({ visible: false }), M.cIn, M.cIn, M.cIn], 0, 0, 0, 0, 0, 0, false);
+      // (the window posts, black, between the panes)
+      for (let z = ZN + 1.6; z < ZT - 0.8; z += 1.45) for (const sx of [-1, 1]) {
+        const a = section(z); add(body, new THREE.BoxGeometry(0.03, 1.25, 0.07), M.cBlack, sx * (a[8][0] + 0.005), 2.5, z, 0, 0, sx * 0.05, false);
+      }
+      // ---- the front: the white panel, the windshield (two pieces, a post between), the black header with the number;
+      // headlamp clusters at the corners, the turn signals, the grille slot, the bumper and the plate
+      { const F = outlineOf(section(ZN), 1);
+        M.cWhiteD.push(Object.assign(M.cWhite.clone(), { side: THREE.DoubleSide }));
+        add(body, polyGeo(clipY(F, 0, YG0)), M.cWhiteD[0], 0, 0, ZN - 0.002, 0, 0, 0, false);
+        add(body, polyGeo(clipY(F, YG0, YG1)), M.tint, 0, 0, ZN - 0.002, 0, 0, 0, false);
+        const hdr = canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#f0f0f0'; g.font = 'bold 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('2033', w * 0.28, h / 2 + 2); });
+        const hg = polyGeo(clipY(F, YG1, 4)); { const p = hg.attributes.position, u = []; for (let i = 0; i < p.count; i++) u.push((0.9 - p.getX(i)) / 1.8, (p.getY(i) - YG1) / 0.27); hg.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2)); }
+        add(body, hg, new THREE.MeshStandardMaterial({ map: hdr, roughness: 0.3, side: THREE.BackSide }), 0, 0, ZN - 0.002, 0, 0, 0, false);   // (seen from outside only)
+        add(body, new THREE.BoxGeometry(0.05, YG1 - YG0, 0.03), M.cBlack, 0, (YG0 + YG1) / 2, ZN - 0.01, 0, 0, 0, false);
+        // (a band of black under the glass, round the wipers)
+        add(body, rbox(1.6, 0.12, 0.03, 0.02), M.cBlack, 0, YG0 + 0.02, ZN - 0.012, 0, 0, 0, false);
+        for (const sx of [-1, 1]) {
+          tubeAB(body, V3(sx * 0.05, YG0 + 0.1, ZN - 0.03), V3(sx * 0.75, YG0 + 0.25, ZN - 0.03), 0.012, M.black, 6);
+          add(body, rbox(0.42, 0.2, 0.04, 0.05), M.cBlack, sx * 0.58, 0.98, ZN - 0.012, 0, 0, 0, false);
+          for (const lx of [0.45, 0.6, 0.72]) add(body, new THREE.CircleGeometry(0.055, 18), M.head, sx * lx, 0.98, ZN - 0.035, 0, Math.PI, 0, false);
+          add(body, rbox(0.12, 0.05, 0.03, 0.015), M.amber, sx * 0.62, 1.16, ZN - 0.012, 0, 0, 0, false);
+          // the rabbit-ear mirrors: an arm out of the roof's front corner, sweeping forward and down, the head at the glass
+          const p0 = V3(sx * 0.95, 3.15, ZN + 0.3), p1 = V3(sx * 1.25, 3.0, ZN - 0.15), p2 = V3(sx * 1.3, 2.45, ZN - 0.42);
+          pipe(body, [p0, p1, p2], 0.025, M.cBlack, 8);
+          const mh = add(body, rbox(0.2, 0.42, 0.09, 0.04), M.cBlack, sx * 1.32, 2.2, ZN - 0.45); mh.rotation.y = -sx * 0.3;
+        }
+        add(body, rbox(0.7, 0.14, 0.03, 0.03), M.cBlack, 0, 0.82, ZN - 0.012, 0, 0, 0, false);
+        add(body, rbox(1.9, 0.2, 0.12, 0.06), M.cBlack, 0, 0.52, ZN - 0.03);
+        add(body, rbox(0.32, 0.16, 0.012, 0.006), M.white, 0, 0.62, ZN - 0.1, 0, 0, 0, false);
+        spots(0.6, 0.98, ZN - 0.05);
+        // the front name plate
+        const np = canvasTex(256, 48, (g, w, h) => { g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#f0f0f0'; g.font = 'italic 900 30px "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('D&F TRAVEL', w / 2, h / 2 + 1); });
+        add(body, new THREE.PlaneGeometry(0.62, 0.11), new THREE.MeshStandardMaterial({ map: np, roughness: 0.3 }), 0.55, 1.3, ZN - 0.004, 0, Math.PI, 0, false); }
+      // ---- the back: white, the black band, the engine grille, the tail lamps up the corners
+      { const R = outlineOf(section(ZT), 1);
+        add(body, polyGeo(clipY(R, 0, YW)), M.cWhiteD[0], 0, 0, ZT + 0.002, 0, 0, 0, false);
+        add(body, polyGeo(clipY(R, YW, 4)), M.cBlack, 0, 0, ZT + 0.002, 0, 0, 0, false);
+        add(body, rbox(1.6, 0.55, 0.03, 0.03), M.cBlack, 0, 1.15, ZT + 0.01);
+        for (let k = 0; k < 7; k++) add(body, new THREE.BoxGeometry(1.5, 0.02, 0.01), M.steel, 0, 0.92 + k * 0.07, ZT + 0.028, 0, 0, 0, false);
+        for (const sx of [-1, 1]) for (const y of [0.85, 1.1, 1.35]) add(body, rbox(0.14, 0.14, 0.03, 0.05), y === 0.85 ? M.amber : M.tail, sx * 0.98, y, ZT + 0.008, 0, 0, 0, false);
+        add(body, rbox(2.2, 0.22, 0.1, 0.05), M.cBlack, 0, 0.55, ZT + 0.03);
+        add(body, rbox(0.32, 0.16, 0.012, 0.006), M.white, 0, 0.62, ZT + 0.085, 0, 0, 0, false);
+        // (the exhaust under the back, angled down: the diesel's smoke - P.soot - comes out there)
+        P.soot = [{ p: toRoot(V3(0.85, 0.36, ZT - 0.25)), d: V3(0.1, -0.5, 1).normalize() }];
+        P.tips.push(toRoot(V3(0.85, 0.36, ZT - 0.25))); }
+      // the arch liners
+      for (const [z, r] of [[zF, 0.66], [zD, 0.64], [zG, 0.64]]) for (const sx of [-1, 1]) {
+        const lg = new THREE.CylinderGeometry(r - 0.02, r - 0.02, 0.5, 28, 1, true, 0, Math.PI); lg.rotateZ(Math.PI / 2);
+        add(body, lg, M.linerB || (M.linerB = Object.assign(M.black.clone(), { side: THREE.DoubleSide })), sx * 1.0, RF, z, 0, 0, 0, false);
+      }
+      // ---- inside: the floor, the driver's seat and the dash, a big flat wheel; seats in rows down the aisle
+      add(body, new THREE.BoxGeometry(2.4, 0.06, ZT - ZN - 0.6), M.grey, 0, 1.38, (ZN + ZT) / 2);
+      add(body, rbox(2.3, 0.35, 0.5, 0.06), M.black, 0, YG0 - 0.1, ZN + 0.32);
+      add(body, rbox(0.55, 0.12, 0.55, 0.05), M.seat, -0.62, 1.62, ZN + 1.25);
+      add(body, rbox(0.55, 0.75, 0.12, 0.05), M.seat, -0.62, 2.0, ZN + 1.52, 0.15, 0, 0);
+      for (let z = ZN + 2.3; z < ZT - 1.5; z += 0.82) for (const x of [-0.95, -0.5, 0.5, 0.95]) {
+        add(body, rbox(0.42, 0.1, 0.45, 0.04), M.cSeat, x, 1.85, z); add(body, rbox(0.42, 0.7, 0.1, 0.04), M.cSeat, x, 2.2, z + 0.25, 0.12, 0, 0);
+      }
+      SW = steering(V3(-0.62, 2.0, ZN + 0.75), 1.05, 0.25);
+      driver = person({ hip: V3(-0.62, 1.7, ZN + 1.28), lean: 0.2, hands: [V3(-0.82, 2.03, ZN + 0.8), V3(-0.42, 2.03, ZN + 0.8)],
+        knee: { dx: 0.1, y: 1.82, z: ZN + 0.9 }, foot: { dx: 0.12, y: 1.45, z: ZN + 0.62 }, helmet: false });
+      P.hideCockpit.push(driver);
+      // ---- the tandem: the physics' rear wheel is the pair - the drive axle (duals) drawn ahead of it, the tag axle behind
+      P.tandem = { dz: DZ };
+    };
+    // ---------------------------------------------------------------- Demolition-derby school bus
+    // A conventional school bus stripped for the derby (10.6 m over the cowcatcher, 2.44 m wide, 3.05 m to the roof): the
+    // hood and black fenders out front, the body box behind with every pane knocked out - open windows on black posts, a
+    // steel mesh over the windshield - the faded yellow-orange paint under a green band and a black skirt, sprayed all over
+    // with the crew's graffiti (GFP 95, the drivers' names, a phone number, smileys); orange steel wheels, duals at the
+    // back. Inside: green seats, a roll cage round the driver in his helmet. The cowcatcher (opts.cow): a welded V-plow of
+    // plate on a pipe frame, braced off the bumper
+    B.busderby = () => {
+      WF = 0.28; WR = 0.28;
+      wheelStyle = { rim: 'busOrange', rimR: 0.29, tread: 'hwy' };
+      const ZW = -2.3, ZT = 4.5, W0 = 1.22, YS = 1.78, YT = 2.48, ZB = -4.25, COW = opts.cow !== false;
+      M.dBase = new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
+      M.dBlack = new THREE.MeshStandardMaterial({ color: 0x121214, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide });
+      M.dSteel = new THREE.MeshStandardMaterial({ color: 0x4a4744, roughness: 0.55, metalness: 0.7, side: THREE.DoubleSide });
+      M.dRust = new THREE.MeshStandardMaterial({ color: 0x6a4a34, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide });
+      M.dSeat = new THREE.MeshStandardMaterial({ color: 0x2f6a3e, roughness: 0.6 });
+      M.dIn = new THREE.MeshStandardMaterial({ color: 0x3a3a36, roughness: 0.8, side: THREE.BackSide });
+      M.mesh.map.wrapS = M.mesh.map.wrapT = THREE.RepeatWrapping; M.mesh.map.repeat.set(6, 3);
+      // ---- the body box: sections with the window band open between the posts (and the entry door on the right)
+      const arch = (z) => { const d = Math.abs(z - zR), r = 0.64; return d < r ? Math.max(0.78, RR + Math.sqrt(r * r - d * d) * 0.96) : 0.78; };
+      const section = (z) => {
+        const e = ZT - z, W = W0 - (e < 0.12 ? 0.12 - Math.sqrt(Math.max(0, 0.0144 - (0.12 - e) * (0.12 - e))) : 0), yb = arch(z);
+        return [[0, yb], [W - 0.05, yb], [W, yb + 0.05], [W, 1.15], [W, 1.45], [W, YS], [W - 0.03, YT], [W - 0.05, 2.62], [W - 0.15, 2.85], [W - 0.4, 2.98], [W * 0.4, 3.04], [0, 3.05]];
+      };
+      const posts = []; for (let z = ZW + 0.55; z < ZT - 0.3; z += 0.76) posts.push(z);
+      const isPost = (z) => posts.some((p) => Math.abs(z - p) < 0.045) || z < ZW + 0.12 || z > ZT - 0.25;
+      const ST = stationsOf(ZW, ZT, 0.08, [...posts.flatMap((p) => [p - 0.045, p + 0.045]), ZW + 0.12, ZT - 0.25, ZT - 0.12, -2.25, -1.52, ...Array.from({ length: 15 }, (_, i) => zR - 0.7 + i * 0.1)]);
+      const liv = sideCanvas(2048, 512, ZW, ZT, 0.7, 2.45, (g, X, Y, left, w, h, hex) => {
+        const base = '#' + new THREE.Color(hex).getHexString(), Rx = (z0, z1, y0, y1) => [Math.min(X(z0), X(z1)), Y(y1), Math.abs(X(z1) - X(z0)), Y(y0) - Y(y1)];
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#121214'; g.fillRect(...Rx(ZW, ZT, 0.6, 1.16));
+        g.fillStyle = '#2c7a38'; g.fillRect(...Rx(ZW, ZT, 1.16, 1.45));
+        g.fillStyle = '#121214'; for (const y of [1.16, 1.45, 1.77]) g.fillRect(...Rx(ZW, ZT, y - 0.02, y + 0.02));
+        g.fillRect(...Rx(ZW, ZT, YT, YT + 0.08));
+        // (the posts black, the window band behind them dark - the open windows show the inside)
+        for (const p of posts) g.fillRect(...Rx(p - 0.05, p + 0.05, YS, YT));
+        // the graffiti: big GFP 95 across the green band, names and numbers round it, smileys, NAR up on the roof's edge
+        const tag = (txt, z, y, px, fill, stroke, rot, font) => { g.save(); g.translate(X(z), Y(y)); g.rotate(rot || 0); g.font = (font || 'bold') + ' ' + px + 'px "Comic Sans MS", "Marker Felt", "Segoe Print", cursive';
+          g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; if (stroke) { g.lineWidth = Math.max(4, px * 0.12); g.strokeStyle = stroke; g.strokeText(txt, 0, 0); } g.fillStyle = fill; g.fillText(txt, 0, 0); g.restore(); };
+        const smile = (z, y, r, col) => { g.save(); g.strokeStyle = col; g.lineWidth = 5; g.beginPath(); g.arc(X(z), Y(y), r, 0, Math.PI * 2); g.stroke();
+          g.beginPath(); g.arc(X(z), Y(y) + 3, r * 0.6, 0.2, Math.PI - 0.2); g.stroke(); g.fillStyle = col; g.fillRect(X(z) - r * 0.4, Y(y) - r * 0.35, 5, 7); g.fillRect(X(z) + r * 0.3, Y(y) - r * 0.35, 5, 7); g.restore(); };
+        tag('GFP', 1.6, 1.42, 150, '#f2dd2a', '#121214', -0.05, '900');
+        tag('95', -0.35, 1.47, 160, '#f2dd2a', '#121214', 0.04, '900');
+        tag('Dave', 0.55, 1.64, 54, '#f4f4f4', '#121214');
+        tag('Lawn', 0.6, 1.25, 52, '#f4f4f4', '#121214');
+        tag('Nick 69', -1.35, 1.64, 50, '#f4f4f4', '#121214');
+        tag('Davis', -1.25, 1.33, 40, '#f2dd2a', null);
+        tag('Corey', -1.5, 1.2, 36, '#f2dd2a', null);
+        tag('724 448 ' + (left ? '1095' : '6612'), 0.4, 1.02, 40, '#f4f4f4', null);
+        tag('ANMJ', 3.45, 1.3, 70, '#f4f4f4', '#121214'); smile(2.75, 1.3, 22, '#f4f4f4');
+        tag('TMJ', 3.6, 1.0, 58, '#f4f4f4', null); smile(3.05, 1.0, 20, '#f4f4f4');
+        tag('ONS', 4.0, 1.6, 54, '#f2dd2a', '#121214'); smile(2.0, 0.95, 18, '#f2dd2a');
+        tag('NAR', 2.5, 2.7, 64, '#121214', null, 0, '900');
+        g.strokeStyle = 'rgba(30,140,60,0.8)'; g.lineWidth = 8; g.beginPath(); g.moveTo(X(1.9), Y(1.55)); g.quadraticCurveTo(X(1.5), Y(1.3), X(1.2), Y(1.55)); g.stroke();
+      });
+      liv.redraw(paintHex); P.repaint = (hex) => { liv.redraw(hex); M.dBase.color.setHex(hex); };
+      M.dLiv = liv.tex.map((t) => new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, metalness: 0.05 }));
+      const door = (z, b) => z > -2.25 && z < -1.52 && b >= 3 && b <= 5;
+      const g0 = shellGeo({ stations: ST, section, z0: ZW, z1: ZT, y0: 0.7, yH: 2.45, leftSlot: (m) => (m === 0 ? 4 : m),
+        mat: (b, z) => { if (b === 0) return 2; if (b === 5 && !isPost(z)) return -1; return b <= 8 ? 0 : 3; } });
+      // (the entry door: the right side only - its bands are left open by a second pass that drops those faces)
+      { const idx = g0.index.array, pos = g0.attributes.position, keep = [], groups = g0.groups.map((gr) => Object.assign({}, gr));
+        let o = 0; const ng = [];
+        for (const gr of groups) { const st = keep.length;
+          for (let k = gr.start; k < gr.start + gr.count; k += 3) {
+            const a = idx[k], b = idx[k + 1], c = idx[k + 2], cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3, cy = (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3, cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+            if (cx > 0.5 && cz > -2.25 && cz < -1.52 && cy > 1.0 && cy < YT) continue; keep.push(a, b, c);
+          }
+          ng.push({ start: st, count: keep.length - st, materialIndex: gr.materialIndex }); }
+        g0.setIndex(keep); g0.clearGroups(); for (const gr of ng) g0.addGroup(gr.start, gr.count, gr.materialIndex); void o; void door; }
+      add(body, g0, [M.dLiv[0], M.tint, M.dBlack, M.dBase, M.dLiv[1]], 0, 0, 0);
+      add(body, g0, [M.dIn, M.dIn, M.dIn, M.dIn, M.dIn], 0, 0, 0, 0, 0, 0, false);
+      // ---- the front wall (the windshield's two openings behind a mesh) and the back (the emergency door, its window
+      // out, tail lamps); the roof's warning lamps, front and back
+      for (const [z, f] of [[ZW, -1], [ZT, 1]]) {
+        const O = outlineOf(section(z), 1), lower = clipY(O, 0, YS), upper = clipY(O, YT, 4);
+        add(body, polyGeo(lower), M.dBase, 0, 0, z, 0, 0, 0, false); add(body, polyGeo(upper), M.dBase, 0, 0, z, 0, 0, 0, false);
+        for (const sx of [-1, 1]) add(body, new THREE.BoxGeometry(f < 0 ? 0.12 : 0.3, YT - YS, 0.04), M.dBlack, sx * (f < 0 ? 1.12 : 1.0), (YS + YT) / 2, z, 0, 0, 0, false);
+        add(body, new THREE.BoxGeometry(0.08, YT - YS, 0.04), M.dBlack, 0, (YS + YT) / 2, z, 0, 0, 0, false);
+        add(body, new THREE.PlaneGeometry(2.2, YT - YS), M.mesh, 0, (YS + YT) / 2, z + f * 0.03, 0, f < 0 ? Math.PI : 0, 0, false);
+        for (const sx of [-1, -0.6, 0.6, 1]) add(body, cylZ(0.07, 0.07, 0.06, 14), Math.abs(sx) > 0.8 ? M.tail : M.amber, sx * 0.95, 2.78, z + f * 0.03);
+        const pl = canvasTex(256, 48, (g, w, h) => { g.fillStyle = '#f2c21b'; g.fillRect(0, 0, w, h); g.fillStyle = '#121214'; g.font = 'bold 34px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SCHOOL BUS', w / 2, h / 2 + 1); g.strokeStyle = 'rgba(30,140,60,0.9)'; g.lineWidth = 7; g.beginPath(); g.moveTo(20, 38); g.lineTo(230, 12); g.stroke(); });
+        add(body, new THREE.PlaneGeometry(1.1, 0.21), new THREE.MeshStandardMaterial({ map: pl, roughness: 0.5 }), 0, 2.72, z + f * 0.035, 0, f < 0 ? Math.PI : 0, 0, false);
+      }
+      for (const sx of [-1, 1]) add(body, rbox(0.12, 0.3, 0.03, 0.03), M.tail, sx * 0.95, 1.25, ZT + 0.02, 0, 0, 0, false);
+      add(body, rbox(2.35, 0.24, 0.16, 0.05), M.dBlack, 0, 0.72, ZT + 0.06);
+      // (the diesel's exhaust out the right side behind the duals; the V8s' headers dump there too)
+      add(body, cylX(0.06, 0.06, 0.22, 14, true), M.dSteel, 1.12, 0.62, zR + 0.95);
+      P.soot = [{ p: toRoot(V3(1.24, 0.62, zR + 0.95)), d: V3(1, -0.2, 0.15).normalize() }];
+      P.tips.push(toRoot(V3(1.24, 0.62, zR + 0.95)));
+      // ---- the hood, the grille and its lamps, the black fenders, the bumper
+      { const hood = new THREE.Shape(); hood.moveTo(ZB + 0.13, 0.9); hood.lineTo(ZB + 0.13, 1.42); hood.quadraticCurveTo(ZB + 0.25, 1.52, ZB + 0.6, 1.53); hood.lineTo(ZW, 1.66); hood.lineTo(ZW, 0.9); hood.closePath();
+        const hg = new THREE.ExtrudeGeometry(hood, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 4, curveSegments: 8 });
+        hg.rotateY(Math.PI / 2); hg.scale(1, 1, -1); hg.translate(-0.6, 0, 0); { const p = hg.attributes.position; for (let k = 0; k < p.count; k += 3) { const t = p.getX(k + 1), u = p.getY(k + 1), v = p.getZ(k + 1); p.setXYZ(k + 1, p.getX(k + 2), p.getY(k + 2), p.getZ(k + 2)); p.setXYZ(k + 2, t, u, v); } } hg.computeVertexNormals();
+        add(body, hg, M.dBase, 0, 0, 0);
+        add(body, rbox(1.12, 0.55, 0.04, 0.03), M.dBlack, 0, 1.15, ZB + 0.08);
+        for (let k = 0; k < 6; k++) add(body, new THREE.BoxGeometry(1.0, 0.025, 0.02), M.chrome, 0, 0.95 + k * 0.08, ZB + 0.055, 0, 0, 0, false);
+        for (const sx of [-1, 1]) {
+          // (the fender: a black shell over the front wheel, the round lamps on its nose)
+          const fd = new THREE.CylinderGeometry(0.66, 0.66, 0.42, 24, 1, true, -Math.PI / 2, Math.PI); fd.rotateZ(Math.PI / 2);
+          add(body, fd, M.dBlack, sx * 1.0, RF + 0.02, zF);
+          add(body, new THREE.BoxGeometry(0.42, 0.06, 0.62), M.dBlack, sx * 1.0, 0.95, zF - 0.85);
+          add(body, new THREE.BoxGeometry(0.42, 0.06, 0.5), M.dBlack, sx * 1.0, 0.95, zF + 0.6);
+          add(body, cylZ(0.11, 0.11, 0.08, 18), M.chrome, sx * 0.85, 1.22, zF - 0.95);
+          add(body, new THREE.CircleGeometry(0.09, 18), M.head, sx * 0.85, 1.22, zF - 0.995, 0, Math.PI, 0, false);
+        }
+        add(body, rbox(2.38, 0.24, 0.16, 0.05), M.dBlack, 0, 0.72, ZB);
+        add(body, rbox(0.3, 0.15, 0.012, 0.006), M.white, 0, 0.72, ZB - 0.085, 0, 0, 0, false);
+        spots(0.85, 1.22, zF - 1.0); }
+      // ---- the cowcatcher: two plates in a V off the bumper to a point 0.8 m ahead, a pipe along their top edge and down
+      // the point, ribs behind, braces back to the frame
+      if (COW) {
+        // (raked: the bottom edge 0.35 m further out than the top, both a V to the point)
+        const yT0 = 1.08, yB0 = 0.2, tipT = ZB - 0.62, tipB = ZB - 0.98, wT = 1.2, wB = 1.15, zT0 = ZB - 0.04, zB0 = ZB - 0.32;
+        const top = (u) => V3(u * wT, yT0 + 0.05 * (1 - Math.abs(u)), zT0 + (tipT - zT0) * (1 - Math.abs(u))), bot = (u) => V3(u * wB, yB0, zB0 + (tipB - zB0) * (1 - Math.abs(u)));
+        for (const sx of [-1, 1]) {
+          pipe(body, [top(sx), top(sx * 0.5), top(0)], 0.055, M.dSteel, 8);
+          pipe(body, [bot(sx), bot(sx * 0.5), bot(0)], 0.05, M.dSteel, 8);
+          for (let k = 0; k <= 6; k++) { const u = sx * k / 6.5; tubeAB(body, top(u), bot(u), 0.03, M.dRust, 6); }
+          for (const t of [0.35, 0.68]) { const a = top(sx).lerp(bot(sx), t), b = top(0).lerp(bot(0), t); pipe(body, [a, a.clone().lerp(b, 0.5).setZ((a.z + b.z) / 2 - 0.02), b], 0.025, M.dRust, 6); }
+          tubeAB(body, V3(sx * 0.55, 0.62, ZB - 0.05), V3(sx * 0.3, 0.45, tipB + 0.35), 0.045, M.dSteel, 8);
+          tubeAB(body, V3(sx * 0.9, 1.0, ZB - 0.05), V3(sx * 0.9, 0.72, ZB + 0.08), 0.05, M.dSteel, 8);
+        }
+        // (a skid plate along the bottom of the V)
+        for (const sx of [-1, 1]) add(body, facesGeo([[sx * wB, yB0 - 0.02, zB0], [sx * wB, yB0 + 0.16, zB0 + 0.05], [0, yB0 + 0.16, tipB + 0.05], [0, yB0 - 0.02, tipB]], [[0, 1, 2, 3]]), M.dSteel, 0, 0, 0, 0, 0, 0, true);
+      }
+      // ---- inside: the floor, green seats in rows (the front ones pulled for the cage), the driver's seat, the dash, the
+      // wheel, the cage round them; the driver in a helmet
+      add(body, new THREE.BoxGeometry(2.3, 0.05, ZT - ZW - 0.1), M.grey, 0, 1.0, (ZW + ZT) / 2);
+      for (let z = -0.6; z < ZT - 0.6; z += 0.78) for (const sx of [-1, 1]) {
+        add(body, rbox(0.95, 0.12, 0.42, 0.05), M.dSeat, sx * 0.62, 1.42, z); add(body, rbox(0.95, 0.6, 0.12, 0.05), M.dSeat, sx * 0.62, 1.72, z + 0.24, 0.1, 0, 0);
+      }
+      add(body, rbox(2.2, 0.32, 0.4, 0.05), M.dBlack, 0, 1.62, ZW + 0.25);
+      add(body, rbox(0.5, 0.12, 0.5, 0.05), M.seat, -0.62, 1.4, ZW + 1.0);
+      add(body, rbox(0.5, 0.7, 0.12, 0.05), M.seat, -0.62, 1.78, ZW + 1.27, 0.12, 0, 0);
+      for (const [x, z] of [[-1.1, ZW + 0.3], [-0.15, ZW + 0.3], [-1.1, ZW + 1.6], [-0.15, ZW + 1.6]]) tubeAB(body, V3(x, 1.02, z), V3(x, 2.9, z), 0.04, M.dSteel, 8);
+      for (const z of [ZW + 0.3, ZW + 1.6]) tubeAB(body, V3(-1.1, 2.85, z), V3(-0.15, 2.85, z), 0.04, M.dSteel, 8);
+      for (const x of [-1.1, -0.15]) { tubeAB(body, V3(x, 2.85, ZW + 0.3), V3(x, 2.85, ZW + 1.6), 0.04, M.dSteel, 8); tubeAB(body, V3(x, 1.5, ZW + 0.3), V3(x, 1.5, ZW + 1.6), 0.04, M.dSteel, 8); }
+      SW = steering(V3(-0.62, 1.86, ZW + 0.55), 0.95, 0.24);
+      driver = person({ hip: V3(-0.62, 1.48, ZW + 1.03), lean: 0.15, hands: [V3(-0.82, 1.88, ZW + 0.6), V3(-0.42, 1.88, ZW + 0.6)],
+        knee: { dx: 0.1, y: 1.6, z: ZW + 0.62 }, foot: { dx: 0.12, y: 1.08, z: ZW + 0.38 }, helmet: true });
+      P.hideCockpit.push(driver);
+    };
     (B[CAR] || B.couch)();
     model.add(driver);
     const eye = driver.userData.eye;
@@ -3244,12 +3788,18 @@
     // instead of floating round it. Gravel: small tight blocks four and three across, staggered, shoulder blocks turned
     // down the shoulder; mud: big staggered knobs with wide voids and lugs running down each sidewall
     function blockTread(R, W, rimR, kind) {
-      const mud = kind === 'mud', at = kind === 'at', depth = mud ? 0.02 : at ? 0.017 : 0.012, rc = R - depth, h = W / 2, list = [];
+      const mud = kind === 'mud', at = kind === 'at', rcT = kind === 'rc', depth = mud ? 0.02 : at ? 0.017 : rcT ? 0.0075 : 0.012, rc = R - depth, h = W / 2, list = [];
       const box = (w, ht, l, x, r, ang, tilt) => { const b = new THREE.BoxGeometry(w, ht, l); if (tilt) b.rotateZ(tilt); b.translate(x, r, 0); b.rotateX(ang); list.push(b); };
-      const pitch = mud ? 0.062 : at ? 0.052 : 0.042, N = Math.round(2 * Math.PI * R / pitch), bl = pitch * (mud ? 0.55 : at ? 0.62 : 0.6);
+      const pitch = mud ? 0.062 : at ? 0.052 : rcT ? 0.021 : 0.042, N = Math.round(2 * Math.PI * R / pitch), bl = pitch * (mud ? 0.55 : at ? 0.62 : rcT ? 0.6 : 0.6);
       for (let k = 0; k < N; k++) {
         const a = k * 2 * Math.PI / N, odd = k & 1;
-        if (at) {
+        if (rcT) {
+          // (an RC monster-truck tyre: big chevron blocks two a row, staggered and angled, and lugs down each sidewall)
+          for (const sx of [-1, 1]) {
+            const b = new THREE.BoxGeometry(W * 0.4, depth + 0.002, bl); b.rotateY(sx * (odd ? 0.45 : 0.3)); b.translate(sx * W * (odd ? 0.27 : 0.21), rc + depth / 2 - 0.001, 0); b.rotateX(a); list.push(b);
+            const lg = (k + (sx > 0 ? 1 : 0)) & 1; box(0.005, 0.012 + 0.006 * lg, bl * 0.8, sx * (h - 0.0015), rc - 0.004 - 0.003 * lg, a);
+          }
+        } else if (at) {
           // all-terrain (the Rebel's): three blocks across and two, staggered, big shoulder blocks, lugs down the sidewalls
           for (const f of odd ? [-0.64, 0, 0.64] : [-0.34, 0.34]) box(W * (odd ? 0.24 : 0.28), depth + 0.004, bl, f * h, rc + depth / 2 - 0.002, a);
           for (const sx of [-1, 1]) { const lg = (k + (sx > 0 ? 1 : 0)) & 1; box(0.012, 0.022 + 0.012 * lg, bl * 0.8, sx * (h - 0.003), rc - 0.009 - 0.006 * lg, a); }
@@ -3318,6 +3868,45 @@
         add(g, cylX(rimR * 0.2, rimR * 0.22, 0.03, 24), m, fx - 0.012, 0, 0);
         for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5; add(g, cylX(0.009, 0.009, 0.022, 8), M.chrome, fx + 0.006, Math.cos(a) * rimR * 0.14, Math.sin(a) * rimR * 0.14); }
         add(g, cylX(0.028, 0.028, 0.012, 16), M.black, fx + 0.01, 0, 0);
+        return;
+      }
+      if (style === 'busOrange') {
+        // a derby bus's steel wheel, sprayed orange: a dished disc with its hand holes, the hub and its nuts dark
+        const m = M.busRim || (M.busRim = new THREE.MeshStandardMaterial({ color: 0xe0501a, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.96, 0, Math.PI * 2, false);
+        for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5, hole = new THREE.Path(); hole.absarc(Math.cos(a) * rimR * 0.6, Math.sin(a) * rimR * 0.6, rimR * 0.14, 0, Math.PI * 2, true); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.006, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 1, curveSegments: 18 });
+        fg.rotateY(Math.PI / 2); add(g, fg, m, fx - 0.06, 0, 0);
+        add(g, latheX([[rimR, fx + 0.002], [rimR * 0.97, fx - 0.03], [rimR * 0.95, fx - 0.06]], 40), m, 0, 0, 0);
+        add(g, cylX(rimR * 0.3, rimR * 0.34, 0.06, 20), M.black, fx - 0.03, 0, 0);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5; add(g, cylX(0.014, 0.014, 0.03, 6), M.steel, fx - 0.03, Math.cos(a) * rimR * 0.4, Math.sin(a) * rimR * 0.4); }
+        return;
+      }
+      if (style === 'alcoa') {
+        // a polished aluminium truck wheel: the dished face with ten hand holes round it, the hub, ten lug nuts, a chrome cap
+        const pol = M.polish || (M.polish = new THREE.MeshStandardMaterial({ color: 0xe6e8ec, roughness: 0.08, metalness: 1 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.86, 0, Math.PI * 2, false);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5 + Math.PI / 10, hole = new THREE.Path(); hole.absellipse(Math.cos(a) * rimR * 0.62, Math.sin(a) * rimR * 0.62, rimR * 0.1, rimR * 0.07, 0, Math.PI * 2, true, a); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 20 });
+        fg.rotateY(Math.PI / 2); add(g, fg, pol, fx - 0.05, 0, 0);
+        add(g, latheX([[rimR, fx + 0.004], [rimR * 0.96, fx - 0.01], [rimR * 0.88, fx - 0.045]], 44), M.chromeD || (M.chromeD = Object.assign(M.chrome.clone(), { side: THREE.DoubleSide })), 0, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.99, 0.012, 8, 44), pol, fx + 0.004, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.86, rimR * 0.86, 0.01, 36), M.black, fx - 0.09, 0, 0);
+        add(g, latheX([[rimR * 0.36, fx - 0.04], [rimR * 0.34, fx - 0.005], [rimR * 0.24, fx + 0.04], [0.001, fx + 0.06]], 28), pol, 0, 0, 0);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5; add(g, cylX(0.014, 0.014, 0.035, 6), M.chrome, fx - 0.03, Math.cos(a) * rimR * 0.42, Math.sin(a) * rimR * 0.42); }
+        return;
+      }
+      if (style === 'rcbl') {
+        // an RC truck's wheel: six black spokes, a blue beadlock ring bolted round the face, a black nut in the middle
+        const blue = M.rcBlue || (M.rcBlue = new THREE.MeshStandardMaterial({ color: 0x1f4fd8, roughness: 0.3, metalness: 0.35 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.86, 0, Math.PI * 2, false);
+        for (let j = 0; j < 6; j++) { const c = j * Math.PI / 3 + Math.PI / 6, hole = new THREE.Path(); hole.absarc(0, 0, rimR * 0.76, c - 0.36, c + 0.36, false); hole.absarc(0, 0, rimR * 0.3, c + 0.2, c - 0.2, true); hole.closePath(); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.0012, bevelSize: 0.0012, bevelSegments: 2, curveSegments: 16 });
+        fg.rotateY(Math.PI / 2); add(g, fg, M.rcPlast, fx - 0.008, 0, 0);
+        add(g, latheX([[rimR * 1.04, fx - 0.004], [rimR * 1.04, fx + 0.002], [rimR * 0.84, fx + 0.002], [rimR * 0.84, fx - 0.004]], 40), blue, 0, 0, 0);
+        for (let j = 0; j < 12; j++) { const a = j * Math.PI / 6; add(g, cylX(0.0018, 0.0018, 0.003, 6), M.steel, fx + 0.003, Math.cos(a) * rimR * 0.94, Math.sin(a) * rimR * 0.94); }
+        add(g, cylX(rimR * 0.86, rimR * 0.86, 0.002, 28), M.black, fx - 0.02, 0, 0);
+        add(g, cylX(0.006, 0.006, 0.008, 6), M.rcPlast, fx - 0.002, 0, 0);
         return;
       }
       if (style === 'rallye') {
@@ -3478,7 +4067,7 @@
     const geo = {};
     for (const front of [true, false]) {
       const R = front ? RF : RR, W = front ? WF : WR, rimR = Math.min(R - 0.03, (!front && wheelStyle.rimRR) || wheelStyle.rimR || R * 0.6);
-      const st = wheelStyle.tread === 'gravel' || wheelStyle.tread === 'at' ? blockTread(R, W, rimR, wheelStyle.tread) : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
+      const st = wheelStyle.tread === 'gravel' || wheelStyle.tread === 'at' || wheelStyle.tread === 'rc' ? blockTread(R, W, rimR, wheelStyle.tread) : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
       geo[front] = { R, W, rimR, carc: st.carc, tr: st.tr, pk: blockTread(R + 0.006, W * 1.04, rimR, 'mud') };
     }
     const wheels = [];
@@ -3492,7 +4081,8 @@
       const stock = [add(spin, G.carc, M.rubber, 0, 0, 0)].concat(G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : []);
       const pkg = [add(spin, G.pk.carc, M.rubber, 0, 0, 0), add(spin, G.pk.tr, M.rubber, 0, 0, 0)]; for (const m of pkg) m.visible = false;
       rim(spin, G.R, G.W, G.rimR, CAR === 'diesel' && !frontW ? 'dualR' : wheelStyle.rim);
-      if (frontW) add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      if (frontW && CAR !== 'rc') add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      if (CAR === 'rc') add(flip, rbox(0.012, 0.03, 0.026, 0.004), M.rcPlast, -G.W / 2 - 0.008, 0, 0);    // (the hub carrier)
       if (CAR === 'rally') {
         add(spin, cylX(0.15, 0.15, 0.026, 36), M.steel, -0.03, 0, 0);
         add(spin, cylX(0.075, 0.075, 0.03, 20), M.black, -0.03, 0, 0);
@@ -3515,14 +4105,28 @@
     }
     // the dually: two tyres each end of the rear axle - the physics' wheel is the pair, the outer tyre drawn outboard of its
     // centre with the deep-dished wheel, the inner one inboard (its tyre and a plain wheel)
-    if (CAR === 'diesel') for (const w of wheels) if (!w.front) {
-      const off = 0.137;
+    if (CAR === 'diesel' || CAR === 'busderby') for (const w of wheels) if (!w.front) {
+      const off = CAR === 'busderby' ? 0.15 : 0.137;
       for (const m of w.spin.children.slice()) m.position.x += off;
       const inner = new THREE.Group(); inner.position.x = -off; w.spin.add(inner);
       for (const m of w.stock.slice()) { const c = add(inner, m.geometry, M.rubber, 0, 0, 0); w.stock.push(c); }
       for (const m of w.pkg.slice()) { const c = add(inner, m.geometry, M.rubber, 0, 0, 0); c.visible = false; w.pkg.push(c); }
       add(inner, cylX(geo[false].rimR, geo[false].rimR, geo[false].W * 0.9, 32, true), M.steel, 0, 0, 0);
       add(inner, cylX(geo[false].rimR * 0.9, geo[false].rimR * 0.9, 0.01, 28), M.steel, 0.02, 0, 0);
+    }
+    // the coach's tandem: the physics' rear wheel is the drive axle (duals) and the tag axle together - the drive axle
+    // drawn DZ ahead of it on two tyres, the tag axle DZ behind on one, turning with it (afterWheels)
+    if (P.tandem) for (const w of wheels) if (!w.front) {
+      const dz = P.tandem.dz, G = geo[false], off = 0.17;
+      w.spin.position.z = w.left ? dz : -dz;
+      for (const m of w.spin.children.slice()) m.position.x += off;
+      const inner = new THREE.Group(); inner.position.x = -off; w.spin.add(inner);
+      for (const m of w.stock.slice()) w.stock.push(add(inner, m.geometry, M.rubber, 0, 0, 0));
+      add(inner, cylX(G.rimR, G.rimR, G.W * 0.9, 32, true), M.steel, 0, 0, 0);
+      const tag = new THREE.Group(); tag.position.z = w.left ? -dz : dz; w.flip.add(tag);
+      w.stock.push(add(tag, G.carc, M.rubber, 0, 0, 0)); if (G.tr) w.stock.push(add(tag, G.tr, M.rubber, 0, 0, 0));
+      rim(tag, G.R, G.W, G.rimR, wheelStyle.rim);
+      w.tag = tag;
     }
     // the Blue Bird ran twin wheels at the back: a second one inboard of each rear
     if (CAR === 'bluebird') for (const w of wheels) if (!w.front) {
@@ -3549,6 +4153,7 @@
       const c = PAINTS[name]; if (c === undefined) return;
       if (CAR === 'razor') { M.paint.emissive.setHex(c); M.halo.uniforms.uColor.value.setHex(c); } else M.paint.color.setHex(c);
       if (M.decal) decalFor(c);
+      if (P.repaint) P.repaint(c);
     }
     // (the Superbird's decals: white on the oranges and reds and on the darkest paints, black on everything else)
     function decalFor(c) {
@@ -3593,11 +4198,13 @@
       for (const m of [jetFx.outer.material, jetFx.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = jetFx.t; }
     }
 
+    if (P.rcSusp) P.rcSusp(wheels);
     rootG.traverse((o) => { if (o.isMesh && o.material && (o.material.transparent || (Array.isArray(o.material) && false))) o.castShadow = false; });
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW.sw, eye: toRoot(eye),
       exhaustTips: P.tips, sootTips: P.soot || null, materials: M, headlights: P.spots, tailLens: [], mirrors: [],
       setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, setJet, setJetSize, variant: 'cc', cls: CAR,
+      afterWheels: P.rcSusp ? () => P.rcSusp(wheels) : P.tandem ? () => { for (const w of wheels) if (w.tag) w.tag.rotation.x = w.spin.rotation.x; } : undefined,
     };
   }
 

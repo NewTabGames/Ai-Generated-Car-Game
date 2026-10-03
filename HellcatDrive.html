@@ -2190,6 +2190,27 @@
     sbirdR: { name: 'F70-14 Polyglas GT', short: 'F70-14 Polyglas', width: 0.21,
       muX: 1.05, muY: 0.93, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.19, relaxY: 0.42,
       B: 1.65, C: 1.4, E: -0.2, heatCap: 3300, cold: 0.95, coldT: 10, warmT: 40, hotT: 105, overheat: 0.0032, prep: 1.06 },
+    // the RC truck: 1/10 monster-truck tyres, 150 mm, soft rubber with tall chevron blocks on foam inserts - they grip
+    // pavement about as well as a road tyre and dig into dirt and grass; short relaxation lengths for a tyre this size
+    rcKnob: { name: '150 mm RC monster-truck tyre', short: 'RC knobbies', width: 0.07,
+      muX: 1.05, muY: 0.95, loose: 0.95, looseKx: [1, 1.0, 1.05, 1.1, 0.8, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.025, relaxY: 0.035,
+      B: 1.6, C: 1.38, E: -0.25, heatCap: 60, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0 },
+    // the tour coach: 315/80R22.5 steer tyres; the rear 'tyre' is the drive axle's duals and the tag axle's singles each
+    // side - three tyres sharing the load, so its peak slips are set for three tyres' load on one (a tandem's scrub holds
+    // it straight: a coach understeers - set like a single tyre, the load stretched them and it spun itself out)
+    coachSteer: { name: '315/80R22.5 steer', short: 'Coach tyres', width: 0.315,
+      muX: 0.85, muY: 0.78, loose: 1.1, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.5, relaxY: 0.9,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 30000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.6, 0.85, 0.85, 0.85, 0.85, 0.6] },
+    coachRear: { name: '315/80R22.5 drive duals + tag', short: 'Coach tyres', width: 0.95,
+      muX: 0.85, muY: 0.72, loose: 1.1, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.085, alphaPeak: 0.055, relaxX: 0.5, relaxY: 1.0,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 90000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.6, 0.85, 0.85, 0.85, 0.85, 0.6] },
+    // the derby bus: 11R22.5 recaps, the rears dual - bald enough that they spin on the dirt and slide into the hits
+    busSteer: { name: '11R22.5 recap', short: '11R22.5 recaps', width: 0.28,
+      muX: 0.82, muY: 0.75, loose: 1.0, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.45, relaxY: 0.8,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 25000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.7, 0.85, 0.85, 0.85, 0.85, 0.7] },
+    busDual: { name: '11R22.5 recap duals', short: '11R22.5 recaps', width: 0.6,
+      muX: 0.82, muY: 0.74, loose: 1.0, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.09, relaxX: 0.45, relaxY: 0.85,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 50000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.7, 0.85, 0.85, 0.85, 0.85, 0.7] },
     // the unicycle: a 24 x 2.125 tyre on a 24 in wheel, round in section (it leans on it like a bike's)
     uni24: { name: '24 x 2.125 unicycle tyre', short: '24 in tyre', width: 0.054,
       muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
@@ -2485,7 +2506,7 @@
       this.launchHold = false; this.launchRpm = this.spec.launchRpm || 4000; this.govT = 0; this.shiftDur = 0.2; this.shiftCut = 1;
       this.chuteOut = false; this.chuteT = 0; this.chuteInfl = 0; this.wheelieBarLoad = 0; this.dcT = 0;
       this.shiftFromG = 0; this.shiftIsDown = false; this.blip = false; this._gPrev = 0;
-      this.popTimer = 0; this.lastThr = 0; this.overrunT = 0;
+      this.popTimer = 0; this.lastThr = 0; this.overrunT = 0; this.thrHi = 0;
       this.stalled = false;
       this.inWater = 0;
       this.time = 0;
@@ -2942,7 +2963,8 @@
           if (e > 0) { Fd *= 1 + P.damp * Math.min(1, e); progF = w.k * s.travelUp * P.k * Math.min(e, 1.6) * Math.min(e, 1.6); }
         }
         let F = w.k * (w.sFree - w.sRaw) + Fd + arb[i] + progF;
-        if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + 2500 * Math.max(0, c);
+        // (bumpStopC: the stop's damping - a 2.6 kg RC truck needs a hundredth of a car's)
+        if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + (s.bumpStopC !== undefined ? s.bumpStopC : 2500) * Math.max(0, c);
         // anti-squat: the rear links' angle turns part of the tyre's drive force into lift on the body at the axle
         // (and the same push down on the tyre). 100 % = no squat at all. Drag cars run more: the body is thrown up on
         // the hit, the tyres are planted, and the nose comes up
@@ -3654,9 +3676,13 @@
       const bTgt = s.boostMax * this.thrEff * bShape * (this.running ? 1 : 0);
       if (s.turbo) this.boost = s.boostMax * this.spool;
       else this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
-      // overrun pops & crackles
-      const dThr = this.lastThr - inp.throttle;
-      if (dThr > 0.35 && rpm > 3000 && this.running) this.overrunT = 0.9 + Math.random() * 0.8;
+      // overrun pops & crackles: a lift off a hard throttle, however fast the pedal comes up. (It used to want the throttle
+      // to fall 35 % inside one 1 ms step: a keyboard key does - it drops 1 to 0 at once - but a pedal or a trigger eases
+      // off over a tenth of a second or more, a few % a step, and never set them off.) Now: the throttle was at 60 % or more
+      // within the last half second (thrHi: the time left on that) and has come back under 25 %, revs up in the engine's
+      // upper half
+      this.thrHi = inp.throttle >= 0.6 ? 0.5 : Math.max(0, (this.thrHi || 0) - h);
+      if (inp.throttle < 0.25 && this.lastThr >= 0.25 && this.thrHi > 0 && rpm > Math.max(1800, 0.42 * (s.redlineRpm || 6000)) && this.running) { this.overrunT = 0.9 + Math.random() * 0.8; this.thrHi = 0; }
       this.lastThr = inp.throttle;
       if (this.overrunT > 0) {
         this.overrunT -= h;
@@ -3779,9 +3805,12 @@
             const shiftAt = s.shiftRpm || s.limiterRpm;
             // light-throttle shift points sit off the engine's idle: a race motor idling at 1,150 (Drag Pak) can't lug
             // along in top at 1,000 rpm like a street V8 - it was coasting in 3rd down to ~23 mph, dragged below idle
-            const dBase = Math.max(1050, 1.35 * s.idleRpm), uBase = Math.max(1650, 1.57 * dBase);
+            // (a big diesel - the coach's, all its torque by 1,000 and governed at 2,100 - brings its own schedule: shiftDown /
+            // shiftUpBase the light-throttle points, shiftDownSpan how far floored lifts the downshift, shiftMinNext the
+            // lowest revs an upshift may land on)
+            const dBase = s.shiftDown !== undefined ? s.shiftDown : Math.max(1050, 1.35 * s.idleRpm), uBase = s.shiftUpBase !== undefined ? s.shiftUpBase : Math.max(1650, 1.57 * dBase);
             const up = uBase + (shiftAt - 130 - uBase) * Math.pow(t, 1.25);
-            const down = dBase + 2900 * Math.pow(t, 1.6);
+            const down = dBase + (s.shiftDownSpan !== undefined ? s.shiftDownSpan : 2900) * Math.pow(t, 1.6);
             // output-shaft based, but don't let converter slip bounce the engine off the limiter
             // with the converter slipping, shift on engine rpm before it sags against the limiter
             const engLimit = turbineRpm > 0.8 * up && this.eOmega * RAD2RPM > (s.shiftRpm || s.limiterRpm - 150);
@@ -3790,7 +3819,7 @@
             const pays = t > 0.6 && turbineRpm > 2500 && this.farLimiter() && this.upshiftGain(turbineRpm) >= 1;
             if (this.gear < this.nGears && (turbineRpm > up || engLimit || pays) && this.sinceUpshift > 0.7) {
               const nextRpm = Math.abs(wc * this.ratioOf(this.gear + 1)) * RAD2RPM;
-              if (nextRpm > 1150) this._beginShift(this.gear + 1);
+              if (nextRpm > (s.shiftMinNext || 1150)) this._beginShift(this.gear + 1);
             } else if (this.gear > 1 && turbineRpm < down && (this.sinceUpshift > 2.0 || turbineRpm < Math.max(720, 0.5 * dBase))) {
               // coasting / braking: skip gears if the car is slowing fast; floored: lowest gear that stays under 5600
               let g = this.gear - 1;
@@ -4111,7 +4140,7 @@
         const tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
         let fxx = g.nx * Fn, fyy = g.ny * Fn, fzz = g.nz * Fn;
         if (tl > 1e-4) {
-          const Ff = Math.min((s.bodyMu || 0.55) * Fn, tl * 20000) / tl;
+          const Ff = Math.min((s.bodyMu || 0.55) * Fn, tl * (s.bodyFricC || 20000)) / tl;   // (bodyFricC: scaled to the vehicle's mass)
           fxx -= tx * Ff; fyy -= ty * Ff; fzz -= tz * Ff;
         }
         if (Fn > 30000 && vn < -3) this.events.impact = Math.max(this.events.impact, -vn * 0.5);
@@ -5195,6 +5224,101 @@
     CdA: 0.66, wings: [{ ClA: 0.38, CdA: 0.05, z: 2.55, y: 1.0 }, { ClA: 0.16, CdA: 0, z: -2.6, y: -0.24 }],
     bodyHalfW: 0.97, bodyFront: -2.77, bodyRear: 2.84, bodyBottom: -0.3, bodyTop: 0.81, bodyPts: sbirdPts(0.52, 0.56),
   } };
+  // RC monster truck: a 1/10-scale 4WD brushless "basher" (the Sandstorm's kind) - 0.47 m long, 0.37 m wide on 150 mm
+  // tyres, a pickup-truck shell on a plastic tub chassis, oil-filled coil-overs with ~55 mm of travel, gear diffs front
+  // and rear on a centre slipper (near enough a spool), a servo that turns the wheels lock to lock in a tenth of a second.
+  // The motor is a DC motor's: full current-limited torque from a standstill, falling off in a straight line to nothing
+  // at its no-load speed (kV x volts). The base one: a 3660-size 3,200 kV brushless on a 3S LiPo (11.1 V, ~35,500 rpm
+  // no-load, ~0.9 kW), 12.5:1 overall - ~47 mph. 2.6 kg. Everything scaled to it: springs of ~400 N/m, brakes (the speed
+  // controller's) of a third of a newton-metre a wheel, a body that weighs what a bag of sugar does
+  // (dcCurve: the torque - lb-ft - against rpm: tMax current-limited, the stall line through pMax at half the no-load speed)
+  const dcCurve = (tMax, pMax, r0) => {
+    const Ts = 4 * pMax / (r0 * Math.PI / 30), c = [];
+    for (let r = 0; r <= r0; r += r0 / 24) c.push([Math.round(r), Math.min(tMax, Ts * (1 - r / r0)) / LBFT]);
+    c.push([r0 * 1.05, 0]); return c;
+  };
+  const rcPts = (cg) => ccPts(cg, 0.47, 0.33, [...ccBox(0.165, 0.05, 0.2, -0.24, 0.24), [-0.1, 0.235, -0.02], [0.1, 0.235, -0.02], [-0.1, 0.235, 0.08], [0.1, 0.235, 0.08],
+    [-0.19, 0.15, -0.165], [0.19, 0.15, -0.165], [-0.19, 0.15, 0.165], [0.19, 0.15, 0.165], [-0.19, 0.075, -0.24], [0.19, 0.075, -0.24], [-0.19, 0.075, 0.24], [0.19, 0.075, 0.24],
+    [-0.13, 0.25, 0.22], [0.13, 0.25, 0.22]]);
+  CARS.rc = { name: 'RC Monster Truck', short: 'RC Truck', car: '3S BRUSHLESS', hp: 1.2, tq: 0.26, cc: true, kbLat: 9, spec: {
+    name: 'RC Monster Truck',
+    mass: 2.6, Ipitch: 0.048, Iyaw: 0.07, Iroll: 0.03, cgHeight: 0.09, wheelbase: 0.33, frontWeight: 0.47,
+    trackF: 0.29, trackR: 0.29, wheelRadius: 0.075, wheelInertiaF: 3.5e-4, wheelInertiaR: 3.5e-4,
+    frontTire: 'rcKnob', rearTire: 'rcKnob', Fz0: 6.4, loadSens: 0.1,
+    springF: 400, springR: 440, dampBumpF: 14, dampRebF: 22, dampBumpR: 15, dampRebR: 24, dampKnee: 0.6,
+    arbF: 60, arbR: 30, travelUp: 0.03, travelDown: 0.025, suspS0: 0.05, rearToe: 0.01, bumpStopK: 20000, bumpStopC: 40, fzMax: 400,
+    // (the speed controller's brake, on the motor: all four wheels through the diffs)
+    brakeTorqueF: 0.35, brakeTorqueR: 0.35, handbrakeTorque: 0.3, noABS: true, noESC: true,
+    maxSteer: 0.52, steerRate: 7, steerRatio: 1, ackermann: 0,
+    electric: true, idleRpm: 0, limiterRpm: 36500, redlineRpm: 35500, shiftRpm: 40000, engineInertia: 2.5e-6, fricA: 0.003, fricB: 0.0001, starterTorque: 0,
+    torqueCurve: dcCurve(0.35, 900, 35500), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 12.5, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, awd: true, awdFront: 0.5, lsdPreload: 0.01, lsdPreloadF: 0.01, centerPreload: 0.6, lsdRamp: 0, driveEff: 0.85,
+    // (the controller's traction management: 4WD on a near-spool spins all four together, so it reads the truck's own speed)
+    tcRefBody: true,
+    CdA: 0.035,
+    bodyK: 2500, bodyC: 40, bodyMu: 0.5, bodyFricC: 60,
+    bodyHalfW: 0.19, bodyFront: -0.25, bodyRear: 0.25, bodyBottom: -0.045, bodyTop: 0.16, bodyPts: rcPts(0.09),
+  } };
+  // Tour coach: a 45 ft motorcoach of the MCI J4500 kind - 13.84 m long, 2.59 m wide, 3.5 m tall, a steer axle, the
+  // drive axle on duals and a tag axle 1.37 m behind it (the physics' rear 'axle' is the pair, midway between them:
+  // 7.69 m from the steer axle). A 12 L inline-six turbo diesel in the back, 410 hp and 1,450 lb-ft, an Allison 6-speed
+  // automatic (two overdrives), 3.58 gears; air suspension, air brakes with ABS. 18 t with a load of passengers and
+  // their bags, 36 % on the steer axle. Governed at 75 mph; 0-60 in ~45 s. Everything at the scale of it: springs of
+  // 200-400 kN/m a corner, the body's ground contact ten times a car's
+  const coachPts = (cg, fw) => ccPts(cg, fw, 7.685, [...ccBox(1.29, 0.4, 3.45, -6.1, 7.6), [-1.1, 3.5, -5.5], [1.1, 3.5, -5.5], [-1.1, 3.5, 7.4], [1.1, 3.5, 7.4],
+    [-1.25, 2.4, 0], [1.25, 2.4, 0], [-1.25, 0.5, 0.9], [1.25, 0.5, 0.9]]);
+  CARS.coach = { name: 'Tour Coach', short: 'Tour Coach', car: '12 L I6 TURBO DIESEL', hp: 410, tq: 1450, cc: true, kbLat: 3.2, spec: {
+    name: 'Tour Coach',
+    mass: 18000, Ipitch: 300000, Iyaw: 295000, Iroll: 28000, cgHeight: 1.25, wheelbase: 7.685, frontWeight: 0.36,
+    trackF: 2.15, trackR: 1.88, wheelRadius: 0.54, wheelInertiaF: 12, wheelInertiaR: 36,
+    frontTire: 'coachSteer', rearTire: 'coachRear', Fz0: 30000, loadSens: 0.07,
+    springF: 170000, springR: 340000, dampBumpF: 11000, dampRebF: 17000, dampBumpR: 22000, dampRebR: 34000, dampKnee: 0.2,
+    arbF: 160000, arbR: 320000, travelUp: 0.09, travelDown: 0.09, suspS0: 0.28, bumpStopK: 4000000, bumpStopC: 30000, fzMax: 400000,
+    brakeTorqueF: 9000, brakeTorqueR: 20000, handbrakeTorque: 25000,
+    maxSteer: 0.6, steerRate: 1.6, steerRatio: 20, ackermann: 0.8,
+    idleRpm: 600, limiterRpm: 2100, redlineRpm: 2000, shiftRpm: 1900, engineInertia: 3.0, fricA: 90, fricB: 70, starterTorque: 1600,
+    // (lb-ft: 1,450 from 1,000 to 1,400, 410 hp at 1,700)
+    torqueCurve: [[0, 500], [600, 800], [800, 1150], [1000, 1450], [1400, 1450], [1600, 1350], [1700, 1265], [1800, 1150], [1900, 1020], [2000, 850], [2100, 500], [2300, 200]],
+    turbo: { lag: 0.9, base: 0.45, rpm0: 800, rpm1: 1300 }, boostMax: 35, popScale: 0,
+    // (the Allison B500: 3.51 / 1.91 / 1.43 / 1.00 / 0.75 / 0.64)
+    autoRatios: [3.51, 1.91, 1.43, 1.0, 0.75, 0.64], autoRev: 4.8, autoFinal: 3.58, tcK: 0.07, tcStall: 1.9, lockupTorque: 3200,
+    shiftTimeWOT: 0.5, shiftTimePart: 0.7, noCoastBlip: true, shiftDown: 750, shiftDownSpan: 250, shiftUpBase: 1250, shiftMinNext: 850,
+    lsdPreload: 300, lsdRamp: 0.1, driveEff: 0.9,
+    govSpeed: 75 / 2.23694, govGrace: 0.5,
+    CdA: 5.0,
+    bodyK: 2400000, bodyC: 160000, bodyFricC: 200000, bodyMu: 0.5,
+    bodyHalfW: 1.3, bodyFront: -6.0, bodyRear: 7.7, bodyBottom: -0.85, bodyTop: 2.25, bodyPts: coachPts(1.25, 0.36),
+  } };
+  // Demolition-derby school bus: a conventional school bus - an International-type 3800 chassis with the hood out front,
+  // 10.4 m long, 2.44 m wide, a 5.6 m wheelbase - stripped for the derby: the glass out, most of the seats gone, the
+  // tank moved in, a cage round the driver, graffiti all over. The stock DT466 diesel (210 hp, 520 lb-ft) and an Allison
+  // 5-speed; duals at the back on 11R22.5 recaps. 7.8 t, 45 % on the front. ~65 mph. The cowcatcher: a welded V-plow of
+  // plate and pipe off the front bumper, 350 kg, 0.8 m ahead of it (CARS.busderby.cow: what bolting it on changes)
+  const derbyPts = (cg, fw, cow) => ccPts(cg, fw, 5.6, [...ccBox(1.22, 0.45, 3.0, -2.2, 3.85), ...ccBox(0.9, 0.5, 1.6, -4.2 - (cow ? 0.8 : 0), -2.2),
+    [-1.0, 3.05, -1.8], [1.0, 3.05, -1.8], [-1.0, 3.05, 3.6], [1.0, 3.05, 3.6]]);
+  CARS.busderby = { name: 'Derby Bus', short: 'Derby Bus', car: 'DT466 I6 DIESEL', hp: 210, tq: 520, cc: true, kbLat: 4.5, spec: {
+    name: 'Derby Bus',
+    mass: 7800, Ipitch: 52000, Iyaw: 54000, Iroll: 9000, cgHeight: 1.15, wheelbase: 5.6, frontWeight: 0.45,
+    trackF: 2.05, trackR: 1.8, wheelRadius: 0.52, wheelInertiaF: 10, wheelInertiaR: 20,
+    frontTire: 'busSteer', rearTire: 'busDual', Fz0: 17000, loadSens: 0.08,
+    springF: 160000, springR: 260000, dampBumpF: 9000, dampRebF: 14000, dampBumpR: 13000, dampRebR: 20000, dampKnee: 0.2,
+    arbF: 90000, arbR: 120000, travelUp: 0.1, travelDown: 0.1, suspS0: 0.3, bumpStopK: 2500000, bumpStopC: 20000, fzMax: 250000,
+    brakeTorqueF: 6500, brakeTorqueR: 9000, handbrakeTorque: 9000, noABS: true,
+    maxSteer: 0.65, steerRate: 2.0, steerRatio: 20, ackermann: 0.8,
+    idleRpm: 700, limiterRpm: 2800, redlineRpm: 2600, shiftRpm: 2500, engineInertia: 1.2, fricA: 45, fricB: 35, starterTorque: 700,
+    // (lb-ft: 520 at 1,400, 210 hp at 2,600)
+    torqueCurve: [[0, 250], [700, 330], [1000, 440], [1400, 520], [1800, 505], [2200, 470], [2600, 424], [2800, 330], [3000, 150]],
+    turbo: { lag: 0.7, base: 0.55, rpm0: 900, rpm1: 1500 }, boostMax: 22, popScale: 0,
+    autoRatios: [3.49, 1.86, 1.41, 1.0, 0.75], autoRev: 5.03, autoFinal: 5.29, tcK: 0.035, tcStall: 2.0, lockupTorque: 1400,
+    shiftTimeWOT: 0.45, shiftTimePart: 0.6, noCoastBlip: true,
+    lsdPreload: 200, lsdRamp: 0.15, driveEff: 0.88,
+    CdA: 5.2,
+    bodyK: 1000000, bodyC: 70000, bodyFricC: 90000, bodyMu: 0.55,
+    bodyHalfW: 1.22, bodyFront: -4.15, bodyRear: 4.4, bodyBottom: -0.7, bodyTop: 1.9, bodyPts: derbyPts(1.15, 0.45, true),
+  } };
+  // (the cowcatcher off: 350 kg lighter, a touch less on the nose, the body ending at the bumper)
+  CARS.busderby.cow = { on: {}, off: { mass: 7450, frontWeight: 0.43, bodyFront: -3.35, bodyPts: derbyPts(1.15, 0.43, false) } };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
   // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
@@ -5731,6 +5855,49 @@
       steerAMax: 5, CdA: 0.58,
     } },
   }, 'pedal', 'Pedal');
+  // the RC truck's other two: the stock brushed one (a 550 can motor on a 2S pack, 7.4 V - ~20,000 rpm no-load, ~180 W, a
+  // lighter NiMH-weight truck, ~25 mph) and the 6S speed-run build (a 4074 2,050 kV on two 3S packs in series, 22.2 V -
+  // ~45,500 rpm, ~2.5 kW, taller gearing: ~65 mph, and it wheelies if you let it)
+  ccEngines('rc', {
+    brushed: { label: 'Brushed 2S', car: 'BRUSHED 550 · 2S', hp: 0.24, tq: 0.18, ev: true, spec: {
+      mass: 2.35, limiterRpm: 20800, redlineRpm: 20000, engineInertia: 3e-6, fricA: 0.006, fricB: 0.0003,
+      torqueCurve: dcCurve(0.25, 180, 20000), autoFinal: 12, brakeTorqueF: 0.25, brakeTorqueR: 0.25,
+    } },
+    bl6s: { label: 'Brushless 6S', car: '6S BRUSHLESS', hp: 3.4, tq: 0.74, ev: true, spec: {
+      mass: 3.4, Ipitch: 0.06, Iyaw: 0.085, Iroll: 0.036, frontWeight: 0.46, springF: 520, springR: 600, dampBumpF: 17, dampRebF: 27, dampBumpR: 19, dampRebR: 30,
+      limiterRpm: 46500, redlineRpm: 45500, engineInertia: 6e-6, fricA: 0.005, fricB: 0.0001,
+      torqueCurve: dcCurve(1.0, 2500, 45500), autoFinal: 11.5, brakeTorqueF: 0.5, brakeTorqueR: 0.5, bodyPts: rcPts(0.09),
+    } },
+  }, 'bl3s', 'Brushless 3S');
+  // the coach's other two: the X15 swap with a tune (605 hp, 2,050 lb-ft, the governor off, taller 3.36 gears: ~100 mph)
+  // and the race coach - a built 15 L on compound turbos, 1,500 hp and 3,900 lb-ft, ~130 mph
+  ccEngines('coach', {
+    tuned: { label: 'X15 swap · tuned', car: '15 L I6 · TUNED', hp: 605, tq: 2050, spec: {
+      mass: 18300, torqueCurve: [[0, 700], [600, 1100], [800, 1600], [1000, 2050], [1300, 2050], [1500, 1950], [1700, 1800], [1800, 1690], [1900, 1520], [2000, 1250], [2100, 800], [2300, 300]],
+      turbo: { lag: 1.0, base: 0.4, rpm0: 850, rpm1: 1400 }, boostMax: 45, autoFinal: 3.36, tcK: 0.09, lockupTorque: 4400, govSpeed: undefined,
+    } },
+    race: { label: 'Race coach', car: '15 L · COMPOUND TURBOS', hp: 1500, tq: 3900, spec: {
+      mass: 18500, idleRpm: 700, limiterRpm: 2800, redlineRpm: 2700, shiftRpm: 2600, engineInertia: 3.4,
+      torqueCurve: [[0, 1200], [800, 2000], [1200, 3200], [1500, 3900], [1900, 3900], [2200, 3700], [2500, 3250], [2700, 2900], [2900, 1800], [3100, 600]],
+      turbo: { lag: 1.2, base: 0.32, rpm0: 1000, rpm1: 1800 }, boostMax: 80, autoFinal: 3.08, tcK: 0.14, tcStall: 1.8, lockupTorque: 9000, shiftTimeWOT: 0.35,
+      lsdPreload: 2000, lsdRamp: 0.3, govSpeed: undefined, brakeTorqueF: 11000, brakeTorqueR: 24000,
+    } },
+  }, 'stock', 'Stock 410 hp');
+  // the derby bus's other two: a 454 big-block gas swap (390 hp, 500 lb-ft, revving to 5,000, the 5-speed on 4.33s:
+  // ~85 mph) and a blown 572 (900 hp, 850 lb-ft on a roots blower, ~105 mph - it'll smoke the duals)
+  ccEngines('busderby', {
+    bigblock: { label: '454 big-block', car: '454 BIG-BLOCK V8', hp: 390, tq: 500, spec: {
+      idleRpm: 750, limiterRpm: 5200, redlineRpm: 5000, shiftRpm: 4800, engineInertia: 0.5, fricA: 30, fricB: 24, starterTorque: 300,
+      torqueCurve: [[0, 300], [1000, 400], [2000, 470], [3000, 500], [3500, 498], [4000, 485], [4600, 445], [5000, 400], [5300, 340]],
+      turbo: undefined, boostMax: 0, popScale: 1, autoFinal: 4.33, tcK: 0.012, tcStall: 2.1, lockupTorque: 1100, mass: 7550,
+    } },
+    blown: { label: 'Blown 572', car: 'BLOWN 572 V8', hp: 900, tq: 850, spec: {
+      idleRpm: 900, limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5600, engineInertia: 0.45, fricA: 32, fricB: 26, starterTorque: 320,
+      torqueCurve: [[0, 420], [1000, 560], [2000, 700], [3000, 800], [4000, 850], [4500, 845], [5000, 820], [5500, 790], [6000, 700], [6300, 560]],
+      turbo: undefined, boostMax: 14, popScale: 2, autoFinal: 4.1, tcK: 0.0105, tcStall: 2.3, lockupTorque: 1900, mass: 7600,
+      lsdPreload: 600, lsdRamp: 0.3, brakeTorqueF: 8000, brakeTorqueR: 11000,
+    } },
+  }, 'dt466', 'DT466 diesel');
   // the Superbird's other two engines: the 440 Six Barrel (three Holley two-barrels on an Edelbrock manifold, 390 hp at
   // 4,700, 490 lb-ft at 3,200) and the 426 Hemi (two four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 - it revs to 6,500;
   // 3.55s behind it, a heavier front end)
@@ -5822,6 +5989,10 @@
    injection knock, a hard tick through the block on every firing, loudest at idle and light load (the clatter).
    Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
    load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
+   RC cars (rc, with ev: 1 for no combustion; 2 = a brushed motor): a small brushless motor's note - its pole-pass whine,
+   buzzy with harmonics from the speed controller's chopped drive, rising to ~1.5 kHz flat out - the spur and pinion's
+   whirr above it, the controller's switching squeal at part throttle and low speed, brush crackle on a brushed can, and
+   the little tyres' tread buzz in place of a car's road roar and wind.
    Turbojet (jet: the jet golf cart): no pistons - the compressor's whine (its blade-pass tone and a turbine tone above it,
    rising with the spool), a broadband roar that deepens and swells with the thrust, and the afterburner's ragged,
    crackling rumble. Nitrous (nos): the solenoids' hiss and a harder, louder engine while it sprays.
@@ -5850,7 +6021,8 @@ class CarSynth {
       jet: 0, ab: 0, jsz: 1,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1; jsz: its size
       nos: 0,      // nitrous spraying, 0..1
       turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
-      diesel: 0 }; // a diesel's injection knock, 0..1
+      diesel: 0,   // a diesel's injection knock, 0..1
+      rc: 0 };     // an RC car's motor and drivetrain (1 brushless, 2 brushed)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -5979,7 +6151,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -6028,7 +6200,8 @@ class CarSynth {
     const flDecay = Math.exp(-1 / (sr * 0.28));
     // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
     // fades out towards a standstill)
-    const whAmp = jet ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+    const rcM = c.rc > 0.5;
+    const whAmp = jet || rcM ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
       : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
@@ -6041,14 +6214,24 @@ class CarSynth {
     const sqAmp = Math.pow(Math.min(1, c.squeal), 1.25) * 0.55 * c.fxVol;
     const spin = Math.min(1, c.spin);
     const spd = c.speed;
-    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8);
+    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1);
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
     const hard = c.surf < 0.5 || (c.surf > 4.5 && c.surf < 5.5);
-    const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9 * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
-    if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
+    // (an RC truck's ~10 mm blocks buzz, higher and quieter, from walking pace)
+    const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * (rcM ? Math.min(1, spd / 8) * 0.35 : Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9) * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
+    if (humAmp > 1e-4) { const hf = rcM ? 80 + spd * 95 : 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
-    const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1);
+    const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1) * (rcM ? 0.35 : 1);
+    // an RC motor: its note rides the current (louder on the throttle, a little on every rev-up) and fades out to a stop;
+    // the controller's switching squeal is loudest pulling away at part throttle and gone by half speed
+    let rcAmp = 0, rcPwm = 0;
+    if (rcM) {
+      if (!this.rcGB) { this.rcGB = this.bp(3000, 3); this.rcPh = 0; this.rcPh2 = 0; }
+      rcAmp = 2.6 * (0.025 + 0.11 * load + 0.035 * this.revUp) * Math.min(1, rpm / 1200) * (0.45 + 0.55 * Math.min(1, rpmN)) * c.engVol * (c.whine || 1) * (interior > 0.5 ? 1.25 : 1);
+      rcPwm = Math.min(1, c.thr) * Math.pow(Math.max(0, 1 - rpmN * 1.8), 2) * 0.06 * c.engVol;
+      this.setBP(this.rcGB, Math.min(9000, 400 + whF * 3.1), 3);
+    }
     // turbojet: the compressor's blade-pass tone rises from ~1.3 kHz at idle to ~3.2 kHz flat out; the roar's band opens
     // up and swells with the thrust (load); the afterburner is a deep rumble with crackle on top
     let jF = 0, jWh = 0, jRoar = 0, aJ = 0;
@@ -6148,6 +6331,16 @@ class CarSynth {
         if (!this.evHs) this.evHs = this.bp(6500, 1.5);
         const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
         oL += gm; oR += gm;
+      }
+      if (rcM && (rcAmp > 1e-5 || rcPwm > 1e-5)) {
+        this.rcPh += 2 * Math.PI * whF / sr; if (this.rcPh > 6.283185307) this.rcPh -= 6.283185307;
+        const p = this.rcPh;
+        const note = Math.sin(p) + 0.5 * Math.sin(2 * p) + 0.33 * Math.sin(3 * p) + 0.22 * Math.sin(4 * p) + 0.12 * Math.sin(6 * p);
+        const whirr = this.run(this.rcGB, w1) * (0.5 + 0.8 * Math.min(1, rpmN));
+        const brush = c.rc > 1.5 && this.rnd() < 0.12 ? w2 * (0.3 + load) : 0;      // (a brushed can's arcing)
+        this.rcPh2 += 2 * Math.PI * (3900 + 60 * Math.sin(this.t * 7)) / sr; if (this.rcPh2 > 6.283185307) this.rcPh2 -= 6.283185307;
+        const o = (note * 0.45 + whirr * 1.1 + brush * 0.5) * rcAmp + Math.sin(this.rcPh2) * rcPwm;
+        oL += o; oR += o * 0.96;
       }
       if (jet && (jWh > 1e-5 || jRoar > 1e-5)) {
         this.jPh1 += 2 * Math.PI * jF / sr; if (this.jPh1 > 6.283185307) this.jPh1 -= 6.283185307;
@@ -6877,7 +7070,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
     // (the Car Crushers 2 cars' colours)
-    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2,
+    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e,
   };
 
   // ------------------------------------------------------------------ builder
@@ -11652,7 +11845,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -11688,7 +11881,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       g.fillStyle = '#060607'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3c40'; g.lineWidth = 2;
       for (let x = -h; x < w; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke(); }
     }), roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
-    const SUITS = { superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
+    const SUITS = { coach: 0x22262e, busderby: 0x3a5a2a, rc: 0x2a3a6a, superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
     M.suit = new THREE.MeshStandardMaterial({ color: SUITS[CAR] || 0x333333, roughness: 0.8 });
     M.pants = new THREE.MeshStandardMaterial({ color: CAR === 'bluebird' || CAR === 'silverbullet' || CAR === 'eggrod' || CAR === 'gtr' ? SUITS[CAR] : 0x2a3446, roughness: 0.85 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, silverbullet: 0x4a2a16, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' || CAR === 'silverbullet' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' || CAR === 'silverbullet' ? 0 : 1 });
@@ -14638,6 +14831,550 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         knee: { dx: 0.08, y: 0.62, z: -0.5 }, foot: { dx: 0.1, y: 0.32, z: -0.9 }, helmet: false });
       P.hideCockpit.push(driver);
     };
+    // ---------------------------------------------------------------- RC monster truck (1/10)
+    // A 1/10 4WD basher to its real size (0.47 m long, 0.37 m wide over the 150 mm tyres): the pickup shell - the blue
+    // polycarbonate with its white flash and SAND STORM on the quarters, a black hood and grille with round red-ringed
+    // lamps, the cab's tinted glass with the banner across the windshield - over the black tub chassis: the bumpers with
+    // their two LED lamps, the shock towers, A-arms and dogbones, four oil-filled coil-overs that work with the wheels, the
+    // big wing on its struts; chunky chevron tyres on black spokes in blue beadlock rings. And inside the cab: two seats,
+    // the dash, a little wheel and a 1/12 driver - the camera rides in his head
+    B.rc = () => {
+      WF = 0.07; WR = 0.07;
+      wheelStyle = { rim: 'rcbl', rimR: 0.044, tread: 'rc' };
+      const cylY = (r0, r1, len, seg) => new THREE.CylinderGeometry(r0, r1, len, seg || 8);
+      M.rcBlack = new THREE.MeshStandardMaterial({ color: 0x121214, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
+      M.rcPlast = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.5, metalness: 0.1 });
+      M.rcHood = new THREE.MeshPhysicalMaterial({ color: 0x141518, roughness: 0.25, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.1, side: THREE.DoubleSide });
+      M.rcShock = new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 0.3, metalness: 0.6 });
+      M.rcSpring = new THREE.MeshStandardMaterial({ color: 0xc8ccd2, roughness: 0.2, metalness: 1 });
+      M.led = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f8ff, emissiveIntensity: 1.6, roughness: 0.2 });
+      M.redRing = new THREE.MeshStandardMaterial({ color: 0xc81820, emissive: 0x600808, emissiveIntensity: 0.4, roughness: 0.35 });
+      M.tint.color.setHex(0x101418);
+      // ---- the shell: sections along z with a livery mapped onto its sides (painted on a canvas - the paint colour is
+      // its base, redrawn when the paint changes)
+      const ZN = -0.222, ZT = 0.215, ZW = -0.075, ZH = -0.02, ZB0 = 0.066, ZB1 = 0.082;
+      const Wz = tbl([[ZN, 0.106], [-0.212, 0.116], [-0.2, 0.121], [-0.165, 0.128], [-0.12, 0.126], [-0.06, 0.121], [0.06, 0.121], [0.12, 0.126], [0.165, 0.131], [0.2, 0.126], [ZT, 0.116]]);
+      const yBase = tbl([[ZN, 0.118], [-0.2, 0.112], [0.2, 0.112], [ZT, 0.12]]);
+      // (the arches: 88 mm high, the front one's leading edge drawn in short of the nose - the shell comes down to a bumper
+      // line there, just clear of the tyre, with the grille in it)
+      const yBz = (z) => { let y = yBase(z); for (const zc of [zF, zR]) { const d = z - zc, rz = zc === zF && d < 0 ? 0.066 : 0.088; if (Math.abs(d) < rz) y = Math.max(y, RF + 0.012 + 0.088 * Math.sqrt(1 - (d / rz) * (d / rz))); } return y; };
+      const ySh = tbl([[ZN, 0.18], [-0.205, 0.188], [-0.165, 0.197], [ZW, 0.205], [0.06, 0.209], [0.11, 0.221], [0.19, 0.222], [ZT, 0.213]]);
+      const yT = tbl([[ZN, 0.188], [-0.21, 0.196], [-0.17, 0.203], [ZW, 0.213], [-0.045, 0.248], [ZH, 0.277], [0.0, 0.283], [0.05, 0.284], [ZB0, 0.277], [ZB1, 0.229], [0.12, 0.23], [0.2, 0.228], [ZT, 0.221]]);
+      const WtT = tbl([[ZN, 0.085], [-0.2, 0.1], [ZW, 0.108], [ZH, 0.097], [ZB0, 0.097], [ZB1, 0.11], [ZT, 0.1]]);
+      const section = (z) => {
+        const W = Wz(z), yb = yBz(z), ysh = Math.max(ySh(z), yb + 0.012), ybe = ysh + 0.006, yt = Math.max(yT(z), ybe + 0.005);
+        const cab = z > ZW && z < ZB1, Wb = W - (cab ? 0.009 : 0.006), Wt = Math.min(WtT(z), Wb - 0.004);
+        const P = [[0, yb], [W * 0.6, yb], [W - 0.006, yb], [W, yb + 0.006]];
+        for (let k = 1; k <= 4; k++) { const t = k / 4; P.push([W + 0.003 * Math.sin(Math.PI * t), yb + 0.006 + (ysh - yb - 0.006) * t]); }
+        P.push([W - 0.004, ysh + 0.004], [Wb, ybe]);
+        for (let k = 1; k <= 2; k++) { const t = k / 3; P.push([Wb + (Wt - Wb) * t, ybe + (yt - 0.004 - ybe) * (1 - Math.pow(1 - t, 1.6))]); }
+        P.push([Wt, yt - 0.004], [Wt - 0.009, yt - 0.0014], [Wt * 0.45, yt - 0.0004], [0, yt]);
+        return P;
+      };
+      // (the side glass runs forward to the windshield's edge - that strip is the A-pillar, sloping up with the glass)
+      const sideGlass = (z, b) => { const t = (b - 9 + 0.5) / 3; return z > ZW + 0.004 && z < ZB1 - 0.012 - t * (ZB1 - ZB0 - 0.01) && !(z > 0.0 && z < 0.008); };
+      const ST = stationsOf(ZN, ZT, 0.006, [ZW, ZH, ZB0, ZB1, zF - 0.066, zF + 0.088, zR - 0.088, zR + 0.088]);
+      const shellMat = (b, z) => {
+        if (b <= 1) return -1;                                                  // (open underneath, like the real shell)
+        if (b <= 2) return 3;                                                   // the shell's edge, black round the arches
+        if (b <= 7) return 0;                                                   // the sides: the livery
+        if (z < ZW) return 3;                                                   // the black hood and fender tops
+        if (z > ZB1) return b <= 8 ? 0 : 2;                                     // the bed
+        if (b === 8) return 0;
+        if (b <= 11) return sideGlass(z, b) ? 1 : 2;                             // the side windows, the pillars
+        if (b === 12) return 2;                                                 // the A- and C-pillars' edge strip
+        if (z < ZH || z > ZB0) return 1;                                        // the windshield, the back window
+        return 2;                                                               // the roof
+      };
+      const pos = [], uv = [], buckets = [], secs = ST.map((z) => ({ z, P: section(z) })), nP = secs[0].P.length;
+      const vid = (r, i, sd) => r * nP * 2 + (sd > 0 ? i : nP + i);
+      for (const s of secs) for (const sd of [1, -1]) for (const [x, y] of s.P) { pos.push(sd * x, y, s.z); uv.push(sd > 0 ? (ZT - s.z) / (ZT - ZN) : (s.z - ZN) / (ZT - ZN), (y - 0.105) / 0.125); }
+      for (let r = 0; r < secs.length - 1; r++) {
+        const zm = (secs[r].z + secs[r + 1].z) / 2;
+        for (let i = 0; i < nP - 1; i++) {
+          const m0 = shellMat(i, zm); if (m0 < 0) continue;
+          for (const sd of [1, -1]) {
+            const m = m0 === 0 && sd < 0 ? 4 : m0, B2 = buckets[m] || (buckets[m] = []);   // (each side its own livery)
+            const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd); if (sd > 0) B2.push(a, b, c, b, d, c); else B2.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      // (the tail's end panel; the nose is the grille, built below)
+      { const r = secs.length - 1, ci = pos.length / 3; pos.push(0, (secs[r].P[2][1] + secs[r].P[nP - 1][1]) / 2, ZT); uv.push(0, 0.5);
+        const B2 = buckets[2] || (buckets[2] = []);
+        for (const sd of [1, -1]) for (let i = 2; i < nP - 1; i++) { const a = vid(r, i, sd), b = vid(r, i + 1, sd); if (sd > 0) B2.push(ci, a, b); else B2.push(ci, b, a); }
+        B2.push(ci, vid(r, 2, -1), vid(r, 2, 1)); }                             // (closed along the bottom too)
+      const sg = new THREE.BufferGeometry(), idx = [];
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      let st0 = 0; buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); sg.addGroup(st0, b.length, m); st0 += b.length; });
+      sg.setIndex(idx); sg.computeVertexNormals();
+      const livCv = [0, 1].map(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 256; return c; });
+      const livTex = livCv.map((c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; });
+      // (a side as you see it - the right side's rear at the left, the left side's at the right, so the graphics sit in the
+      // same places on both and the lettering reads: the base colour, a black sill, the white-and-silver flash from the
+      // front fender back across the door, black slashes through it, SAND STORM in red on a white box on the quarter)
+      const drawLivery = (hex) => { for (let k = 0; k < 2; k++) drawSide(livCv[k].getContext('2d'), hex, k === 1); for (const t of livTex) t.needsUpdate = true; };
+      const drawSide = (g, hex, mir) => {
+        const w = 1024, h = 256, base = '#' + new THREE.Color(hex).getHexString();
+        g.setTransform(1, 0, 0, 1, 0, 0); if (mir) g.setTransform(-1, 0, 0, 1, w, 0);
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        const grd = g.createLinearGradient(0, h, 0, 0); grd.addColorStop(0, 'rgba(0,0,0,0.45)'); grd.addColorStop(0.5, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(255,255,255,0.12)'); g.fillStyle = grd; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#0d0d10'; g.fillRect(0, 0, w, 12);
+        // (the black of the hood dipping onto the front fender's top)
+        g.beginPath(); g.moveTo(w, 12); g.lineTo(w, 70); g.lineTo(900, 40); g.lineTo(840, 12); g.closePath(); g.fill();
+        const flash = (fill, d) => { g.fillStyle = fill; g.beginPath(); g.moveTo(940 + d, 150 - d); g.lineTo(760, 200); g.lineTo(560, 236); g.lineTo(700, 170); g.lineTo(520, 150); g.lineTo(690, 130);
+          g.lineTo(600, 62); g.lineTo(760, 118); g.lineTo(925 + d, 100 + d); g.closePath(); g.fill(); };
+        flash('#0b0b0e', 10); flash('#e8ebef', 0);
+        const sv = g.createLinearGradient(560, 0, 1000, 0); sv.addColorStop(0, 'rgba(150,160,175,0.7)'); sv.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = sv;
+        g.beginPath(); g.moveTo(560, 236); g.lineTo(700, 170); g.lineTo(760, 200); g.closePath(); g.fill();
+        g.fillStyle = '#0b0b0e'; for (const [x, y] of [[640, 150], [720, 120], [830, 160]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 70, y - 22); g.lineTo(x + 76, y - 14); g.lineTo(x + 6, y + 8); g.closePath(); g.fill(); }
+        // (SAND STORM across the bed side, over the rear arch - the panel there runs 0.18-0.22 m up, canvas rows ~20-100)
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.save(); g.translate(mir ? w - 226 : 226, 62); g.rotate(mir ? 0.05 : -0.05);
+        g.fillStyle = '#f4f4f4'; g.fillRect(-150, -32, 300, 64); g.strokeStyle = '#0b0b0e'; g.lineWidth = 5; g.strokeRect(-150, -32, 300, 64);
+        g.font = 'italic 900 52px Impact, "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 5; g.strokeStyle = '#fff'; g.fillStyle = '#d4151c';
+        g.strokeText('SAND STORM', 0, 3); g.fillText('SAND STORM', 0, 3); g.restore();
+        g.fillStyle = '#fff'; g.font = 'bold 22px Arial, sans-serif'; g.textAlign = 'center'; g.fillText('4WD', mir ? w - 470 : 470, 200); g.fillText(ENGINE === 'brushed' ? 'BRUSHED 2S' : ENGINE === 'bl6s' ? 'BRUSHLESS 6S' : 'BRUSHLESS 3S', mir ? w - 440 : 440, 228);
+      };
+      drawLivery(paintHex);
+      M.rcLivery = livTex.map((t) => new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.22, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 }));
+      // (the sides' inner face plain - from the cab or through the glass the lettering mustn't show through backwards)
+      M.shellIn = new THREE.MeshStandardMaterial({ color: 0x0d1430, roughness: 0.7, side: THREE.BackSide });
+      const noDraw = new THREE.MeshBasicMaterial({ visible: false });
+      P.repaint = (hex) => drawLivery(hex);
+      add(body, sg, [M.rcLivery[0], M.tint, M.paint, M.rcHood, M.rcLivery[1]], 0, 0, 0);
+      add(body, sg, [M.shellIn, noDraw, noDraw, noDraw, M.shellIn], 0, 0, 0, 0, 0, 0, false);
+      M.paint.side = THREE.DoubleSide;
+      // (the windshield banner)
+      { const bt = canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#0c0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#e8e8e8'; g.font = 'bold 38px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SANDSTORM', w / 2, h / 2 + 2); });
+        const zb = ZH - 0.008, yb = yT(zb) + 0.0006, bw = WtT(zb) * 1.6;
+        const pl = add(body, new THREE.PlaneGeometry(bw, 0.012), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.4 }), 0, yb, zb, 0, 0, 0, false);   // (a sticker on the outside: from the cab you look through it)
+        // (lying on the glass, its face out and forward - so it reads from the front)
+        const sl = (yT(zb + 0.004) - yT(zb - 0.004)) / 0.008;
+        pl.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(-1, 0, 0), V3(0, sl, 1).normalize(), V3(0, 1, -sl).normalize())); }
+      // ---- the nose: the fender fronts in the body colour, the grille between them - a black frame, two lamps in red rings
+      // at its outer corners (dark lenses, a bulb that lights with the headlights), slats between, a badge over it
+      { const S0 = section(ZN), sh = new THREE.Shape();
+        sh.moveTo(S0[2][0], S0[2][1]); for (let i = 3; i < S0.length; i++) sh.lineTo(S0[i][0], S0[i][1]);
+        for (let i = S0.length - 2; i >= 2; i--) sh.lineTo(-S0[i][0], S0[i][1]);
+        sh.closePath();
+        add(body, new THREE.ShapeGeometry(sh, 4), M.paint, 0, 0, ZN - 0.0004, 0, 0, 0, false);
+        const gf = new THREE.Shape(); rrPath(gf, -0.076, 0.136, 0.076, 0.182, 0.008);
+        add(body, new THREE.ExtrudeGeometry(gf, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.0015, bevelSize: 0.0015, bevelSegments: 2, curveSegments: 6 }), M.rcHood, 0, 0, ZN - 0.0045, 0, 0, 0, false);
+        M.rcLens = M.rcLens || new THREE.MeshPhysicalMaterial({ color: 0x15171b, roughness: 0.1, metalness: 0.4, clearcoat: 1 });
+        for (const sx of [-1, 1]) {
+          const lx = sx * 0.055, ly = 0.159, lz = ZN - 0.008;
+          add(body, new THREE.TorusGeometry(0.0145, 0.0034, 10, 28), M.redRing, lx, ly, lz, 0, 0, 0, false);
+          add(body, new THREE.CircleGeometry(0.0125, 24), M.rcLens, lx, ly, lz + 0.0012, 0, Math.PI, 0, false);
+          add(body, new THREE.CircleGeometry(0.0045, 16), M.head, lx, ly, lz + 0.0006, 0, Math.PI, 0, false);
+        }
+        for (let k = -3; k <= 3; k++) add(body, rbox(0.0045, 0.03, 0.003, 0.0015), M.rcPlast, k * 0.0085, 0.159, ZN - 0.0075, 0, 0, 0, false);
+        for (const y of [0.143, 0.175]) add(body, rbox(0.068, 0.003, 0.003, 0.0012), M.rcPlast, 0, y, ZN - 0.0075, 0, 0, 0, false);
+        add(body, rbox(0.03, 0.009, 0.003, 0.002), M.chrome, 0, 0.187, ZN + 0.004, -0.3, 0, 0, false); }
+      // (the tail: a black panel across it, red lamps at its corners)
+      add(body, rbox(0.17, 0.03, 0.003, 0.004), M.rcHood, 0, 0.175, ZT + 0.0012, 0, 0, 0, false);
+      for (const sx of [-1, 1]) add(body, rbox(0.03, 0.016, 0.003, 0.003), M.tail, sx * 0.07, 0.178, ZT + 0.0028, 0, 0, 0, false);
+      // ---- the chassis: the tub, the bumpers with their skid plates and two LED lamps up front, the shock towers, the
+      // motor and its heat-sink fan, the servo, the battery strap
+      add(body, rbox(0.1, 0.03, 0.38, 0.008), M.rcPlast, 0, 0.06, 0);
+      add(body, rbox(0.075, 0.024, 0.13, 0.006), M.rcBlack, 0, 0.087, 0.04);
+      add(body, cylZ(0.019, 0.019, 0.05, 20), M.alu, 0.0, 0.092, 0.11);
+      add(body, cylZ(0.016, 0.016, 0.008, 16), M.rcPlast, 0.0, 0.092, 0.08);
+      add(body, rbox(0.046, 0.026, 0.14, 0.005), new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5 }), -0.07, 0.083, -0.02);      // the LiPo in its tray
+      add(body, rbox(0.05, 0.004, 0.012, 0.002), M.rcBlue || (M.rcBlue = new THREE.MeshStandardMaterial({ color: 0x1f4fd8, roughness: 0.3, metalness: 0.35 })), -0.07, 0.097, -0.06);   // its strap
+      add(body, rbox(0.04, 0.022, 0.05, 0.005), M.rcBlack, 0.068, 0.08, -0.05);                                          // the speed controller
+      add(body, cylX(0.009, 0.009, 0.006, 16), M.alu, 0.09, 0.083, -0.05);                                               // its fan
+      for (const fz of [-1, 1]) {
+        const bz = fz * 0.235;
+        add(body, rbox(0.17, 0.026, 0.03, 0.008), M.rcPlast, 0, 0.075, bz);
+        const sk = add(body, rbox(0.11, 0.005, 0.05, 0.002), M.rcPlast, 0, 0.062, fz * 0.214); sk.rotation.x = -fz * 0.5;     // (the skid plate, angled up into the bumper)
+        add(body, rbox(0.15, 0.09, 0.008, 0.004), M.rcPlast, 0, 0.115, fz * 0.142);       // shock tower
+        add(body, rbox(0.04, 0.035, 0.05, 0.006), M.rcBlack, 0, 0.078, fz * 0.17);         // diff case
+      }
+      for (const sx of [-1, 1]) { add(body, rbox(0.022, 0.016, 0.01, 0.004), M.rcPlast, sx * 0.05, 0.08, -0.252); add(body, new THREE.CircleGeometry(0.006, 16), M.led, sx * 0.05, 0.08, -0.258, 0, Math.PI, 0, false); }
+      spots(0.05, 0.08, -0.26, 20);
+      // ---- the wing: on two struts off the rear of the chassis, end plates
+      { const wy = 0.288, wz = 0.215;
+        const wg = profile([[wz - 0.06, wy], [wz - 0.05, wy + 0.008], [wz + 0.01, wy + 0.012], [wz + 0.055, wy + 0.016], [wz + 0.06, wy + 0.004], [wz + 0.01, wy], [wz - 0.04, wy - 0.003]], 0.24, 0.002);
+        add(body, wg, M.rcBlack, 0, 0, 0);
+        for (const sx of [-1, 1]) {
+          add(body, profile([[wz - 0.065, wy - 0.012], [wz + 0.065, wy - 0.006], [wz + 0.07, wy + 0.03], [wz - 0.05, wy + 0.02]], 0.003, 0.0008), M.rcBlack, sx * 0.121, 0, 0);
+          tubeAB(body, V3(sx * 0.03, 0.1, 0.19), V3(sx * 0.04, wy - 0.002, wz + 0.005), 0.004, M.rcPlast, 8);
+        }
+        add(body, rbox(0.1, 0.004, 0.012, 0.002), M.rcPlast, 0, wy - 0.004, wz + 0.005); }
+      // ---- the suspension: per corner an upper and a lower A-arm, a dogbone to the hub and a coil-over from the tower to the
+      // lower arm - all following the wheel up and down (afterWheels)
+      const susp = [];
+      for (let i = 0; i < 4; i++) {
+        const fr = i < 2, sx = (i & 1) === 0 ? -1 : 1, z0 = fr ? zF : zR, fz = fr ? -1 : 1;
+        const mk = (r, len, mat) => { const gg = new THREE.Group(); body.add(gg); const m = add(gg, cylY(r, r, 1, 8), mat, 0, 0.5, 0); return { g: gg, m, len }; };
+        const s = {
+          i, sx, z0, fz,
+          lo: mk(0.006, 1, M.rcPlast), up: mk(0.004, 1, M.rcPlast), dog: mk(0.0035, 1, M.steel),
+          shBody: mk(0.0075, 1, M.rcShock), shRod: mk(0.0022, 1, M.chrome), spring: new THREE.Group(),
+          top: V3(sx * 0.068, 0.153, z0 + fz * 0.022),
+        };
+        // (the spring: a helix along its own y, scaled to the shock's length)
+        const hp = []; for (let k = 0; k <= 96; k++) { const a = k / 96 * Math.PI * 2 * 9; hp.push(V3(Math.cos(a) * 0.0105, k / 96, Math.sin(a) * 0.0105)); }
+        s.springM = add(s.spring, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hp), 300, 0.0016, 5, false), M.rcSpring, 0, 0, 0, 0, 0, 0, false);
+        body.add(s.spring);
+        susp.push(s);
+      }
+      const place = (o, a, b) => { const d = new THREE.Vector3().subVectors(b, a), l = d.length(); o.g.position.copy(a); o.g.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); o.g.scale.set(1, l, 1); };
+      const placeS = (g, a, b) => { const d = new THREE.Vector3().subVectors(b, a), l = d.length(); g.position.copy(a); g.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize()); g.scale.set(1, l, 1); };
+      const _hp = V3(0, 0, 0);
+      P.rcSusp = (wheels) => {
+        for (const s of susp) {
+          const c = wheels[s.i].corner.position; _hp.set(c.x, c.y + cgH, c.z - zOff);             // the hub, in model space
+          const inX = s.sx * 0.05, hubIn = V3(_hp.x - s.sx * 0.03, _hp.y, _hp.z);
+          place(s.lo, V3(inX, 0.058, s.z0), V3(hubIn.x, hubIn.y - 0.018, hubIn.z));
+          place(s.up, V3(s.sx * 0.045, 0.1, s.z0), V3(hubIn.x, hubIn.y + 0.016, hubIn.z));
+          place(s.dog, V3(s.sx * 0.02, 0.078, s.z0 + s.fz * 0.005), hubIn);
+          const low = V3(hubIn.x - s.sx * 0.012, hubIn.y - 0.014, hubIn.z + s.fz * 0.012);
+          const mid = s.top.clone().lerp(low, 0.45);
+          place(s.shBody, s.top, mid); place(s.shRod, mid, low); placeS(s.spring, s.top.clone().lerp(low, 0.06), low.clone().lerp(s.top, 0.12));
+        }
+      };
+      // ---- inside the cab: the floor under the windows, the dash, two seats, the wheel, the driver
+      add(body, rbox(0.2, 0.004, 0.15, 0.002), M.grey, 0, 0.184, -0.005);
+      add(body, rbox(0.21, 0.016, 0.018, 0.004), M.rcPlast, 0, 0.205, ZW + 0.012);
+      for (const dx of [-0.012, 0.012]) add(body, new THREE.CircleGeometry(0.005, 14), M.alu, -0.045 + dx, 0.207, ZW + 0.021, 0, Math.PI, 0, false);
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.06, 0.012, 0.05, 0.004), M.seat, sx * 0.045, 0.19, 0.03);
+        add(body, rbox(0.06, 0.06, 0.01, 0.004), M.seat, sx * 0.045, 0.222, 0.058, -0.2, 0, 0);
+      }
+      { const colG = new THREE.Group(); colG.position.set(-0.045, 0.222, -0.022); colG.rotation.x = -0.6; body.add(colG);
+        const sw = new THREE.Group(); colG.add(sw);
+        add(sw, new THREE.TorusGeometry(0.013, 0.0018, 8, 24), M.black, 0, 0, 0, 0, 0, 0, false);
+        for (let k = 0; k < 3; k++) { const sp = add(sw, new THREE.BoxGeometry(0.0018, 0.013, 0.0012), M.alu, 0, 0, 0, 0, 0, k * 2.094 + Math.PI, false); sp.geometry.translate(0, 0.0065, 0); }
+        tubeAB(body, V3(-0.045, 0.222, -0.021), V3(-0.045, 0.207, -0.045), 0.002, M.black, 6);
+        SW = { colG, sw }; }
+      { const SC = 0.085, dg = new THREE.Group(); dg.position.set(-0.045, 0.192, 0.026); dg.scale.setScalar(SC);
+        const pp = person({ hip: V3(0, 0.0, 0), lean: 0.22, hands: [V3(-0.15, 0.33, -0.52), V3(0.15, 0.33, -0.52)], knee: { dx: 0.1, y: 0.1, z: -0.42 }, foot: { dx: 0.12, y: -0.12, z: -0.7 }, helmet: true });
+        dg.add(pp); const e = pp.userData.eye; dg.userData.eye = V3(e.x * SC + dg.position.x, e.y * SC + dg.position.y, e.z * SC + dg.position.z);
+        driver = dg; P.hideCockpit.push(driver); }
+    };
+    // ---------------------------------------------------------------- the buses' shared helpers
+    // a body from sections along z - o.section(z): the right half's points, the same count at every station - mirrored,
+    // with uvs for a side livery (u along z as each side is seen, rear at the left; v up the height from o.y0 over o.yH)
+    // and a material slot per band (o.mat(b, z); below 0 leaves it open; o.leftSlot maps a right-side slot to the left's)
+    function shellGeo(o) {
+      const secs = o.stations.map((z) => ({ z, P: o.section(z) })), nP = secs[0].P.length, pos = [], uv = [], buckets = [];
+      const vid = (r, i, sd) => r * nP * 2 + (sd > 0 ? i : nP + i);
+      for (const s of secs) for (const sd of [1, -1]) for (const [x, y] of s.P) { pos.push(sd * x, y, s.z); uv.push(sd > 0 ? (o.z1 - s.z) / (o.z1 - o.z0) : (s.z - o.z0) / (o.z1 - o.z0), (y - o.y0) / o.yH); }
+      for (let r = 0; r < secs.length - 1; r++) {
+        const zm = (secs[r].z + secs[r + 1].z) / 2;
+        for (let i = 0; i < nP - 1; i++) {
+          const m0 = o.mat(i, zm); if (m0 < 0) continue;
+          for (const sd of [1, -1]) {
+            const m = sd < 0 && o.leftSlot ? o.leftSlot(m0) : m0, B2 = buckets[m] || (buckets[m] = []);
+            const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd); if (sd > 0) B2.push(a, b, c, b, d, c); else B2.push(a, c, b, b, c, d);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry(), idx = [];
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      let st0 = 0; buckets.forEach((b, m) => { if (!b) return; for (const i of b) idx.push(i); g.addGroup(st0, b.length, m); st0 += b.length; });
+      g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+    // the outline of a section (both halves) as a polygon, and that polygon clipped to the band y0..y1 - for the flat end
+    // faces, split into the glass, the panel and the header
+    const outlineOf = (P, from) => { const out = []; for (let i = from; i < P.length; i++) out.push([P[i][0], P[i][1]]); for (let i = P.length - 2; i >= from; i--) out.push([-P[i][0], P[i][1]]); return out; };
+    function clipY(poly, y0, y1) {
+      const half = (pts, keep, yc) => { const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ia = keep(a[1]), ib = keep(b[1]);
+        if (ia) out.push(a); if (ia !== ib) { const t = (yc - a[1]) / (b[1] - a[1]); out.push([a[0] + (b[0] - a[0]) * t, yc]); } } return out; };
+      return half(half(poly, (y) => y >= y0, y0), (y) => y <= y1, y1);
+    }
+    const polyGeo = (poly) => { const sh = new THREE.Shape(); poly.forEach(([x, y], i) => (i ? sh.lineTo(x, y) : sh.moveTo(x, y))); return new THREE.ShapeGeometry(sh, 1); };
+    // a livery canvas for each side, drawn in body coordinates (z, y): X / Y put a point where it lands on that side's
+    // canvas, so shapes sit at the same places on both sides and the lettering reads on both
+    function sideCanvas(wpx, hpx, z0, z1, y0, yH, draw) {
+      const cvs = [0, 1].map(() => { const c = document.createElement('canvas'); c.width = wpx; c.height = hpx; return c; });
+      const tex = cvs.map((c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; });
+      const redraw = (...a) => { cvs.forEach((c, k) => { const left = k === 1, X = (z) => (left ? (z - z0) : (z1 - z)) / (z1 - z0) * wpx, Y = (y) => (1 - (y - y0) / yH) * hpx;
+        draw(c.getContext('2d'), X, Y, left, wpx, hpx, ...a); }); tex.forEach((t) => { t.needsUpdate = true; }); };
+      return { tex, redraw };
+    }
+
+    // ---------------------------------------------------------------- Tour coach (MCI J4500 kind)
+    // A 45 ft three-axle motorcoach to its real size (13.84 m long, 2.59 m wide, 3.5 m tall): the white body with the black
+    // glass band from the window line up over the roof's edge, the front cap's curve over the big two-piece windshield and
+    // its header with the fleet number, the headlamp clusters in the white front, the rabbit-ear mirrors out on their arms,
+    // the entry door ahead of the front axle on the right, the baggage bays between the axles, the brush-stroke swoosh down
+    // each side - purple, red, orange, yellow - and the company's name on the quarters; polished aluminium wheels - the steer
+    // axle, the drive axle on duals, the tag axle behind it. Inside: the driver's seat, the dash and the wheel, rows of seats
+    B.coach = () => {
+      WF = 0.315; WR = 0.315;
+      wheelStyle = { rim: 'alcoa', rimR: 0.29, tread: 'hwy' };
+      const ZN = zF - 2.3, ZT = zR + 0.685 + 3.17, DZ = 0.685, zD = zR - DZ, zG = zR + DZ, YW = 1.86, YG0 = 1.5, YG1 = 2.98;
+      M.cWhite = new THREE.MeshPhysicalMaterial({ color: 0xf2f2ee, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.1 });
+      M.cBlack = new THREE.MeshPhysicalMaterial({ color: 0x0b0c0e, roughness: 0.2, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08, side: THREE.DoubleSide });
+      M.cIn = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.8, side: THREE.BackSide });
+      M.cSeat = new THREE.MeshStandardMaterial({ color: 0x24305a, roughness: 0.75 });
+      M.tint.color.setHex(0x182028);
+      const arch = (z) => { let y = 0.42; for (const [zc, r] of [[zF, 0.66], [zD, 0.64], [zG, 0.64]]) { const d = Math.abs(z - zc); if (d < r) y = Math.max(y, RF + Math.sqrt(r * r - d * d) * 0.95); } if (z > zD && z < zG) y = Math.max(y, RF + 0.64 * 0.95); return y; };
+      const section = (z) => {
+        const d = z - ZN, e = ZT - z, rF = 0.45, rR = 0.22;
+        let W = 1.295; if (d < rF) W -= rF - Math.sqrt(Math.max(0, rF * rF - (rF - d) * (rF - d))); if (e < rR) W -= rR - Math.sqrt(Math.max(0, rR * rR - (rR - e) * (rR - e)));
+        const yR = d < 0.45 ? 3.25 + 0.25 * Math.sqrt(Math.max(0, 1 - Math.pow((0.45 - d) / 0.45, 2))) : e < 0.3 ? 3.35 + 0.15 * Math.sqrt(Math.max(0, 1 - Math.pow((0.3 - e) / 0.3, 2))) : 3.5;
+        const yb = arch(z), top = (y) => (y <= 2.9 ? y : 2.9 + (y - 2.9) * (yR - 2.9) / 0.6);
+        const P = [[0, yb], [W - 0.1, yb], [W - 0.015, yb + 0.04], [W, yb + 0.12]];
+        for (let k = 1; k <= 3; k++) P.push([W, yb + 0.12 + (YW - yb - 0.12) * k / 4]);
+        P.push([W, YW], [W - 0.04, 2.5], [W - 0.08, top(3.15)], [W - 0.16, top(3.36)], [W - 0.32, top(3.45)], [W * 0.4, top(3.49)], [0, top(3.5)]);
+        return P;
+      };
+      const ST = stationsOf(ZN, ZT, 0.1, [...Array.from({ length: 12 }, (_, i) => ZN + i * 0.04), ...Array.from({ length: 8 }, (_, i) => ZT - i * 0.04),
+        ...[zF, zD, zG].flatMap((zc) => Array.from({ length: 15 }, (_, i) => zc - 0.7 + i * 0.1))].filter((z) => z >= ZN && z <= ZT));
+      const liv = sideCanvas(2048, 512, ZN, ZT, 0.3, 3.25, (g, X, Y, left, w, h, hex) => {
+        g.fillStyle = '#' + new THREE.Color(hex).getHexString(); g.fillRect(0, 0, w, h);
+        // the black glass band, down over the windshield's wrap at the front corner and (right side) the entry door's glass
+        g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, Y(YW));
+        const xa = X(ZN), xb = X(ZN + 0.5); g.fillRect(Math.min(xa, xb), Y(YW), Math.abs(xb - xa), Y(YG0) - Y(YW));
+        if (!left) { g.fillRect(Math.min(X(ZN + 0.62), X(zF - 0.72)), Y(2.98), Math.abs(X(zF - 0.72) - X(ZN + 0.62)), Y(0.95) - Y(2.98)); }
+        // (the window posts: faint dark-grey lines through the band)
+        g.strokeStyle = '#26282c'; g.lineWidth = 3; for (let z = ZN + 1.6; z < ZT - 0.6; z += 1.45) { g.beginPath(); g.moveTo(X(z), Y(YW + 0.05)); g.lineTo(X(z + 0.04), Y(3.15)); g.stroke(); }
+        // baggage bays and the shut lines round them, the entry door's outline (right), the fuel door
+        g.strokeStyle = '#9a9c9e'; g.lineWidth = 2;
+        for (let k = 0; k < 4; k++) { const za = zF + 0.85 + k * 1.52; g.strokeRect(Math.min(X(za), X(za + 1.42)), Y(1.62), Math.abs(X(za + 1.42) - X(za)), Y(0.55) - Y(1.62)); }
+        if (!left) { g.strokeRect(Math.min(X(ZN + 0.58), X(zF - 0.68)), Y(3.02), Math.abs(X(zF - 0.68) - X(ZN + 0.58)), Y(0.48) - Y(3.02)); }
+        // the swoosh: four fat brush strokes from the back - purple, red, orange, yellow - overlapping, tapering at their
+        // ends, riding a wave that peaks up at the window line and dips to the bays; a black shadow edge under each
+        const path = (t) => [ZT - 0.9 - t * 10.4, 1.22 + 0.28 * t + 0.33 * (0.35 + 0.65 * Math.min(1, t / 0.4)) * Math.sin(t * Math.PI * 4.3 - 0.5)];
+        const strokes = [['#5a2a8a', 0, 0.17, 0.12], ['#cf1d3a', 0.12, 0.46, 0.17], ['#f07a12', 0.42, 0.74, 0.17], ['#f8bc1c', 0.7, 1.0, 0.15]];
+        for (const [col, t0, t1, hw] of strokes) for (const [fill, dy, k] of [['#0b0c0e', -0.07, 1.0], [col, 0, 1.0]]) {
+          g.fillStyle = fill; g.beginPath();
+          const N = 60, hAt = (t) => hw * k * Math.pow(Math.sin(Math.PI * (t - t0) / (t1 - t0)), 0.45);
+          for (let n = 0; n <= N; n++) { const t = t0 + (t1 - t0) * n / N, [z, y] = path(t); g.lineTo(X(z), Y(y + dy + hAt(t))); }
+          for (let n = N; n >= 0; n--) { const t = t0 + (t1 - t0) * n / N, [z, y] = path(t); g.lineTo(X(z), Y(y + dy - hAt(t) * 0.8)); }
+          g.closePath(); g.fill();
+        }
+        g.fillStyle = 'rgba(255,255,255,0.22)';
+        for (let n = 0; n < 70; n++) { const t = n / 70, [z, y] = path(t); g.fillRect(X(z) - 22, Y(y + 0.05 - (n % 4) * 0.035), 34, 2); }   // (the brush's dry streaks)
+        // the name, on the quarter behind the swoosh
+        g.save(); g.translate(X(ZT - 1.85), Y(1.71)); g.transform(1, 0, -0.18, 1, 0, 0);
+        g.font = '900 50px "Arial Black", Impact, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#0b0c0e';
+        g.fillText('D&F TRAVEL', 0, 0); g.restore();
+        g.font = 'bold 15px Arial, sans-serif'; g.fillStyle = '#0b0c0e'; g.textAlign = 'center';
+        if (!left) g.fillText('SEATS 57', X(zF - 0.95), Y(1.72));
+      });
+      liv.redraw(paintHex); P.repaint = (hex) => { liv.redraw(hex); M.cWhite.color.setHex(hex); for (const m of M.cWhiteD) m.color.setHex(hex); };
+      M.cWhite.color.setHex(paintHex); M.cWhiteD = [];
+      M.cLiv = liv.tex.map((t) => new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.1 }));
+      // (the window band is real tinted glass - the seats show through it, and from the driver's seat you see out of it -
+      // from the windshield's wrap at the front corner back to the engine bay; the entry door's glass too)
+      const glassBand = (b, z) => (b === 7 || b === 8) && z < ZT - 0.75 || (b === 6 && z < ZN + 0.48);
+      const g0 = shellGeo({ stations: ST, section, z0: ZN, z1: ZT, y0: 0.3, yH: 3.25, leftSlot: (m) => (m === 0 ? 4 : m),
+        mat: (b, z) => (b === 0 ? 2 : glassBand(b, z) ? 1 : b <= 9 ? 0 : 3) });
+      add(body, g0, [M.cLiv[0], M.tint, M.black, M.cWhite, M.cLiv[1]], 0, 0, 0);
+      add(body, g0, [M.cIn, new THREE.MeshBasicMaterial({ visible: false }), M.cIn, M.cIn, M.cIn], 0, 0, 0, 0, 0, 0, false);
+      // (the window posts, black, between the panes)
+      for (let z = ZN + 1.6; z < ZT - 0.8; z += 1.45) for (const sx of [-1, 1]) {
+        const a = section(z); add(body, new THREE.BoxGeometry(0.03, 1.25, 0.07), M.cBlack, sx * (a[8][0] + 0.005), 2.5, z, 0, 0, sx * 0.05, false);
+      }
+      // ---- the front: the white panel, the windshield (two pieces, a post between), the black header with the number;
+      // headlamp clusters at the corners, the turn signals, the grille slot, the bumper and the plate
+      { const F = outlineOf(section(ZN), 1);
+        M.cWhiteD.push(Object.assign(M.cWhite.clone(), { side: THREE.DoubleSide }));
+        add(body, polyGeo(clipY(F, 0, YG0)), M.cWhiteD[0], 0, 0, ZN - 0.002, 0, 0, 0, false);
+        add(body, polyGeo(clipY(F, YG0, YG1)), M.tint, 0, 0, ZN - 0.002, 0, 0, 0, false);
+        const hdr = canvasTex(512, 64, (g, w, h) => { g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#f0f0f0'; g.font = 'bold 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('2033', w * 0.28, h / 2 + 2); });
+        const hg = polyGeo(clipY(F, YG1, 4)); { const p = hg.attributes.position, u = []; for (let i = 0; i < p.count; i++) u.push((0.9 - p.getX(i)) / 1.8, (p.getY(i) - YG1) / 0.27); hg.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2)); }
+        add(body, hg, new THREE.MeshStandardMaterial({ map: hdr, roughness: 0.3, side: THREE.BackSide }), 0, 0, ZN - 0.002, 0, 0, 0, false);   // (seen from outside only)
+        add(body, new THREE.BoxGeometry(0.05, YG1 - YG0, 0.03), M.cBlack, 0, (YG0 + YG1) / 2, ZN - 0.01, 0, 0, 0, false);
+        // (a band of black under the glass, round the wipers)
+        add(body, rbox(1.6, 0.12, 0.03, 0.02), M.cBlack, 0, YG0 + 0.02, ZN - 0.012, 0, 0, 0, false);
+        for (const sx of [-1, 1]) {
+          tubeAB(body, V3(sx * 0.05, YG0 + 0.1, ZN - 0.03), V3(sx * 0.75, YG0 + 0.25, ZN - 0.03), 0.012, M.black, 6);
+          add(body, rbox(0.42, 0.2, 0.04, 0.05), M.cBlack, sx * 0.58, 0.98, ZN - 0.012, 0, 0, 0, false);
+          for (const lx of [0.45, 0.6, 0.72]) add(body, new THREE.CircleGeometry(0.055, 18), M.head, sx * lx, 0.98, ZN - 0.035, 0, Math.PI, 0, false);
+          add(body, rbox(0.12, 0.05, 0.03, 0.015), M.amber, sx * 0.62, 1.16, ZN - 0.012, 0, 0, 0, false);
+          // the rabbit-ear mirrors: an arm out of the roof's front corner, sweeping forward and down, the head at the glass
+          const p0 = V3(sx * 0.95, 3.15, ZN + 0.3), p1 = V3(sx * 1.25, 3.0, ZN - 0.15), p2 = V3(sx * 1.3, 2.45, ZN - 0.42);
+          pipe(body, [p0, p1, p2], 0.025, M.cBlack, 8);
+          const mh = add(body, rbox(0.2, 0.42, 0.09, 0.04), M.cBlack, sx * 1.32, 2.2, ZN - 0.45); mh.rotation.y = -sx * 0.3;
+        }
+        add(body, rbox(0.7, 0.14, 0.03, 0.03), M.cBlack, 0, 0.82, ZN - 0.012, 0, 0, 0, false);
+        add(body, rbox(1.9, 0.2, 0.12, 0.06), M.cBlack, 0, 0.52, ZN - 0.03);
+        add(body, rbox(0.32, 0.16, 0.012, 0.006), M.white, 0, 0.62, ZN - 0.1, 0, 0, 0, false);
+        spots(0.6, 0.98, ZN - 0.05);
+        // the front name plate
+        const np = canvasTex(256, 48, (g, w, h) => { g.fillStyle = '#0b0c0e'; g.fillRect(0, 0, w, h); g.fillStyle = '#f0f0f0'; g.font = 'italic 900 30px "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('D&F TRAVEL', w / 2, h / 2 + 1); });
+        add(body, new THREE.PlaneGeometry(0.62, 0.11), new THREE.MeshStandardMaterial({ map: np, roughness: 0.3 }), 0.55, 1.3, ZN - 0.004, 0, Math.PI, 0, false); }
+      // ---- the back: white, the black band, the engine grille, the tail lamps up the corners
+      { const R = outlineOf(section(ZT), 1);
+        add(body, polyGeo(clipY(R, 0, YW)), M.cWhiteD[0], 0, 0, ZT + 0.002, 0, 0, 0, false);
+        add(body, polyGeo(clipY(R, YW, 4)), M.cBlack, 0, 0, ZT + 0.002, 0, 0, 0, false);
+        add(body, rbox(1.6, 0.55, 0.03, 0.03), M.cBlack, 0, 1.15, ZT + 0.01);
+        for (let k = 0; k < 7; k++) add(body, new THREE.BoxGeometry(1.5, 0.02, 0.01), M.steel, 0, 0.92 + k * 0.07, ZT + 0.028, 0, 0, 0, false);
+        for (const sx of [-1, 1]) for (const y of [0.85, 1.1, 1.35]) add(body, rbox(0.14, 0.14, 0.03, 0.05), y === 0.85 ? M.amber : M.tail, sx * 0.98, y, ZT + 0.008, 0, 0, 0, false);
+        add(body, rbox(2.2, 0.22, 0.1, 0.05), M.cBlack, 0, 0.55, ZT + 0.03);
+        add(body, rbox(0.32, 0.16, 0.012, 0.006), M.white, 0, 0.62, ZT + 0.085, 0, 0, 0, false);
+        // (the exhaust under the back, angled down: the diesel's smoke - P.soot - comes out there)
+        P.soot = [{ p: toRoot(V3(0.85, 0.36, ZT - 0.25)), d: V3(0.1, -0.5, 1).normalize() }];
+        P.tips.push(toRoot(V3(0.85, 0.36, ZT - 0.25))); }
+      // the arch liners
+      for (const [z, r] of [[zF, 0.66], [zD, 0.64], [zG, 0.64]]) for (const sx of [-1, 1]) {
+        const lg = new THREE.CylinderGeometry(r - 0.02, r - 0.02, 0.5, 28, 1, true, 0, Math.PI); lg.rotateZ(Math.PI / 2);
+        add(body, lg, M.linerB || (M.linerB = Object.assign(M.black.clone(), { side: THREE.DoubleSide })), sx * 1.0, RF, z, 0, 0, 0, false);
+      }
+      // ---- inside: the floor, the driver's seat and the dash, a big flat wheel; seats in rows down the aisle
+      add(body, new THREE.BoxGeometry(2.4, 0.06, ZT - ZN - 0.6), M.grey, 0, 1.38, (ZN + ZT) / 2);
+      add(body, rbox(2.3, 0.35, 0.5, 0.06), M.black, 0, YG0 - 0.1, ZN + 0.32);
+      add(body, rbox(0.55, 0.12, 0.55, 0.05), M.seat, -0.62, 1.62, ZN + 1.25);
+      add(body, rbox(0.55, 0.75, 0.12, 0.05), M.seat, -0.62, 2.0, ZN + 1.52, 0.15, 0, 0);
+      for (let z = ZN + 2.3; z < ZT - 1.5; z += 0.82) for (const x of [-0.95, -0.5, 0.5, 0.95]) {
+        add(body, rbox(0.42, 0.1, 0.45, 0.04), M.cSeat, x, 1.85, z); add(body, rbox(0.42, 0.7, 0.1, 0.04), M.cSeat, x, 2.2, z + 0.25, 0.12, 0, 0);
+      }
+      SW = steering(V3(-0.62, 2.0, ZN + 0.75), 1.05, 0.25);
+      driver = person({ hip: V3(-0.62, 1.7, ZN + 1.28), lean: 0.2, hands: [V3(-0.82, 2.03, ZN + 0.8), V3(-0.42, 2.03, ZN + 0.8)],
+        knee: { dx: 0.1, y: 1.82, z: ZN + 0.9 }, foot: { dx: 0.12, y: 1.45, z: ZN + 0.62 }, helmet: false });
+      P.hideCockpit.push(driver);
+      // ---- the tandem: the physics' rear wheel is the pair - the drive axle (duals) drawn ahead of it, the tag axle behind
+      P.tandem = { dz: DZ };
+    };
+    // ---------------------------------------------------------------- Demolition-derby school bus
+    // A conventional school bus stripped for the derby (10.6 m over the cowcatcher, 2.44 m wide, 3.05 m to the roof): the
+    // hood and black fenders out front, the body box behind with every pane knocked out - open windows on black posts, a
+    // steel mesh over the windshield - the faded yellow-orange paint under a green band and a black skirt, sprayed all over
+    // with the crew's graffiti (GFP 95, the drivers' names, a phone number, smileys); orange steel wheels, duals at the
+    // back. Inside: green seats, a roll cage round the driver in his helmet. The cowcatcher (opts.cow): a welded V-plow of
+    // plate on a pipe frame, braced off the bumper
+    B.busderby = () => {
+      WF = 0.28; WR = 0.28;
+      wheelStyle = { rim: 'busOrange', rimR: 0.29, tread: 'hwy' };
+      const ZW = -2.3, ZT = 4.5, W0 = 1.22, YS = 1.78, YT = 2.48, ZB = -4.25, COW = opts.cow !== false;
+      M.dBase = new THREE.MeshStandardMaterial({ color: paintHex, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide });
+      M.dBlack = new THREE.MeshStandardMaterial({ color: 0x121214, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide });
+      M.dSteel = new THREE.MeshStandardMaterial({ color: 0x4a4744, roughness: 0.55, metalness: 0.7, side: THREE.DoubleSide });
+      M.dRust = new THREE.MeshStandardMaterial({ color: 0x6a4a34, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide });
+      M.dSeat = new THREE.MeshStandardMaterial({ color: 0x2f6a3e, roughness: 0.6 });
+      M.dIn = new THREE.MeshStandardMaterial({ color: 0x3a3a36, roughness: 0.8, side: THREE.BackSide });
+      M.mesh.map.wrapS = M.mesh.map.wrapT = THREE.RepeatWrapping; M.mesh.map.repeat.set(6, 3);
+      // ---- the body box: sections with the window band open between the posts (and the entry door on the right)
+      const arch = (z) => { const d = Math.abs(z - zR), r = 0.64; return d < r ? Math.max(0.78, RR + Math.sqrt(r * r - d * d) * 0.96) : 0.78; };
+      const section = (z) => {
+        const e = ZT - z, W = W0 - (e < 0.12 ? 0.12 - Math.sqrt(Math.max(0, 0.0144 - (0.12 - e) * (0.12 - e))) : 0), yb = arch(z);
+        return [[0, yb], [W - 0.05, yb], [W, yb + 0.05], [W, 1.15], [W, 1.45], [W, YS], [W - 0.03, YT], [W - 0.05, 2.62], [W - 0.15, 2.85], [W - 0.4, 2.98], [W * 0.4, 3.04], [0, 3.05]];
+      };
+      const posts = []; for (let z = ZW + 0.55; z < ZT - 0.3; z += 0.76) posts.push(z);
+      const isPost = (z) => posts.some((p) => Math.abs(z - p) < 0.045) || z < ZW + 0.12 || z > ZT - 0.25;
+      const ST = stationsOf(ZW, ZT, 0.08, [...posts.flatMap((p) => [p - 0.045, p + 0.045]), ZW + 0.12, ZT - 0.25, ZT - 0.12, -2.25, -1.52, ...Array.from({ length: 15 }, (_, i) => zR - 0.7 + i * 0.1)]);
+      const liv = sideCanvas(2048, 512, ZW, ZT, 0.7, 2.45, (g, X, Y, left, w, h, hex) => {
+        const base = '#' + new THREE.Color(hex).getHexString(), Rx = (z0, z1, y0, y1) => [Math.min(X(z0), X(z1)), Y(y1), Math.abs(X(z1) - X(z0)), Y(y0) - Y(y1)];
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#121214'; g.fillRect(...Rx(ZW, ZT, 0.6, 1.16));
+        g.fillStyle = '#2c7a38'; g.fillRect(...Rx(ZW, ZT, 1.16, 1.45));
+        g.fillStyle = '#121214'; for (const y of [1.16, 1.45, 1.77]) g.fillRect(...Rx(ZW, ZT, y - 0.02, y + 0.02));
+        g.fillRect(...Rx(ZW, ZT, YT, YT + 0.08));
+        // (the posts black, the window band behind them dark - the open windows show the inside)
+        for (const p of posts) g.fillRect(...Rx(p - 0.05, p + 0.05, YS, YT));
+        // the graffiti: big GFP 95 across the green band, names and numbers round it, smileys, NAR up on the roof's edge
+        const tag = (txt, z, y, px, fill, stroke, rot, font) => { g.save(); g.translate(X(z), Y(y)); g.rotate(rot || 0); g.font = (font || 'bold') + ' ' + px + 'px "Comic Sans MS", "Marker Felt", "Segoe Print", cursive';
+          g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; if (stroke) { g.lineWidth = Math.max(4, px * 0.12); g.strokeStyle = stroke; g.strokeText(txt, 0, 0); } g.fillStyle = fill; g.fillText(txt, 0, 0); g.restore(); };
+        const smile = (z, y, r, col) => { g.save(); g.strokeStyle = col; g.lineWidth = 5; g.beginPath(); g.arc(X(z), Y(y), r, 0, Math.PI * 2); g.stroke();
+          g.beginPath(); g.arc(X(z), Y(y) + 3, r * 0.6, 0.2, Math.PI - 0.2); g.stroke(); g.fillStyle = col; g.fillRect(X(z) - r * 0.4, Y(y) - r * 0.35, 5, 7); g.fillRect(X(z) + r * 0.3, Y(y) - r * 0.35, 5, 7); g.restore(); };
+        tag('GFP', 1.6, 1.42, 150, '#f2dd2a', '#121214', -0.05, '900');
+        tag('95', -0.35, 1.47, 160, '#f2dd2a', '#121214', 0.04, '900');
+        tag('Dave', 0.55, 1.64, 54, '#f4f4f4', '#121214');
+        tag('Lawn', 0.6, 1.25, 52, '#f4f4f4', '#121214');
+        tag('Nick 69', -1.35, 1.64, 50, '#f4f4f4', '#121214');
+        tag('Davis', -1.25, 1.33, 40, '#f2dd2a', null);
+        tag('Corey', -1.5, 1.2, 36, '#f2dd2a', null);
+        tag('724 448 ' + (left ? '1095' : '6612'), 0.4, 1.02, 40, '#f4f4f4', null);
+        tag('ANMJ', 3.45, 1.3, 70, '#f4f4f4', '#121214'); smile(2.75, 1.3, 22, '#f4f4f4');
+        tag('TMJ', 3.6, 1.0, 58, '#f4f4f4', null); smile(3.05, 1.0, 20, '#f4f4f4');
+        tag('ONS', 4.0, 1.6, 54, '#f2dd2a', '#121214'); smile(2.0, 0.95, 18, '#f2dd2a');
+        tag('NAR', 2.5, 2.7, 64, '#121214', null, 0, '900');
+        g.strokeStyle = 'rgba(30,140,60,0.8)'; g.lineWidth = 8; g.beginPath(); g.moveTo(X(1.9), Y(1.55)); g.quadraticCurveTo(X(1.5), Y(1.3), X(1.2), Y(1.55)); g.stroke();
+      });
+      liv.redraw(paintHex); P.repaint = (hex) => { liv.redraw(hex); M.dBase.color.setHex(hex); };
+      M.dLiv = liv.tex.map((t) => new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, metalness: 0.05 }));
+      const door = (z, b) => z > -2.25 && z < -1.52 && b >= 3 && b <= 5;
+      const g0 = shellGeo({ stations: ST, section, z0: ZW, z1: ZT, y0: 0.7, yH: 2.45, leftSlot: (m) => (m === 0 ? 4 : m),
+        mat: (b, z) => { if (b === 0) return 2; if (b === 5 && !isPost(z)) return -1; return b <= 8 ? 0 : 3; } });
+      // (the entry door: the right side only - its bands are left open by a second pass that drops those faces)
+      { const idx = g0.index.array, pos = g0.attributes.position, keep = [], groups = g0.groups.map((gr) => Object.assign({}, gr));
+        let o = 0; const ng = [];
+        for (const gr of groups) { const st = keep.length;
+          for (let k = gr.start; k < gr.start + gr.count; k += 3) {
+            const a = idx[k], b = idx[k + 1], c = idx[k + 2], cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3, cy = (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3, cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+            if (cx > 0.5 && cz > -2.25 && cz < -1.52 && cy > 1.0 && cy < YT) continue; keep.push(a, b, c);
+          }
+          ng.push({ start: st, count: keep.length - st, materialIndex: gr.materialIndex }); }
+        g0.setIndex(keep); g0.clearGroups(); for (const gr of ng) g0.addGroup(gr.start, gr.count, gr.materialIndex); void o; void door; }
+      add(body, g0, [M.dLiv[0], M.tint, M.dBlack, M.dBase, M.dLiv[1]], 0, 0, 0);
+      add(body, g0, [M.dIn, M.dIn, M.dIn, M.dIn, M.dIn], 0, 0, 0, 0, 0, 0, false);
+      // ---- the front wall (the windshield's two openings behind a mesh) and the back (the emergency door, its window
+      // out, tail lamps); the roof's warning lamps, front and back
+      for (const [z, f] of [[ZW, -1], [ZT, 1]]) {
+        const O = outlineOf(section(z), 1), lower = clipY(O, 0, YS), upper = clipY(O, YT, 4);
+        add(body, polyGeo(lower), M.dBase, 0, 0, z, 0, 0, 0, false); add(body, polyGeo(upper), M.dBase, 0, 0, z, 0, 0, 0, false);
+        for (const sx of [-1, 1]) add(body, new THREE.BoxGeometry(f < 0 ? 0.12 : 0.3, YT - YS, 0.04), M.dBlack, sx * (f < 0 ? 1.12 : 1.0), (YS + YT) / 2, z, 0, 0, 0, false);
+        add(body, new THREE.BoxGeometry(0.08, YT - YS, 0.04), M.dBlack, 0, (YS + YT) / 2, z, 0, 0, 0, false);
+        add(body, new THREE.PlaneGeometry(2.2, YT - YS), M.mesh, 0, (YS + YT) / 2, z + f * 0.03, 0, f < 0 ? Math.PI : 0, 0, false);
+        for (const sx of [-1, -0.6, 0.6, 1]) add(body, cylZ(0.07, 0.07, 0.06, 14), Math.abs(sx) > 0.8 ? M.tail : M.amber, sx * 0.95, 2.78, z + f * 0.03);
+        const pl = canvasTex(256, 48, (g, w, h) => { g.fillStyle = '#f2c21b'; g.fillRect(0, 0, w, h); g.fillStyle = '#121214'; g.font = 'bold 34px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SCHOOL BUS', w / 2, h / 2 + 1); g.strokeStyle = 'rgba(30,140,60,0.9)'; g.lineWidth = 7; g.beginPath(); g.moveTo(20, 38); g.lineTo(230, 12); g.stroke(); });
+        add(body, new THREE.PlaneGeometry(1.1, 0.21), new THREE.MeshStandardMaterial({ map: pl, roughness: 0.5 }), 0, 2.72, z + f * 0.035, 0, f < 0 ? Math.PI : 0, 0, false);
+      }
+      for (const sx of [-1, 1]) add(body, rbox(0.12, 0.3, 0.03, 0.03), M.tail, sx * 0.95, 1.25, ZT + 0.02, 0, 0, 0, false);
+      add(body, rbox(2.35, 0.24, 0.16, 0.05), M.dBlack, 0, 0.72, ZT + 0.06);
+      // (the diesel's exhaust out the right side behind the duals; the V8s' headers dump there too)
+      add(body, cylX(0.06, 0.06, 0.22, 14, true), M.dSteel, 1.12, 0.62, zR + 0.95);
+      P.soot = [{ p: toRoot(V3(1.24, 0.62, zR + 0.95)), d: V3(1, -0.2, 0.15).normalize() }];
+      P.tips.push(toRoot(V3(1.24, 0.62, zR + 0.95)));
+      // ---- the hood, the grille and its lamps, the black fenders, the bumper
+      { const hood = new THREE.Shape(); hood.moveTo(ZB + 0.13, 0.9); hood.lineTo(ZB + 0.13, 1.42); hood.quadraticCurveTo(ZB + 0.25, 1.52, ZB + 0.6, 1.53); hood.lineTo(ZW, 1.66); hood.lineTo(ZW, 0.9); hood.closePath();
+        const hg = new THREE.ExtrudeGeometry(hood, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 4, curveSegments: 8 });
+        hg.rotateY(Math.PI / 2); hg.scale(1, 1, -1); hg.translate(-0.6, 0, 0); { const p = hg.attributes.position; for (let k = 0; k < p.count; k += 3) { const t = p.getX(k + 1), u = p.getY(k + 1), v = p.getZ(k + 1); p.setXYZ(k + 1, p.getX(k + 2), p.getY(k + 2), p.getZ(k + 2)); p.setXYZ(k + 2, t, u, v); } } hg.computeVertexNormals();
+        add(body, hg, M.dBase, 0, 0, 0);
+        add(body, rbox(1.12, 0.55, 0.04, 0.03), M.dBlack, 0, 1.15, ZB + 0.08);
+        for (let k = 0; k < 6; k++) add(body, new THREE.BoxGeometry(1.0, 0.025, 0.02), M.chrome, 0, 0.95 + k * 0.08, ZB + 0.055, 0, 0, 0, false);
+        for (const sx of [-1, 1]) {
+          // (the fender: a black shell over the front wheel, the round lamps on its nose)
+          const fd = new THREE.CylinderGeometry(0.66, 0.66, 0.42, 24, 1, true, -Math.PI / 2, Math.PI); fd.rotateZ(Math.PI / 2);
+          add(body, fd, M.dBlack, sx * 1.0, RF + 0.02, zF);
+          add(body, new THREE.BoxGeometry(0.42, 0.06, 0.62), M.dBlack, sx * 1.0, 0.95, zF - 0.85);
+          add(body, new THREE.BoxGeometry(0.42, 0.06, 0.5), M.dBlack, sx * 1.0, 0.95, zF + 0.6);
+          add(body, cylZ(0.11, 0.11, 0.08, 18), M.chrome, sx * 0.85, 1.22, zF - 0.95);
+          add(body, new THREE.CircleGeometry(0.09, 18), M.head, sx * 0.85, 1.22, zF - 0.995, 0, Math.PI, 0, false);
+        }
+        add(body, rbox(2.38, 0.24, 0.16, 0.05), M.dBlack, 0, 0.72, ZB);
+        add(body, rbox(0.3, 0.15, 0.012, 0.006), M.white, 0, 0.72, ZB - 0.085, 0, 0, 0, false);
+        spots(0.85, 1.22, zF - 1.0); }
+      // ---- the cowcatcher: two plates in a V off the bumper to a point 0.8 m ahead, a pipe along their top edge and down
+      // the point, ribs behind, braces back to the frame
+      if (COW) {
+        // (raked: the bottom edge 0.35 m further out than the top, both a V to the point)
+        const yT0 = 1.08, yB0 = 0.2, tipT = ZB - 0.62, tipB = ZB - 0.98, wT = 1.2, wB = 1.15, zT0 = ZB - 0.04, zB0 = ZB - 0.32;
+        const top = (u) => V3(u * wT, yT0 + 0.05 * (1 - Math.abs(u)), zT0 + (tipT - zT0) * (1 - Math.abs(u))), bot = (u) => V3(u * wB, yB0, zB0 + (tipB - zB0) * (1 - Math.abs(u)));
+        for (const sx of [-1, 1]) {
+          pipe(body, [top(sx), top(sx * 0.5), top(0)], 0.055, M.dSteel, 8);
+          pipe(body, [bot(sx), bot(sx * 0.5), bot(0)], 0.05, M.dSteel, 8);
+          for (let k = 0; k <= 6; k++) { const u = sx * k / 6.5; tubeAB(body, top(u), bot(u), 0.03, M.dRust, 6); }
+          for (const t of [0.35, 0.68]) { const a = top(sx).lerp(bot(sx), t), b = top(0).lerp(bot(0), t); pipe(body, [a, a.clone().lerp(b, 0.5).setZ((a.z + b.z) / 2 - 0.02), b], 0.025, M.dRust, 6); }
+          tubeAB(body, V3(sx * 0.55, 0.62, ZB - 0.05), V3(sx * 0.3, 0.45, tipB + 0.35), 0.045, M.dSteel, 8);
+          tubeAB(body, V3(sx * 0.9, 1.0, ZB - 0.05), V3(sx * 0.9, 0.72, ZB + 0.08), 0.05, M.dSteel, 8);
+        }
+        // (a skid plate along the bottom of the V)
+        for (const sx of [-1, 1]) add(body, facesGeo([[sx * wB, yB0 - 0.02, zB0], [sx * wB, yB0 + 0.16, zB0 + 0.05], [0, yB0 + 0.16, tipB + 0.05], [0, yB0 - 0.02, tipB]], [[0, 1, 2, 3]]), M.dSteel, 0, 0, 0, 0, 0, 0, true);
+      }
+      // ---- inside: the floor, green seats in rows (the front ones pulled for the cage), the driver's seat, the dash, the
+      // wheel, the cage round them; the driver in a helmet
+      add(body, new THREE.BoxGeometry(2.3, 0.05, ZT - ZW - 0.1), M.grey, 0, 1.0, (ZW + ZT) / 2);
+      for (let z = -0.6; z < ZT - 0.6; z += 0.78) for (const sx of [-1, 1]) {
+        add(body, rbox(0.95, 0.12, 0.42, 0.05), M.dSeat, sx * 0.62, 1.42, z); add(body, rbox(0.95, 0.6, 0.12, 0.05), M.dSeat, sx * 0.62, 1.72, z + 0.24, 0.1, 0, 0);
+      }
+      add(body, rbox(2.2, 0.32, 0.4, 0.05), M.dBlack, 0, 1.62, ZW + 0.25);
+      add(body, rbox(0.5, 0.12, 0.5, 0.05), M.seat, -0.62, 1.4, ZW + 1.0);
+      add(body, rbox(0.5, 0.7, 0.12, 0.05), M.seat, -0.62, 1.78, ZW + 1.27, 0.12, 0, 0);
+      for (const [x, z] of [[-1.1, ZW + 0.3], [-0.15, ZW + 0.3], [-1.1, ZW + 1.6], [-0.15, ZW + 1.6]]) tubeAB(body, V3(x, 1.02, z), V3(x, 2.9, z), 0.04, M.dSteel, 8);
+      for (const z of [ZW + 0.3, ZW + 1.6]) tubeAB(body, V3(-1.1, 2.85, z), V3(-0.15, 2.85, z), 0.04, M.dSteel, 8);
+      for (const x of [-1.1, -0.15]) { tubeAB(body, V3(x, 2.85, ZW + 0.3), V3(x, 2.85, ZW + 1.6), 0.04, M.dSteel, 8); tubeAB(body, V3(x, 1.5, ZW + 0.3), V3(x, 1.5, ZW + 1.6), 0.04, M.dSteel, 8); }
+      SW = steering(V3(-0.62, 1.86, ZW + 0.55), 0.95, 0.24);
+      driver = person({ hip: V3(-0.62, 1.48, ZW + 1.03), lean: 0.15, hands: [V3(-0.82, 1.88, ZW + 0.6), V3(-0.42, 1.88, ZW + 0.6)],
+        knee: { dx: 0.1, y: 1.6, z: ZW + 0.62 }, foot: { dx: 0.12, y: 1.08, z: ZW + 0.38 }, helmet: true });
+      P.hideCockpit.push(driver);
+    };
     (B[CAR] || B.couch)();
     model.add(driver);
     const eye = driver.userData.eye;
@@ -14677,12 +15414,18 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // instead of floating round it. Gravel: small tight blocks four and three across, staggered, shoulder blocks turned
     // down the shoulder; mud: big staggered knobs with wide voids and lugs running down each sidewall
     function blockTread(R, W, rimR, kind) {
-      const mud = kind === 'mud', at = kind === 'at', depth = mud ? 0.02 : at ? 0.017 : 0.012, rc = R - depth, h = W / 2, list = [];
+      const mud = kind === 'mud', at = kind === 'at', rcT = kind === 'rc', depth = mud ? 0.02 : at ? 0.017 : rcT ? 0.0075 : 0.012, rc = R - depth, h = W / 2, list = [];
       const box = (w, ht, l, x, r, ang, tilt) => { const b = new THREE.BoxGeometry(w, ht, l); if (tilt) b.rotateZ(tilt); b.translate(x, r, 0); b.rotateX(ang); list.push(b); };
-      const pitch = mud ? 0.062 : at ? 0.052 : 0.042, N = Math.round(2 * Math.PI * R / pitch), bl = pitch * (mud ? 0.55 : at ? 0.62 : 0.6);
+      const pitch = mud ? 0.062 : at ? 0.052 : rcT ? 0.021 : 0.042, N = Math.round(2 * Math.PI * R / pitch), bl = pitch * (mud ? 0.55 : at ? 0.62 : rcT ? 0.6 : 0.6);
       for (let k = 0; k < N; k++) {
         const a = k * 2 * Math.PI / N, odd = k & 1;
-        if (at) {
+        if (rcT) {
+          // (an RC monster-truck tyre: big chevron blocks two a row, staggered and angled, and lugs down each sidewall)
+          for (const sx of [-1, 1]) {
+            const b = new THREE.BoxGeometry(W * 0.4, depth + 0.002, bl); b.rotateY(sx * (odd ? 0.45 : 0.3)); b.translate(sx * W * (odd ? 0.27 : 0.21), rc + depth / 2 - 0.001, 0); b.rotateX(a); list.push(b);
+            const lg = (k + (sx > 0 ? 1 : 0)) & 1; box(0.005, 0.012 + 0.006 * lg, bl * 0.8, sx * (h - 0.0015), rc - 0.004 - 0.003 * lg, a);
+          }
+        } else if (at) {
           // all-terrain (the Rebel's): three blocks across and two, staggered, big shoulder blocks, lugs down the sidewalls
           for (const f of odd ? [-0.64, 0, 0.64] : [-0.34, 0.34]) box(W * (odd ? 0.24 : 0.28), depth + 0.004, bl, f * h, rc + depth / 2 - 0.002, a);
           for (const sx of [-1, 1]) { const lg = (k + (sx > 0 ? 1 : 0)) & 1; box(0.012, 0.022 + 0.012 * lg, bl * 0.8, sx * (h - 0.003), rc - 0.009 - 0.006 * lg, a); }
@@ -14751,6 +15494,45 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         add(g, cylX(rimR * 0.2, rimR * 0.22, 0.03, 24), m, fx - 0.012, 0, 0);
         for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5; add(g, cylX(0.009, 0.009, 0.022, 8), M.chrome, fx + 0.006, Math.cos(a) * rimR * 0.14, Math.sin(a) * rimR * 0.14); }
         add(g, cylX(0.028, 0.028, 0.012, 16), M.black, fx + 0.01, 0, 0);
+        return;
+      }
+      if (style === 'busOrange') {
+        // a derby bus's steel wheel, sprayed orange: a dished disc with its hand holes, the hub and its nuts dark
+        const m = M.busRim || (M.busRim = new THREE.MeshStandardMaterial({ color: 0xe0501a, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.96, 0, Math.PI * 2, false);
+        for (let j = 0; j < 5; j++) { const a = j * 2 * Math.PI / 5, hole = new THREE.Path(); hole.absarc(Math.cos(a) * rimR * 0.6, Math.sin(a) * rimR * 0.6, rimR * 0.14, 0, Math.PI * 2, true); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.006, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 1, curveSegments: 18 });
+        fg.rotateY(Math.PI / 2); add(g, fg, m, fx - 0.06, 0, 0);
+        add(g, latheX([[rimR, fx + 0.002], [rimR * 0.97, fx - 0.03], [rimR * 0.95, fx - 0.06]], 40), m, 0, 0, 0);
+        add(g, cylX(rimR * 0.3, rimR * 0.34, 0.06, 20), M.black, fx - 0.03, 0, 0);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5; add(g, cylX(0.014, 0.014, 0.03, 6), M.steel, fx - 0.03, Math.cos(a) * rimR * 0.4, Math.sin(a) * rimR * 0.4); }
+        return;
+      }
+      if (style === 'alcoa') {
+        // a polished aluminium truck wheel: the dished face with ten hand holes round it, the hub, ten lug nuts, a chrome cap
+        const pol = M.polish || (M.polish = new THREE.MeshStandardMaterial({ color: 0xe6e8ec, roughness: 0.08, metalness: 1 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.86, 0, Math.PI * 2, false);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5 + Math.PI / 10, hole = new THREE.Path(); hole.absellipse(Math.cos(a) * rimR * 0.62, Math.sin(a) * rimR * 0.62, rimR * 0.1, rimR * 0.07, 0, Math.PI * 2, true, a); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 20 });
+        fg.rotateY(Math.PI / 2); add(g, fg, pol, fx - 0.05, 0, 0);
+        add(g, latheX([[rimR, fx + 0.004], [rimR * 0.96, fx - 0.01], [rimR * 0.88, fx - 0.045]], 44), M.chromeD || (M.chromeD = Object.assign(M.chrome.clone(), { side: THREE.DoubleSide })), 0, 0, 0);
+        add(g, new THREE.TorusGeometry(rimR * 0.99, 0.012, 8, 44), pol, fx + 0.004, 0, 0, 0, Math.PI / 2, 0);
+        add(g, cylX(rimR * 0.86, rimR * 0.86, 0.01, 36), M.black, fx - 0.09, 0, 0);
+        add(g, latheX([[rimR * 0.36, fx - 0.04], [rimR * 0.34, fx - 0.005], [rimR * 0.24, fx + 0.04], [0.001, fx + 0.06]], 28), pol, 0, 0, 0);
+        for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5; add(g, cylX(0.014, 0.014, 0.035, 6), M.chrome, fx - 0.03, Math.cos(a) * rimR * 0.42, Math.sin(a) * rimR * 0.42); }
+        return;
+      }
+      if (style === 'rcbl') {
+        // an RC truck's wheel: six black spokes, a blue beadlock ring bolted round the face, a black nut in the middle
+        const blue = M.rcBlue || (M.rcBlue = new THREE.MeshStandardMaterial({ color: 0x1f4fd8, roughness: 0.3, metalness: 0.35 }));
+        const face = new THREE.Shape(); face.absarc(0, 0, rimR * 0.86, 0, Math.PI * 2, false);
+        for (let j = 0; j < 6; j++) { const c = j * Math.PI / 3 + Math.PI / 6, hole = new THREE.Path(); hole.absarc(0, 0, rimR * 0.76, c - 0.36, c + 0.36, false); hole.absarc(0, 0, rimR * 0.3, c + 0.2, c - 0.2, true); hole.closePath(); face.holes.push(hole); }
+        const fg = new THREE.ExtrudeGeometry(face, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.0012, bevelSize: 0.0012, bevelSegments: 2, curveSegments: 16 });
+        fg.rotateY(Math.PI / 2); add(g, fg, M.rcPlast, fx - 0.008, 0, 0);
+        add(g, latheX([[rimR * 1.04, fx - 0.004], [rimR * 1.04, fx + 0.002], [rimR * 0.84, fx + 0.002], [rimR * 0.84, fx - 0.004]], 40), blue, 0, 0, 0);
+        for (let j = 0; j < 12; j++) { const a = j * Math.PI / 6; add(g, cylX(0.0018, 0.0018, 0.003, 6), M.steel, fx + 0.003, Math.cos(a) * rimR * 0.94, Math.sin(a) * rimR * 0.94); }
+        add(g, cylX(rimR * 0.86, rimR * 0.86, 0.002, 28), M.black, fx - 0.02, 0, 0);
+        add(g, cylX(0.006, 0.006, 0.008, 6), M.rcPlast, fx - 0.002, 0, 0);
         return;
       }
       if (style === 'rallye') {
@@ -14911,7 +15693,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const geo = {};
     for (const front of [true, false]) {
       const R = front ? RF : RR, W = front ? WF : WR, rimR = Math.min(R - 0.03, (!front && wheelStyle.rimRR) || wheelStyle.rimR || R * 0.6);
-      const st = wheelStyle.tread === 'gravel' || wheelStyle.tread === 'at' ? blockTread(R, W, rimR, wheelStyle.tread) : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
+      const st = wheelStyle.tread === 'gravel' || wheelStyle.tread === 'at' || wheelStyle.tread === 'rc' ? blockTread(R, W, rimR, wheelStyle.tread) : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
       geo[front] = { R, W, rimR, carc: st.carc, tr: st.tr, pk: blockTread(R + 0.006, W * 1.04, rimR, 'mud') };
     }
     const wheels = [];
@@ -14925,7 +15707,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const stock = [add(spin, G.carc, M.rubber, 0, 0, 0)].concat(G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : []);
       const pkg = [add(spin, G.pk.carc, M.rubber, 0, 0, 0), add(spin, G.pk.tr, M.rubber, 0, 0, 0)]; for (const m of pkg) m.visible = false;
       rim(spin, G.R, G.W, G.rimR, CAR === 'diesel' && !frontW ? 'dualR' : wheelStyle.rim);
-      if (frontW) add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      if (frontW && CAR !== 'rc') add(flip, cylX(0.02, 0.02, 0.08, 8), M.steel, -G.W / 2 - 0.03, 0, 0);
+      if (CAR === 'rc') add(flip, rbox(0.012, 0.03, 0.026, 0.004), M.rcPlast, -G.W / 2 - 0.008, 0, 0);    // (the hub carrier)
       if (CAR === 'rally') {
         add(spin, cylX(0.15, 0.15, 0.026, 36), M.steel, -0.03, 0, 0);
         add(spin, cylX(0.075, 0.075, 0.03, 20), M.black, -0.03, 0, 0);
@@ -14948,14 +15731,28 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     // the dually: two tyres each end of the rear axle - the physics' wheel is the pair, the outer tyre drawn outboard of its
     // centre with the deep-dished wheel, the inner one inboard (its tyre and a plain wheel)
-    if (CAR === 'diesel') for (const w of wheels) if (!w.front) {
-      const off = 0.137;
+    if (CAR === 'diesel' || CAR === 'busderby') for (const w of wheels) if (!w.front) {
+      const off = CAR === 'busderby' ? 0.15 : 0.137;
       for (const m of w.spin.children.slice()) m.position.x += off;
       const inner = new THREE.Group(); inner.position.x = -off; w.spin.add(inner);
       for (const m of w.stock.slice()) { const c = add(inner, m.geometry, M.rubber, 0, 0, 0); w.stock.push(c); }
       for (const m of w.pkg.slice()) { const c = add(inner, m.geometry, M.rubber, 0, 0, 0); c.visible = false; w.pkg.push(c); }
       add(inner, cylX(geo[false].rimR, geo[false].rimR, geo[false].W * 0.9, 32, true), M.steel, 0, 0, 0);
       add(inner, cylX(geo[false].rimR * 0.9, geo[false].rimR * 0.9, 0.01, 28), M.steel, 0.02, 0, 0);
+    }
+    // the coach's tandem: the physics' rear wheel is the drive axle (duals) and the tag axle together - the drive axle
+    // drawn DZ ahead of it on two tyres, the tag axle DZ behind on one, turning with it (afterWheels)
+    if (P.tandem) for (const w of wheels) if (!w.front) {
+      const dz = P.tandem.dz, G = geo[false], off = 0.17;
+      w.spin.position.z = w.left ? dz : -dz;
+      for (const m of w.spin.children.slice()) m.position.x += off;
+      const inner = new THREE.Group(); inner.position.x = -off; w.spin.add(inner);
+      for (const m of w.stock.slice()) w.stock.push(add(inner, m.geometry, M.rubber, 0, 0, 0));
+      add(inner, cylX(G.rimR, G.rimR, G.W * 0.9, 32, true), M.steel, 0, 0, 0);
+      const tag = new THREE.Group(); tag.position.z = w.left ? -dz : dz; w.flip.add(tag);
+      w.stock.push(add(tag, G.carc, M.rubber, 0, 0, 0)); if (G.tr) w.stock.push(add(tag, G.tr, M.rubber, 0, 0, 0));
+      rim(tag, G.R, G.W, G.rimR, wheelStyle.rim);
+      w.tag = tag;
     }
     // the Blue Bird ran twin wheels at the back: a second one inboard of each rear
     if (CAR === 'bluebird') for (const w of wheels) if (!w.front) {
@@ -14982,6 +15779,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const c = PAINTS[name]; if (c === undefined) return;
       if (CAR === 'razor') { M.paint.emissive.setHex(c); M.halo.uniforms.uColor.value.setHex(c); } else M.paint.color.setHex(c);
       if (M.decal) decalFor(c);
+      if (P.repaint) P.repaint(c);
     }
     // (the Superbird's decals: white on the oranges and reds and on the darkest paints, black on everything else)
     function decalFor(c) {
@@ -15026,11 +15824,13 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       for (const m of [jetFx.outer.material, jetFx.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = jetFx.t; }
     }
 
+    if (P.rcSusp) P.rcSusp(wheels);
     rootG.traverse((o) => { if (o.isMesh && o.material && (o.material.transparent || (Array.isArray(o.material) && false))) o.castShadow = false; });
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW.sw, eye: toRoot(eye),
       exhaustTips: P.tips, sootTips: P.soot || null, materials: M, headlights: P.spots, tailLens: [], mirrors: [],
       setPaint, setLights, setTires, setInteriorVisible, setTransmission, drawCluster, drawScreen, setChute, setJet, setJetSize, variant: 'cc', cls: CAR,
+      afterWheels: P.rcSusp ? () => P.rcSusp(wheels) : P.tandem ? () => { for (const w of wheels) if (w.tag) w.tag.rotation.x = w.spin.rotation.x; } : undefined,
     };
   }
 
@@ -19396,7 +20196,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal', sbirdEng: 'c440',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal', sbirdEng: 'c440', rcEng: 'bl3s', coachEng: 'stock', derbyEng: 'dt466', busCow: true,
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -19746,6 +20546,61 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           info: 'The Superbird with the 426 Street Hemi: hemispherical heads, two Carter AFB four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 · 727 TorqueFlite with a 2,300 rpm converter, Sure-Grip on 3.55s · ~1,830 kg · 0-60 ~6.3 s, ~14.5 s quarter mile at 107 mph, ~130 mph',
           snd: { nEng: 1, cyl: 8, fmul: 0.88, deep: 0.55, loud: 0.9, open: 0.7, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6400, race: 0.55, rough: 0.2 } },
       } },
+    rc: { btn: 'RC TRUCK', sub: 'A 1/10 4WD monster-truck RC car · brushed 2S, brushless 3S or a 6S speed-run build · drive it on the real roads - or from the little driver\'s seat (C)', paint: 'Bay Blue', tc: 1, cam: [0.17, 0.18], scale: 0.12, noPkg: true,
+      hint: 'RC truck (Brushless 3S): shift up (E) for DRIVE - a 3,200 kV brushless on a 3S LiPo, 4WD: 0-30 in ~1.7 s, ~45 mph, at the size of a shoebox. It turns like a kart and rolls over like an RC truck: the stability control is on (Sport, T for Off). Press C for the view from the cab.',
+      info: 'A 1/10-scale 4WD monster-truck basher like the Sandstorm: a blue polycarbonate pickup shell with a black hood, the white flash and SAND STORM on the quarters, tinted glass, a big rear wing; a plastic tub chassis with front and rear bumpers (LED lamps up front), A-arms, dogbones and four oil-filled coil-overs that work with the wheels; 150 mm chevron tyres on blue beadlock wheels; gear diffs front and rear on a centre slipper · a 3660 3,200 kV brushless on 3S (11.1 V), ~0.9 kW, 12.5:1 overall · 0.47 m long, 0.37 m wide · 2.6 kg · 0-30 ~1.7 s, ~45 mph · a tiny cab inside with two seats, the dash, a wheel and a 1/12 driver',
+      trans: 'Single speed · 4WD', tyres: '150 mm RC knobbies',
+      snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1, rpmRef: 35500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'rcEng', optLabel: 'Power', options: [
+        ['brushed', 'Brushed 2S', 'The ready-to-run motor: a 550 can on 2S, ~180 W · 0-20 ~1.2 s · ~27 mph'],
+        ['bl3s', 'Brushless 3S', 'A 3,200 kV brushless on 3S, ~0.9 kW · 0-30 ~1.7 s · ~45 mph'],
+        ['bl6s', 'Brushless 6S', 'A 4074 2,050 kV on 6S, ~2.5 kW, speed-run gearing · 0-40 ~2.4 s · ~62 mph'],
+      ],
+      eng: {
+        brushed: { hint: 'RC truck (Brushed 2S): shift up (E) for DRIVE - the ready-to-run brushed 550 motor on a 2S pack, ~180 W through the same 4WD: ~27 mph, gentle enough to learn it on. The stability control is on (Sport, T for Off). C for the view from the cab.',
+          info: 'The RC truck with its stock brushed motor: a 550-size can on 2S (7.4 V), ~20,000 rpm, ~180 W, 12:1 overall · 2.35 kg · 0-20 ~1.2 s, ~27 mph',
+          trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 2, whK: 0.05, whPure: 1, whine: 1, rpmRef: 20000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+        bl6s: { hint: 'RC truck (Brushless 6S): shift up (E) for DRIVE - a 4074 2,050 kV brushless on 6S, ~2.5 kW in a 3.4 kg truck: ~62 mph. Feed the throttle in - with the stability control off (T) it spins the wheels at any speed and swaps ends in a turn. C for the view from the cab.',
+          info: 'The RC truck built for speed runs: a 4074 2,050 kV brushless on 6S (22.2 V), ~45,500 rpm, ~2.5 kW, 11.5:1 overall, stiffer springs · 3.4 kg · 0-40 ~2.4 s, ~62 mph',
+          trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1.15, rpmRef: 45500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      } },
+    coach: { btn: 'TOUR COACH', sub: 'A 45 ft three-axle motorcoach · 12 L turbo diesel, Allison 6-speed · stock and governed, an X15 swap with a tune, or a 1,500 hp race coach', paint: 'Alpine White', tc: 0, cam: [2.2, 1.9], road: true, noPkg: true, soot: 0.35,
+      hint: 'Tour coach: shift up (E) for DRIVE - 18 t and 410 hp: 0-60 in ~36 s, governed at 75 mph. It takes the whole road to turn (a 7.7 m wheelbase - swing wide), and the air brakes need room. The tag axle behind the drive axle scrubs in tight turns.',
+      info: 'A 45 ft motorcoach of the MCI J4500 kind: 13.84 m long, 2.59 m wide, 3.5 m tall · the white body with the black glass band, the front cap over the big two-piece windshield with the fleet number, rabbit-ear mirrors, the entry door, baggage bays, the D&F Travel brush-stroke swoosh · a steer axle, the drive axle on duals and a tag axle, all on polished aluminium wheels · 12 L inline-six turbo diesel at the back, 410 hp, 1,450 lb-ft · Allison 6-speed automatic, 3.58 gears · air suspension, air brakes with ABS · ~18 t loaded · 0-60 ~36 s, governed at 75 mph',
+      trans: '6-speed auto (Allison)', tyres: '315/80R22.5',
+      snd: { nEng: 1, cyl: 6, fmul: 0.7, deep: 0.5, loud: 0.45, open: 0.2, whK: 0.19, whPure: 1, whine: 1.0, rpmRef: 2100, race: 0.1, rough: 0.2, turbo: 1, diesel: 0.75 },
+      optKey: 'coachEng', optLabel: 'Engine', options: [
+        ['stock', 'Stock 410 hp', 'The 12 L turbo diesel, 410 hp, 1,450 lb-ft · 6-speed auto · 0-60 ~36 s · governed at 75 mph'],
+        ['tuned', 'X15 swap + tune', 'A 15 L swapped in and turned up, 605 hp, 2,050 lb-ft · the governor off · 0-60 ~27 s · ~95 mph'],
+        ['race', 'Race coach', 'A built 15 L on compound turbos, 1,500 hp, 3,900 lb-ft · 0-60 ~13 s · ~135 mph - in an 18 t coach'],
+      ],
+      eng: {
+        tuned: { hint: 'Tour coach, X15 swap: shift up (E) for DRIVE - a 15 L in the back turned up to 605 hp and 2,050 lb-ft, the governor off: 0-60 in ~27 s and ~95 mph. Still 18 t: brake early, turn wide.',
+          info: 'The coach with a 15 L inline-six swapped in and tuned - 605 hp, 2,050 lb-ft - taller 3.36 gears and the speed governor off · ~18.3 t · 0-60 ~27 s, ~95 mph', soot: 0.8,
+          snd: { nEng: 1, cyl: 6, fmul: 0.68, deep: 0.6, loud: 0.65, open: 0.35, whK: 0.19, whPure: 1, whine: 1.3, rpmRef: 2100, race: 0.25, rough: 0.2, turbo: 1, diesel: 0.65 } },
+        race: { hint: 'Race coach: shift up (E) for DRIVE - a built 15 L on compound turbos, 1,500 hp and 3,900 lb-ft through the Allison: 0-60 in ~13 s, ~135 mph, in 18 t of coach. It rolls coal off the line. Leave a LOT of room to stop.',
+          info: 'The coach built to race: a 15 L inline-six on compound turbos (~80 psi), 1,500 hp, 3,900 lb-ft, revving to 2,800 · a built Allison, 3.08 gears, a locked rear diff, bigger brakes · ~18.5 t · 0-60 ~13 s, 1/4 mile ~20 s at 81 mph, ~135 mph', soot: 1.4,
+          snd: { nEng: 1, cyl: 6, fmul: 0.66, deep: 0.75, loud: 0.95, open: 0.6, whK: 0.19, whPure: 1, whine: 1.9, rpmRef: 2800, race: 0.7, rough: 0.25, turbo: 1, diesel: 0.55, surge: 1 } },
+      } },
+    busderby: { btn: 'DERBY BUS', sub: 'A school bus stripped for the demolition derby · graffiti, the glass out, a cage · the DT466 diesel, a 454 big-block or a blown 572 · the cowcatcher on or off · its own arena', paint: 'Bus Yellow', tc: 3, cam: [1.75, 1.6], map: 'arena', noPkg: true, soot: 0.5,
+      toggle: { key: 'busCow', label: 'Cowcatcher', on: 'Bolted on', off: 'Off', note: 'A welded V-plow of bars off the front bumper: 350 kg on the nose, and it reaches 0.8 m further - it takes the hits and shoves the junk aside' },
+      hint: 'Derby bus: shift up (E) for DRIVE - the stock DT466 diesel, 210 hp in 7.8 t: 0-60 in ~40 s, ~68 mph. Traction control is off - it\'s a derby. Hit things with the cowcatcher (Esc → Drive to take it off). It brought you to the arena: the junk cars are there to be crushed.',
+      info: 'A conventional school bus (an International 3800 kind: the hood out front, a 5.6 m wheelbase) stripped for the demolition derby: every pane knocked out, a mesh over the windshield, most of the seats pulled, a roll cage round the driver, the crew\'s graffiti sprayed all over the faded yellow - GFP 95, Dave, Lawn, Nick 69 - orange steel wheels, duals at the back · the cowcatcher: a welded V of steel bars off the bumper · the DT466 diesel, 210 hp, 520 lb-ft · Allison 5-speed, 5.29 gears · ~7.8 t · 0-60 ~40 s, ~68 mph',
+      trans: '5-speed auto (Allison)', tyres: '11R22.5 recaps',
+      snd: { nEng: 1, cyl: 6, fmul: 0.78, deep: 0.35, loud: 0.6, open: 0.7, whK: 0.19, whPure: 1, whine: 0.8, rpmRef: 2800, race: 0.3, rough: 0.3, turbo: 1, diesel: 0.9 },
+      optKey: 'derbyEng', optLabel: 'Engine', options: [
+        ['dt466', 'DT466 diesel', 'The stock 7.6 L inline-six diesel, 210 hp, 520 lb-ft · 5-speed auto · 0-60 ~40 s · ~68 mph'],
+        ['bigblock', '454 big-block', 'A junkyard 454 big-block gas V8, 390 hp, 500 lb-ft, open headers · 0-60 ~20 s · ~89 mph'],
+        ['blown', 'Blown 572', 'A 572 big-block under a roots blower, 900 hp, 850 lb-ft · 0-60 ~11 s · ~114 mph - it smokes the duals'],
+      ],
+      eng: {
+        bigblock: { hint: 'Derby bus, 454 big-block: shift up (E) for DRIVE - a junkyard 454 gas V8 on open headers, 390 hp: 0-60 in ~20 s, ~89 mph. Traction control is off. The cowcatcher comes off in Esc → Drive.',
+          info: 'The derby bus with a 454 big-block gas V8 swapped in: 390 hp, 500 lb-ft, open headers out the side · the 5-speed on 4.33s · ~7.55 t · 0-60 ~20 s, ~89 mph', soot: 0,
+          snd: { nEng: 1, cyl: 8, fmul: 0.86, deep: 0.5, loud: 0.85, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5200, race: 0.75, rough: 0.35 } },
+        blown: { hint: 'Derby bus, blown 572: shift up (E) for DRIVE - a 572 big-block under a roots blower, 900 hp: 0-60 in ~11 s, ~114 mph, and it lights up the duals in the first three gears. Traction control is off.',
+          info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
+          snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
+      } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
       info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
@@ -19780,14 +20635,19 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (a kart is 6 ft long and sits a foot off the ground: in close and low)
   // (a racing mower is 7 ft long with its driver sitting up 4 ft off the ground)
   const CAMK = CC ? CCD.cam[0] : PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : MOWER ? 0.68 : 1, CAMH = CC ? CCD.cam[1] : PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : MOWER ? 0.8 : 1;
+  // (MINI: a scale model's size against a real car - the RC truck's 0.12: the chase camera's minimums, the cockpit's head
+  // movement and near plane, and the smoke and dust come down with it)
+  const MINI = CC && CCD.scale ? CCD.scale : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
+  // (a car's on/off fitting - the derby bus's cowcatcher: its spec changes when it's off)
+  if (CC && CCD.toggle && S[CCD.toggle.key] === false && VEH.CARS[S.car].cow) Object.assign(carSpec, VEH.CARS[S.car].cow.off);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
   // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
   // (the dune buggy has two packages: its dune tyres - true - or off-road knobbies - 'knobby')
-  const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
+  const OFFROAD = () => !(CC && CCD.noPkg) && !!(S.offroad && S.offroad[S.car]);
   // (the trophy truck too: its mud-terrains - true - or sand paddles - 'paddle')
   const PKG_KIND = () => { const v = S.offroad && S.offroad[S.car]; return typeof v === 'string' ? v : null; };
   const pkg = () => VEH.OFFROAD_PKG(S.car, CARDEF.cls, PKG_KIND());
@@ -19971,7 +20831,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
-      : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius })) : CAR.build(THREE, o);
+      : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius, cow: id !== S.car || S.busCow !== false })) : CAR.build(THREE, o);
   }
   // (a vehicle's CARS entry from its id and option key - engine, class or version)
   function defOf(id, opt) {
@@ -20183,7 +21043,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       desc: 'The Avenger: a rounded hot-rod coupe body in lime green, yellow-to-orange flames licking back from the nose outlined in red, the name across the doors, a wall of stickers under it, dark windows, the zoomies out of the rear fenders - on the same chassis, engine, axles, shocks and tyres as the other truck, so it drives the same.',
       btn: 'AVENGER', tc: 3 },
     // (the Car Crushers 2 cars, a card each - see CC_CARS)
-    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options })),
+    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options, toggle: c.toggle })),
   ];
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
@@ -20242,6 +21102,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         const b = el(`<button class="mopt ${sel ? 'on' : ''}"><b>${label}</b><span>${note}</span></button>`);
         b.addEventListener('click', () => pickCar(m.id, key));
         opts.appendChild(b);
+      }
+      // (an on/off fitting - the derby bus's cowcatcher: flip it here; driving that car, it restarts with it changed)
+      if (m.toggle) {
+        const T = m.toggle, tg = el('<div class="mopts"></div>');
+        for (const [val, lab] of [[true, T.on], [false, T.off]]) {
+          const b = el(`<button class="mopt ${S[T.key] !== false === val ? 'on' : ''}"><b>${T.label}: ${lab}</b><span>${val ? T.note : 'The plain bumper'}</span></button>`);
+          b.addEventListener('click', () => { if (carLocked()) return; S[T.key] = val; saveS(); if (S.car === m.id) location.reload(); else openMoreCars(); });
+          tg.appendChild(b);
+        }
+        card.appendChild(tg);
       }
       list.appendChild(card);
     }
@@ -20416,6 +21286,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
       if (CC && CCD.options) add(row(CCD.optLabel || 'Engine', (CCD.optLabel ? 'Switching' : 'Swapping engines') + ' restarts the game (each keeps its own Fun-tab tune)',
         seg(CCD.options.map((o) => [o[0], o[1]]), CARDEF.engine || 'ev', (v) => { if (v !== (CARDEF.engine || 'ev')) pickCar(S.car, v); })));
+      if (CC && CCD.toggle) add(row(CCD.toggle.label, CCD.toggle.note + ' · changing it restarts the game',
+        seg([[true, CCD.toggle.on], [false, CCD.toggle.off]], S[CCD.toggle.key] !== false, (v) => { if (carLocked() || v === (S[CCD.toggle.key] !== false)) return; S[CCD.toggle.key] = v; saveS(); location.reload(); })));
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
@@ -20448,7 +21320,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           if (carLocked()) return;
           S.offroad = Object.assign({}, S.offroad, { trophy: v }); applyVehicleSettings();
         })));
-      else add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
+      else if (!(CC && CCD.noPkg)) add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
@@ -20781,6 +21653,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
       if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
+      if (MINI < 1) { const k = Math.sqrt(MINI); rate *= 3 * k; size *= k * 0.6; grow *= k; up *= k; }   // (a scale model's: little puffs)
       { const m = G.smk[i]; m[0] = rate * tune.smoke; m[1] = alpha; m[2] = size; m[3] = shade; m[4] = grow; m[5] = life; m[6] = up; }
       if (S.dust === 'small') { rate *= DUST_SMALL.rate; alpha = Math.min(alpha, DUST_SMALL.alpha); size = Math.min(size, DUST_SMALL.size); grow = Math.min(grow, DUST_SMALL.grow); life = Math.min(life, DUST_SMALL.life); up = Math.min(up, DUST_SMALL.up); }
       // (a cloud already filling the screen many times over gets its new puffs fewer but denser: same look, a
@@ -20792,8 +21665,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       while (G.emitAcc[i] >= 1) {
         G.emitAcc[i] -= 1;
         const back = w.omega * w.radius - (veh.vx * fx + veh.vz * fz);
-        smoke.emit(w.cpx + (Math.random() - 0.5) * 0.3, w.cpy + 0.15 + Math.random() * 0.1, w.cpz + (Math.random() - 0.5) * 0.3,
-          veh.vx * 0.3 - fx * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2, 0.4 + Math.random() * (0.8 + up), veh.vz * 0.3 - fz * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2,
+        smoke.emit(w.cpx + (Math.random() - 0.5) * 0.3 * MINI, w.cpy + (0.15 + Math.random() * 0.1) * MINI, w.cpz + (Math.random() - 0.5) * 0.3 * MINI,
+          veh.vx * 0.3 - fx * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2 * MINI, (0.4 + Math.random() * (0.8 + up)) * Math.sqrt(MINI), veh.vz * 0.3 - fz * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2 * MINI,
           size * (0.8 + Math.random() * 0.4), grow, life * (0.7 + Math.random() * 0.6), alpha, shade);
       }
     }
@@ -20916,12 +21789,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (!cam.dragging && cam.orbitT > 0) cam.orbitT -= dt;
     if (!cam.dragging && cam.orbitT <= 0) { cam.orbitYaw *= Math.exp(-dt * 3); cam.orbitPitch *= Math.exp(-dt * 3); }
     if (cam.mode === 2) {
-      camera.near = 0.02;
+      camera.near = 0.02 * Math.max(MINI, 0.2);
       // head: g-force lean + look into corners
       // (a dragster's 5 g shoves your head a little further back into the rest)
       const tx = clamp(-veh.gLat * 0.025, -0.05, 0.05), tz = clamp(veh.gLong * 0.02, -0.04, DRAGSTER ? 0.08 : 0.04);
-      cam.head.x += (tx - cam.head.x) * Math.min(1, dt * 6); cam.head.z += (tz - cam.head.z) * Math.min(1, dt * 6);
-      cam.head.y = (veh.fuelCut ? (Math.random() - 0.5) * 0.004 : 0) + (Math.random() - 0.5) * 0.0015 * clamp(Math.abs(speed) / 60, 0, 1);
+      cam.head.x += (tx * MINI - cam.head.x) * Math.min(1, dt * 6); cam.head.z += (tz * MINI - cam.head.z) * Math.min(1, dt * 6);
+      cam.head.y = ((veh.fuelCut ? (Math.random() - 0.5) * 0.004 : 0) + (Math.random() - 0.5) * 0.0015 * clamp(Math.abs(speed) / 60, 0, 1)) * MINI;
       // tractor: sitting on the frame right behind the engines, everything shakes
       if (PULLER && veh.running) { const sh = 0.0025 + 0.007 * clamp(veh.thrEff, 0, 1); cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.5; }
       // dragster: the engine is bolted to the frame right behind your seat - and 5 g shoves your head back
@@ -20931,7 +21804,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       }
       const hy = (G.lookBack ? Math.PI * 0.92 : -veh.steerAngle * 0.4);
       cam.headYaw += (hy - cam.headYaw) * Math.min(1, dt * 5);
-      _v.copy(car.eye).add(cam.head); _v.y += S.seatY; _v.z += S.seatZ;
+      _v.copy(car.eye).add(cam.head); _v.y += S.seatY * MINI; _v.z += S.seatZ * MINI;
       car.root.localToWorld(_v);
       camera.position.copy(_v);
       yawQ.setFromAxisAngle(Y, cam.headYaw + cam.orbitYaw);
@@ -20942,9 +21815,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       camera.quaternion.copy(camQ);
       camera.fov = S.fov;
     } else {
-      camera.near = 0.1;
+      camera.near = 0.1 * Math.max(MINI, 0.3);
       const far = cam.mode === 1;
-      const dist = (far ? 10.5 : 6.4) * CAMK * cam.zoom + clamp(Math.abs(speed) * 0.012, 0, 1.2);
+      const dist = (far ? 10.5 : 6.4) * CAMK * cam.zoom + clamp(Math.abs(speed) * 0.012, 0, 1.2) * MINI;
       const height = (far ? 3.3 : 1.95) * CAMH * (0.75 + 0.25 * cam.zoom);
       // heading smoothing (flat forward)
       let fx = a.fx, fz = a.fz; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
@@ -20962,9 +21835,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       dir.applyAxisAngle(Y, cam.orbitYaw);
       const hgt = height + cam.orbitPitch * 4;
       camera.position.set(veh.px - dir.x * dist, cam.yS + hgt, veh.pz - dir.z * dist);
-      const gh = groundH(camera.position.x, camera.position.z) + 0.6;
+      const gh = groundH(camera.position.x, camera.position.z) + 0.6 * Math.max(MINI, 0.25);
       if (camera.position.y < gh) camera.position.y = gh;
-      _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
+      _v.set(veh.px + dir.x * 2.2 * MINI * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * MINI * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
       if (BIG && !ROADCC && veh.running && !ENG_SND.ev) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
@@ -21017,13 +21890,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       cut: veh.fuelCut ? 1 : 0, boost: veh.boost, run: veh.running ? 1 : 0, crank: veh.cranking ? 1 : 0,
       squeal, sqPitch: pitch, spin, speed, surf: rw.contact ? rw.surface : 0, interior: cam.mode === 2 ? 1 : 0,
       horn: G.horn ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol, rough: ENG_SND.rough || 0, whine: (BIG ? ENG_SND.whine : DRAGPAK ? 1.7 : DEMON ? 1.45 : 1) * tune.whine,
-      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() && !BIG ? 1 : 0,
+      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: (OFFROAD() && !BIG) || ENG_SND.rc ? 1 : 0,
       boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
-      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0,
     });
   }
   function processEvents() {

@@ -238,7 +238,7 @@
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
     // (the Car Crushers 2 cars' colours)
-    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2,
+    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e,
   };
 
   // ------------------------------------------------------------------ builder
