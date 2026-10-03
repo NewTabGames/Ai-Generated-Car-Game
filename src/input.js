@@ -227,6 +227,7 @@
         let ks = this.kbSteer;
         // keyboard: limit lock at speed, optional gentle countersteer help
         if (!this.rawSteer) ks *= physSteerLimit(speed, 10, 0.02, this.kbGeom);
+        else ks *= this.rawKbK || 1;
         if (st.kbCountersteer && vehicleYawHint !== undefined && tgt === 0) ks = clamp(ks + vehicleYawHint * 0.5, -1, 1);
         steer = ks; thr = Math.max(kbThr, padThr); brk = Math.max(kbBrk, padBrk); clu = this.kb('clutch') ? 1 : padClu;
       }

@@ -15,8 +15,9 @@ function mk(id, key, world) {
   for (let i = 0; i < 240; i++) { v.input.brake = 1; v.step(1 / 120); } v.input.brake = 0;
   return { v, def, sp };
 }
-// (the keyboard's lock at speed - or, for a vehicle that scales its own (steerAScale: the unicycle), the key held, raw)
-const kbLim = (def, sp, s) => !def.kbLat || sp.steerAScale ? 1 : Math.min(1, Math.atan(sp.wheelbase * def.kbLat / Math.max(1, s * s)) / sp.maxSteer);
+// (the keyboard's lock at speed - or, for a vehicle that scales its own (steerAScale: the unicycle), the key held, raw,
+// cut to kbAScale/steerAScale)
+const kbLim = (def, sp, s) => sp.steerAScale ? (sp.kbAScale ? Math.min(1, sp.kbAScale / sp.steerAScale) : 1) : !def.kbLat ? 1 : Math.min(1, Math.atan(sp.wheelbase * def.kbLat / Math.max(1, s * s)) / sp.maxSteer);
 function run(id, key) {
   const out = [], UNI = id === 'unicycle';
   { const { v } = mk(id, key); const T = {}; let t = 0, qm = null, mxP = 0, mxR = 0;

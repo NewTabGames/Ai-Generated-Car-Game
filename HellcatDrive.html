@@ -5369,7 +5369,7 @@
     springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
     arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
-    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4, kbAScale: 3.5,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
     uni: { kp: 300, kd: 35 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
@@ -6799,6 +6799,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         let ks = this.kbSteer;
         // keyboard: limit lock at speed, optional gentle countersteer help
         if (!this.rawSteer) ks *= physSteerLimit(speed, 10, 0.02, this.kbGeom);
+        else ks *= this.rawKbK || 1;
         if (st.kbCountersteer && vehicleYawHint !== undefined && tgt === 0) ks = clamp(ks + vehicleYawHint * 0.5, -1, 1);
         steer = ks; thr = Math.max(kbThr, padThr); brk = Math.max(kbBrk, padBrk); clu = this.kb('clutch') ? 1 : padClu;
       }
@@ -21031,6 +21032,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
   if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
   input.rawSteer = !!sp.steerAScale;           // (the RC truck and the unicycle scale their own lock with speed: the keys and the stick go in raw)
+  // (...a held key still turns only as hard as kbAScale, m/s^2 - the unicycle's rider can't lean past ~0.35 g)
+  input.rawKbK = sp.steerAScale && sp.kbAScale ? Math.min(1, sp.kbAScale / sp.steerAScale) : 1;
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 

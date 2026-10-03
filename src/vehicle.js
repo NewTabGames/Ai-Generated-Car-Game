@@ -3504,7 +3504,7 @@
     springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
     arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
-    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4, kbAScale: 3.5,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
     uni: { kp: 300, kd: 35 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
