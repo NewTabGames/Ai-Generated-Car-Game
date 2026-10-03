@@ -318,6 +318,13 @@
     chevR: { name: '255/60R17 redline radial', short: 'Redline radials', width: 0.255,
       muX: 1.2, muY: 1.02, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.18, relaxY: 0.38,
       B: 1.75, C: 1.4, E: -0.22, heatCap: 3600, cold: 0.95, coldT: 10, warmT: 40, hotT: 110, overheat: 0.003, prep: 1.08 },
+    // the Superbird: F70-14 Goodyear Polyglas GTs - bias-belted, 1970's best street tyre, a long way short of a radial's grip
+    sbirdF: { name: 'F70-14 Polyglas GT', short: 'F70-14 Polyglas', width: 0.21,
+      muX: 1.02, muY: 0.92, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.19, relaxY: 0.42,
+      B: 1.65, C: 1.4, E: -0.2, heatCap: 3200, cold: 0.95, coldT: 10, warmT: 40, hotT: 105, overheat: 0.0032, prep: 1.05 },
+    sbirdR: { name: 'F70-14 Polyglas GT', short: 'F70-14 Polyglas', width: 0.21,
+      muX: 1.05, muY: 0.93, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.19, relaxY: 0.42,
+      B: 1.65, C: 1.4, E: -0.2, heatCap: 3300, cold: 0.95, coldT: 10, warmT: 40, hotT: 105, overheat: 0.0032, prep: 1.06 },
     // the unicycle: a 24 x 2.125 tyre on a 24 in wheel, round in section (it leans on it like a bike's)
     uni24: { name: '24 x 2.125 unicycle tyre', short: '24 in tyre', width: 0.054,
       muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
@@ -3293,6 +3300,36 @@
     CdA: 0.95,
     bodyHalfW: 0.96, bodyFront: -2.24, bodyRear: 2.77, bodyBottom: -0.35, bodyTop: 0.8, bodyPts: chevPts(0.53, 0.56),
   } };
+  // Plymouth Superbird (1970): the Road Runner built for NASCAR's superspeedways - the nose cone with its hidden lamps 19 in
+  // out ahead of the fenders, the flush back window, the wing up on its two uprights - 1,935 of them for the street. The
+  // 440 Super Commando four-barrel - 375 hp at 4,600, 480 lb-ft at 3,200 - a 727 TorqueFlite, an 8 3/4 Sure-Grip on 3.23s,
+  // F70-14 Polyglas on 14 in Rallyes; 1,800 kg with the driver, 56 / 44. The nose and the wing make real downforce (the
+  // race cars ran 200 mph on it); on the street they make it slippery: ~125 mph where the 3.23s run out of revs.
+  // (the 440 Six Barrel and the 426 Hemi: CARS.superbird.make)
+  const sbirdPts = (cg, fw) => ccPts(cg, fw, 2.946, [...ccBox(0.95, 0.24, 0.9, -2.85, 2.66), [-0.62, 1.32, 0.0], [0.62, 1.32, 0.0], [-0.62, 1.28, -0.3], [0.62, 1.28, -0.3],
+    [-0.62, 1.05, 1.2], [0.62, 1.05, 1.2], [-0.82, 1.56, 2.4], [0.82, 1.56, 2.4], [-0.72, 0.5, -2.92], [0.72, 0.5, -2.92]]);
+  CARS.superbird = { name: 'Plymouth Superbird', short: 'Superbird', car: '440 SUPER COMMANDO', hp: 375, tq: 480, cc: true, kbLat: 6.5, spec: {
+    name: 'Plymouth Superbird',
+    mass: 1800, Ipitch: 3600, Iyaw: 3800, Iroll: 640, cgHeight: 0.52, wheelbase: 2.946, frontWeight: 0.56,
+    trackF: 1.516, trackR: 1.504, wheelRadius: 0.325, wheelInertiaF: 1.2, wheelInertiaR: 1.3,
+    frontTire: 'sbirdF', rearTire: 'sbirdR',
+    // (torsion bars in front, leaf springs at the back - the heavy-duty package)
+    springF: 40000, springR: 32000, dampBumpF: 2600, dampRebF: 3900, dampBumpR: 2500, dampRebR: 3700,
+    arbF: 24000, arbR: 6000, travelUp: 0.09, travelDown: 0.11, suspS0: 0.28,
+    brakeTorqueF: 3000, brakeTorqueR: 1500, handbrakeTorque: 1500, noABS: true,
+    maxSteer: 0.6, steerRate: 3.8, steerRatio: 17,
+    idleRpm: 750, limiterRpm: 5800, redlineRpm: 5600, shiftRpm: 5400, engineInertia: 0.3, fricA: 28, fricB: 20, starterTorque: 200,
+    // (lb-ft: 480 at 3,200, 375 hp at 4,600)
+    torqueCurve: [[0, 300], [1000, 380], [2000, 445], [2800, 475], [3200, 480], [3600, 476], [4000, 462], [4600, 428], [5000, 395], [5400, 355], [5800, 310], [6200, 260]],
+    boostMax: 0, popScale: 1,
+    // (the 727 TorqueFlite: 2.45 / 1.45 / 1.00)
+    autoRatios: [2.45, 1.45, 1.0], autoRev: 2.2, autoFinal: 3.23, tcK: 0.0105, tcStall: 2.0, noLockup: true,
+    shiftTimeWOT: 0.3, shiftTimePart: 0.45,
+    lsdPreload: 150, lsdRamp: 0.35, driveEff: 0.85,
+    // (the slipperiest car Detroit had built - the wing and the nose push it down where they are)
+    CdA: 0.66, wings: [{ ClA: 0.38, CdA: 0.05, z: 2.55, y: 1.0 }, { ClA: 0.16, CdA: 0, z: -2.6, y: -0.24 }],
+    bodyHalfW: 0.97, bodyFront: -2.77, bodyRear: 2.84, bodyBottom: -0.3, bodyTop: 0.81, bodyPts: sbirdPts(0.52, 0.56),
+  } };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
   // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
@@ -3829,6 +3866,21 @@
       steerAMax: 5, CdA: 0.58,
     } },
   }, 'pedal', 'Pedal');
+  // the Superbird's other two engines: the 440 Six Barrel (three Holley two-barrels on an Edelbrock manifold, 390 hp at
+  // 4,700, 490 lb-ft at 3,200) and the 426 Hemi (two four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 - it revs to 6,500;
+  // 3.55s behind it, a heavier front end)
+  ccEngines('superbird', {
+    six: { label: '440 Six Barrel', car: '440 SIX BARREL', hp: 390, tq: 490, spec: {
+      limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5600,
+      torqueCurve: [[0, 300], [1000, 385], [2000, 455], [2800, 485], [3200, 490], [3600, 487], [4000, 474], [4700, 436], [5200, 400], [5600, 365], [6000, 320], [6400, 270]],
+      autoFinal: 3.55,
+    } },
+    hemi: { label: '426 Hemi', car: '426 HEMI', hp: 425, tq: 490, spec: {
+      mass: 1830, frontWeight: 0.57, idleRpm: 900, limiterRpm: 6500, redlineRpm: 6300, shiftRpm: 6100, engineInertia: 0.32, fricA: 30, fricB: 22,
+      torqueCurve: [[0, 260], [1000, 340], [2000, 410], [3000, 465], [4000, 490], [4500, 481], [5000, 446], [5500, 410], [6000, 370], [6500, 320], [7000, 260]],
+      autoFinal: 3.55, tcStall: 2.2, lsdPreload: 200, bodyPts: sbirdPts(0.52, 0.57),
+    } },
+  }, 'c440', '440 Super Commando');
   // Fun-tab tuning: rebuild spec s from the stock spec b and the tune t (shared by the game and the tests)
   function tuneSpec(s, b, t) {
     // (an electric motor has no boost, idle, nitrous, exhaust or launch rpm: those settings leave it alone)

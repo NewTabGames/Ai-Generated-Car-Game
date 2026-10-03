@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal', sbirdEng: 'c440',
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -351,6 +351,24 @@
       info: '1970 Chevrolet Chevelle SS 454 sport coupe: the long hood with the cowl-induction bulge, the full-width grille with its quad headlamps and the bar across, a chrome bumper wrapping the corners with the parking lamps in it, the semi-fastback roof with its sail panels and black vinyl top, the rear wheels under the coke-bottle hips, tail lamps in the rear bumper, red stripes over the hood and the deck, a red interior · LS6 454 V8, 450 hp at 5,600, 500 lb-ft at 3,600 · TH400 3-speed automatic, 12-bolt posi on 3.77s · 17 in five-spokes on redline radials · 5.01 m long, 2.85 m wheelbase · ~1,830 kg · 0-60 ~5.4 s, ~13.8 s quarter mile, ~130 mph',
       trans: '3-speed auto (TH400)', tyres: 'Redline radials',
       snd: { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.5, loud: 0.75, open: 0.5, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6000, race: 0.35, rough: 0.15 } },
+    superbird: { btn: 'SUPERBIRD', sub: 'The 1970 Plymouth Superbird · the nose cone and the wing NASCAR banned · a 440 four-barrel, the 440 Six Barrel or the 426 Hemi · TorqueFlite 3-speed', paint: 'Vitamin C', tc: 0, cam: [1.12, 1.05], road: true,
+      hint: 'Superbird: shift up (E) for DRIVE - the 440 Super Commando, 375 hp and 480 lb-ft through a TorqueFlite 3-speed and a Sure-Grip on 3.23s: 0-60 in ~6 s, a ~14.7 s quarter. Bias-belted tyres and no ABS - it was built for Talladega, not for corners. The nose and the wing hold it down the faster it goes. Lights (L) swing the headlamp doors up.',
+      info: '1970 Plymouth Superbird: a Road Runner with the aero package that won Petty and the others 8 races in 1970 - the pointed nose cone 19 in out ahead of the fenders with the headlamps hidden behind flip-up doors, the reverse scoops on the front fenders, the flush back window under a black vinyl top, the wing up on two swept uprights over the deck, PLYMOUTH in script down the quarters and the Road Runner on the uprights · 440 Super Commando V8, 375 hp at 4,600, 480 lb-ft at 3,200 · 727 TorqueFlite 3-speed, 8 3/4 Sure-Grip on 3.23s · F70-14 Polyglas on Rallye wheels · 5.62 m long, 2.95 m wheelbase · ~1,800 kg · 0-60 ~6.3 s, ~14.7 s quarter mile, ~125 mph',
+      trans: '3-speed auto (TorqueFlite)', tyres: 'F70-14 Polyglas GT',
+      snd: { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.5, loud: 0.75, open: 0.5, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5600, race: 0.35, rough: 0.15 },
+      optKey: 'sbirdEng', optLabel: 'Engine', options: [
+        ['c440', '440 Super Commando', 'The 440 four-barrel · 375 hp · 480 lb-ft · 3.23s · 0-60 ~6.3 s · ~125 mph'],
+        ['six', '440 Six Barrel', 'Three two-barrels on the 440 · 390 hp · 490 lb-ft · 3.55s · 0-60 ~6.3 s · ~14.6 s quarter'],
+        ['hemi', '426 Hemi', 'The Street Hemi, two four-barrels · 425 hp · 490 lb-ft · 3.55s · ~14.5 s quarter at 107 mph · ~130 mph'],
+      ],
+      eng: {
+        six: { hint: 'Superbird, 440 Six Barrel: shift up (E) for DRIVE - three Holley two-barrels on the 440, 390 hp and 490 lb-ft, the TorqueFlite and 3.55s: it pulls harder off the line and runs out of revs sooner. The outer two carbs open when you floor it.',
+          info: 'The Superbird with the 440 Six Barrel: three Holley two-barrels on an Edelbrock aluminium manifold, 390 hp at 4,700, 490 lb-ft at 3,200 · 727 TorqueFlite, Sure-Grip on 3.55s · ~1,800 kg · 0-60 ~6.3 s, ~14.6 s quarter mile',
+          snd: { nEng: 1, cyl: 8, fmul: 0.9, deep: 0.5, loud: 0.8, open: 0.55, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5900, race: 0.4, rough: 0.15 } },
+        hemi: { hint: 'Superbird, 426 Hemi: shift up (E) for DRIVE - the Street Hemi, two Carter four-barrels, 425 hp at 5,000 and 490 lb-ft, revving to 6,500 through the TorqueFlite and 3.55s: a ~14.5 s quarter at 107 mph on bias-belted tyres. 135 of them were built.',
+          info: 'The Superbird with the 426 Street Hemi: hemispherical heads, two Carter AFB four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 · 727 TorqueFlite with a 2,300 rpm converter, Sure-Grip on 3.55s · ~1,830 kg · 0-60 ~6.3 s, ~14.5 s quarter mile at 107 mph, ~130 mph',
+          snd: { nEng: 1, cyl: 8, fmul: 0.88, deep: 0.55, loud: 0.9, open: 0.7, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6400, race: 0.55, rough: 0.2 } },
+      } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
       info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
