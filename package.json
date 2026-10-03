@@ -11,7 +11,8 @@
     "test": "node test/sim-test.js",
     "test:dragster": "node test/dragster-test.js",
     "test:puller": "node test/puller-test.js",
-    "test:audio": "node test/audio-test.js"
+    "test:audio": "node test/audio-test.js",
+    "test:tyres": "node test/tyre-look-test.js"
   },
   "keywords": [
     "threejs",

@@ -2,6 +2,7 @@
    treaded tyre), the black frame - its crown over the tyre, a leg down each side to the bearings - the seat post with its
    clamp, the saddle with its yellow bumpers fore and aft, the cranks straight on the hub (no gears, no freewheel) and the
    platform pedals, kept level. The rider sits up on it, arms out for balance, the legs following the pedals round.
+   With the off-road package, a mountain-unicycle knobby in place of the street tyre.
    The jet version: a model-aircraft-class turbojet on a rack behind the saddle, its flame out of the back, a fuel tank
    under it; the rider in goggles.
    The physics runs the one tyre as four wheels (two 'axles' 10 cm apart, two side by side at each): one wheel is drawn
@@ -106,10 +107,21 @@
     // at the middle of the physics' four, turning with them; the cranks and pedals on the hub (the pedals kept level)
     const hub = new THREE.Group(); dyn.add(hub);
     const spin = new THREE.Group(); hub.add(spin);
-    const W = 0.054, rimR = R - 0.04;
-    { const tyre = new THREE.TorusGeometry(R - W * 0.5, W * 0.5, 14, 64); tyre.rotateY(Math.PI / 2); add(spin, tyre, M.rubber, 0, 0, 0);
+    const W = 0.054, rimR = R - 0.04, tyreStock = [], tyreKnob = [];
+    { const tyre = new THREE.TorusGeometry(R - W * 0.5, W * 0.5, 14, 64); tyre.rotateY(Math.PI / 2); tyreStock.push(add(spin, tyre, M.rubber, 0, 0, 0));
       // (a block tread round the crown)
-      const N = 72; for (let k = 0; k < N; k++) for (const ox of (k & 1 ? [-0.012, 0.012] : [0])) { const b = add(spin, new THREE.BoxGeometry(0.012, 0.005, 0.014), M.rubber, ox, 0, 0, 0, 0, 0, false); b.geometry.translate(0, R - 0.002, 0); b.rotation.x = k * 2 * Math.PI / N; }
+      const N = 72; for (let k = 0; k < N; k++) for (const ox of (k & 1 ? [-0.012, 0.012] : [0])) { const b = add(spin, new THREE.BoxGeometry(0.012, 0.005, 0.014), M.rubber, ox, 0, 0, 0, 0, 0, false); b.geometry.translate(0, R - 0.002, 0); b.rotation.x = k * 2 * Math.PI / N; tyreStock.push(b); }
+      // (the off-road package: a mountain-unicycle knobby - a carcass under tall square knobs, three across the crown and
+      // four down the shoulders in turn, one merged mesh; shown in place of the street tyre by setTires)
+      { const kh = 0.009, r = W * 0.5, Rc = R - kh * 0.6 - r, NK = Math.round(2 * Math.PI * R / 0.032), pos = [], nrm = [];
+        for (let k = 0; k < NK; k++) for (const ph of (k & 1 ? [-1.15, -0.4, 0.4, 1.15] : [-0.78, 0, 0.78])) {
+          const b = new THREE.BoxGeometry(W * 0.2, kh * 2, 0.017).toNonIndexed();
+          b.rotateZ(-ph); b.translate((r + kh * 0.4) * Math.sin(ph), Rc + (r + kh * 0.4) * Math.cos(ph), 0); b.rotateX(k * 2 * Math.PI / NK);
+          pos.push(...b.attributes.position.array); nrm.push(...b.attributes.normal.array);
+        }
+        const kg = new THREE.BufferGeometry(); kg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); kg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+        const carc = new THREE.TorusGeometry(Rc, r, 14, 64); carc.rotateY(Math.PI / 2);
+        for (const g of [carc, kg]) { const m = add(spin, g, M.rubber, 0, 0, 0); m.visible = false; tyreKnob.push(m); } }
       const rim = new THREE.TorusGeometry(rimR, 0.008, 6, 64); rim.rotateY(Math.PI / 2); rim.scale(2.2, 1, 1); add(spin, rim, M.rim, 0, 0, 0);
       add(spin, cylX(0.022, 0.022, 0.1, 16), M.alu, 0, 0, 0);
       for (const sx of [-1, 1]) add(spin, cylX(0.032, 0.032, 0.005, 20), M.alu, sx * 0.035, 0, 0);
@@ -277,7 +289,9 @@
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: new THREE.Group(), eye,
       exhaustTips: tips, materials: M, headlights: [], tailLens: [], mirrors: [],
-      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      setPaint, setLights, setInteriorVisible,
+      // (the off-road package's knobby - ccKnob - in place of the street tyre)
+      setTires(front, rear) { const on = front === 'ccKnob' || rear === 'ccKnob'; for (const m of tyreStock) m.visible = !on; for (const m of tyreKnob) m.visible = on; }, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
       afterWheels, setRider, setJet: JET ? setJet : undefined, setJetSize: JET ? setJetSize : undefined, variant: 'unicycle', cls: JET ? 'jet' : 'pedal',
     };
   }

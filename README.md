@@ -204,3 +204,10 @@ node test/rc-test.js
 node test/bus-test.js
 node test/pops-test.js
 ```
+
+The tyre look test runs the game in headless Chromium, so it needs Playwright (`npm i -D playwright && npx playwright install chromium`; without it, it skips). It builds every vehicle - every title-screen car and More Cars card, each version - with every tyre choice the game offers it (the game's `tyreChoices()`), and fails if two choices are drawn the same. A new vehicle is checked automatically; a new tyre option belongs in `tyreChoices()` in `src/game.js`, and the vehicle's model has to show it in its `setTires(front, rear)`:
+
+```bash
+node test/tyre-look-test.js                      # all vehicles
+ONLY=bike,unicycle node test/tyre-look-test.js   # just these
+```

@@ -675,6 +675,20 @@
     if (C[id] && C[id].make) return C[id].make(opt || undefined);
     return C[id] && !C[id].more ? C[id] : C.hellcat;
   }
+  // every pair of tyres the game can put on a vehicle (with that option): its own, the off-road package in each of its
+  // kinds, a Car Crushers car's tyre options, the Hellcat's drag radials, the Drag Pak's rears. test/tyre-look-test.js
+  // builds every vehicle's model and checks each pair is drawn differently - a menu that offers tyres lists them here
+  function tyreChoices(id, opt) {
+    const def = defOf(id, opt), cc = CC_CARS[id], out = [];
+    const add = (f, r) => { if (!out.some((o) => o[0] === f && o[1] === r)) out.push([f, r]); };
+    const f0 = def.spec.frontTire || VEH.SPEC.frontTire, r0 = def.spec.rearTire || VEH.SPEC.rearTire;
+    add(f0, r0);
+    if (id === 'hellcat') add('street', 'drag');
+    if (id === 'dragpak') { add(f0, 'etdrag'); add(f0, 'etdragpro'); }
+    if (cc && cc.tyreOpts) for (const t of cc.tyreOpts) add(t[0], t[0]);
+    if (!(cc && cc.noPkg)) for (const k of id === 'trophy' ? [null, 'paddle'] : id === 'buggy' ? [null, 'knobby'] : [null]) { const p = VEH.OFFROAD_PKG(id, def.cls, k); add(p.front, p.rear); }
+    return out;
+  }
   const car = buildModel(S.car, CARDEF, sp, S.paint);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
@@ -2820,6 +2834,9 @@
   if (S.netRoom) onlineJoin(S.netRoom, true);
 
   window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE };
+  // (for the tests: every vehicle id and its options, and the builders the game itself uses - see tyreChoices)
+  Object.assign(window.__hc, { VEH, buildModel, defOf, tyreChoices, carIds: ['hellcat', 'demon', 'dragpak', ...MORE_IDS],
+    optionsOf: (id) => { const m = MORE_CARS.find((x) => x.id === id); return m && m.options ? m.options.map((o) => o[0]) : [undefined]; } });
   function loop(now) {
     requestAnimationFrame(loop);
     frame(now);
