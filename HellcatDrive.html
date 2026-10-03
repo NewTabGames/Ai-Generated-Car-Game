@@ -2849,12 +2849,11 @@
 
       // ---------------- steering rack + Ackermann
       let target = clamp(inp.steer || 0, -1, 1) * s.maxSteer;   // (|| 0: a NaN input must never poison the state)
-      // (steerAMax: the most cornering the rider can ride - the unicycle's 10 cm 'wheelbase' would ask for a turn no tyre
-      // or rider can make from any steering at speed: the lock is held to what makes steerAMax m/s^2 at this speed)
-      if (s.steerAMax) { const lim = Math.atan(s.wheelbase * s.steerAMax / Math.max(0.25, vFwd * vFwd)); target = clamp(target, -lim, lim); }
-      // (steerAScale: an RC transmitter's dual rate - the stick's whole travel spread over the lock that makes
-      // steerAScale m/s^2 at this speed. A 33 cm wheelbase at 60 mph turns on fractions of a degree: full lock there
-      // spun it, and a clamp would have put all of it in the stick's first tenth. The game passes the stick in raw)
+      // (steerAScale: the stick's whole travel spread over the lock that makes steerAScale m/s^2 at this speed - an RC
+      // transmitter's dual rate on the RC truck, the most cornering the rider can lean into on the unicycle. A 33 cm or
+      // a 10 cm wheelbase turns on fractions of a degree at speed: full lock spun the one and asked the other for a turn
+      // no rider can make, and a clamp at that lock put all of the turn in the stick's first tenth. The game passes the
+      // keys and the stick in raw for these)
       if (s.steerAScale) target *= Math.min(1, Math.atan(s.wheelbase * s.steerAScale / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
       // (gyro: an RC truck's stability gyro - Traxxas' TSM and the like. It reads the yaw rate and steers against any
       // rotation beyond what the steering asks for, so the tail stepping out is caught with countersteer before it
@@ -5370,7 +5369,7 @@
     springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
     arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
-    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAMax: 4,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
     uni: { kp: 300, kd: 35 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
@@ -5888,7 +5887,7 @@
       idleRpm: 3300, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
       torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, noCoastBlip: true,
       jet: { thrust: 550, ab: 0, idle: 0.33, rpm100: 10000, ram: 0.002, y: 0, z: 0.25, revTq: 40, revRpm: 100 },
-      steerAMax: 5, CdA: 0.58,
+      steerAScale: 5, CdA: 0.58,
     } },
     // the improved pedal one: a geared hub (the wheel turns 3.3 times to the cranks' once - a Schlumpf-type hub geared
     // far past any real one) and a track sprinter on clipless pedals (~1.6 kW at 130 rpm), tucked down: ~35 mph
@@ -21031,7 +21030,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const input = new INP.Input();
   // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
   if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
-  input.rawSteer = !!sp.steerAScale;           // (the RC truck scales its own lock with speed: the keys and the stick go in raw)
+  input.rawSteer = !!sp.steerAScale;           // (the RC truck and the unicycle scale their own lock with speed: the keys and the stick go in raw)
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
