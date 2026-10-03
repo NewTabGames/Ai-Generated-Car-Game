@@ -15,6 +15,8 @@
   function build(THREE, opts) {
     opts = opts || {};
     const JET = opts.engine === 'jet';
+    // (the improved pedal one: a geared hub - the cranks turn 0.3 times to the wheel's once, the physics' autoFinal)
+    const GEAR = opts.engine === 'improved', CRK = 0.3;
     const cgH = opts.cgHeight || 1.0, zOff = opts.zOff || 0;
     const cgToFront = opts.cgToFront || 0.05, cgToRear = opts.cgToRear || 0.05;
     const R = opts.wheelRadiusF || opts.wheelRadius || 0.305;
@@ -122,9 +124,12 @@
       for (const g of sp) add(spin, g, M.spoke, 0, 0, 0, 0, 0, 0, false);
     }
     const CR = 0.125, pedals = [];
+    // (geared: the cranks on their own axle through the hub, the fat hub shell round the gears)
+    const crankG = GEAR ? new THREE.Group() : spin; let crankA = 0, lastSpin = 0;
+    if (GEAR) { hub.add(crankG); add(spin, cylX(0.05, 0.05, 0.08, 24), M.alu, 0, 0, 0); for (const sx of [-1, 1]) add(spin, cylX(0.042, 0.042, 0.01, 24), M.black, sx * 0.043, 0, 0); }
     for (const sx of [-1, 1]) {
       // (the cranks opposite each other, the left one down at the start)
-      const arm = add(spin, rbox(0.018, CR + 0.03, 0.014, 0.006), M.black, sx * 0.075, sx < 0 ? -CR / 2 : CR / 2, 0);
+      const arm = add(crankG, rbox(0.018, CR + 0.03, 0.014, 0.006), M.black, sx * 0.075, sx < 0 ? -CR / 2 : CR / 2, 0);
       void arm;
       const pd = new THREE.Group(); dyn.add(pd);
       add(pd, rbox(0.1, 0.018, 0.09, 0.006), M.black, sx * 0.05, 0, 0);
@@ -241,8 +246,9 @@
       for (const L of legs) { const top = V3(L.sx * legX, crownY - 0.01, 0), bot = V3(L.sx * legX, _a.y, _a.z); place(L.m, top, bot, 0.011); }
       for (const b of bearings) b.m.position.set(b.sx * legX, _a.y, _a.z);
       // the pedals round on their cranks, kept level; the legs follow them (knees forward and out a little)
+      if (GEAR) { let d = spin.rotation.x - lastSpin; d = Math.atan2(Math.sin(d), Math.cos(d)); lastSpin = spin.rotation.x; crankA += d * CRK; crankG.rotation.x = crankA; }
       for (let k = 0; k < 2; k++) {
-        const P = pedals[k], a = spin.rotation.x + P.a0;
+        const P = pedals[k], a = (GEAR ? crankA : spin.rotation.x) + P.a0;
         _p.set(P.sx * 0.1, _a.y + Math.cos(a) * CR, _a.z + Math.sin(a) * CR);
         P.g.position.copy(_p);
         const G = legRig[k], hp = V3(P.sx * 0.09, hip.y, hip.z), ft = _p.clone().add(V3(P.sx * 0.03, 0.045, -0.02));

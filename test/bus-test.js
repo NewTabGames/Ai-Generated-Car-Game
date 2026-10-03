@@ -1,6 +1,7 @@
 // The tour coach (stock / tuned / race) and the derby bus (DT466 / 454 / blown 572, cowcatcher on and off): launch
 // (0-30 / 60 / 100), the quarter mile, top speed after a minute, a stop from 50, keyboard turns (lateral g, roll, a wheel
-// lifting, over?)
+// lifting, over?); the derby bus off an arena-sized kicker (2.5 m lip) - how hard it rebounds off the landing and how
+// long it takes to settle (it pogoed: a rebound near the impact speed, seconds of bouncing)
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694;
 const flat = { C: { WATER_LEVEL: -1e4 }, ground(x, z, o) { o.h = 0; o.nx = 0; o.ny = 1; o.nz = 0; o.surface = 0; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } };
@@ -39,6 +40,28 @@ for (const [id, key, cow] of [['coach', 'stock'], ['coach', 'tuned'], ['coach', 
     row.push(`${mph}:${(aLat / 9.81).toFixed(2)}g r${(mxR * 57.3).toFixed(0)}${lift > 0.05 ? ' lift' + lift.toFixed(1) : ''}${over ? ' OVER' : ''}`);
   }
   out.push('kb turn ' + row.join(' · '));
+  if (id === 'busderby') {
+    const LIP = 2.5, ramp = { C: flat.C, collidersNear: flat.collidersNear, ground(x, z, o) { const d = -40 - z; o.h = d > 0 && d < 8 ? LIP * d / 8 : 0; o.nx = 0; o.ny = 1; o.nz = d > 0 && d < 8 ? LIP / 8 : 0;
+      const n = Math.hypot(o.ny, o.nz); o.ny /= n; o.nz /= n; o.surface = 3; return o; } };
+    const row2 = [];
+    for (const mph of [30, 45]) {
+      const { sp } = mk(id, key, cow), v = new Vehicle(ramp, sp); v.setTires(sp.frontTire, sp.rearTire); v.reset(0, 0, 0, 0, -1);
+      v.running = true; v.park = false; v.gear = 3; v.tcMode = 3;
+      for (let i = 0; i < 120; i++) { v.input.brake = 1; v.step(1 / 120); } v.input.brake = 0;
+      const u = mph / MPH; v.vz = -u; for (const w of v.wheels) w.omega = u / w.radius; v.eOmega = u / sp.wheelRadius * sp.autoRatios[2] * sp.autoFinal;
+      let air = false, tL = -1, vImp = 0, vUp = 0, last = 0;
+      for (let t = 0; t < 30; t += 1 / 120) {
+        const s2 = v.forwardSpeed * MPH; v.input.throttle = s2 < mph ? 1 : 0; v.step(1 / 120);
+        const down = v.wheels.filter((w) => w.contact).length;
+        if (v.pz < -48 && down === 0) air = true;
+        if (air && tL < 0 && down >= 2) { tL = t; vImp = -v.vy; }
+        if (tL >= 0) { vUp = Math.max(vUp, v.vy); if (Math.abs(v.vy) > 0.15 || Math.hypot(v.wx, v.wz) > 0.08) last = t - tL; if (t - tL > 4) break; }
+      }
+      if (!isFinite(v.px) || tL < 0 || vUp > 0.5 * vImp || last > 1.5) bad++;
+      row2.push(`${mph} mph: rebound ${tL < 0 ? '-' : (100 * vUp / vImp).toFixed(0) + '%'} of a ${vImp.toFixed(1)} m/s landing, settled in ${last.toFixed(2)} s`);
+    }
+    out.push('off a 2.5 m kicker - ' + row2.join(' · '));
+  }
   console.log(`== ${id}:${key}${cow === false ? ' (no cowcatcher)' : ''}\n  ` + out.join('\n  '));
 }
-if (bad) { console.log('FAIL: NaN'); process.exit(1); }
+if (bad) { console.log('FAIL: NaN or a bouncy landing'); process.exit(1); }
