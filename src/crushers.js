@@ -3187,7 +3187,17 @@
       // ---- inside: white buckets and rear bench, white door panels, a console; the black dash with its round gauges, the
       // wheel
       add(body, rbox(1.66, 0.04, 2.0, 0.01), M.black, 0, 0.3, 0.2);
-      for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(1.4, 0.42), M.whiteIn, sx * 0.84, 0.68, -0.05, 0, sx * Math.PI / 2, 0, false);
+      for (const sx of [-1, 1]) add(body, new THREE.PlaneGeometry(1.4, 0.6), M.whiteIn, sx * 0.84, 0.6, -0.05, 0, sx * Math.PI / 2, 0, false);
+      // (the footwells: the carpet runs on under the dash to the toe board and up the firewall, the kick panels each side
+      // and the tunnel down the middle close them in - there was a hole there onto the road and the front tyres - and the
+      // pedals stand on the toe board)
+      add(body, rbox(1.66, 0.04, 0.3, 0.01), M.black, 0, 0.3, -0.92);
+      add(body, rbox(1.62, 0.03, 0.32, 0.01), M.black, 0, 0.4, -1.0, -0.95, 0, 0);
+      add(body, rbox(1.66, 0.48, 0.03, 0.01), M.black, 0, 0.66, -1.12);
+      add(body, rbox(1.66, 0.03, 0.26, 0.01), M.black, 0, 0.87, -1.0);
+      for (const sx of [-1, 1]) add(body, rbox(0.03, 0.6, 0.4, 0.01), M.black, sx * 0.81, 0.6, -0.93);
+      add(body, rbox(0.24, 0.22, 0.42, 0.05), M.black, 0, 0.42, -0.8);
+      for (const [x, w] of [[-0.3, 0.05], [-0.48, 0.09]]) { add(body, rbox(w, 0.11, 0.015, 0.006), M.black, x, 0.46, -0.98, -0.6, 0, 0); tubeAB(body, V3(x, 0.52, -1.0), V3(x, 0.72, -1.06), 0.008, M.steel, 6); }
       add(body, rbox(1.66, 0.22, 0.42, 0.06), M.black, 0, 0.85, -0.7);
       add(body, rbox(0.5, 0.12, 0.08, 0.03), M.black, -0.4, 0.9, -0.5);
       for (const dx of [-0.13, 0.0, 0.13]) { add(body, new THREE.TorusGeometry(0.045, 0.006, 6, 20), M.chrome, -0.4 + dx, 0.91, -0.457, 0, 0, 0, false); add(body, new THREE.CircleGeometry(0.042, 20), M.black, -0.4 + dx, 0.91, -0.458, 0, 0, 0, false); }
@@ -3611,8 +3621,8 @@
     // hood and black fenders out front, the body box behind with every pane knocked out - open windows on black posts, a
     // steel mesh over the windshield - the faded yellow-orange paint under a green band and a black skirt, sprayed all over
     // with the crew's graffiti (GFP 95, the drivers' names, a phone number, smileys); orange steel wheels, duals at the
-    // back. Inside: green seats, a roll cage round the driver in his helmet. The cowcatcher (opts.cow): a welded V-plow of
-    // plate on a pipe frame, braced off the bumper
+    // back. Inside: green seats, a roll cage round the driver in their helmet. The cowcatcher (opts.cow): a solid welded
+    // V-plow of steel plate on a pipe frame, braced off the bumper
     B.busderby = () => {
       WF = 0.28; WR = 0.28;
       wheelStyle = { rim: 'busOrange', rimR: 0.29, tread: 'hwy' };
@@ -3623,7 +3633,7 @@
       M.dRust = new THREE.MeshStandardMaterial({ color: 0x6a4a34, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide });
       M.dSeat = new THREE.MeshStandardMaterial({ color: 0x2f6a3e, roughness: 0.6 });
       M.dIn = new THREE.MeshStandardMaterial({ color: 0x3a3a36, roughness: 0.8, side: THREE.BackSide });
-      M.mesh.map.wrapS = M.mesh.map.wrapT = THREE.RepeatWrapping; M.mesh.map.repeat.set(6, 3);
+      M.dInD = new THREE.MeshStandardMaterial({ color: 0x3a3a36, roughness: 0.8, side: THREE.DoubleSide });
       // ---- the body box: sections with the window band open between the posts (and the entry door on the right)
       const arch = (z) => { const d = Math.abs(z - zR), r = 0.64; return d < r ? Math.max(0.78, RR + Math.sqrt(r * r - d * d) * 0.96) : 0.78; };
       const section = (z) => {
@@ -3680,12 +3690,20 @@
       add(body, g0, [M.dIn, M.dIn, M.dIn, M.dIn, M.dIn], 0, 0, 0, 0, 0, 0, false);
       // ---- the front wall (the windshield's two openings behind a mesh) and the back (the emergency door, its window
       // out, tail lamps); the roof's warning lamps, front and back
+      // (the screen: welded wire, 10 cm squares of 8 mm rod - it keeps the debris out and you see through it)
+      const screen = (w, h) => { const L = [];
+        for (let x = -w / 2; x <= w / 2 + 1e-6; x += 0.1) { const b = new THREE.BoxGeometry(0.008, h, 0.008); b.translate(x, 0, 0); L.push(b); }
+        for (let y = -h / 2 + 0.05; y < h / 2; y += 0.1) { const b = new THREE.BoxGeometry(w, 0.008, 0.008); b.translate(0, y, 0.006); L.push(b); }
+        return mergeGeos(L); };
+      const scr = screen(2.2, YT - YS);
       for (const [z, f] of [[ZW, -1], [ZT, 1]]) {
         const O = outlineOf(section(z), 1), lower = clipY(O, 0, YS), upper = clipY(O, YT, 4);
         add(body, polyGeo(lower), M.dBase, 0, 0, z, 0, 0, 0, false); add(body, polyGeo(upper), M.dBase, 0, 0, z, 0, 0, 0, false);
+        // (inside, the walls are the interior's grey, not the paint)
+        add(body, polyGeo(lower), M.dInD, 0, 0, z - f * 0.012, 0, 0, 0, false); add(body, polyGeo(upper), M.dInD, 0, 0, z - f * 0.012, 0, 0, 0, false);
         for (const sx of [-1, 1]) add(body, new THREE.BoxGeometry(f < 0 ? 0.12 : 0.3, YT - YS, 0.04), M.dBlack, sx * (f < 0 ? 1.12 : 1.0), (YS + YT) / 2, z, 0, 0, 0, false);
         add(body, new THREE.BoxGeometry(0.08, YT - YS, 0.04), M.dBlack, 0, (YS + YT) / 2, z, 0, 0, 0, false);
-        add(body, new THREE.PlaneGeometry(2.2, YT - YS), M.mesh, 0, (YS + YT) / 2, z + f * 0.03, 0, f < 0 ? Math.PI : 0, 0, false);
+        add(body, scr, M.dSteel, 0, (YS + YT) / 2, z + f * 0.035, 0, f < 0 ? Math.PI : 0, 0, false);
         for (const sx of [-1, -0.6, 0.6, 1]) add(body, cylZ(0.07, 0.07, 0.06, 14), Math.abs(sx) > 0.8 ? M.tail : M.amber, sx * 0.95, 2.78, z + f * 0.03);
         const pl = canvasTex(256, 48, (g, w, h) => { g.fillStyle = '#f2c21b'; g.fillRect(0, 0, w, h); g.fillStyle = '#121214'; g.font = 'bold 34px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('SCHOOL BUS', w / 2, h / 2 + 1); g.strokeStyle = 'rgba(30,140,60,0.9)'; g.lineWidth = 7; g.beginPath(); g.moveTo(20, 38); g.lineTo(230, 12); g.stroke(); });
         add(body, new THREE.PlaneGeometry(1.1, 0.21), new THREE.MeshStandardMaterial({ map: pl, roughness: 0.5 }), 0, 2.72, z + f * 0.035, 0, f < 0 ? Math.PI : 0, 0, false);
@@ -3715,20 +3733,50 @@
         add(body, rbox(2.38, 0.24, 0.16, 0.05), M.dBlack, 0, 0.72, ZB);
         add(body, rbox(0.3, 0.15, 0.012, 0.006), M.white, 0, 0.72, ZB - 0.085, 0, 0, 0, false);
         spots(0.85, 1.22, zF - 1.0); }
-      // ---- the cowcatcher: two plates in a V off the bumper to a point 0.8 m ahead, a pipe along their top edge and down
-      // the point, ribs behind, braces back to the frame
+      // ---- the cowcatcher: a solid V of 10 mm steel plate off the bumper to a point 0.8 m ahead - the two plates welded up
+      // the point, a pipe along their top and bottom edges and down the point and the ends, two stiffeners welded across
+      // the face, braces back to the frame behind. The plate scraped bright, rusting, a tag sprayed on it
       if (COW) {
         // (raked: the bottom edge 0.35 m further out than the top, both a V to the point)
-        const yT0 = 1.08, yB0 = 0.2, tipT = ZB - 0.62, tipB = ZB - 0.98, wT = 1.2, wB = 1.15, zT0 = ZB - 0.04, zB0 = ZB - 0.32;
+        const yT0 = 1.08, yB0 = 0.2, tipT = ZB - 0.62, tipB = ZB - 0.98, wT = 1.2, wB = 1.15, zT0 = ZB - 0.04, zB0 = ZB - 0.32, TH = 0.04;
         const top = (u) => V3(u * wT, yT0 + 0.05 * (1 - Math.abs(u)), zT0 + (tipT - zT0) * (1 - Math.abs(u))), bot = (u) => V3(u * wB, yB0, zB0 + (tipB - zB0) * (1 - Math.abs(u)));
+        const plateTex = canvasTex(1024, 256, (g, w, h) => {
+          g.fillStyle = '#4e4b47'; g.fillRect(0, 0, w, h);
+          // (mill scale in blotches, rust bleeding down from the top edge and round the welds, bright scrapes from hits)
+          for (let k = 0; k < 90; k++) { const x = Math.random() * w, y = Math.random() * h, r = 8 + Math.random() * 40, v = 62 + Math.random() * 30;
+            g.fillStyle = `rgba(${v},${v - 4},${v - 9},0.35)`; g.beginPath(); g.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2); g.fill(); }
+          for (let k = 0; k < 26; k++) { const x = Math.random() * w, y = Math.random() * h * 0.9, r = 10 + Math.random() * 46, gr = g.createRadialGradient(x, y, 0, x, y, r);
+            gr.addColorStop(0, 'rgba(126,64,28,0.75)'); gr.addColorStop(1, 'rgba(126,64,28,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
+          for (let k = 0; k < 40; k++) { const x = Math.random() * w; g.strokeStyle = 'rgba(120,62,26,0.45)'; g.lineWidth = 2 + Math.random() * 4; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + (Math.random() - 0.5) * 10, 30 + Math.random() * 120); g.stroke(); }
+          for (let k = 0; k < 34; k++) { const x = Math.random() * w, y = 30 + Math.random() * (h - 40), l = 40 + Math.random() * 140, a = (Math.random() - 0.5) * 0.22;
+            g.strokeStyle = `rgba(${150 + Math.random() * 40},${148 + Math.random() * 40},${140 + Math.random() * 40},${0.18 + Math.random() * 0.22})`; g.lineWidth = 1 + Math.random() * 2;
+            g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
+          // (the weld bead up the point, and a tag in the bus's yellow)
+          g.strokeStyle = '#2e2b28'; g.lineWidth = 7; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.stroke(); g.setLineDash([]);
+          g.save(); g.translate(w * 0.3, h * 0.55); g.rotate(-0.06); g.font = '900 86px "Comic Sans MS", "Marker Felt", "Segoe Print", cursive'; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.lineJoin = 'round'; g.lineWidth = 10; g.strokeStyle = '#121214'; g.strokeText('GFP', 0, 0); g.fillStyle = '#f2dd2a'; g.fillText('GFP', 0, 0); g.restore();
+          g.save(); g.translate(w * 0.72, h * 0.5); g.rotate(0.05); g.font = 'bold 54px "Comic Sans MS", "Marker Felt", "Segoe Print", cursive'; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.lineWidth = 6; g.strokeStyle = '#121214'; g.strokeText('95', 0, 0); g.fillStyle = '#f4f4f4'; g.fillText('95', 0, 0); g.restore();
+        });
+        M.dPlate = new THREE.MeshStandardMaterial({ map: plateTex, roughness: 0.72, metalness: 0.45, side: THREE.DoubleSide });
         for (const sx of [-1, 1]) {
+          // (the face, mapped across the whole V as you look at it from ahead: u from its right end (-x) to its left)
+          const A = top(sx), B = top(0), C = bot(0), D = bot(sx), uv = (p) => [0.5 - 0.5 * p.x / wT, (p.y - yB0) / (yT0 + 0.05 - yB0)];
+          const fg = new THREE.BufferGeometry(), P4 = [A, B, C, A, C, D];
+          fg.setAttribute('position', new THREE.Float32BufferAttribute(P4.flatMap((p) => [p.x, p.y, p.z]), 3));
+          fg.setAttribute('uv', new THREE.Float32BufferAttribute(P4.flatMap(uv), 2)); fg.computeVertexNormals();
+          add(body, fg, M.dPlate, 0, 0, 0);
+          // (its back and its edges: the plate's thickness and the shadowed back, 4 cm behind)
+          const v8 = [A, B, C, D].map((p) => [p.x, p.y, p.z]).concat([A, B, C, D].map((p) => [p.x, p.y, p.z + TH]));
+          add(body, facesGeo(v8, [[4, 5, 6, 7], [0, 1, 5, 4], [3, 2, 6, 7], [0, 3, 7, 4]]), M.dSteel, 0, 0, 0);
           pipe(body, [top(sx), top(sx * 0.5), top(0)], 0.055, M.dSteel, 8);
           pipe(body, [bot(sx), bot(sx * 0.5), bot(0)], 0.05, M.dSteel, 8);
-          for (let k = 0; k <= 6; k++) { const u = sx * k / 6.5; tubeAB(body, top(u), bot(u), 0.03, M.dRust, 6); }
+          tubeAB(body, top(sx), bot(sx), 0.045, M.dSteel, 8);
           for (const t of [0.35, 0.68]) { const a = top(sx).lerp(bot(sx), t), b = top(0).lerp(bot(0), t); pipe(body, [a, a.clone().lerp(b, 0.5).setZ((a.z + b.z) / 2 - 0.02), b], 0.025, M.dRust, 6); }
-          tubeAB(body, V3(sx * 0.55, 0.62, ZB - 0.05), V3(sx * 0.3, 0.45, tipB + 0.35), 0.045, M.dSteel, 8);
+          tubeAB(body, V3(sx * 0.55, 0.62, ZB - 0.05), V3(sx * 0.3, 0.45, tipB + 0.4), 0.045, M.dSteel, 8);
           tubeAB(body, V3(sx * 0.9, 1.0, ZB - 0.05), V3(sx * 0.9, 0.72, ZB + 0.08), 0.05, M.dSteel, 8);
         }
+        tubeAB(body, top(0), bot(0), 0.06, M.dSteel, 10);
         // (a skid plate along the bottom of the V)
         for (const sx of [-1, 1]) add(body, facesGeo([[sx * wB, yB0 - 0.02, zB0], [sx * wB, yB0 + 0.16, zB0 + 0.05], [0, yB0 + 0.16, tipB + 0.05], [0, yB0 - 0.02, tipB]], [[0, 1, 2, 3]]), M.dSteel, 0, 0, 0, 0, 0, 0, true);
       }
@@ -3812,6 +3860,14 @@
         }
       }
       return { carc: carcass(rc + 0.004, W, rimR), tr: mergeGeos(list) };
+    }
+    function rcSlick(R, W, rimR) {
+      const h = W / 2, c = R - 0.001, sh = W * 0.32, list = [];
+      const carc = latheX([[rimR, -h + 0.003], [rimR + 0.004, -h], [rimR + (R - rimR) * 0.55, -h - 0.002], [c - sh * 0.45, -h + sh * 0.12], [c - sh * 0.1, -h + sh * 0.55], [c, -h + sh],
+        [c, h - sh], [c - sh * 0.1, h - sh * 0.55], [c - sh * 0.45, h - sh * 0.12], [rimR + (R - rimR) * 0.55, h + 0.002], [rimR + 0.004, h], [rimR, h - 0.003]], 64);
+      // (the grooves: dark rings sunk a hair into the crown either side of the centre)
+      for (const f of [-0.28, 0.28]) { const t = new THREE.TorusGeometry(c - 0.0003, 0.0011, 4, 64); t.rotateY(Math.PI / 2); t.translate(f * h, 0, 0); list.push(t); }
+      return { carc, tr: mergeGeos(list) };
     }
     const RIM = {
       steel: new THREE.MeshStandardMaterial({ color: 0x2a2b2e, roughness: 0.45, metalness: 0.6 }),
@@ -4068,7 +4124,9 @@
     for (const front of [true, false]) {
       const R = front ? RF : RR, W = front ? WF : WR, rimR = Math.min(R - 0.03, (!front && wheelStyle.rimRR) || wheelStyle.rimR || R * 0.6);
       const st = wheelStyle.tread === 'gravel' || wheelStyle.tread === 'at' || wheelStyle.tread === 'rc' ? blockTread(R, W, rimR, wheelStyle.tread) : { carc: carcass(R, W, rimR), tr: tread(R, W, wheelStyle.tread) };
-      geo[front] = { R, W, rimR, carc: st.carc, tr: st.tr, pk: blockTread(R + 0.006, W * 1.04, rimR, 'mud') };
+      // (the package tyres: every car's mud knobbies - the RC truck's are its belted slicks, a smooth round-shouldered
+      // carcass with the two thin grooves round the crown its speed-run slicks have)
+      geo[front] = { R, W, rimR, carc: st.carc, tr: st.tr, pk: CAR === 'rc' ? rcSlick(R, W, rimR) : blockTread(R + 0.006, W * 1.04, rimR, 'mud') };
     }
     const wheels = [];
     for (let i = 0; i < 4; i++) {
@@ -4179,7 +4237,7 @@
     function setTransmission() {}
     function setTires(front, rear) {
       for (const w of wheels) {
-        const t = w.front ? front : rear, on = t === 'ccKnob' || t === 'rallyKnob' || t === 'offroad';
+        const t = w.front ? front : rear, on = t === 'ccKnob' || t === 'rallyKnob' || t === 'offroad' || t === 'rcSlick';
         for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on;
       }
     }

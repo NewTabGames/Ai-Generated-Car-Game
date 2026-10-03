@@ -242,8 +242,22 @@
 
     // ---------------------------------------------------------------- the wheels: one tyre drawn at each axle
     // (on the left wheel of each pair; the right ones are the physics' twins, nothing drawn)
+    // (the dual-sport knobbies - the off-road package: a slimmer carcass under rows of square knobs, three across the
+    // crown and four down the shoulders in turn, standing out to the road tyre's size. Merged into one mesh)
+    function knobbyGeo(R, W) {
+      const Rc = R - W * 0.42, r = W * 0.4, kh = 0.013, N = Math.round(2 * Math.PI * R / 0.048), pos = [], nrm = [];
+      for (let k = 0; k < N; k++) for (const ph of (k & 1 ? [-1.12, -0.38, 0.38, 1.12] : [-0.76, 0, 0.76])) {
+        const b = new THREE.BoxGeometry(W * 0.17, kh * 2, 0.026).toNonIndexed();
+        b.rotateZ(-ph); b.translate((r + kh * 0.5) * Math.sin(ph), Rc + (r + kh * 0.5) * Math.cos(ph), 0); b.rotateX(k * 2 * Math.PI / N);
+        pos.push(...b.attributes.position.array); nrm.push(...b.attributes.normal.array);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+      const carc = new THREE.TorusGeometry(Rc, r, 14, 40); carc.rotateY(Math.PI / 2);
+      return [carc, g];
+    }
     function wheelGeo(g, R, W, rimR, front) {
-      const tyre = new THREE.TorusGeometry(R - W * 0.42, W * 0.46, 14, 40); tyre.rotateY(Math.PI / 2); add(g, tyre, M.rubber, 0, 0, 0);
+      const tyre = new THREE.TorusGeometry(R - W * 0.42, W * 0.46, 14, 40); tyre.rotateY(Math.PI / 2);
+      const stock = [add(g, tyre, M.rubber, 0, 0, 0)], pkg = knobbyGeo(R, W).map((k) => { const m = add(g, k, M.rubber, 0, 0, 0); m.visible = false; return m; });
       add(g, new THREE.CylinderGeometry(rimR, rimR, W * 0.7, 32, 1, true).rotateZ(Math.PI / 2), M.black, 0, 0, 0);
       // a black cast wheel, many thin spokes with their edges machined
       const n = front ? 10 : 8;
@@ -254,15 +268,16 @@
       add(g, cylX(0.05, 0.05, 0.1, 16), M.alu, 0, 0, 0);
       if (front) for (const sx of [-1, 1]) { add(g, cylX(0.15, 0.15, 0.005, 32), M.disc, sx * 0.07, 0, 0); add(g, cylX(0.08, 0.08, 0.007, 16), M.black, sx * 0.07, 0, 0); }
       else { add(g, cylX(0.15, 0.15, 0.008, 32), M.disc, 0.07, 0, 0); add(g, cylX(0.2, 0.2, 0.03, 40), M.alu, -0.07, 0, 0); }
+      return { stock, pkg };
     }
     const wheels = [];
     for (let i = 0; i < 4; i++) {
       const frontW = i < 2, left = (i & 1) === 0, side = left ? -1 : 1;
       const corner = new THREE.Group(); corner.position.set(side * 0.01, (frontW ? RF : RR) - cgH, frontW ? -cgToFront : cgToRear); rootG.add(corner);
       const flip = new THREE.Group(); corner.add(flip); const spin = new THREE.Group(); spin.position.x = -side * 0.01; flip.add(spin);
-      if (left) wheelGeo(spin, frontW ? RF : RR, frontW ? 0.13 : 0.18, frontW ? 0.24 : 0.23, frontW);
+      const T = left ? wheelGeo(spin, frontW ? RF : RR, frontW ? 0.13 : 0.18, frontW ? 0.24 : 0.23, frontW) : { stock: [], pkg: [] };
       // (left: false - the game spins a mirrored left wheel the other way, and these are drawn unmirrored)
-      wheels.push({ corner, flip, spin, left: false, front: frontW, side, stock: [], pkg: [] });
+      wheels.push({ corner, flip, spin, left: false, front: frontW, side, stock: T.stock, pkg: T.pkg });
     }
     // (the calipers on the fork sliders; the swingarm pivots in the frame and follows the back axle)
     add(slide, rbox(0.04, 0.1, 0.07, 0.01), M.black, ...at(-0.07, RF + 0.12, zF + 0.08).toArray());
@@ -341,7 +356,9 @@
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: SW, eye,
       exhaustTips: tips, materials: M, headlights: spots, tailLens: [], mirrors: [],
-      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster, drawScreen: noop, setChute: noop,
+      setPaint, setLights, setInteriorVisible,
+      // (the off-road package's dual-sport knobbies - ccKnob - in place of the touring tyres)
+      setTires(front, rear) { for (const w of wheels) { const on = (w.front ? front : rear) === 'ccKnob'; for (const m of w.stock) m.visible = !on; for (const m of w.pkg) m.visible = on; } }, setTransmission: noop, drawCluster, drawScreen: noop, setChute: noop,
       afterWheels, setRider, variant: 'bike', cls: VER,
     };
   }

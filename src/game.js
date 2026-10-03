@@ -370,9 +370,11 @@
           snd: { nEng: 1, cyl: 8, fmul: 0.88, deep: 0.55, loud: 0.9, open: 0.7, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6400, race: 0.55, rough: 0.2 } },
       } },
     rc: { btn: 'RC TRUCK', sub: 'A 1/10 4WD monster-truck RC car · brushed 2S, brushless 3S or a 6S speed-run build · drive it on the real roads - or from the little driver\'s seat (C)', paint: 'Bay Blue', tc: 1, cam: [0.17, 0.18], scale: 0.12, noPkg: true,
-      hint: 'RC truck (Brushless 3S): shift up (E) for DRIVE - a 3,200 kV brushless on a 3S LiPo, 4WD: 0-30 in ~1.7 s, ~45 mph, at the size of a shoebox. It turns like a kart and rolls over like an RC truck: the stability control is on (Sport, T for Off). Press C for the view from the cab.',
+      hint: 'RC truck (Brushless 3S): shift up (E) for DRIVE - a 3,200 kV brushless on a 3S LiPo, 4WD: 0-30 in ~1.7 s, ~45 mph, at the size of a shoebox. It turns like a kart and rolls over like an RC truck: its gyro and the stability control are on (Sport, T for Off) - the steering is scaled to the speed, like a transmitter\'s dual rate. Slicks or knobbies: Esc → Drive → Tyres. Press C for the view from the cab.',
       info: 'A 1/10-scale 4WD monster-truck basher like the Sandstorm: a blue polycarbonate pickup shell with a black hood, the white flash and SAND STORM on the quarters, tinted glass, a big rear wing; a plastic tub chassis with front and rear bumpers (LED lamps up front), A-arms, dogbones and four oil-filled coil-overs that work with the wheels; 150 mm chevron tyres on blue beadlock wheels; gear diffs front and rear on a centre slipper · a 3660 3,200 kV brushless on 3S (11.1 V), ~0.9 kW, 12.5:1 overall · 0.47 m long, 0.37 m wide · 2.6 kg · 0-30 ~1.7 s, ~45 mph · a tiny cab inside with two seats, the dash, a wheel and a 1/12 driver',
       trans: 'Single speed · 4WD', tyres: '150 mm RC knobbies',
+      tyreOpts: [['rcKnob', 'Knobbies', '150 mm RC knobbies'], ['rcSlick', 'Belted slicks', '150 mm belted slicks']],
+      tyreNote: 'Knobbies: tall chevron blocks - they dig into dirt, grass and sand and grip pavement about like a road tyre · Belted slicks: smooth, soft and belted for speed runs - a lot more grip on pavement, they skate on anything loose',
       snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1, rpmRef: 35500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
       optKey: 'rcEng', optLabel: 'Power', options: [
         ['brushed', 'Brushed 2S', 'The ready-to-run motor: a 550 can on 2S, ~180 W · 0-20 ~1.2 s · ~27 mph'],
@@ -380,10 +382,10 @@
         ['bl6s', 'Brushless 6S', 'A 4074 2,050 kV on 6S, ~2.5 kW, speed-run gearing · 0-40 ~2.4 s · ~62 mph'],
       ],
       eng: {
-        brushed: { hint: 'RC truck (Brushed 2S): shift up (E) for DRIVE - the ready-to-run brushed 550 motor on a 2S pack, ~180 W through the same 4WD: ~27 mph, gentle enough to learn it on. The stability control is on (Sport, T for Off). C for the view from the cab.',
+        brushed: { hint: 'RC truck (Brushed 2S): shift up (E) for DRIVE - the ready-to-run brushed 550 motor on a 2S pack, ~180 W through the same 4WD: ~27 mph, gentle enough to learn it on. The gyro and the stability control are on (Sport, T for Off). C for the view from the cab.',
           info: 'The RC truck with its stock brushed motor: a 550-size can on 2S (7.4 V), ~20,000 rpm, ~180 W, 12:1 overall · 2.35 kg · 0-20 ~1.2 s, ~27 mph',
           trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 2, whK: 0.05, whPure: 1, whine: 1, rpmRef: 20000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
-        bl6s: { hint: 'RC truck (Brushless 6S): shift up (E) for DRIVE - a 4074 2,050 kV brushless on 6S, ~2.5 kW in a 3.4 kg truck: ~62 mph. Feed the throttle in - with the stability control off (T) it spins the wheels at any speed and swaps ends in a turn. C for the view from the cab.',
+        bl6s: { hint: 'RC truck (Brushless 6S): shift up (E) for DRIVE - a 4074 2,050 kV brushless on 6S, ~2.5 kW in a 3.4 kg truck: ~62 mph. Feed the throttle in - its gyro catches the tail, but with the stability control off (T) the gyro is off too: it spins the wheels at any speed and swaps ends in a turn. C for the view from the cab.',
           info: 'The RC truck built for speed runs: a 4074 2,050 kV brushless on 6S (22.2 V), ~45,500 rpm, ~2.5 kW, 11.5:1 overall, stiffer springs · 3.4 kg · 0-40 ~2.4 s, ~62 mph',
           trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1.15, rpmRef: 45500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
       } },
@@ -424,16 +426,20 @@
           info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
           snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
       } },
-    unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
+    unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph), pedal a geared-hub one (~35 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
       info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
       trans: 'Direct drive (no gears)', tyres: '24 x 2.125',
       snd: { nEng: 1, cyl: 1, ev: 1, whK: 0.1, whPure: 1, whine: 0, rpmRef: 200, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
       optKey: 'uniEng', optLabel: 'Version', options: [
         ['pedal', 'Pedal', 'Leg power: ~0.7 hp · no gears · ~14 mph'],
+        ['improved', 'Improved pedal', 'A geared hub (the wheel turns 3.3 times a pedal stroke) and a sprinter\'s legs, ~2 hp · 0-30 ~12 s · ~35 mph'],
         ['jet', 'Jet unicycle', 'A model-jet turbojet behind the saddle, 124 lbf of thrust · 0-60 ~9 s · ~85 mph'],
       ],
       eng: {
+        improved: { hint: 'Improved pedal unicycle: shift up (E) for DRIVE and pedal (the gas) - a geared hub turns the wheel 3.3 times for every turn of the cranks, and the rider is a track sprinter: 0-30 in ~12 s, ~35 mph. It takes a while to wind up; the rider keeps it balanced, leaning into the turns, and only the legs brake it.',
+          info: 'The 24 in unicycle with a geared hub - the wheel turns 3.3 times to the cranks\' once, a Schlumpf-type hub geared far past any real one - clipless pedals and a track sprinter tucked down on it (~1.6 kW at 130 rpm, ~160 Nm off the line) · 80 kg with the rider · 0-30 ~12 s, ~35 mph',
+          trans: 'Geared hub, 3.3:1 overdrive' },
         jet: { hint: 'Jet unicycle: shift up (E) for DRIVE and open the throttle - a model-aircraft turbojet on a rack behind the saddle, 124 lbf of thrust. It takes a couple of seconds to spool, then shoves: 0-60 in ~9 s, ~85 mph on a bicycle tyre. Turns are held to what the rider can lean into; the legs are the only brake. R pedals backwards.',
           info: 'The 24 in unicycle with a model-aircraft-class turbojet strapped on a rack behind the saddle (~550 N, 124 lbf), a fuel tank under it, its thrust line through the rider\'s centre of gravity; the rider in a helmet and goggles · no brake but the legs · 95 kg · 0-60 ~9 s, ~84 mph',
           trans: 'Jet thrust · pedals for reverse',
@@ -494,8 +500,10 @@
       + 'grip about the same on grass (the bars tear it up) and squirm on pavement']
     : ['KO2 all-terrains · 2" lift', 'KO2 all-terrains + 2" lift', 'BFGoodrich All-Terrain T/A KO2 LT285/55R20 on all four corners (32 in tall, ~70 lb each)' + (DRAGPAK ? ' on 20 in wheels' : '') + ' + 2 in lift and extra droop. '
       + 'Far more bite on dirt, gravel and grass, more ground clearance and gentle, catchable slides · on pavement: close to the street tyres with a little less grip, tread hum, and taller effective gearing'];
-  const tireF = () => (OFFROAD() ? pkg().front : FIXED ? carSpec.frontTire : 'street');
-  const tireR = () => (OFFROAD() ? pkg().rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? carSpec.rearTire : S.rearTire);
+  // (a Car Crushers car with a choice of tyres - the RC truck's knobbies or slicks: S.ccTyre[car], the first the stock ones)
+  const ccTyre = () => (CC && CCD.tyreOpts && S.ccTyre && CCD.tyreOpts.find((t) => t[0] === S.ccTyre[S.car])) || null;
+  const tireF = () => (OFFROAD() ? pkg().front : FIXED ? (ccTyre() ? ccTyre()[0] : carSpec.frontTire) : 'street');
+  const tireR = () => (OFFROAD() ? pkg().rear : DRAGPAK ? (S.dpRear || 'etdrag') : FIXED ? (ccTyre() ? ccTyre()[0] : carSpec.rearTire) : S.rearTire);
   veh.setTires(tireF(), tireR());
   veh.tcMode = S.tcMode; veh.absOn = S.abs;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
@@ -680,6 +688,7 @@
   const input = new INP.Input();
   // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
   if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
+  input.rawSteer = !!sp.steerAScale;           // (the RC truck scales its own lock with speed: the keys and the stick go in raw)
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
@@ -1109,6 +1118,10 @@
       if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
       if (CC && CCD.options) add(row(CCD.optLabel || 'Engine', (CCD.optLabel ? 'Switching' : 'Swapping engines') + ' restarts the game (each keeps its own Fun-tab tune)',
         seg(CCD.options.map((o) => [o[0], o[1]]), CARDEF.engine || 'ev', (v) => { if (v !== (CARDEF.engine || 'ev')) pickCar(S.car, v); })));
+      if (CC && CCD.tyreOpts) add(row('Tyres', CCD.tyreNote, seg(CCD.tyreOpts.map((t) => [t[0], t[1]]), ccTyre() ? ccTyre()[0] : CCD.tyreOpts[0][0], (v) => {
+        if (carLocked()) return;
+        S.ccTyre = Object.assign({}, S.ccTyre, { [S.car]: v }); applyVehicleSettings();
+      })));
       if (CC && CCD.toggle) add(row(CCD.toggle.label, CCD.toggle.note + ' · changing it restarts the game',
         seg([[true, CCD.toggle.on], [false, CCD.toggle.off]], S[CCD.toggle.key] !== false, (v) => { if (carLocked() || v === (S[CCD.toggle.key] !== false)) return; S[CCD.toggle.key] = v; saveS(); location.reload(); })));
       if (MONSTER) {
@@ -1775,7 +1788,7 @@
       { html: '<b>' + CARDEF.short + '</b>' + (DEMON ? ' · ' + (S.fuel === 'e10' ? '91 oct' : 'E85') : DRAGPAK ? ' · race gas' : MONSTER || KART || MOWER || CC ? ' · ' + CARDEF.car : PULLER ? ' · ' + VEH.CARS.puller.engines[CARDEF.engine].short : DRAGSTER ? (NITRO ? ' · nitro' : ' · methanol') : '') },
       { html: CC ? CCD.trans : MOWER ? (CARDEF.cls === 'bp' ? '5-speed transaxle · foot clutch' : CARDEF.cls === 'fx' ? 'Centrifugal clutch · 3-speed · chain' : '6-speed + quickshifter · chain')
         : KART ? (CARDEF.cls === 'kz' ? '6-speed sequential · chain drive' : CARDEF.cls === 'sc' ? '6-speed + quickshifter · chain drive' : 'Centrifugal clutch · chain drive') : MONSTER ? '2-speed · 4x4 · lockers' : PULLER ? 'Slider clutch · 3-speed planetary' : DRAGSTER ? (NITRO ? 'Direct drive · 6-disc clutch' : '2-speed · 5-disc clutch') : veh.transType === 'auto' ? (DRAGPAK ? '3-speed race auto' : '8HP90 auto') : 'TR-6060 manual' + (veh.useClutchPedal ? ' · pedal' : '') },
-      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_KIND() === 'paddle' ? 'Sand paddles' : PKG_UI[0]) : CC ? CCD.tyres : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
+      { html: OFFROAD() ? (PKG_KIND() === 'knobby' ? 'Off-road knobbies' : PKG_KIND() === 'paddle' ? 'Sand paddles' : PKG_UI[0]) : CC ? (ccTyre() ? ccTyre()[2] : CCD.tyres) : MOWER ? (CARDEF.cls === 'bp' ? 'Turf tyres' : CARDEF.cls === 'fx' ? 'Kart dirt tyres' : 'Racing slicks') : KART ? (CARDEF.cls === 'rental' ? 'Hard rental tyres' : 'Kart slicks') : MONSTER ? '66x43.00-25 paddles' : PULLER ? '30.5L-32 pulling tyres' : DRAGSTER ? (NITRO ? '36x17.5 slicks' : '34.5x17 slicks') : veh.spec.rearTire === 'drag' ? 'Drag radials' : veh.spec.rearTire === 'etstreet' ? 'ET Street R' : veh.spec.rearTire === 'etdragpro' ? 'ET Drag Pro' : veh.spec.rearTire === 'etdrag' ? 'ET Drag slicks' : 'P Zero' },
       { html: input.source === 'wheel' ? 'Wheel' : 'Keyboard' },
     ];
     if (MONSTER) chips.push({ html: '4WS <b>' + S.rsMode.toUpperCase() + '</b>' });

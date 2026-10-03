@@ -330,6 +330,11 @@
     rcKnob: { name: '150 mm RC monster-truck tyre', short: 'RC knobbies', width: 0.07,
       muX: 1.05, muY: 0.95, loose: 0.95, looseKx: [1, 1.0, 1.05, 1.1, 0.8, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.025, relaxY: 0.035,
       B: 1.6, C: 1.38, E: -0.25, heatCap: 60, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0 },
+    // the RC truck's on-road option: 1/10 belted street slicks on the same wheels - a soft compound with a belt inside so
+    // they don't balloon at speed. A lot more grip on pavement; on gravel, grass, dirt and mud they skate
+    rcSlick: { name: '150 mm belted RC slicks', short: 'RC slicks', width: 0.075,
+      muX: 1.25, muY: 1.12, loose: 0.6, looseKx: [1, 1.0, 0.8, 0.9, 0.7, 1], kappaPeak: 0.11, alphaPeak: 0.11, relaxX: 0.02, relaxY: 0.028,
+      B: 1.75, C: 1.4, E: -0.2, heatCap: 60, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.1 },
     // the tour coach: 315/80R22.5 steer tyres; the rear 'tyre' is the drive axle's duals and the tag axle's singles each
     // side - three tyres sharing the load, so its peak slips are set for three tyres' load on one (a tandem's scrub holds
     // it straight: a coach understeers - set like a single tyre, the load stretched them and it spun itself out)
@@ -982,6 +987,17 @@
       // (steerAMax: the most cornering the rider can ride - the unicycle's 10 cm 'wheelbase' would ask for a turn no tyre
       // or rider can make from any steering at speed: the lock is held to what makes steerAMax m/s^2 at this speed)
       if (s.steerAMax) { const lim = Math.atan(s.wheelbase * s.steerAMax / Math.max(0.25, vFwd * vFwd)); target = clamp(target, -lim, lim); }
+      // (steerAScale: an RC transmitter's dual rate - the stick's whole travel spread over the lock that makes
+      // steerAScale m/s^2 at this speed. A 33 cm wheelbase at 60 mph turns on fractions of a degree: full lock there
+      // spun it, and a clamp would have put all of it in the stick's first tenth. The game passes the stick in raw)
+      if (s.steerAScale) target *= Math.min(1, Math.atan(s.wheelbase * s.steerAScale / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
+      // (gyro: an RC truck's stability gyro - Traxxas' TSM and the like. It reads the yaw rate and steers against any
+      // rotation beyond what the steering asks for, so the tail stepping out is caught with countersteer before it
+      // spins; softer in Track, off with TC Off. The servo's speed still limits it)
+      if (s.gyro && this.tcMode < 3 && vFwd > 2) {
+        const yawRate = wx * upX + wy * upY + wz * upZ, e = yawRate + vFwd * Math.tan(target) / s.wheelbase;
+        if (e * yawRate > 0) target = clamp(target + s.gyro * (this.tcMode === 2 ? 0.5 : 1) * e, -s.maxSteer, s.maxSteer);
+      }
       const mr = s.steerRate * h;
       this.steerAngle += clamp(target - this.steerAngle, -mr, mr);
       const d = this.steerAngle;
@@ -1099,7 +1115,9 @@
         }
         let F = w.k * (w.sFree - w.sRaw) + Fd + arb[i] + progF;
         // (bumpStopC: the stop's damping - a 2.6 kg RC truck needs a hundredth of a car's)
-        if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + (s.bumpStopC !== undefined ? s.bumpStopC : 2500) * Math.max(0, c);
+        // (bumpStopRebC: the stop's hysteresis coming back out - a big rubber jounce bumper gives back little of a heavy
+        // landing; without it a bus that bottomed out was thrown back up. Never pulls the wheel up)
+        if (w.sRaw < w.sMin) { const fs = s.bumpStopK * (w.sMin - w.sRaw); F += fs + (c > 0 ? (s.bumpStopC !== undefined ? s.bumpStopC : 2500) * c : Math.max(-fs, (s.bumpStopRebC || 0) * c)); }
         // anti-squat: the rear links' angle turns part of the tyre's drive force into lift on the body at the axle
         // (and the same push down on the tyre). 100 % = no squat at all. Drag cars run more: the body is thrown up on
         // the hit, the tyres are planted, and the nose comes up
@@ -2046,7 +2064,7 @@
     _driveline(h, TL, TR, TbL, TbR) {
       const s = this.spec, wl = this.wheels[2], wr = this.wheels[3];
       const Ir = wl.inertia, Ie = s.engineInertia, eff = s.driveEff;
-      const wc0 = 0.5 * (wl.omega + wr.omega);
+      let wc0 = 0.5 * (wl.omega + wr.omega);
       this._transLogic(h, wc0);
       const G = this._gEff();
       const gliding = this.transType === 'auto' && this.gear >= 1 && ((this.shiftTimer > 0 && this.shiftFromG) || s.cvt);
@@ -2086,6 +2104,13 @@
       } else {
         const cap = this._cap;
         const Itot = 2 * Ir + Ie * G * G;
+        // (an electric motor is geared straight to its wheels: it never slips. Coming out of a shift it's coupled again
+        // at once, the momentum kept - one step of the clutch model's slip at its full grip spun a tiny motor's wheels
+        // (the RC truck's) up to thousands of rad/s going into reverse)
+        if (!this.locked && s.electric) {
+          const wcL = (2 * Ir * wc0 + Ie * G * this.eOmega) / Itot, sh = wcL - wc0;
+          wl.omega += sh; wr.omega += sh; this.eOmega = wcL * G; wc0 = wcL; this.locked = true;
+        }
         if (this.locked) {
           // with the ratio changing, the clutch also has to spin the engine up (or soak its inertia on upshifts)
           const wcDot = (G * eff * (Te - Ie * wc0 * Gdot) + TL + TR) / Itot;
@@ -2185,6 +2210,12 @@
         this.lastTin = Tin;
       } else {
         const cap = this._cap, Itot = Isum + Ie * G * G;
+        // (an electric motor never slips: coupled again at once out of a shift - see _driveline)
+        if (!this.locked && s.electric) {
+          const wcL = (Isum * wc0 + Ie * G * this.eOmega) / Itot, sh = wcL - wc0;
+          for (let i = 0; i < 4; i++) W[i].omega += sh;
+          this.eOmega = wcL * G; wc0 = wcL; this.locked = true;
+        }
         if (this.locked) {
           const wcDot = (G * eff * (Te - Ie * wc0 * Gdot) + Tsum) / Itot;
           const Treq = Te - Ie * G * wcDot - Ie * wc0 * Gdot;
@@ -3385,6 +3416,9 @@
     // (the speed controller's brake, on the motor: all four wheels through the diffs)
     brakeTorqueF: 0.35, brakeTorqueR: 0.35, handbrakeTorque: 0.3, noABS: true, noESC: true,
     maxSteer: 0.52, steerRate: 7, steerRatio: 1, ackermann: 0,
+    // (the transmitter's dual rate: full stick asks for ~1.4 g at any speed, a little past the tyres; and the gyro -
+    // it catches the tail stepping out off a lift, a bump or a landing with countersteer)
+    steerAScale: 14, gyro: 0.2,
     electric: true, idleRpm: 0, limiterRpm: 36500, redlineRpm: 35500, shiftRpm: 40000, engineInertia: 2.5e-6, fricA: 0.003, fricB: 0.0001, starterTorque: 0,
     torqueCurve: dcCurve(0.35, 900, 35500), boostMax: 0, popScale: 0,
     autoRatios: [1], autoRev: 1, autoFinal: 12.5, engineTc: true, noCoastBlip: true,
@@ -3437,8 +3471,10 @@
     mass: 7800, Ipitch: 52000, Iyaw: 54000, Iroll: 9000, cgHeight: 1.15, wheelbase: 5.6, frontWeight: 0.45,
     trackF: 2.05, trackR: 1.8, wheelRadius: 0.52, wheelInertiaF: 10, wheelInertiaR: 20,
     frontTire: 'busSteer', rearTire: 'busDual', Fz0: 17000, loadSens: 0.08,
-    springF: 160000, springR: 260000, dampBumpF: 9000, dampRebF: 14000, dampBumpR: 13000, dampRebR: 20000, dampKnee: 0.2,
-    arbF: 90000, arbR: 120000, travelUp: 0.1, travelDown: 0.1, suspS0: 0.3, bumpStopK: 2500000, bumpStopC: 20000, fzMax: 250000,
+    // (derby shocks: heavy damping that doesn't blow off on a hit, 18 cm of bump and rubber jounce bumpers that soak up a
+    // landing instead of throwing the 8 t back up - it pogoed off the arena's ramps on a school bus's soft, short setup)
+    springF: 160000, springR: 260000, dampBumpF: 18000, dampRebF: 36000, dampBumpR: 26000, dampRebR: 50000, dampKnee: 0.6,
+    arbF: 90000, arbR: 120000, travelUp: 0.18, travelDown: 0.12, suspS0: 0.3, bumpStopK: 2500000, bumpStopC: 200000, bumpStopRebC: 150000, fzMax: 250000,
     brakeTorqueF: 6500, brakeTorqueR: 9000, handbrakeTorque: 9000, noABS: true,
     maxSteer: 0.65, steerRate: 2.0, steerRatio: 20, ackermann: 0.8,
     idleRpm: 700, limiterRpm: 2800, redlineRpm: 2600, shiftRpm: 2500, engineInertia: 1.2, fricA: 45, fricB: 35, starterTorque: 700,
@@ -3988,6 +4024,12 @@
       torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, noCoastBlip: true,
       jet: { thrust: 550, ab: 0, idle: 0.33, rpm100: 10000, ram: 0.002, y: 0, z: 0.25, revTq: 40, revRpm: 100 },
       steerAMax: 5, CdA: 0.58,
+    } },
+    // the improved pedal one: a geared hub (the wheel turns 3.3 times to the cranks' once - a Schlumpf-type hub geared
+    // far past any real one) and a track sprinter on clipless pedals (~1.6 kW at 130 rpm), tucked down: ~35 mph
+    improved: { label: 'Improved pedal', car: 'GEARED HUB · LEG POWER', hp: 2.1, tq: 118, kbLat: 3.5, ev: true, spec: {
+      mass: 80, CdA: 0.5, autoFinal: 0.3,
+      torqueCurve: [[0, 118], [60, 108], [100, 98], [130, 85], [160, 62], [190, 30], [210, 8], [230, 0]],
     } },
   }, 'pedal', 'Pedal');
   // the RC truck's other two: the stock brushed one (a 550 can motor on a 2S pack, 7.4 V - ~20,000 rpm no-load, ~180 W, a

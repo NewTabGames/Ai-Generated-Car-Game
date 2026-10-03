@@ -1,4 +1,4 @@
-// The hot rod, the Chevelle and the unicycle (pedal and jet): launch (0-30 / 60 / 100, the quarter mile), top speed, a
+// The hot rod, the Chevelle and the unicycle (pedal, improved pedal and jet): launch (0-30 / 60 / 100, the quarter mile), top speed, a
 // stop from 60 (30 / 10 for the unicycle), keyboard turns (lateral g, roll, a wheel lifting, over?) and - the unicycle -
 // how far it pitches and leans, riding, braking and turning. Env: CARS (id[:key],...), TC (0-3)
 const { Vehicle, CARS } = require('../src/vehicle.js');
@@ -48,4 +48,4 @@ function run(id, key) {
   }
   console.log(`== ${id}${key ? ':' + key : ''}\n  ` + out.join('\n  '));
 }
-for (const c of (process.env.CARS || 'hotrod,chevelle,unicycle:pedal,unicycle:jet').split(',')) { const [id, key] = c.split(':'); run(id, key); }
+for (const c of (process.env.CARS || 'hotrod,chevelle,unicycle:pedal,unicycle:improved,unicycle:jet').split(',')) { const [id, key] = c.split(':'); run(id, key); }
