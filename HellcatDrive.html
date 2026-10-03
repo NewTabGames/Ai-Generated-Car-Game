@@ -16038,13 +16038,18 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     M.suit = new THREE.MeshStandardMaterial({ color: 0x6b6247, roughness: 0.85 });
     M.helmet = new THREE.MeshStandardMaterial({ color: 0x5b5a3e, roughness: 0.7 });
     M.skin = new THREE.MeshStandardMaterial({ color: 0xc89478, roughness: 0.6 });
-    // the track links: steel shoes, a rubber pad down each, the end connectors
-    function trackTex() {
+    // the track links: steel shoes, a rubber pad down each, the end connectors - or, with the off-road package's pads
+    // off (grouser), the bare shoes: worn bright steel with a raised grouser bar across each
+    function trackTex(grouser) {
       const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
       // (u runs along the track - one link a tile - v across it)
-      g.fillStyle = '#2a2c2e'; g.fillRect(0, 0, 64, 128);
+      g.fillStyle = grouser ? '#3e4042' : '#2a2c2e'; g.fillRect(0, 0, 64, 128);
       g.fillStyle = '#0e0f10'; g.fillRect(0, 0, 6, 128);
-      g.fillStyle = '#18191a'; g.fillRect(12, 10, 46, 50); g.fillRect(12, 68, 46, 50);
+      if (grouser) {
+        g.fillStyle = '#16171a'; g.fillRect(30, 7, 8, 114);
+        g.fillStyle = '#8c9096'; g.fillRect(22, 7, 8, 114);
+        g.fillStyle = '#5c5f64'; g.fillRect(12, 7, 10, 114); g.fillRect(40, 7, 18, 114);
+      } else { g.fillStyle = '#18191a'; g.fillRect(12, 10, 46, 50); g.fillRect(12, 68, 46, 50); }
       g.fillStyle = '#50535a'; g.fillRect(0, 0, 64, 7); g.fillRect(0, 121, 64, 7); g.fillRect(0, 60, 64, 8);
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
     }
@@ -16125,7 +16130,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const tGeo = trackGeo(), sides = [];
     for (const sx of [-1, 1]) {
       const sg = new THREE.Group(); sg.position.x = sx * trackX; body.add(sg);
-      const tex = trackTex(); tex.repeat.set(1, 1);
+      const tex = trackTex(false), texG = trackTex(true); tex.repeat.set(1, 1); texG.repeat.set(1, 1);
       const tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.45, side: THREE.DoubleSide });
       add(sg, tGeo, tm, 0, 0, 0);
       const spin = [];
@@ -16149,7 +16154,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         }
         add(pg, cylX(0.14, 0.14, 0.5, 16), M.dark, 0, 0, 0); }
       for (const z of RET) { const rg = new THREE.Group(); rg.position.set(0, 0.9, z); sg.add(rg); spin.push({ g: rg, r: 0.11 }); add(rg, cylX(0.11, 0.11, 0.3, 16), M.wheel, 0, 0, 0); }
-      sides.push({ g: sg, tex, spin, travel: 0, prev: null, sx });
+      sides.push({ g: sg, tex, texG, tm, spin, travel: 0, prev: null, sx });
     }
     // the armoured side skirts: over the tops of the road wheels and the top run, thicker ballistic panels at the front
     for (const sx of [-1, 1]) {
@@ -16235,7 +16240,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         const a = s.sx < 0 ? f.spin.rotation.x : -f.spin.rotation.x;
         if (s.prev !== null) { let d = a - s.prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; s.travel += d * RW; }
         s.prev = a;
-        s.tex.offset.x = -s.travel / 0.19;
+        s.tex.offset.x = s.texG.offset.x = -s.travel / 0.19;
         for (const w of s.spin) w.g.rotation.x = -s.travel / w.r;
       }
     }
@@ -16254,7 +16259,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: steerG, eye: toRoot(V3(0, 1.66, -2.62)),
       exhaustTips: tips, materials: M, headlights: spots, tailLens: [], mirrors: [],
-      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      setPaint, setLights, setInteriorVisible,
+      // (the off-road package - trackGrouser: the rubber pads off, the bare steel grousers showing)
+      setTires(front) { for (const sd of sides) { const m = front === 'trackGrouser' ? sd.texG : sd.tex; if (sd.tm.map !== m) { sd.tm.map = m; sd.tm.needsUpdate = true; } } }, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
       afterWheels, setTurret, variant: 'tank', cls: 'tank',
     };
   }
@@ -17066,11 +17073,15 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const padTG = mergeGeos(padT), tyRib = carcass(RF, 0.3, rimR);
       const ribT = []; for (const ox of [-0.32, 0, 0.32]) { const t = new THREE.TorusGeometry(RF + 0.004, 0.013, 6, 56); t.rotateY(Math.PI / 2); t.translate(ox * 0.3, 0, 0); ribT.push(t); }
       const ribTG = mergeGeos(ribT);
+      // (the 40 in mud-terrains: 13 mm taller, big open lugs two across and staggered, shoulder lugs out over the
+      // sidewalls, deep voids between)
+      const RM = RF + 0.013, tyM = carcass(RM - 0.022, TW, rimR), trM = blocks(RM - 0.022, TW, 18, [[-0.25, 0.4, 0.5, 0], [0.25, 0.4, 0.5, 0.5], [-0.49, 0.16, 0.42, 0.5], [0.49, 0.16, 0.42, 0]], 0.04, 1);
       makeWheels((w, R) => {
         w.stock.push(add(w.spin, tyG, M.rubber, 0, 0, 0), add(w.spin, trG, M.rubber, 0, 0, 0));
         if (w.front) w.pkg.push(add(w.spin, tyRib, M.rubber, 0, 0, 0), add(w.spin, ribTG, M.rubber, 0, 0, 0));
         else w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padTG, M.rubber, 0, 0, 0));
-        for (const m of w.pkg) m.visible = false;
+        w.knob.push(add(w.spin, tyM, M.rubber, 0, 0, 0), add(w.spin, trM, M.rubber, 0, 0, 0));
+        for (const m of w.pkg.concat(w.knob)) m.visible = false;
         add(w.spin, cylX(rimR, rimR, TW * 0.85, 40, true), M.black, 0, 0, 0);
         add(w.spin, cylX(rimR * 0.98, rimR * 0.98, 0.02, 40), M.gloss, TW * 0.3, 0, 0);
         const ring = new THREE.TorusGeometry(rimR - 0.01, 0.022, 10, 48); ring.rotateY(Math.PI / 2); add(w.spin, ring, M.red, TW * 0.36, 0, 0);
@@ -17292,7 +17303,10 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     }
     function setTires(front, rear) {
       if (TT) {
-        for (const w of wheels) { const t = w.front ? front : rear, pkg = t === 'ttRib' || t === 'ttPaddle'; for (const m of w.stock) m.visible = !pkg; for (const m of w.pkg) m.visible = pkg; }
+        for (const w of wheels) {
+          const t = w.front ? front : rear, pkg = t === 'ttRib' || t === 'ttPaddle', mud = t === 'ttMud';
+          for (const m of w.stock) m.visible = !pkg && !mud; for (const m of w.pkg) m.visible = pkg; for (const m of w.knob) m.visible = mud;
+        }
         return;
       }
       for (const w of wheels) {
@@ -17868,6 +17882,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
    treaded tyre), the black frame - its crown over the tyre, a leg down each side to the bearings - the seat post with its
    clamp, the saddle with its yellow bumpers fore and aft, the cranks straight on the hub (no gears, no freewheel) and the
    platform pedals, kept level. The rider sits up on it, arms out for balance, the legs following the pedals round.
+   With the off-road package, a mountain-unicycle knobby in place of the street tyre.
    The jet version: a model-aircraft-class turbojet on a rack behind the saddle, its flame out of the back, a fuel tank
    under it; the rider in goggles.
    The physics runs the one tyre as four wheels (two 'axles' 10 cm apart, two side by side at each): one wheel is drawn
@@ -17972,10 +17987,21 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // at the middle of the physics' four, turning with them; the cranks and pedals on the hub (the pedals kept level)
     const hub = new THREE.Group(); dyn.add(hub);
     const spin = new THREE.Group(); hub.add(spin);
-    const W = 0.054, rimR = R - 0.04;
-    { const tyre = new THREE.TorusGeometry(R - W * 0.5, W * 0.5, 14, 64); tyre.rotateY(Math.PI / 2); add(spin, tyre, M.rubber, 0, 0, 0);
+    const W = 0.054, rimR = R - 0.04, tyreStock = [], tyreKnob = [];
+    { const tyre = new THREE.TorusGeometry(R - W * 0.5, W * 0.5, 14, 64); tyre.rotateY(Math.PI / 2); tyreStock.push(add(spin, tyre, M.rubber, 0, 0, 0));
       // (a block tread round the crown)
-      const N = 72; for (let k = 0; k < N; k++) for (const ox of (k & 1 ? [-0.012, 0.012] : [0])) { const b = add(spin, new THREE.BoxGeometry(0.012, 0.005, 0.014), M.rubber, ox, 0, 0, 0, 0, 0, false); b.geometry.translate(0, R - 0.002, 0); b.rotation.x = k * 2 * Math.PI / N; }
+      const N = 72; for (let k = 0; k < N; k++) for (const ox of (k & 1 ? [-0.012, 0.012] : [0])) { const b = add(spin, new THREE.BoxGeometry(0.012, 0.005, 0.014), M.rubber, ox, 0, 0, 0, 0, 0, false); b.geometry.translate(0, R - 0.002, 0); b.rotation.x = k * 2 * Math.PI / N; tyreStock.push(b); }
+      // (the off-road package: a mountain-unicycle knobby - a carcass under tall square knobs, three across the crown and
+      // four down the shoulders in turn, one merged mesh; shown in place of the street tyre by setTires)
+      { const kh = 0.009, r = W * 0.5, Rc = R - kh * 0.6 - r, NK = Math.round(2 * Math.PI * R / 0.032), pos = [], nrm = [];
+        for (let k = 0; k < NK; k++) for (const ph of (k & 1 ? [-1.15, -0.4, 0.4, 1.15] : [-0.78, 0, 0.78])) {
+          const b = new THREE.BoxGeometry(W * 0.2, kh * 2, 0.017).toNonIndexed();
+          b.rotateZ(-ph); b.translate((r + kh * 0.4) * Math.sin(ph), Rc + (r + kh * 0.4) * Math.cos(ph), 0); b.rotateX(k * 2 * Math.PI / NK);
+          pos.push(...b.attributes.position.array); nrm.push(...b.attributes.normal.array);
+        }
+        const kg = new THREE.BufferGeometry(); kg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); kg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+        const carc = new THREE.TorusGeometry(Rc, r, 14, 64); carc.rotateY(Math.PI / 2);
+        for (const g of [carc, kg]) { const m = add(spin, g, M.rubber, 0, 0, 0); m.visible = false; tyreKnob.push(m); } }
       const rim = new THREE.TorusGeometry(rimR, 0.008, 6, 64); rim.rotateY(Math.PI / 2); rim.scale(2.2, 1, 1); add(spin, rim, M.rim, 0, 0, 0);
       add(spin, cylX(0.022, 0.022, 0.1, 16), M.alu, 0, 0, 0);
       for (const sx of [-1, 1]) add(spin, cylX(0.032, 0.032, 0.005, 20), M.alu, sx * 0.035, 0, 0);
@@ -18143,7 +18169,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: new THREE.Group(), eye,
       exhaustTips: tips, materials: M, headlights: [], tailLens: [], mirrors: [],
-      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      setPaint, setLights, setInteriorVisible,
+      // (the off-road package's knobby - ccKnob - in place of the street tyre)
+      setTires(front, rear) { const on = front === 'ccKnob' || rear === 'ccKnob'; for (const m of tyreStock) m.visible = !on; for (const m of tyreKnob) m.visible = on; }, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
       afterWheels, setRider, setJet: JET ? setJet : undefined, setJetSize: JET ? setJetSize : undefined, variant: 'unicycle', cls: JET ? 'jet' : 'pedal',
     };
   }
@@ -20976,6 +21004,20 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (C[id] && C[id].make) return C[id].make(opt || undefined);
     return C[id] && !C[id].more ? C[id] : C.hellcat;
   }
+  // every pair of tyres the game can put on a vehicle (with that option): its own, the off-road package in each of its
+  // kinds, a Car Crushers car's tyre options, the Hellcat's drag radials, the Drag Pak's rears. test/tyre-look-test.js
+  // builds every vehicle's model and checks each pair is drawn differently - a menu that offers tyres lists them here
+  function tyreChoices(id, opt) {
+    const def = defOf(id, opt), cc = CC_CARS[id], out = [];
+    const add = (f, r) => { if (!out.some((o) => o[0] === f && o[1] === r)) out.push([f, r]); };
+    const f0 = def.spec.frontTire || VEH.SPEC.frontTire, r0 = def.spec.rearTire || VEH.SPEC.rearTire;
+    add(f0, r0);
+    if (id === 'hellcat') add('street', 'drag');
+    if (id === 'dragpak') { add(f0, 'etdrag'); add(f0, 'etdragpro'); }
+    if (cc && cc.tyreOpts) for (const t of cc.tyreOpts) add(t[0], t[0]);
+    if (!(cc && cc.noPkg)) for (const k of id === 'trophy' ? [null, 'paddle'] : id === 'buggy' ? [null, 'knobby'] : [null]) { const p = VEH.OFFROAD_PKG(id, def.cls, k); add(p.front, p.rear); }
+    return out;
+  }
   const car = buildModel(S.car, CARDEF, sp, S.paint);
   scene.add(car.root);
   car.setTires(tireF(), tireR()); car.setTransmission(veh.transType);
@@ -23121,6 +23163,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   if (S.netRoom) onlineJoin(S.netRoom, true);
 
   window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE };
+  // (for the tests: every vehicle id and its options, and the builders the game itself uses - see tyreChoices)
+  Object.assign(window.__hc, { VEH, buildModel, defOf, tyreChoices, carIds: ['hellcat', 'demon', 'dragpak', ...MORE_IDS],
+    optionsOf: (id) => { const m = MORE_CARS.find((x) => x.id === id); return m && m.options ? m.options.map((o) => o[0]) : [undefined]; } });
   function loop(now) {
     requestAnimationFrame(loop);
     frame(now);

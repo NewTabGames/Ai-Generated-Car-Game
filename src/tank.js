@@ -96,13 +96,18 @@
     M.suit = new THREE.MeshStandardMaterial({ color: 0x6b6247, roughness: 0.85 });
     M.helmet = new THREE.MeshStandardMaterial({ color: 0x5b5a3e, roughness: 0.7 });
     M.skin = new THREE.MeshStandardMaterial({ color: 0xc89478, roughness: 0.6 });
-    // the track links: steel shoes, a rubber pad down each, the end connectors
-    function trackTex() {
+    // the track links: steel shoes, a rubber pad down each, the end connectors - or, with the off-road package's pads
+    // off (grouser), the bare shoes: worn bright steel with a raised grouser bar across each
+    function trackTex(grouser) {
       const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
       // (u runs along the track - one link a tile - v across it)
-      g.fillStyle = '#2a2c2e'; g.fillRect(0, 0, 64, 128);
+      g.fillStyle = grouser ? '#3e4042' : '#2a2c2e'; g.fillRect(0, 0, 64, 128);
       g.fillStyle = '#0e0f10'; g.fillRect(0, 0, 6, 128);
-      g.fillStyle = '#18191a'; g.fillRect(12, 10, 46, 50); g.fillRect(12, 68, 46, 50);
+      if (grouser) {
+        g.fillStyle = '#16171a'; g.fillRect(30, 7, 8, 114);
+        g.fillStyle = '#8c9096'; g.fillRect(22, 7, 8, 114);
+        g.fillStyle = '#5c5f64'; g.fillRect(12, 7, 10, 114); g.fillRect(40, 7, 18, 114);
+      } else { g.fillStyle = '#18191a'; g.fillRect(12, 10, 46, 50); g.fillRect(12, 68, 46, 50); }
       g.fillStyle = '#50535a'; g.fillRect(0, 0, 64, 7); g.fillRect(0, 121, 64, 7); g.fillRect(0, 60, 64, 8);
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
     }
@@ -183,7 +188,7 @@
     const tGeo = trackGeo(), sides = [];
     for (const sx of [-1, 1]) {
       const sg = new THREE.Group(); sg.position.x = sx * trackX; body.add(sg);
-      const tex = trackTex(); tex.repeat.set(1, 1);
+      const tex = trackTex(false), texG = trackTex(true); tex.repeat.set(1, 1); texG.repeat.set(1, 1);
       const tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.45, side: THREE.DoubleSide });
       add(sg, tGeo, tm, 0, 0, 0);
       const spin = [];
@@ -207,7 +212,7 @@
         }
         add(pg, cylX(0.14, 0.14, 0.5, 16), M.dark, 0, 0, 0); }
       for (const z of RET) { const rg = new THREE.Group(); rg.position.set(0, 0.9, z); sg.add(rg); spin.push({ g: rg, r: 0.11 }); add(rg, cylX(0.11, 0.11, 0.3, 16), M.wheel, 0, 0, 0); }
-      sides.push({ g: sg, tex, spin, travel: 0, prev: null, sx });
+      sides.push({ g: sg, tex, texG, tm, spin, travel: 0, prev: null, sx });
     }
     // the armoured side skirts: over the tops of the road wheels and the top run, thicker ballistic panels at the front
     for (const sx of [-1, 1]) {
@@ -293,7 +298,7 @@
         const a = s.sx < 0 ? f.spin.rotation.x : -f.spin.rotation.x;
         if (s.prev !== null) { let d = a - s.prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; s.travel += d * RW; }
         s.prev = a;
-        s.tex.offset.x = -s.travel / 0.19;
+        s.tex.offset.x = s.texG.offset.x = -s.travel / 0.19;
         for (const w of s.spin) w.g.rotation.x = -s.travel / w.r;
       }
     }
@@ -312,7 +317,9 @@
     return {
       root: rootG, model, exterior: model, interior: model, wheels, steerWheel: steerG, eye: toRoot(V3(0, 1.66, -2.62)),
       exhaustTips: tips, materials: M, headlights: spots, tailLens: [], mirrors: [],
-      setPaint, setLights, setTires: noop, setInteriorVisible, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      setPaint, setLights, setInteriorVisible,
+      // (the off-road package - trackGrouser: the rubber pads off, the bare steel grousers showing)
+      setTires(front) { for (const sd of sides) { const m = front === 'trackGrouser' ? sd.texG : sd.tex; if (sd.tm.map !== m) { sd.tm.map = m; sd.tm.needsUpdate = true; } } }, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
       afterWheels, setTurret, variant: 'tank', cls: 'tank',
     };
   }

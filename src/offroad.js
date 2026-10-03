@@ -430,11 +430,15 @@
       const padTG = mergeGeos(padT), tyRib = carcass(RF, 0.3, rimR);
       const ribT = []; for (const ox of [-0.32, 0, 0.32]) { const t = new THREE.TorusGeometry(RF + 0.004, 0.013, 6, 56); t.rotateY(Math.PI / 2); t.translate(ox * 0.3, 0, 0); ribT.push(t); }
       const ribTG = mergeGeos(ribT);
+      // (the 40 in mud-terrains: 13 mm taller, big open lugs two across and staggered, shoulder lugs out over the
+      // sidewalls, deep voids between)
+      const RM = RF + 0.013, tyM = carcass(RM - 0.022, TW, rimR), trM = blocks(RM - 0.022, TW, 18, [[-0.25, 0.4, 0.5, 0], [0.25, 0.4, 0.5, 0.5], [-0.49, 0.16, 0.42, 0.5], [0.49, 0.16, 0.42, 0]], 0.04, 1);
       makeWheels((w, R) => {
         w.stock.push(add(w.spin, tyG, M.rubber, 0, 0, 0), add(w.spin, trG, M.rubber, 0, 0, 0));
         if (w.front) w.pkg.push(add(w.spin, tyRib, M.rubber, 0, 0, 0), add(w.spin, ribTG, M.rubber, 0, 0, 0));
         else w.pkg.push(add(w.spin, tyP, M.rubber, 0, 0, 0), add(w.spin, padTG, M.rubber, 0, 0, 0));
-        for (const m of w.pkg) m.visible = false;
+        w.knob.push(add(w.spin, tyM, M.rubber, 0, 0, 0), add(w.spin, trM, M.rubber, 0, 0, 0));
+        for (const m of w.pkg.concat(w.knob)) m.visible = false;
         add(w.spin, cylX(rimR, rimR, TW * 0.85, 40, true), M.black, 0, 0, 0);
         add(w.spin, cylX(rimR * 0.98, rimR * 0.98, 0.02, 40), M.gloss, TW * 0.3, 0, 0);
         const ring = new THREE.TorusGeometry(rimR - 0.01, 0.022, 10, 48); ring.rotateY(Math.PI / 2); add(w.spin, ring, M.red, TW * 0.36, 0, 0);
@@ -656,7 +660,10 @@
     }
     function setTires(front, rear) {
       if (TT) {
-        for (const w of wheels) { const t = w.front ? front : rear, pkg = t === 'ttRib' || t === 'ttPaddle'; for (const m of w.stock) m.visible = !pkg; for (const m of w.pkg) m.visible = pkg; }
+        for (const w of wheels) {
+          const t = w.front ? front : rear, pkg = t === 'ttRib' || t === 'ttPaddle', mud = t === 'ttMud';
+          for (const m of w.stock) m.visible = !pkg && !mud; for (const m of w.pkg) m.visible = pkg; for (const m of w.knob) m.visible = mud;
+        }
         return;
       }
       for (const w of wheels) {
