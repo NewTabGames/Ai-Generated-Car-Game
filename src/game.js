@@ -19,7 +19,7 @@
   // ------------------------------------------------------------------ settings
   const DEFAULTS = {
     car: 'hellcat', fuel: 'e85', tree: 'pro', rollout: true, pullerEng: 'hemi4', dragClass: 'tf', kartClass: 'tag', mowerClass: 'bp',
-    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal', sbirdEng: 'c440',
+    miniEng: 'ev', scooterEng: 'ev', razorEng: 'ev', golfEng: 'std', rallyEng: 'r4', cyberEng: 'awd', tankEng: 'gov', bikeEng: 'stock', trophyEng: 'tt', buggyEng: 'vw', ramEng: 'hemi', atvEng: 'sport', dieselEng: 'stock', uniEng: 'pedal', sbirdEng: 'c440', rcEng: 'bl3s', coachEng: 'stock', derbyEng: 'dt466', busCow: true,
     trans: 'auto', rearTire: 'street', dpRear: 'etdrag', offroad: {}, tcMode: 0, ver: 2, abs: true, paint: 'TorRed', time: 'day', units: 'mph',
     viewDist: 1700, treeDensity: 1, shadows: true, resScale: 1, fov: 66, seatY: 0, seatZ: 0, chaseFov: 62, showHud: true, showInputs: true, showPerf: true,
     map: 'country', rsMode: 'auto', airAssist: true, vol: 0.8, engVol: 1, fxVol: 1, camMode: 0, cockpitWheel: 'match', wheelDeg: 180, clutchPedal: false, arcadeReverse: true, cockpitHud: false,
@@ -369,6 +369,61 @@
           info: 'The Superbird with the 426 Street Hemi: hemispherical heads, two Carter AFB four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 · 727 TorqueFlite with a 2,300 rpm converter, Sure-Grip on 3.55s · ~1,830 kg · 0-60 ~6.3 s, ~14.5 s quarter mile at 107 mph, ~130 mph',
           snd: { nEng: 1, cyl: 8, fmul: 0.88, deep: 0.55, loud: 0.9, open: 0.7, whK: 0.19, whPure: 0, whine: 0, rpmRef: 6400, race: 0.55, rough: 0.2 } },
       } },
+    rc: { btn: 'RC TRUCK', sub: 'A 1/10 4WD monster-truck RC car · brushed 2S, brushless 3S or a 6S speed-run build · drive it on the real roads - or from the little driver\'s seat (C)', paint: 'Bay Blue', tc: 1, cam: [0.17, 0.18], scale: 0.12, noPkg: true,
+      hint: 'RC truck (Brushless 3S): shift up (E) for DRIVE - a 3,200 kV brushless on a 3S LiPo, 4WD: 0-30 in ~1.7 s, ~45 mph, at the size of a shoebox. It turns like a kart and rolls over like an RC truck: the stability control is on (Sport, T for Off). Press C for the view from the cab.',
+      info: 'A 1/10-scale 4WD monster-truck basher like the Sandstorm: a blue polycarbonate pickup shell with a black hood, the white flash and SAND STORM on the quarters, tinted glass, a big rear wing; a plastic tub chassis with front and rear bumpers (LED lamps up front), A-arms, dogbones and four oil-filled coil-overs that work with the wheels; 150 mm chevron tyres on blue beadlock wheels; gear diffs front and rear on a centre slipper · a 3660 3,200 kV brushless on 3S (11.1 V), ~0.9 kW, 12.5:1 overall · 0.47 m long, 0.37 m wide · 2.6 kg · 0-30 ~1.7 s, ~45 mph · a tiny cab inside with two seats, the dash, a wheel and a 1/12 driver',
+      trans: 'Single speed · 4WD', tyres: '150 mm RC knobbies',
+      snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1, rpmRef: 35500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 },
+      optKey: 'rcEng', optLabel: 'Power', options: [
+        ['brushed', 'Brushed 2S', 'The ready-to-run motor: a 550 can on 2S, ~180 W · 0-20 ~1.2 s · ~27 mph'],
+        ['bl3s', 'Brushless 3S', 'A 3,200 kV brushless on 3S, ~0.9 kW · 0-30 ~1.7 s · ~45 mph'],
+        ['bl6s', 'Brushless 6S', 'A 4074 2,050 kV on 6S, ~2.5 kW, speed-run gearing · 0-40 ~2.4 s · ~62 mph'],
+      ],
+      eng: {
+        brushed: { hint: 'RC truck (Brushed 2S): shift up (E) for DRIVE - the ready-to-run brushed 550 motor on a 2S pack, ~180 W through the same 4WD: ~27 mph, gentle enough to learn it on. The stability control is on (Sport, T for Off). C for the view from the cab.',
+          info: 'The RC truck with its stock brushed motor: a 550-size can on 2S (7.4 V), ~20,000 rpm, ~180 W, 12:1 overall · 2.35 kg · 0-20 ~1.2 s, ~27 mph',
+          trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 2, whK: 0.05, whPure: 1, whine: 1, rpmRef: 20000, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+        bl6s: { hint: 'RC truck (Brushless 6S): shift up (E) for DRIVE - a 4074 2,050 kV brushless on 6S, ~2.5 kW in a 3.4 kg truck: ~62 mph. Feed the throttle in - with the stability control off (T) it spins the wheels at any speed and swaps ends in a turn. C for the view from the cab.',
+          info: 'The RC truck built for speed runs: a 4074 2,050 kV brushless on 6S (22.2 V), ~45,500 rpm, ~2.5 kW, 11.5:1 overall, stiffer springs · 3.4 kg · 0-40 ~2.4 s, ~62 mph',
+          trans: 'Single speed · 4WD', snd: { nEng: 1, cyl: 1, ev: 1, rc: 1, whK: 0.0333, whPure: 1, whine: 1.15, rpmRef: 45500, open: 1, fmul: 1, deep: 0, loud: 0, race: 0 } },
+      } },
+    coach: { btn: 'TOUR COACH', sub: 'A 45 ft three-axle motorcoach · 12 L turbo diesel, Allison 6-speed · stock and governed, an X15 swap with a tune, or a 1,500 hp race coach', paint: 'Alpine White', tc: 0, cam: [2.2, 1.9], road: true, noPkg: true, soot: 0.35,
+      hint: 'Tour coach: shift up (E) for DRIVE - 18 t and 410 hp: 0-60 in ~36 s, governed at 75 mph. It takes the whole road to turn (a 7.7 m wheelbase - swing wide), and the air brakes need room. The tag axle behind the drive axle scrubs in tight turns.',
+      info: 'A 45 ft motorcoach of the MCI J4500 kind: 13.84 m long, 2.59 m wide, 3.5 m tall · the white body with the black glass band, the front cap over the big two-piece windshield with the fleet number, rabbit-ear mirrors, the entry door, baggage bays, the D&F Travel brush-stroke swoosh · a steer axle, the drive axle on duals and a tag axle, all on polished aluminium wheels · 12 L inline-six turbo diesel at the back, 410 hp, 1,450 lb-ft · Allison 6-speed automatic, 3.58 gears · air suspension, air brakes with ABS · ~18 t loaded · 0-60 ~36 s, governed at 75 mph',
+      trans: '6-speed auto (Allison)', tyres: '315/80R22.5',
+      snd: { nEng: 1, cyl: 6, fmul: 0.7, deep: 0.5, loud: 0.45, open: 0.2, whK: 0.19, whPure: 1, whine: 1.0, rpmRef: 2100, race: 0.1, rough: 0.2, turbo: 1, diesel: 0.75 },
+      optKey: 'coachEng', optLabel: 'Engine', options: [
+        ['stock', 'Stock 410 hp', 'The 12 L turbo diesel, 410 hp, 1,450 lb-ft · 6-speed auto · 0-60 ~36 s · governed at 75 mph'],
+        ['tuned', 'X15 swap + tune', 'A 15 L swapped in and turned up, 605 hp, 2,050 lb-ft · the governor off · 0-60 ~27 s · ~95 mph'],
+        ['race', 'Race coach', 'A built 15 L on compound turbos, 1,500 hp, 3,900 lb-ft · 0-60 ~13 s · ~135 mph - in an 18 t coach'],
+      ],
+      eng: {
+        tuned: { hint: 'Tour coach, X15 swap: shift up (E) for DRIVE - a 15 L in the back turned up to 605 hp and 2,050 lb-ft, the governor off: 0-60 in ~27 s and ~95 mph. Still 18 t: brake early, turn wide.',
+          info: 'The coach with a 15 L inline-six swapped in and tuned - 605 hp, 2,050 lb-ft - taller 3.36 gears and the speed governor off · ~18.3 t · 0-60 ~27 s, ~95 mph', soot: 0.8,
+          snd: { nEng: 1, cyl: 6, fmul: 0.68, deep: 0.6, loud: 0.65, open: 0.35, whK: 0.19, whPure: 1, whine: 1.3, rpmRef: 2100, race: 0.25, rough: 0.2, turbo: 1, diesel: 0.65 } },
+        race: { hint: 'Race coach: shift up (E) for DRIVE - a built 15 L on compound turbos, 1,500 hp and 3,900 lb-ft through the Allison: 0-60 in ~13 s, ~135 mph, in 18 t of coach. It rolls coal off the line. Leave a LOT of room to stop.',
+          info: 'The coach built to race: a 15 L inline-six on compound turbos (~80 psi), 1,500 hp, 3,900 lb-ft, revving to 2,800 · a built Allison, 3.08 gears, a locked rear diff, bigger brakes · ~18.5 t · 0-60 ~13 s, 1/4 mile ~20 s at 81 mph, ~135 mph', soot: 1.4,
+          snd: { nEng: 1, cyl: 6, fmul: 0.66, deep: 0.75, loud: 0.95, open: 0.6, whK: 0.19, whPure: 1, whine: 1.9, rpmRef: 2800, race: 0.7, rough: 0.25, turbo: 1, diesel: 0.55, surge: 1 } },
+      } },
+    busderby: { btn: 'DERBY BUS', sub: 'A school bus stripped for the demolition derby · graffiti, the glass out, a cage · the DT466 diesel, a 454 big-block or a blown 572 · the cowcatcher on or off · its own arena', paint: 'Bus Yellow', tc: 3, cam: [1.75, 1.6], map: 'arena', noPkg: true, soot: 0.5,
+      toggle: { key: 'busCow', label: 'Cowcatcher', on: 'Bolted on', off: 'Off', note: 'A welded V-plow of bars off the front bumper: 350 kg on the nose, and it reaches 0.8 m further - it takes the hits and shoves the junk aside' },
+      hint: 'Derby bus: shift up (E) for DRIVE - the stock DT466 diesel, 210 hp in 7.8 t: 0-60 in ~40 s, ~68 mph. Traction control is off - it\'s a derby. Hit things with the cowcatcher (Esc → Drive to take it off). It brought you to the arena: the junk cars are there to be crushed.',
+      info: 'A conventional school bus (an International 3800 kind: the hood out front, a 5.6 m wheelbase) stripped for the demolition derby: every pane knocked out, a mesh over the windshield, most of the seats pulled, a roll cage round the driver, the crew\'s graffiti sprayed all over the faded yellow - GFP 95, Dave, Lawn, Nick 69 - orange steel wheels, duals at the back · the cowcatcher: a welded V of steel bars off the bumper · the DT466 diesel, 210 hp, 520 lb-ft · Allison 5-speed, 5.29 gears · ~7.8 t · 0-60 ~40 s, ~68 mph',
+      trans: '5-speed auto (Allison)', tyres: '11R22.5 recaps',
+      snd: { nEng: 1, cyl: 6, fmul: 0.78, deep: 0.35, loud: 0.6, open: 0.7, whK: 0.19, whPure: 1, whine: 0.8, rpmRef: 2800, race: 0.3, rough: 0.3, turbo: 1, diesel: 0.9 },
+      optKey: 'derbyEng', optLabel: 'Engine', options: [
+        ['dt466', 'DT466 diesel', 'The stock 7.6 L inline-six diesel, 210 hp, 520 lb-ft · 5-speed auto · 0-60 ~40 s · ~68 mph'],
+        ['bigblock', '454 big-block', 'A junkyard 454 big-block gas V8, 390 hp, 500 lb-ft, open headers · 0-60 ~20 s · ~89 mph'],
+        ['blown', 'Blown 572', 'A 572 big-block under a roots blower, 900 hp, 850 lb-ft · 0-60 ~11 s · ~114 mph - it smokes the duals'],
+      ],
+      eng: {
+        bigblock: { hint: 'Derby bus, 454 big-block: shift up (E) for DRIVE - a junkyard 454 gas V8 on open headers, 390 hp: 0-60 in ~20 s, ~89 mph. Traction control is off. The cowcatcher comes off in Esc → Drive.',
+          info: 'The derby bus with a 454 big-block gas V8 swapped in: 390 hp, 500 lb-ft, open headers out the side · the 5-speed on 4.33s · ~7.55 t · 0-60 ~20 s, ~89 mph', soot: 0,
+          snd: { nEng: 1, cyl: 8, fmul: 0.86, deep: 0.5, loud: 0.85, open: 1, whK: 0.19, whPure: 0, whine: 0, rpmRef: 5200, race: 0.75, rough: 0.35 } },
+        blown: { hint: 'Derby bus, blown 572: shift up (E) for DRIVE - a 572 big-block under a roots blower, 900 hp: 0-60 in ~11 s, ~114 mph, and it lights up the duals in the first three gears. Traction control is off.',
+          info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
+          snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
+      } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
       info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
@@ -403,14 +458,19 @@
   // (a kart is 6 ft long and sits a foot off the ground: in close and low)
   // (a racing mower is 7 ft long with its driver sitting up 4 ft off the ground)
   const CAMK = CC ? CCD.cam[0] : PULLER ? 1.65 : FUNNY ? 1.15 : DRAGSTER ? 1.3 : MONSTER ? 1.55 : KART ? 0.55 : MOWER ? 0.68 : 1, CAMH = CC ? CCD.cam[1] : PULLER ? 1.65 : FUNNY ? 1.2 : DRAGSTER ? 1.45 : MONSTER ? 2.05 : KART ? 0.55 : MOWER ? 0.8 : 1;
+  // (MINI: a scale model's size against a real car - the RC truck's 0.12: the chase camera's minimums, the cockpit's head
+  // movement and near plane, and the smoke and dust come down with it)
+  const MINI = CC && CCD.scale ? CCD.scale : 1;
   const FINISH = CARDEF.finishFt === 1000 ? 1000 : 1320;   // Top Fuel races to 1,000 ft
   const carSpec = Object.assign({}, CARDEF.spec);
+  // (a car's on/off fitting - the derby bus's cowcatcher: its spec changes when it's off)
+  if (CC && CCD.toggle && S[CCD.toggle.key] === false && VEH.CARS[S.car].cow) Object.assign(carSpec, VEH.CARS[S.car].cow.off);
   if (DEMON && S.fuel === 'e10') carSpec.torqueScale = (carSpec.torqueScale || 1) * 0.865;
   const veh = new VEH.Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, carSpec);
   veh.setTransmission(FIXED ? 'auto' : S.trans);
   // off-road package, saved per car: KO2 all-terrains + lift on the road cars; each of the More Cars gets its own
   // (the dune buggy has two packages: its dune tyres - true - or off-road knobbies - 'knobby')
-  const OFFROAD = () => !!(S.offroad && S.offroad[S.car]);
+  const OFFROAD = () => !(CC && CCD.noPkg) && !!(S.offroad && S.offroad[S.car]);
   // (the trophy truck too: its mud-terrains - true - or sand paddles - 'paddle')
   const PKG_KIND = () => { const v = S.offroad && S.offroad[S.car]; return typeof v === 'string' ? v : null; };
   const pkg = () => VEH.OFFROAD_PKG(S.car, CARDEF.cls, PKG_KIND());
@@ -594,7 +654,7 @@
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
-      : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius })) : CAR.build(THREE, o);
+      : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius, cow: id !== S.car || S.busCow !== false })) : CAR.build(THREE, o);
   }
   // (a vehicle's CARS entry from its id and option key - engine, class or version)
   function defOf(id, opt) {
@@ -806,7 +866,7 @@
       desc: 'The Avenger: a rounded hot-rod coupe body in lime green, yellow-to-orange flames licking back from the nose outlined in red, the name across the doors, a wall of stickers under it, dark windows, the zoomies out of the rear fenders - on the same chassis, engine, axles, shocks and tyres as the other truck, so it drives the same.',
       btn: 'AVENGER', tc: 3 },
     // (the Car Crushers 2 cars, a card each - see CC_CARS)
-    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options })),
+    ...Object.entries(CC_CARS).map(([id, c]) => ({ id, name: c.btn, btn: c.btn, paint: c.paint, tc: c.tc, map: c.map, sub: c.sub, desc: c.info, optKey: c.optKey, options: c.options, toggle: c.toggle })),
   ];
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
@@ -865,6 +925,16 @@
         const b = el(`<button class="mopt ${sel ? 'on' : ''}"><b>${label}</b><span>${note}</span></button>`);
         b.addEventListener('click', () => pickCar(m.id, key));
         opts.appendChild(b);
+      }
+      // (an on/off fitting - the derby bus's cowcatcher: flip it here; driving that car, it restarts with it changed)
+      if (m.toggle) {
+        const T = m.toggle, tg = el('<div class="mopts"></div>');
+        for (const [val, lab] of [[true, T.on], [false, T.off]]) {
+          const b = el(`<button class="mopt ${S[T.key] !== false === val ? 'on' : ''}"><b>${T.label}: ${lab}</b><span>${val ? T.note : 'The plain bumper'}</span></button>`);
+          b.addEventListener('click', () => { if (carLocked()) return; S[T.key] = val; saveS(); if (S.car === m.id) location.reload(); else openMoreCars(); });
+          tg.appendChild(b);
+        }
+        card.appendChild(tg);
       }
       list.appendChild(card);
     }
@@ -1039,6 +1109,8 @@
       if (CC) add(row(CARDEF.name, CCD.info, el('<span></span>')));
       if (CC && CCD.options) add(row(CCD.optLabel || 'Engine', (CCD.optLabel ? 'Switching' : 'Swapping engines') + ' restarts the game (each keeps its own Fun-tab tune)',
         seg(CCD.options.map((o) => [o[0], o[1]]), CARDEF.engine || 'ev', (v) => { if (v !== (CARDEF.engine || 'ev')) pickCar(S.car, v); })));
+      if (CC && CCD.toggle) add(row(CCD.toggle.label, CCD.toggle.note + ' · changing it restarts the game',
+        seg([[true, CCD.toggle.on], [false, CCD.toggle.off]], S[CCD.toggle.key] !== false, (v) => { if (carLocked() || v === (S[CCD.toggle.key] !== false)) return; S[CCD.toggle.key] = v; saveS(); location.reload(); })));
       if (MONSTER) {
         add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
@@ -1071,7 +1143,7 @@
           if (carLocked()) return;
           S.offroad = Object.assign({}, S.offroad, { trophy: v }); applyVehicleSettings();
         })));
-      else add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
+      else if (!(CC && CCD.noPkg)) add(row('Off-road package', PKG_UI[2], seg([[false, 'Off'], [true, PKG_UI[1]]], OFFROAD(), (v) => {
         if (carLocked()) return;
         S.offroad = Object.assign({}, S.offroad, { [S.car]: v }); applyVehicleSettings();
       })));
@@ -1404,6 +1476,7 @@
         skids.add(i, w.cpx, w.cpz, fx, fz, w.tire.width * 1.1, rut, groundH, SOIL[w.surface]);
       } else skids.break(i);
       if (MONSTER) { rate *= 1.5; size *= 2.1; grow *= 1.4; up *= 1.5; }   // 43 in wide paddle tyres throw a lot of dirt
+      if (MINI < 1) { const k = Math.sqrt(MINI); rate *= 3 * k; size *= k * 0.6; grow *= k; up *= k; }   // (a scale model's: little puffs)
       { const m = G.smk[i]; m[0] = rate * tune.smoke; m[1] = alpha; m[2] = size; m[3] = shade; m[4] = grow; m[5] = life; m[6] = up; }
       if (S.dust === 'small') { rate *= DUST_SMALL.rate; alpha = Math.min(alpha, DUST_SMALL.alpha); size = Math.min(size, DUST_SMALL.size); grow = Math.min(grow, DUST_SMALL.grow); life = Math.min(life, DUST_SMALL.life); up = Math.min(up, DUST_SMALL.up); }
       // (a cloud already filling the screen many times over gets its new puffs fewer but denser: same look, a
@@ -1415,8 +1488,8 @@
       while (G.emitAcc[i] >= 1) {
         G.emitAcc[i] -= 1;
         const back = w.omega * w.radius - (veh.vx * fx + veh.vz * fz);
-        smoke.emit(w.cpx + (Math.random() - 0.5) * 0.3, w.cpy + 0.15 + Math.random() * 0.1, w.cpz + (Math.random() - 0.5) * 0.3,
-          veh.vx * 0.3 - fx * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2, 0.4 + Math.random() * (0.8 + up), veh.vz * 0.3 - fz * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2,
+        smoke.emit(w.cpx + (Math.random() - 0.5) * 0.3 * MINI, w.cpy + (0.15 + Math.random() * 0.1) * MINI, w.cpz + (Math.random() - 0.5) * 0.3 * MINI,
+          veh.vx * 0.3 - fx * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2 * MINI, (0.4 + Math.random() * (0.8 + up)) * Math.sqrt(MINI), veh.vz * 0.3 - fz * clamp(back, -15, 15) * 0.18 + (Math.random() - 0.5) * 1.2 * MINI,
           size * (0.8 + Math.random() * 0.4), grow, life * (0.7 + Math.random() * 0.6), alpha, shade);
       }
     }
@@ -1539,12 +1612,12 @@
     if (!cam.dragging && cam.orbitT > 0) cam.orbitT -= dt;
     if (!cam.dragging && cam.orbitT <= 0) { cam.orbitYaw *= Math.exp(-dt * 3); cam.orbitPitch *= Math.exp(-dt * 3); }
     if (cam.mode === 2) {
-      camera.near = 0.02;
+      camera.near = 0.02 * Math.max(MINI, 0.2);
       // head: g-force lean + look into corners
       // (a dragster's 5 g shoves your head a little further back into the rest)
       const tx = clamp(-veh.gLat * 0.025, -0.05, 0.05), tz = clamp(veh.gLong * 0.02, -0.04, DRAGSTER ? 0.08 : 0.04);
-      cam.head.x += (tx - cam.head.x) * Math.min(1, dt * 6); cam.head.z += (tz - cam.head.z) * Math.min(1, dt * 6);
-      cam.head.y = (veh.fuelCut ? (Math.random() - 0.5) * 0.004 : 0) + (Math.random() - 0.5) * 0.0015 * clamp(Math.abs(speed) / 60, 0, 1);
+      cam.head.x += (tx * MINI - cam.head.x) * Math.min(1, dt * 6); cam.head.z += (tz * MINI - cam.head.z) * Math.min(1, dt * 6);
+      cam.head.y = ((veh.fuelCut ? (Math.random() - 0.5) * 0.004 : 0) + (Math.random() - 0.5) * 0.0015 * clamp(Math.abs(speed) / 60, 0, 1)) * MINI;
       // tractor: sitting on the frame right behind the engines, everything shakes
       if (PULLER && veh.running) { const sh = 0.0025 + 0.007 * clamp(veh.thrEff, 0, 1); cam.head.y += (Math.random() - 0.5) * sh; cam.head.x += (Math.random() - 0.5) * sh * 0.5; }
       // dragster: the engine is bolted to the frame right behind your seat - and 5 g shoves your head back
@@ -1554,7 +1627,7 @@
       }
       const hy = (G.lookBack ? Math.PI * 0.92 : -veh.steerAngle * 0.4);
       cam.headYaw += (hy - cam.headYaw) * Math.min(1, dt * 5);
-      _v.copy(car.eye).add(cam.head); _v.y += S.seatY; _v.z += S.seatZ;
+      _v.copy(car.eye).add(cam.head); _v.y += S.seatY * MINI; _v.z += S.seatZ * MINI;
       car.root.localToWorld(_v);
       camera.position.copy(_v);
       yawQ.setFromAxisAngle(Y, cam.headYaw + cam.orbitYaw);
@@ -1565,9 +1638,9 @@
       camera.quaternion.copy(camQ);
       camera.fov = S.fov;
     } else {
-      camera.near = 0.1;
+      camera.near = 0.1 * Math.max(MINI, 0.3);
       const far = cam.mode === 1;
-      const dist = (far ? 10.5 : 6.4) * CAMK * cam.zoom + clamp(Math.abs(speed) * 0.012, 0, 1.2);
+      const dist = (far ? 10.5 : 6.4) * CAMK * cam.zoom + clamp(Math.abs(speed) * 0.012, 0, 1.2) * MINI;
       const height = (far ? 3.3 : 1.95) * CAMH * (0.75 + 0.25 * cam.zoom);
       // heading smoothing (flat forward)
       let fx = a.fx, fz = a.fz; const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
@@ -1585,9 +1658,9 @@
       dir.applyAxisAngle(Y, cam.orbitYaw);
       const hgt = height + cam.orbitPitch * 4;
       camera.position.set(veh.px - dir.x * dist, cam.yS + hgt, veh.pz - dir.z * dist);
-      const gh = groundH(camera.position.x, camera.position.z) + 0.6;
+      const gh = groundH(camera.position.x, camera.position.z) + 0.6 * Math.max(MINI, 0.25);
       if (camera.position.y < gh) camera.position.y = gh;
-      _v.set(veh.px + dir.x * 2.2 * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * (DRAGSTER ? 1.6 : 1));
+      _v.set(veh.px + dir.x * 2.2 * MINI * (DRAGSTER ? 1.6 : 1), cam.yS + (far ? 0.9 : 0.75) * CAMH, veh.pz + dir.z * 2.2 * MINI * (DRAGSTER ? 1.6 : 1));
       camera.lookAt(_v);
       if (BIG && !ROADCC && veh.running && !ENG_SND.ev) { const sh = (DRAGSTER ? 0.003 : MONSTER || KART || MOWER ? 0.002 : 0.004) + (NITRO ? 0.016 : MONSTER ? 0.006 : KART || MOWER ? 0.004 : 0.012) * clamp(veh.thrEff, 0, 1) * clamp(veh.rpm() / sp.limiterRpm, 0.3, 1); camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
       camera.fov = S.chaseFov + clamp(Math.abs(speed) * 0.09, 0, 13);
@@ -1640,13 +1713,13 @@
       cut: veh.fuelCut ? 1 : 0, boost: veh.boost, run: veh.running ? 1 : 0, crank: veh.cranking ? 1 : 0,
       squeal, sqPitch: pitch, spin, speed, surf: rw.contact ? rw.surface : 0, interior: cam.mode === 2 ? 1 : 0,
       horn: G.horn ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol, rough: ENG_SND.rough || 0, whine: (BIG ? ENG_SND.whine : DRAGPAK ? 1.7 : DEMON ? 1.45 : 1) * tune.whine,
-      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: OFFROAD() && !BIG ? 1 : 0,
+      rpmRef: (BIG ? ENG_SND.rpmRef : DRAGPAK ? 8800 : 6200) * clamp(sp.limiterRpm / STOCK.limiterRpm, 0.7, 2), hum: (OFFROAD() && !BIG) || ENG_SND.rc ? 1 : 0,
       boostRef: Math.max(BIG ? STOCK.boostMax : DRAGPAK ? 24 : 11.6, sp.boostMax), race: BIG ? ENG_SND.race : DRAGPAK ? 1 : 0,
       nEng: ENG_SND.nEng, cyl: ENG_SND.cyl, fmul: ENG_SND.fmul, deep: ENG_SND.deep, loud: ENG_SND.loud, open: ENG_SND.open, whK: ENG_SND.whK, whPure: ENG_SND.whPure,
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
-      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0,
     });
   }
   function processEvents() {

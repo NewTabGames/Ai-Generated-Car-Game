@@ -11,6 +11,10 @@
    injection knock, a hard tick through the block on every firing, loudest at idle and light load (the clatter).
    Electric motors (ev): no combustion at all - the motor's whine (its pole-pass frequency, rising with speed, louder under
    load and regen), a gear-mesh whine an octave and a bit above it, and a faint inverter hiss.
+   RC cars (rc, with ev: 1 for no combustion; 2 = a brushed motor): a small brushless motor's note - its pole-pass whine,
+   buzzy with harmonics from the speed controller's chopped drive, rising to ~1.5 kHz flat out - the spur and pinion's
+   whirr above it, the controller's switching squeal at part throttle and low speed, brush crackle on a brushed can, and
+   the little tyres' tread buzz in place of a car's road roar and wind.
    Turbojet (jet: the jet golf cart): no pistons - the compressor's whine (its blade-pass tone and a turbine tone above it,
    rising with the spool), a broadband roar that deepens and swells with the thrust, and the afterburner's ragged,
    crackling rumble. Nitrous (nos): the solenoids' hiss and a harder, louder engine while it sprays.
@@ -39,7 +43,8 @@ class CarSynth {
       jet: 0, ab: 0, jsz: 1,   // 1: a turbojet (rpm = its spool x 10,000, load = its thrust); ab: the afterburner, 0..1; jsz: its size
       nos: 0,      // nitrous spraying, 0..1
       turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
-      diesel: 0 }; // a diesel's injection knock, 0..1
+      diesel: 0,   // a diesel's injection knock, 0..1
+      rc: 0 };     // an RC car's motor and drivetrain (1 brushless, 2 brushed)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -168,7 +173,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -217,7 +222,8 @@ class CarSynth {
     const flDecay = Math.exp(-1 / (sr * 0.28));
     // (an electric motor: its whine rides the current - loud under power, quieter coasting, back up under regen - and
     // fades out towards a standstill)
-    const whAmp = jet ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
+    const rcM = c.rc > 0.5;
+    const whAmp = jet || rcM ? 0 : ev ? (0.012 + 0.075 * load + 0.02 * this.revUp) * Math.min(1, rpm / 900) * (0.35 + 0.65 * rpmN) * (interior > 0.5 ? 1.4 : 1) * c.engVol * c.whine
       : c.run > 0.5 ? (0.009 + 0.085 * Math.pow(boostN, 1.2) + 0.05 * this.revUp) * (0.3 + 0.7 * rpmN) * (interior > 0.5 ? 1.6 : 1) * c.engVol * c.whine : 0;
     this.setBP(this.whBP, whPure ? whF : whF * 2, whPure ? 14 : 7);
     this.setBP(this.hiss, 2600 + rpm * 0.45, 2.5);
@@ -230,14 +236,24 @@ class CarSynth {
     const sqAmp = Math.pow(Math.min(1, c.squeal), 1.25) * 0.55 * c.fxVol;
     const spin = Math.min(1, c.spin);
     const spd = c.speed;
-    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8);
+    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1);
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
     const hard = c.surf < 0.5 || (c.surf > 4.5 && c.surf < 5.5);
-    const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9 * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
-    if (humAmp > 1e-4) { const hf = 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
+    // (an RC truck's ~10 mm blocks buzz, higher and quieter, from walking pace)
+    const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * (rcM ? Math.min(1, spd / 8) * 0.35 : Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9) * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
+    if (humAmp > 1e-4) { const hf = rcM ? 80 + spd * 95 : 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
     const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
-    const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1);
+    const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1) * (rcM ? 0.35 : 1);
+    // an RC motor: its note rides the current (louder on the throttle, a little on every rev-up) and fades out to a stop;
+    // the controller's switching squeal is loudest pulling away at part throttle and gone by half speed
+    let rcAmp = 0, rcPwm = 0;
+    if (rcM) {
+      if (!this.rcGB) { this.rcGB = this.bp(3000, 3); this.rcPh = 0; this.rcPh2 = 0; }
+      rcAmp = 2.6 * (0.025 + 0.11 * load + 0.035 * this.revUp) * Math.min(1, rpm / 1200) * (0.45 + 0.55 * Math.min(1, rpmN)) * c.engVol * (c.whine || 1) * (interior > 0.5 ? 1.25 : 1);
+      rcPwm = Math.min(1, c.thr) * Math.pow(Math.max(0, 1 - rpmN * 1.8), 2) * 0.06 * c.engVol;
+      this.setBP(this.rcGB, Math.min(9000, 400 + whF * 3.1), 3);
+    }
     // turbojet: the compressor's blade-pass tone rises from ~1.3 kHz at idle to ~3.2 kHz flat out; the roar's band opens
     // up and swells with the thrust (load); the afterburner is a deep rumble with crackle on top
     let jF = 0, jWh = 0, jRoar = 0, aJ = 0;
@@ -337,6 +353,16 @@ class CarSynth {
         if (!this.evHs) this.evHs = this.bp(6500, 1.5);
         const gm = Math.sin(this.whPh2) * whAmp * 0.35 + this.run(this.evHs, w1) * whAmp * 0.1;
         oL += gm; oR += gm;
+      }
+      if (rcM && (rcAmp > 1e-5 || rcPwm > 1e-5)) {
+        this.rcPh += 2 * Math.PI * whF / sr; if (this.rcPh > 6.283185307) this.rcPh -= 6.283185307;
+        const p = this.rcPh;
+        const note = Math.sin(p) + 0.5 * Math.sin(2 * p) + 0.33 * Math.sin(3 * p) + 0.22 * Math.sin(4 * p) + 0.12 * Math.sin(6 * p);
+        const whirr = this.run(this.rcGB, w1) * (0.5 + 0.8 * Math.min(1, rpmN));
+        const brush = c.rc > 1.5 && this.rnd() < 0.12 ? w2 * (0.3 + load) : 0;      // (a brushed can's arcing)
+        this.rcPh2 += 2 * Math.PI * (3900 + 60 * Math.sin(this.t * 7)) / sr; if (this.rcPh2 > 6.283185307) this.rcPh2 -= 6.283185307;
+        const o = (note * 0.45 + whirr * 1.1 + brush * 0.5) * rcAmp + Math.sin(this.rcPh2) * rcPwm;
+        oL += o; oR += o * 0.96;
       }
       if (jet && (jWh > 1e-5 || jRoar > 1e-5)) {
         this.jPh1 += 2 * Math.PI * jF / sr; if (this.jPh1 > 6.283185307) this.jPh1 -= 6.283185307;

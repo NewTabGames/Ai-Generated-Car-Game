@@ -325,6 +325,27 @@
     sbirdR: { name: 'F70-14 Polyglas GT', short: 'F70-14 Polyglas', width: 0.21,
       muX: 1.05, muY: 0.93, loose: 1.0, kappaPeak: 0.12, alphaPeak: 0.14, relaxX: 0.19, relaxY: 0.42,
       B: 1.65, C: 1.4, E: -0.2, heatCap: 3300, cold: 0.95, coldT: 10, warmT: 40, hotT: 105, overheat: 0.0032, prep: 1.06 },
+    // the RC truck: 1/10 monster-truck tyres, 150 mm, soft rubber with tall chevron blocks on foam inserts - they grip
+    // pavement about as well as a road tyre and dig into dirt and grass; short relaxation lengths for a tyre this size
+    rcKnob: { name: '150 mm RC monster-truck tyre', short: 'RC knobbies', width: 0.07,
+      muX: 1.05, muY: 0.95, loose: 0.95, looseKx: [1, 1.0, 1.05, 1.1, 0.8, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.025, relaxY: 0.035,
+      B: 1.6, C: 1.38, E: -0.25, heatCap: 60, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0 },
+    // the tour coach: 315/80R22.5 steer tyres; the rear 'tyre' is the drive axle's duals and the tag axle's singles each
+    // side - three tyres sharing the load, so its peak slips are set for three tyres' load on one (a tandem's scrub holds
+    // it straight: a coach understeers - set like a single tyre, the load stretched them and it spun itself out)
+    coachSteer: { name: '315/80R22.5 steer', short: 'Coach tyres', width: 0.315,
+      muX: 0.85, muY: 0.78, loose: 1.1, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.5, relaxY: 0.9,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 30000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.6, 0.85, 0.85, 0.85, 0.85, 0.6] },
+    coachRear: { name: '315/80R22.5 drive duals + tag', short: 'Coach tyres', width: 0.95,
+      muX: 0.85, muY: 0.72, loose: 1.1, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.085, alphaPeak: 0.055, relaxX: 0.5, relaxY: 1.0,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 90000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.6, 0.85, 0.85, 0.85, 0.85, 0.6] },
+    // the derby bus: 11R22.5 recaps, the rears dual - bald enough that they spin on the dirt and slide into the hits
+    busSteer: { name: '11R22.5 recap', short: '11R22.5 recaps', width: 0.28,
+      muX: 0.82, muY: 0.75, loose: 1.0, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.12, relaxX: 0.45, relaxY: 0.8,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 25000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.7, 0.85, 0.85, 0.85, 0.85, 0.7] },
+    busDual: { name: '11R22.5 recap duals', short: '11R22.5 recaps', width: 0.6,
+      muX: 0.82, muY: 0.74, loose: 1.0, looseKx: [1, 1.0, 0.95, 1.0, 0.9, 1], kappaPeak: 0.1, alphaPeak: 0.09, relaxX: 0.45, relaxY: 0.85,
+      B: 2.3, C: 1.3, E: -0.1, heatCap: 50000, cold: 0.96, coldT: 5, warmT: 30, hotT: 100, overheat: 0.003, prep: 1.0, crr: [0.7, 0.85, 0.85, 0.85, 0.85, 0.7] },
     // the unicycle: a 24 x 2.125 tyre on a 24 in wheel, round in section (it leans on it like a bike's)
     uni24: { name: '24 x 2.125 unicycle tyre', short: '24 in tyre', width: 0.054,
       muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
@@ -620,7 +641,7 @@
       this.launchHold = false; this.launchRpm = this.spec.launchRpm || 4000; this.govT = 0; this.shiftDur = 0.2; this.shiftCut = 1;
       this.chuteOut = false; this.chuteT = 0; this.chuteInfl = 0; this.wheelieBarLoad = 0; this.dcT = 0;
       this.shiftFromG = 0; this.shiftIsDown = false; this.blip = false; this._gPrev = 0;
-      this.popTimer = 0; this.lastThr = 0; this.overrunT = 0;
+      this.popTimer = 0; this.lastThr = 0; this.overrunT = 0; this.thrHi = 0;
       this.stalled = false;
       this.inWater = 0;
       this.time = 0;
@@ -1077,7 +1098,8 @@
           if (e > 0) { Fd *= 1 + P.damp * Math.min(1, e); progF = w.k * s.travelUp * P.k * Math.min(e, 1.6) * Math.min(e, 1.6); }
         }
         let F = w.k * (w.sFree - w.sRaw) + Fd + arb[i] + progF;
-        if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + 2500 * Math.max(0, c);
+        // (bumpStopC: the stop's damping - a 2.6 kg RC truck needs a hundredth of a car's)
+        if (w.sRaw < w.sMin) F += s.bumpStopK * (w.sMin - w.sRaw) + (s.bumpStopC !== undefined ? s.bumpStopC : 2500) * Math.max(0, c);
         // anti-squat: the rear links' angle turns part of the tyre's drive force into lift on the body at the axle
         // (and the same push down on the tyre). 100 % = no squat at all. Drag cars run more: the body is thrown up on
         // the hit, the tyres are planted, and the nose comes up
@@ -1789,9 +1811,13 @@
       const bTgt = s.boostMax * this.thrEff * bShape * (this.running ? 1 : 0);
       if (s.turbo) this.boost = s.boostMax * this.spool;
       else this.boost += (bTgt - this.boost) * Math.min(1, h / 0.12);
-      // overrun pops & crackles
-      const dThr = this.lastThr - inp.throttle;
-      if (dThr > 0.35 && rpm > 3000 && this.running) this.overrunT = 0.9 + Math.random() * 0.8;
+      // overrun pops & crackles: a lift off a hard throttle, however fast the pedal comes up. (It used to want the throttle
+      // to fall 35 % inside one 1 ms step: a keyboard key does - it drops 1 to 0 at once - but a pedal or a trigger eases
+      // off over a tenth of a second or more, a few % a step, and never set them off.) Now: the throttle was at 60 % or more
+      // within the last half second (thrHi: the time left on that) and has come back under 25 %, revs up in the engine's
+      // upper half
+      this.thrHi = inp.throttle >= 0.6 ? 0.5 : Math.max(0, (this.thrHi || 0) - h);
+      if (inp.throttle < 0.25 && this.lastThr >= 0.25 && this.thrHi > 0 && rpm > Math.max(1800, 0.42 * (s.redlineRpm || 6000)) && this.running) { this.overrunT = 0.9 + Math.random() * 0.8; this.thrHi = 0; }
       this.lastThr = inp.throttle;
       if (this.overrunT > 0) {
         this.overrunT -= h;
@@ -1914,9 +1940,12 @@
             const shiftAt = s.shiftRpm || s.limiterRpm;
             // light-throttle shift points sit off the engine's idle: a race motor idling at 1,150 (Drag Pak) can't lug
             // along in top at 1,000 rpm like a street V8 - it was coasting in 3rd down to ~23 mph, dragged below idle
-            const dBase = Math.max(1050, 1.35 * s.idleRpm), uBase = Math.max(1650, 1.57 * dBase);
+            // (a big diesel - the coach's, all its torque by 1,000 and governed at 2,100 - brings its own schedule: shiftDown /
+            // shiftUpBase the light-throttle points, shiftDownSpan how far floored lifts the downshift, shiftMinNext the
+            // lowest revs an upshift may land on)
+            const dBase = s.shiftDown !== undefined ? s.shiftDown : Math.max(1050, 1.35 * s.idleRpm), uBase = s.shiftUpBase !== undefined ? s.shiftUpBase : Math.max(1650, 1.57 * dBase);
             const up = uBase + (shiftAt - 130 - uBase) * Math.pow(t, 1.25);
-            const down = dBase + 2900 * Math.pow(t, 1.6);
+            const down = dBase + (s.shiftDownSpan !== undefined ? s.shiftDownSpan : 2900) * Math.pow(t, 1.6);
             // output-shaft based, but don't let converter slip bounce the engine off the limiter
             // with the converter slipping, shift on engine rpm before it sags against the limiter
             const engLimit = turbineRpm > 0.8 * up && this.eOmega * RAD2RPM > (s.shiftRpm || s.limiterRpm - 150);
@@ -1925,7 +1954,7 @@
             const pays = t > 0.6 && turbineRpm > 2500 && this.farLimiter() && this.upshiftGain(turbineRpm) >= 1;
             if (this.gear < this.nGears && (turbineRpm > up || engLimit || pays) && this.sinceUpshift > 0.7) {
               const nextRpm = Math.abs(wc * this.ratioOf(this.gear + 1)) * RAD2RPM;
-              if (nextRpm > 1150) this._beginShift(this.gear + 1);
+              if (nextRpm > (s.shiftMinNext || 1150)) this._beginShift(this.gear + 1);
             } else if (this.gear > 1 && turbineRpm < down && (this.sinceUpshift > 2.0 || turbineRpm < Math.max(720, 0.5 * dBase))) {
               // coasting / braking: skip gears if the car is slowing fast; floored: lowest gear that stays under 5600
               let g = this.gear - 1;
@@ -2246,7 +2275,7 @@
         const tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
         let fxx = g.nx * Fn, fyy = g.ny * Fn, fzz = g.nz * Fn;
         if (tl > 1e-4) {
-          const Ff = Math.min((s.bodyMu || 0.55) * Fn, tl * 20000) / tl;
+          const Ff = Math.min((s.bodyMu || 0.55) * Fn, tl * (s.bodyFricC || 20000)) / tl;   // (bodyFricC: scaled to the vehicle's mass)
           fxx -= tx * Ff; fyy -= ty * Ff; fzz -= tz * Ff;
         }
         if (Fn > 30000 && vn < -3) this.events.impact = Math.max(this.events.impact, -vn * 0.5);
@@ -3330,6 +3359,101 @@
     CdA: 0.66, wings: [{ ClA: 0.38, CdA: 0.05, z: 2.55, y: 1.0 }, { ClA: 0.16, CdA: 0, z: -2.6, y: -0.24 }],
     bodyHalfW: 0.97, bodyFront: -2.77, bodyRear: 2.84, bodyBottom: -0.3, bodyTop: 0.81, bodyPts: sbirdPts(0.52, 0.56),
   } };
+  // RC monster truck: a 1/10-scale 4WD brushless "basher" (the Sandstorm's kind) - 0.47 m long, 0.37 m wide on 150 mm
+  // tyres, a pickup-truck shell on a plastic tub chassis, oil-filled coil-overs with ~55 mm of travel, gear diffs front
+  // and rear on a centre slipper (near enough a spool), a servo that turns the wheels lock to lock in a tenth of a second.
+  // The motor is a DC motor's: full current-limited torque from a standstill, falling off in a straight line to nothing
+  // at its no-load speed (kV x volts). The base one: a 3660-size 3,200 kV brushless on a 3S LiPo (11.1 V, ~35,500 rpm
+  // no-load, ~0.9 kW), 12.5:1 overall - ~47 mph. 2.6 kg. Everything scaled to it: springs of ~400 N/m, brakes (the speed
+  // controller's) of a third of a newton-metre a wheel, a body that weighs what a bag of sugar does
+  // (dcCurve: the torque - lb-ft - against rpm: tMax current-limited, the stall line through pMax at half the no-load speed)
+  const dcCurve = (tMax, pMax, r0) => {
+    const Ts = 4 * pMax / (r0 * Math.PI / 30), c = [];
+    for (let r = 0; r <= r0; r += r0 / 24) c.push([Math.round(r), Math.min(tMax, Ts * (1 - r / r0)) / LBFT]);
+    c.push([r0 * 1.05, 0]); return c;
+  };
+  const rcPts = (cg) => ccPts(cg, 0.47, 0.33, [...ccBox(0.165, 0.05, 0.2, -0.24, 0.24), [-0.1, 0.235, -0.02], [0.1, 0.235, -0.02], [-0.1, 0.235, 0.08], [0.1, 0.235, 0.08],
+    [-0.19, 0.15, -0.165], [0.19, 0.15, -0.165], [-0.19, 0.15, 0.165], [0.19, 0.15, 0.165], [-0.19, 0.075, -0.24], [0.19, 0.075, -0.24], [-0.19, 0.075, 0.24], [0.19, 0.075, 0.24],
+    [-0.13, 0.25, 0.22], [0.13, 0.25, 0.22]]);
+  CARS.rc = { name: 'RC Monster Truck', short: 'RC Truck', car: '3S BRUSHLESS', hp: 1.2, tq: 0.26, cc: true, kbLat: 9, spec: {
+    name: 'RC Monster Truck',
+    mass: 2.6, Ipitch: 0.048, Iyaw: 0.07, Iroll: 0.03, cgHeight: 0.09, wheelbase: 0.33, frontWeight: 0.47,
+    trackF: 0.29, trackR: 0.29, wheelRadius: 0.075, wheelInertiaF: 3.5e-4, wheelInertiaR: 3.5e-4,
+    frontTire: 'rcKnob', rearTire: 'rcKnob', Fz0: 6.4, loadSens: 0.1,
+    springF: 400, springR: 440, dampBumpF: 14, dampRebF: 22, dampBumpR: 15, dampRebR: 24, dampKnee: 0.6,
+    arbF: 60, arbR: 30, travelUp: 0.03, travelDown: 0.025, suspS0: 0.05, rearToe: 0.01, bumpStopK: 20000, bumpStopC: 40, fzMax: 400,
+    // (the speed controller's brake, on the motor: all four wheels through the diffs)
+    brakeTorqueF: 0.35, brakeTorqueR: 0.35, handbrakeTorque: 0.3, noABS: true, noESC: true,
+    maxSteer: 0.52, steerRate: 7, steerRatio: 1, ackermann: 0,
+    electric: true, idleRpm: 0, limiterRpm: 36500, redlineRpm: 35500, shiftRpm: 40000, engineInertia: 2.5e-6, fricA: 0.003, fricB: 0.0001, starterTorque: 0,
+    torqueCurve: dcCurve(0.35, 900, 35500), boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 1, autoFinal: 12.5, engineTc: true, noCoastBlip: true,
+    dragClutch: EV_CLUTCH, awd: true, awdFront: 0.5, lsdPreload: 0.01, lsdPreloadF: 0.01, centerPreload: 0.6, lsdRamp: 0, driveEff: 0.85,
+    // (the controller's traction management: 4WD on a near-spool spins all four together, so it reads the truck's own speed)
+    tcRefBody: true,
+    CdA: 0.035,
+    bodyK: 2500, bodyC: 40, bodyMu: 0.5, bodyFricC: 60,
+    bodyHalfW: 0.19, bodyFront: -0.25, bodyRear: 0.25, bodyBottom: -0.045, bodyTop: 0.16, bodyPts: rcPts(0.09),
+  } };
+  // Tour coach: a 45 ft motorcoach of the MCI J4500 kind - 13.84 m long, 2.59 m wide, 3.5 m tall, a steer axle, the
+  // drive axle on duals and a tag axle 1.37 m behind it (the physics' rear 'axle' is the pair, midway between them:
+  // 7.69 m from the steer axle). A 12 L inline-six turbo diesel in the back, 410 hp and 1,450 lb-ft, an Allison 6-speed
+  // automatic (two overdrives), 3.58 gears; air suspension, air brakes with ABS. 18 t with a load of passengers and
+  // their bags, 36 % on the steer axle. Governed at 75 mph; 0-60 in ~45 s. Everything at the scale of it: springs of
+  // 200-400 kN/m a corner, the body's ground contact ten times a car's
+  const coachPts = (cg, fw) => ccPts(cg, fw, 7.685, [...ccBox(1.29, 0.4, 3.45, -6.1, 7.6), [-1.1, 3.5, -5.5], [1.1, 3.5, -5.5], [-1.1, 3.5, 7.4], [1.1, 3.5, 7.4],
+    [-1.25, 2.4, 0], [1.25, 2.4, 0], [-1.25, 0.5, 0.9], [1.25, 0.5, 0.9]]);
+  CARS.coach = { name: 'Tour Coach', short: 'Tour Coach', car: '12 L I6 TURBO DIESEL', hp: 410, tq: 1450, cc: true, kbLat: 3.2, spec: {
+    name: 'Tour Coach',
+    mass: 18000, Ipitch: 300000, Iyaw: 295000, Iroll: 28000, cgHeight: 1.25, wheelbase: 7.685, frontWeight: 0.36,
+    trackF: 2.15, trackR: 1.88, wheelRadius: 0.54, wheelInertiaF: 12, wheelInertiaR: 36,
+    frontTire: 'coachSteer', rearTire: 'coachRear', Fz0: 30000, loadSens: 0.07,
+    springF: 170000, springR: 340000, dampBumpF: 11000, dampRebF: 17000, dampBumpR: 22000, dampRebR: 34000, dampKnee: 0.2,
+    arbF: 160000, arbR: 320000, travelUp: 0.09, travelDown: 0.09, suspS0: 0.28, bumpStopK: 4000000, bumpStopC: 30000, fzMax: 400000,
+    brakeTorqueF: 9000, brakeTorqueR: 20000, handbrakeTorque: 25000,
+    maxSteer: 0.6, steerRate: 1.6, steerRatio: 20, ackermann: 0.8,
+    idleRpm: 600, limiterRpm: 2100, redlineRpm: 2000, shiftRpm: 1900, engineInertia: 3.0, fricA: 90, fricB: 70, starterTorque: 1600,
+    // (lb-ft: 1,450 from 1,000 to 1,400, 410 hp at 1,700)
+    torqueCurve: [[0, 500], [600, 800], [800, 1150], [1000, 1450], [1400, 1450], [1600, 1350], [1700, 1265], [1800, 1150], [1900, 1020], [2000, 850], [2100, 500], [2300, 200]],
+    turbo: { lag: 0.9, base: 0.45, rpm0: 800, rpm1: 1300 }, boostMax: 35, popScale: 0,
+    // (the Allison B500: 3.51 / 1.91 / 1.43 / 1.00 / 0.75 / 0.64)
+    autoRatios: [3.51, 1.91, 1.43, 1.0, 0.75, 0.64], autoRev: 4.8, autoFinal: 3.58, tcK: 0.07, tcStall: 1.9, lockupTorque: 3200,
+    shiftTimeWOT: 0.5, shiftTimePart: 0.7, noCoastBlip: true, shiftDown: 750, shiftDownSpan: 250, shiftUpBase: 1250, shiftMinNext: 850,
+    lsdPreload: 300, lsdRamp: 0.1, driveEff: 0.9,
+    govSpeed: 75 / 2.23694, govGrace: 0.5,
+    CdA: 5.0,
+    bodyK: 2400000, bodyC: 160000, bodyFricC: 200000, bodyMu: 0.5,
+    bodyHalfW: 1.3, bodyFront: -6.0, bodyRear: 7.7, bodyBottom: -0.85, bodyTop: 2.25, bodyPts: coachPts(1.25, 0.36),
+  } };
+  // Demolition-derby school bus: a conventional school bus - an International-type 3800 chassis with the hood out front,
+  // 10.4 m long, 2.44 m wide, a 5.6 m wheelbase - stripped for the derby: the glass out, most of the seats gone, the
+  // tank moved in, a cage round the driver, graffiti all over. The stock DT466 diesel (210 hp, 520 lb-ft) and an Allison
+  // 5-speed; duals at the back on 11R22.5 recaps. 7.8 t, 45 % on the front. ~65 mph. The cowcatcher: a welded V-plow of
+  // plate and pipe off the front bumper, 350 kg, 0.8 m ahead of it (CARS.busderby.cow: what bolting it on changes)
+  const derbyPts = (cg, fw, cow) => ccPts(cg, fw, 5.6, [...ccBox(1.22, 0.45, 3.0, -2.2, 3.85), ...ccBox(0.9, 0.5, 1.6, -4.2 - (cow ? 0.8 : 0), -2.2),
+    [-1.0, 3.05, -1.8], [1.0, 3.05, -1.8], [-1.0, 3.05, 3.6], [1.0, 3.05, 3.6]]);
+  CARS.busderby = { name: 'Derby Bus', short: 'Derby Bus', car: 'DT466 I6 DIESEL', hp: 210, tq: 520, cc: true, kbLat: 4.5, spec: {
+    name: 'Derby Bus',
+    mass: 7800, Ipitch: 52000, Iyaw: 54000, Iroll: 9000, cgHeight: 1.15, wheelbase: 5.6, frontWeight: 0.45,
+    trackF: 2.05, trackR: 1.8, wheelRadius: 0.52, wheelInertiaF: 10, wheelInertiaR: 20,
+    frontTire: 'busSteer', rearTire: 'busDual', Fz0: 17000, loadSens: 0.08,
+    springF: 160000, springR: 260000, dampBumpF: 9000, dampRebF: 14000, dampBumpR: 13000, dampRebR: 20000, dampKnee: 0.2,
+    arbF: 90000, arbR: 120000, travelUp: 0.1, travelDown: 0.1, suspS0: 0.3, bumpStopK: 2500000, bumpStopC: 20000, fzMax: 250000,
+    brakeTorqueF: 6500, brakeTorqueR: 9000, handbrakeTorque: 9000, noABS: true,
+    maxSteer: 0.65, steerRate: 2.0, steerRatio: 20, ackermann: 0.8,
+    idleRpm: 700, limiterRpm: 2800, redlineRpm: 2600, shiftRpm: 2500, engineInertia: 1.2, fricA: 45, fricB: 35, starterTorque: 700,
+    // (lb-ft: 520 at 1,400, 210 hp at 2,600)
+    torqueCurve: [[0, 250], [700, 330], [1000, 440], [1400, 520], [1800, 505], [2200, 470], [2600, 424], [2800, 330], [3000, 150]],
+    turbo: { lag: 0.7, base: 0.55, rpm0: 900, rpm1: 1500 }, boostMax: 22, popScale: 0,
+    autoRatios: [3.49, 1.86, 1.41, 1.0, 0.75], autoRev: 5.03, autoFinal: 5.29, tcK: 0.035, tcStall: 2.0, lockupTorque: 1400,
+    shiftTimeWOT: 0.45, shiftTimePart: 0.6, noCoastBlip: true,
+    lsdPreload: 200, lsdRamp: 0.15, driveEff: 0.88,
+    CdA: 5.2,
+    bodyK: 1000000, bodyC: 70000, bodyFricC: 90000, bodyMu: 0.55,
+    bodyHalfW: 1.22, bodyFront: -4.15, bodyRear: 4.4, bodyBottom: -0.7, bodyTop: 1.9, bodyPts: derbyPts(1.15, 0.45, true),
+  } };
+  // (the cowcatcher off: 350 kg lighter, a touch less on the nose, the body ending at the bumper)
+  CARS.busderby.cow = { on: {}, off: { mass: 7450, frontWeight: 0.43, bodyFront: -3.35, bodyPts: derbyPts(1.15, 0.43, false) } };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
   // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
@@ -3866,6 +3990,49 @@
       steerAMax: 5, CdA: 0.58,
     } },
   }, 'pedal', 'Pedal');
+  // the RC truck's other two: the stock brushed one (a 550 can motor on a 2S pack, 7.4 V - ~20,000 rpm no-load, ~180 W, a
+  // lighter NiMH-weight truck, ~25 mph) and the 6S speed-run build (a 4074 2,050 kV on two 3S packs in series, 22.2 V -
+  // ~45,500 rpm, ~2.5 kW, taller gearing: ~65 mph, and it wheelies if you let it)
+  ccEngines('rc', {
+    brushed: { label: 'Brushed 2S', car: 'BRUSHED 550 · 2S', hp: 0.24, tq: 0.18, ev: true, spec: {
+      mass: 2.35, limiterRpm: 20800, redlineRpm: 20000, engineInertia: 3e-6, fricA: 0.006, fricB: 0.0003,
+      torqueCurve: dcCurve(0.25, 180, 20000), autoFinal: 12, brakeTorqueF: 0.25, brakeTorqueR: 0.25,
+    } },
+    bl6s: { label: 'Brushless 6S', car: '6S BRUSHLESS', hp: 3.4, tq: 0.74, ev: true, spec: {
+      mass: 3.4, Ipitch: 0.06, Iyaw: 0.085, Iroll: 0.036, frontWeight: 0.46, springF: 520, springR: 600, dampBumpF: 17, dampRebF: 27, dampBumpR: 19, dampRebR: 30,
+      limiterRpm: 46500, redlineRpm: 45500, engineInertia: 6e-6, fricA: 0.005, fricB: 0.0001,
+      torqueCurve: dcCurve(1.0, 2500, 45500), autoFinal: 11.5, brakeTorqueF: 0.5, brakeTorqueR: 0.5, bodyPts: rcPts(0.09),
+    } },
+  }, 'bl3s', 'Brushless 3S');
+  // the coach's other two: the X15 swap with a tune (605 hp, 2,050 lb-ft, the governor off, taller 3.36 gears: ~100 mph)
+  // and the race coach - a built 15 L on compound turbos, 1,500 hp and 3,900 lb-ft, ~130 mph
+  ccEngines('coach', {
+    tuned: { label: 'X15 swap · tuned', car: '15 L I6 · TUNED', hp: 605, tq: 2050, spec: {
+      mass: 18300, torqueCurve: [[0, 700], [600, 1100], [800, 1600], [1000, 2050], [1300, 2050], [1500, 1950], [1700, 1800], [1800, 1690], [1900, 1520], [2000, 1250], [2100, 800], [2300, 300]],
+      turbo: { lag: 1.0, base: 0.4, rpm0: 850, rpm1: 1400 }, boostMax: 45, autoFinal: 3.36, tcK: 0.09, lockupTorque: 4400, govSpeed: undefined,
+    } },
+    race: { label: 'Race coach', car: '15 L · COMPOUND TURBOS', hp: 1500, tq: 3900, spec: {
+      mass: 18500, idleRpm: 700, limiterRpm: 2800, redlineRpm: 2700, shiftRpm: 2600, engineInertia: 3.4,
+      torqueCurve: [[0, 1200], [800, 2000], [1200, 3200], [1500, 3900], [1900, 3900], [2200, 3700], [2500, 3250], [2700, 2900], [2900, 1800], [3100, 600]],
+      turbo: { lag: 1.2, base: 0.32, rpm0: 1000, rpm1: 1800 }, boostMax: 80, autoFinal: 3.08, tcK: 0.14, tcStall: 1.8, lockupTorque: 9000, shiftTimeWOT: 0.35,
+      lsdPreload: 2000, lsdRamp: 0.3, govSpeed: undefined, brakeTorqueF: 11000, brakeTorqueR: 24000,
+    } },
+  }, 'stock', 'Stock 410 hp');
+  // the derby bus's other two: a 454 big-block gas swap (390 hp, 500 lb-ft, revving to 5,000, the 5-speed on 4.33s:
+  // ~85 mph) and a blown 572 (900 hp, 850 lb-ft on a roots blower, ~105 mph - it'll smoke the duals)
+  ccEngines('busderby', {
+    bigblock: { label: '454 big-block', car: '454 BIG-BLOCK V8', hp: 390, tq: 500, spec: {
+      idleRpm: 750, limiterRpm: 5200, redlineRpm: 5000, shiftRpm: 4800, engineInertia: 0.5, fricA: 30, fricB: 24, starterTorque: 300,
+      torqueCurve: [[0, 300], [1000, 400], [2000, 470], [3000, 500], [3500, 498], [4000, 485], [4600, 445], [5000, 400], [5300, 340]],
+      turbo: undefined, boostMax: 0, popScale: 1, autoFinal: 4.33, tcK: 0.012, tcStall: 2.1, lockupTorque: 1100, mass: 7550,
+    } },
+    blown: { label: 'Blown 572', car: 'BLOWN 572 V8', hp: 900, tq: 850, spec: {
+      idleRpm: 900, limiterRpm: 6000, redlineRpm: 5800, shiftRpm: 5600, engineInertia: 0.45, fricA: 32, fricB: 26, starterTorque: 320,
+      torqueCurve: [[0, 420], [1000, 560], [2000, 700], [3000, 800], [4000, 850], [4500, 845], [5000, 820], [5500, 790], [6000, 700], [6300, 560]],
+      turbo: undefined, boostMax: 14, popScale: 2, autoFinal: 4.1, tcK: 0.0105, tcStall: 2.3, lockupTorque: 1900, mass: 7600,
+      lsdPreload: 600, lsdRamp: 0.3, brakeTorqueF: 8000, brakeTorqueR: 11000,
+    } },
+  }, 'dt466', 'DT466 diesel');
   // the Superbird's other two engines: the 440 Six Barrel (three Holley two-barrels on an Edelbrock manifold, 390 hp at
   // 4,700, 490 lb-ft at 3,200) and the 426 Hemi (two four-barrels, 425 hp at 5,000, 490 lb-ft at 4,000 - it revs to 6,500;
   // 3.55s behind it, a heavier front end)
