@@ -702,7 +702,7 @@
   const input = new INP.Input();
   // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
   if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
-  input.rawSteer = !!sp.steerAScale;           // (the RC truck scales its own lock with speed: the keys and the stick go in raw)
+  input.rawSteer = !!sp.steerAScale;           // (the RC truck and the unicycle scale their own lock with speed: the keys and the stick go in raw)
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
