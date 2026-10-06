@@ -892,8 +892,10 @@
     // It works the pedals itself in the air - brake to drop the nose, gas to lift it - and on top of that a spotter's hand
     // (a game aid, like traction control): a light, capped nudge in pitch and roll towards that landing attitude
     // (_aaTorque) that steadies a truck that left a ramp crooked or twisting, but can't save one that's way over
+    // (a craft with spec.airLevel - the landspeeder - has the nudge built in: its repulsor field's stabilisers level it
+    // wherever it flies, with the air assist on or off. It aims for the same landing, but leaves the pedals alone)
     _airAssist(dt) {
-      const inp = this.input, { qx, qy, qz, qw } = this;
+      const inp = this.input, { qx, qy, qz, qw } = this, feet = !!inp.airAssist;
       const pitch = Math.asin(clamp(-2 * (qy * qz - qx * qw), -1, 1)) * 57.2958;
       const rx = 1 - 2 * (qy * qy + qz * qz), ry = 2 * (qx * qy + qz * qw), rz = 2 * (qx * qz - qy * qw);
       const rate = (this.wx * rx + this.wy * ry + this.wz * rz) * 57.2958, ahead = pitch + 0.35 * rate;
@@ -917,6 +919,7 @@
         // (a jet - the fire truck: its gas drives no wheels, so it can't lift the nose and isn't touched; the brake still
         // drops it, and the nudge below works harder)
         const jet = !!s.jet;
+        if (!feet) return;
         if (inp.throttle > 0 && !jet) inp.throttle *= clamp((16 - e) / 14, 0, 1);
         if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
         // and the feet do the flying: stab the brake to bring a rising nose down, rev the wheels to lift a dropping one
@@ -926,7 +929,7 @@
         if (e < -8 && !jet) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
       } else {
         this.aaAir = 0;
-        if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
+        if (feet && (this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
           // touchdown: feather the gas until the rears match the ground, and don't let it rear up over backwards off the
           // landing (a wheelie on the way out is fine; one still climbing past 25 deg isn't)
           const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
@@ -956,7 +959,7 @@
       // gather obstacles once per frame
       const sp = Math.hypot(this.vx, this.vz);
       this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
-      if (this.input.airAssist) this._airAssist(Math.min(dt, 0.1));
+      if (this.input.airAssist || this.spec.airLevel) this._airAssist(Math.min(dt, 0.1));
       // (wheelie control reads the nose-up pitch against the road, not the horizon: the slope under it along its heading)
       if (this.spec.wheelieCtl) {
         const g = this._wcG || (this._wcG = {}), { qx, qy, qz, qw } = this;
@@ -1476,7 +1479,7 @@
       }
 
       // ---------------- air assist's nudge (see _airAssist)
-      if (inp.airAssist && this.airborne) { const T = this._aaTorque(m00, m10, m20, m02, m12, m22, m11); if (T) { Tx += T[0]; Ty += T[1]; Tz += T[2]; } }
+      if ((inp.airAssist || s.airLevel) && this.airborne) { const T = this._aaTorque(m00, m10, m20, m02, m12, m22, m11); if (T) { Tx += T[0]; Ty += T[1]; Tz += T[2]; } }
 
       // ---------------- water
       const wl0 = world.C.WATER_LEVEL;
@@ -3540,7 +3543,10 @@
     torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
     autoRatios: [1], autoRev: 2.2, autoFinal: 12, noCoastBlip: true, engineTc: true,
     dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
-    jet: { thrust: 2600, ab: 0, idle: 0.3, rpm100: 10000, ram: 0.003, y: 0.05, z: 1.0, revTq: 22, revRpm: 3000, spool: 2.6 },
+    // (the thrust through the CG, and the field's stabilisers level it in the air (airLevel - the air assist's nudge,
+    // built in): off a steep kicker the pads still on the ramp throw the nose down as the fronts leave it, and with
+    // nothing to answer that it pitched 70-90 deg over a long flight, landed on its nose and rolled)
+    jet: { thrust: 2600, ab: 0, idle: 0.3, rpm100: 10000, ram: 0.003, y: 0, z: 1.0, revTq: 22, revRpm: 3000, spool: 2.6 }, airLevel: true,
     // (the field resists a spin, more the faster it goes: with the fronts past their limit at speed nothing else damped
     // the yaw, and it snaked; without the rubber's give it needs it)
     aeroDamp: [0.5, 6, 25], CdA: 0.68, ClA: 0,
