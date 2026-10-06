@@ -219,7 +219,7 @@
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { landspeeder: 0xa5714b, coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -255,7 +255,7 @@
       g.fillStyle = '#060607'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a3c40'; g.lineWidth = 2;
       for (let x = -h; x < w; x += 8) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke(); }
     }), roughness: 0.6, metalness: 0.4, side: THREE.DoubleSide });
-    const SUITS = { coach: 0x22262e, busderby: 0x3a5a2a, rc: 0x2a3a6a, superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
+    const SUITS = { landspeeder: 0xe4dfd2, coach: 0x22262e, busderby: 0x3a5a2a, rc: 0x2a3a6a, superbird: 0x3a4a5c, hotrod: 0x2a2a2c, chevelle: 0x30353c, prius: 0x3a4250, sixseven: 0x1a1a1c, silverbullet: 0xd9d2bc, diesel: 0x4a5a3a, ram: 0x2e3440, cyber: 0x2a2c30, golf: 0x2d5a3a, rally: 0x1b2f63, couch: 0x2b4a7a, eggrod: 0xe8e8e8, banana: 0x2a6a3a, bluebird: 0xe8e2d0, gtr: 0x222326, mini: 0x5a3d8a, potty: 0x3b6e2e, scooter: 0x3a2a22, razor: 0x1a1a1c };
     M.suit = new THREE.MeshStandardMaterial({ color: SUITS[CAR] || 0x333333, roughness: 0.8 });
     M.pants = new THREE.MeshStandardMaterial({ color: CAR === 'bluebird' || CAR === 'silverbullet' || CAR === 'eggrod' || CAR === 'gtr' ? SUITS[CAR] : 0x2a3446, roughness: 0.85 });
     M.helmet = new THREE.MeshPhysicalMaterial({ color: { rally: 0xf2f2f2, golf: 0xd22020, couch: 0xf2c417, eggrod: 0x6fb6e8, bluebird: 0x5a3a22, silverbullet: 0x4a2a16, scooter: 0x141416, potty: 0xf2f2f2, banana: 0xf2c21b }[CAR] || 0xf2f2f2, roughness: CAR === 'bluebird' || CAR === 'silverbullet' ? 0.7 : 0.25, clearcoat: CAR === 'bluebird' || CAR === 'silverbullet' ? 0 : 1 });
@@ -3797,6 +3797,260 @@
         knee: { dx: 0.1, y: 1.6, z: ZW + 0.62 }, foot: { dx: 0.12, y: 1.08, z: ZW + 0.38 }, helmet: true });
       P.hideCockpit.push(driver);
     };
+    // ---------------------------------------------------------------- X-34 landspeeder
+    // Luke's X-34 the way the film and its museum prop have it: a long low body with a blunt rounded bullet of a nose and
+    // a flat deck; a long grille of chrome slats down each flank in a recess rounded at its front end, two vents behind
+    // it at the back of each flank, another grille across the nose; a big clear bubble far back over the two seats (the
+    // pilot on the right); three turbines - two low on stalks off the back corners (the left one's cowling gone, its
+    // bare engine showing) and one up on a swept pylon on the centre line behind the bubble - their intakes facing
+    // forward round red lips, the fans inside turning with the spool, the exhausts dark, the cowlings silver-grey with a
+    // dark red band. Dusty rust-brown paint under a dark red stripe, sand-scoured down to grey primer, and to bare metal
+    // round the nose. It floats on its repulsors half a metre up: no wheels (the physics' four pads are invisible)
+    B.landspeeder = () => {
+      P.noWheels = true; WF = 0.2; WR = 0.2;
+      const ZN = -1.62, ZT = 1.33, W0 = 0.84, YB0 = 0.5, YT0 = 1.12, RN = 0.6, YC = YB0 + 0.42 * (YT0 - YB0);
+      const CK0 = -0.18, CK1 = 0.84, CKW = 0.48;     // (the cockpit opening, inside the bubble's rim)
+      // the body's section at z: half-width, bottom, top - the nose rounds off blunt in plan and in profile to a tip a
+      // little below half height, the tail rounds a little
+      const dims = (z) => {
+        const t = clamp((ZN + RN - z) / RN, 0, 1), f = Math.sqrt(Math.max(0, 1 - t * t));
+        const tt = clamp((z - (ZT - 0.16)) / 0.16, 0, 1), ft = Math.sqrt(Math.max(0, 1 - tt * tt));
+        const W = W0 * (0.06 + 0.94 * Math.pow(f, 0.7)) * (0.9 + 0.1 * ft);
+        const yt = YC + (YT0 - YC) * Math.pow(f, 0.5) - 0.04 * (1 - ft), yb = YC - (YC - YB0) * Math.pow(f, 0.42) + 0.05 * (1 - ft);
+        return [W, yb, yt];
+      };
+      // the right half's points (bottom centre round to the deck's centre): a flat bottom, its edge rounded, the flank
+      // straight up to the crease over the grille, stepped in a little above it, the top edge rounded into the deck
+      const NB = 5, NT = 6;
+      const section = (z) => {
+        const [W, yb, yt] = dims(z), h = yt - yb, rb = Math.min(0.12, 0.25 * h), rt = Math.min(0.17, 0.32 * h), yS = yb + 0.75 * h, Wi = W - 0.016;
+        const P2 = [[0, yb], [0.5 * (W - rb), yb]];
+        for (let k = 0; k <= NB; k++) { const a = -Math.PI / 2 + k / NB * Math.PI / 2; P2.push([W - rb + rb * Math.cos(a), yb + rb + rb * Math.sin(a)]); }
+        P2.push([W, yb + rb + (yS - yb - rb) * 0.5], [W, yS], [Wi, yS + 0.014], [Wi, yS + 0.014 + (yt - rt - yS - 0.014) * 0.5]);
+        for (let k = 0; k <= NT; k++) { const a = k / NT * Math.PI / 2; P2.push([Wi - rt + rt * Math.cos(a), yt - rt + rt * Math.sin(a)]); }
+        const x1 = Math.min(CKW, 0.92 * (Wi - rt)); P2.push([x1, yt], [x1 / 2, yt], [0, yt]);
+        return P2;
+      };
+      // v: how far round the section a point is (0 bottom centre, 1 the deck's centre) - the livery is drawn unwrapped on it
+      const arcV = (P2) => { const L = [0]; for (let i = 1; i < P2.length; i++) L.push(L[i - 1] + Math.hypot(P2[i][0] - P2[i - 1][0], P2[i][1] - P2[i - 1][1])); return L.map((l) => l / L[L.length - 1]); };
+      const SEC0 = section(0), V0 = arcV(SEC0), nP = SEC0.length;
+      // (v at a height, mid-body - where the grille, the vents and the stripe go on the livery: the section climbs all the
+      // way round, so the first point at that height)
+      const vAt = (y) => { for (let i = 1; i < nP; i++) if (SEC0[i][1] >= y) { const a = SEC0[i - 1], b = SEC0[i], t = clamp((y - a[1]) / (b[1] - a[1] || 1), 0, 1); return V0[i - 1] + (V0[i] - V0[i - 1]) * t; } return 1; };
+      const uAt = (z) => (z - ZN) / (ZT - ZN);
+      const ST = stationsOf(ZN, ZT, 0.07, [ZN + 0.01, ZN + 0.025, ZN + 0.05, ZN + 0.09, ZN + 0.14, ZN + 0.2, ZN + 0.28, ZN + 0.38, ZN + 0.5, CK0, CK1, ZT - 0.05, ZT - 0.1]);
+      {
+        const pos = [], uv = [], idx = [];
+        const secs = ST.map((z) => { const P2 = section(z); return { z, P2, V: arcV(P2) }; });
+        for (const s of secs) for (const sd of [1, -1]) for (let i = 0; i < nP; i++) { pos.push(sd * s.P2[i][0], s.P2[i][1], s.z); uv.push(uAt(s.z), s.V[i]); }
+        const vid = (r, i, sd) => r * nP * 2 + (sd > 0 ? 0 : nP) + i;
+        for (let r = 0; r < secs.length - 1; r++) {
+          const zm = (secs[r].z + secs[r + 1].z) / 2;
+          for (let i = 0; i < nP - 1; i++) {
+            // (the deck is open over the cockpit, under the bubble)
+            if (zm > CK0 && zm < CK1 && i >= nP - 3) continue;
+            for (const sd of [1, -1]) {
+              const a = vid(r, i, sd), b = vid(r, i + 1, sd), c = vid(r + 1, i, sd), d = vid(r + 1, i + 1, sd);
+              if (sd > 0) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
+            }
+          }
+        }
+        // the end caps: the nose's tip and the flat back, fans from their middles
+        for (const [r, f] of [[0, -1], [secs.length - 1, 1]]) {
+          const s = secs[r], ci = pos.length / 3; pos.push(0, (s.P2[0][1] + s.P2[nP - 1][1]) / 2, s.z); uv.push(uAt(s.z), 0.5);
+          for (const sd of [1, -1]) for (let i = 0; i < nP - 1; i++) { const a = vid(r, i, sd), b = vid(r, i + 1, sd); if (f * sd > 0) idx.push(ci, a, b); else idx.push(ci, b, a); }
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        g.setIndex(idx); g.computeVertexNormals();
+        // the livery, unwrapped (u along the body from the nose, v round it from the belly to the deck's centre line):
+        // dusty rust-brown paint, faded and sand-scoured - tan dust, grey primer showing through, bare metal worn
+        // through at the nose - the dark red stripe along the crease, the dark recesses of the grille and the vents
+        const vG0 = vAt(0.64), vG1 = vAt(0.93), vS0 = vAt(0.975), vS1 = vAt(1.02), vCr = vAt(0.965);
+        const zG0 = -1.36, zG1 = 0.9;
+        let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const livery = canvasTex(2048, 1024, () => {});
+        const drawLivery = (hex) => {
+          const cv = livery.image, g2 = cv.getContext('2d'), w = cv.width, h = cv.height, X = (z) => uAt(z) * w, Y = (v) => (1 - v) * h;
+          const base = new THREE.Color(hex), css = (c, k, a) => `rgba(${Math.round(clamp(c.r * k, 0, 1) * 255)},${Math.round(clamp(c.g * k, 0, 1) * 255)},${Math.round(clamp(c.b * k, 0, 1) * 255)},${a === undefined ? 1 : a})`;
+          seed = 7;
+          g2.fillStyle = css(base, 1); g2.fillRect(0, 0, w, h);
+          // (the belly darker and dirtier, the deck sun-faded)
+          let gr = g2.createLinearGradient(0, Y(0), 0, Y(0.32)); gr.addColorStop(0, css(base, 0.5)); gr.addColorStop(1, css(base, 0.95)); g2.fillStyle = gr; g2.fillRect(0, Y(0.32), w, Y(0) - Y(0.32));
+          gr = g2.createLinearGradient(0, Y(0.78), 0, Y(1)); gr.addColorStop(0, css(base, 1)); gr.addColorStop(1, css(base, 1.14)); g2.fillStyle = gr; g2.fillRect(0, Y(1), w, Y(0.78) - Y(1));
+          // mottling: the paint faded unevenly, in soft patches a shade lighter and darker, and dust in broad clouds
+          for (let k = 0; k < 220; k++) { const x = rnd() * w, y = rnd() * h, r = 30 + rnd() * 90;
+            gr = g2.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rnd() < 0.35 ? 'rgba(201,169,122,0.3)' : css(base, rnd() < 0.5 ? 0.9 : 1.1, 0.3)); gr.addColorStop(1, css(base, 1, 0));
+            g2.fillStyle = gr; g2.fillRect(x - r, y - r, 2 * r, 2 * r); }
+          // wear: scuffs worn to grey primer and to tan filler, small and ragged, along the edges and low down
+          const scuff = (x, y, r, col) => { g2.fillStyle = col; g2.beginPath(); const n = 7 + (rnd() * 5 | 0);
+            for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, rr = r * (0.45 + rnd() * 0.75); g2.lineTo(x + Math.cos(a) * rr * 1.7, y + Math.sin(a) * rr); } g2.closePath(); g2.fill(); };
+          for (let k = 0; k < 170; k++) { const y = rnd() < 0.6 ? Y(0.15 + rnd() * 0.55) : rnd() * h, x = rnd() * w, r = 2 + rnd() * rnd() * 16, pr = rnd();
+            scuff(x, y, r, pr < 0.55 ? `rgba(${132 + rnd() * 20},${126 + rnd() * 16},${114 + rnd() * 14},${0.3 + rnd() * 0.35})` : pr < 0.9 ? `rgba(${190 + rnd() * 20},${160 + rnd() * 20},${118 + rnd() * 20},${0.3 + rnd() * 0.3})` : `rgba(${70 + rnd() * 20},${42 + rnd() * 12},${26 + rnd() * 8},0.45)`); }
+          // the nose worn through to bare metal and primer
+          gr = g2.createLinearGradient(X(ZN), 0, X(ZN + 0.6), 0); gr.addColorStop(0, 'rgba(150,146,136,0.85)'); gr.addColorStop(0.5, 'rgba(150,146,136,0.45)'); gr.addColorStop(1, 'rgba(150,146,136,0)');
+          g2.fillStyle = gr; g2.fillRect(X(ZN), 0, X(ZN + 0.6) - X(ZN), h);
+          for (let k = 0; k < 120; k++) scuff(X(ZN) + rnd() * (X(ZN + 0.7) - X(ZN)), rnd() * h, 4 + rnd() * 14, rnd() < 0.5 ? css(base, 0.95, 0.75) : `rgba(${176 + rnd() * 20},${172 + rnd() * 20},${160 + rnd() * 20},0.7)`);
+          // the stripe: dark red along the flank just over the crease, chipped
+          g2.fillStyle = '#6e2219'; g2.fillRect(X(-1.3), Y(vS1), X(ZT) - X(-1.3), Y(vS0) - Y(vS1));
+          for (let k = 0; k < 140; k++) scuff(X(-1.3) + rnd() * (X(ZT) - X(-1.3)), Y(vS1) + rnd() * (Y(vS0) - Y(vS1)), 1.5 + rnd() * 6, rnd() < 0.6 ? css(base, 1) : 'rgba(140,136,126,0.85)');
+          // the crease's shadow
+          g2.fillStyle = 'rgba(36,20,12,0.5)'; g2.fillRect(0, Y(vCr) - 2, w, 4);
+          // the grille's recess: dark, rounded at the front, square at the back; the two vents behind it
+          const stad = (z0, z1, v0, v1, roundBack) => { const y0 = Y(v1), y1 = Y(v0), r = (y1 - y0) / 2; g2.beginPath();
+            g2.moveTo(X(z0) + r, y0); g2.lineTo(X(z1) - (roundBack ? r : 0), y0); if (roundBack) g2.arc(X(z1) - r, y0 + r, r, -Math.PI / 2, Math.PI / 2); else g2.lineTo(X(z1), y1);
+            g2.lineTo(X(z0) + r, y1); g2.arc(X(z0) + r, y0 + r, r, Math.PI / 2, Math.PI * 1.5); g2.closePath(); };
+          stad(zG0, zG1, vG0, vG1, false); g2.fillStyle = '#12100e'; g2.fill(); g2.lineWidth = 6; g2.strokeStyle = 'rgba(40,22,14,0.85)'; g2.stroke();
+          stad(0.94, 1.18, vAt(0.74), vAt(0.93), true); g2.fillStyle = '#0e0c0a'; g2.fill();
+          stad(1.2, 1.36, vAt(0.8), vAt(0.95), true); g2.fill();
+          // (the back panel between the turbines, darker)
+          g2.fillStyle = css(base, 0.55); g2.fillRect(X(ZT - 0.03), 0, w - X(ZT - 0.03), h);
+          // grime streaks back along the flanks from the grille and the nose
+          for (let k = 0; k < 110; k++) { const x = rnd() * w, y = Y(vG1) + rnd() * (Y(0.18) - Y(vG1)); g2.strokeStyle = `rgba(52,30,18,${0.07 + rnd() * 0.12})`; g2.lineWidth = 2 + rnd() * 7;
+            g2.beginPath(); g2.moveTo(x, y); g2.lineTo(x + 30 + rnd() * 140, y + (rnd() - 0.3) * 10); g2.stroke(); }
+          // sand settled on the deck
+          for (let k = 0; k < 160; k++) { const x = rnd() * w, y = Y(0.82 + rnd() * 0.18), r = 10 + rnd() * 40; gr = g2.createRadialGradient(x, y, 0, x, y, r);
+            gr.addColorStop(0, 'rgba(201,169,122,0.28)'); gr.addColorStop(1, 'rgba(201,169,122,0)'); g2.fillStyle = gr; g2.fillRect(x - r, y - r, 2 * r, 2 * r); }
+          // (the nose's blunt face is the first few centimetres of u spread over it all: anything with detail there smears
+          // into a starburst - so it gets a plain wash, worn metal into the paint by height, faded into the rest)
+          const xN = X(ZN + 0.14);
+          for (let y = 0; y < h; y += 4) { const v = 1 - y / h, c = new THREE.Color(hex).lerp(new THREE.Color(0x968f84), 0.45 + 0.25 * Math.sin(v * 9.0) * Math.sin(v * 3.1));
+            gr = g2.createLinearGradient(0, 0, xN, 0); gr.addColorStop(0, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(0.75, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(1, css(c, 1, 0));
+            g2.fillStyle = gr; g2.fillRect(0, y, xN, 4); }
+          livery.needsUpdate = true;
+        };
+        drawLivery(paintHex);
+        P.repaint = (hex) => drawLivery(hex);
+        M.lsBody = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.78, metalness: 0.18 });
+        add(body, g, M.lsBody, 0, 0, 0);
+        // (the body's inside, seen through the cockpit opening)
+        M.lsIn = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.9, side: THREE.BackSide });
+        add(body, g, M.lsIn, 0, 0, 0, 0, 0, 0, false);
+        // the grille: chrome slats across its recess, standing a little proud of the flank, each following the body's
+        // curve round the nose and stopping where the recess rounds off
+        M.lsSlat = new THREE.MeshStandardMaterial({ color: 0xb4b2aa, roughness: 0.32, metalness: 0.9 });
+        const yG0 = 0.64, yG1 = 0.93, rG = (yG1 - yG0) / 2, NS = 12;
+        for (const sx of [-1, 1]) for (let k = 0; k < NS; k++) {
+          const y = yG0 + 0.012 + k * (yG1 - yG0 - 0.024) / (NS - 1), dy = Math.abs(y - (yG0 + rG)) / rG, z0 = zG0 + rG * (1 - Math.sqrt(Math.max(0, 1 - dy * dy))) + 0.012;
+          const pts = []; for (let i = 0; i <= 12; i++) { const z = z0 + (zG1 - 0.012 - z0) * i / 12; pts.push(V3(sx * (dims(z)[0] + 0.006), y, z)); }
+          add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.0075, 6, false), M.lsSlat, 0, 0, 0);
+        }
+        // the front grille, across the blunt nose: a dark recess, chrome slats and a lip round it, all laid on the nose's
+        // curve (the skin at (x, y): the first station back from the tip whose section reaches out that far)
+        const halfAt = (z, y) => { const P2 = section(z); let best = -1; for (let i = 1; i < P2.length; i++) { const a = P2[i - 1], b = P2[i];
+          if (a[1] !== b[1] && (a[1] - y) * (b[1] - y) <= 0) best = Math.max(best, a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1])); } return best; };
+        const skinZ = (x, y) => { let lo = ZN, hi = ZN + RN; if (halfAt(lo, y) >= Math.abs(x)) return lo;
+          for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (halfAt(m, y) >= Math.abs(x)) hi = m; else lo = m; } return hi; };
+        const onNose = (x, y, off) => { const z = skinZ(x, y), e = 0.004, dx = (skinZ(x + e, y) - skinZ(x - e, y)) / (2 * e), dy = (skinZ(x, y + e) - skinZ(x, y - e)) / (2 * e);
+          const n = V3(dx, dy, -1).normalize(); return V3(x, y, z).addScaledVector(n, off); };
+        const XG = 0.46, YG0 = 0.67, YG1 = 0.85, RG = (YG1 - YG0) / 2, YGC = (YG0 + YG1) / 2;
+        const xmax = (y) => XG - RG + Math.sqrt(Math.max(0, RG * RG - (y - YGC) * (y - YGC)));
+        { const NX = 28, NY = 8, pos = [];
+          const pt = (i, j) => { const y = YG0 + (YG1 - YG0) * j / NY, xm = xmax(y), x = -xm + 2 * xm * i / NX; return onNose(x, y, 0.003); };
+          for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const a = pt(i, j), b = pt(i + 1, j), c = pt(i, j + 1), d = pt(i + 1, j + 1); for (const q of [a, c, b, b, c, d]) pos.push(q.x, q.y, q.z); }
+          const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); rg.computeVertexNormals();
+          add(body, rg, M.lsDuct || (M.lsDuct = new THREE.MeshStandardMaterial({ color: 0x1a1816, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide })), 0, 0, 0, 0, 0, 0, false); }
+        for (let k = 0; k < 6; k++) { const y = YG0 + 0.018 + k * (YG1 - YG0 - 0.036) / 5, xm = xmax(y) - 0.012, pts = [];
+          for (let i = 0; i <= 20; i++) pts.push(onNose(-xm + 2 * xm * i / 20, y, 0.011));
+          add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0075, 6, false), M.lsSlat, 0, 0, 0); }
+        { const ring = []; for (let k = 0; k < 64; k++) { const a = k / 64 * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+            ring.push(onNose(Math.sign(c) * (XG - RG + RG * Math.abs(c)) * 1.02 + (Math.abs(c) < 1e-6 ? 0 : 0), YGC + sn * RG * 1.06, 0.008)); }
+          M.lsLip2 = new THREE.MeshStandardMaterial({ color: 0x6a4630, roughness: 0.6, metalness: 0.35 });
+          add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring, true), 128, 0.014, 6, true), M.lsLip2, 0, 0, 0); }
+      }
+      // ---- the bubble: a clear half-ellipsoid on a thin dark frame, over the cockpit
+      const BZ = (CK0 + CK1) / 2, BL = 0.8, BW = 0.66, BH = 0.58;
+      M.lsGlass = new THREE.MeshPhysicalMaterial({ color: 0xdfe8ee, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.16, envMapIntensity: 2.4, clearcoat: 1, clearcoatRoughness: 0.02, side: THREE.DoubleSide, depthWrite: false });
+      { const bg = new THREE.SphereGeometry(1, 48, 18, 0, Math.PI * 2, 0, Math.PI / 2); bg.scale(BW, BH, BL);
+        const bm = add(body, bg, M.lsGlass, 0, YT0 - 0.005, BZ, 0, 0, 0, false); bm.renderOrder = 3;
+        const ring = []; for (let k = 0; k <= 64; k++) { const a = k / 64 * Math.PI * 2; ring.push(V3(Math.cos(a) * BW, YT0 + 0.006, BZ + Math.sin(a) * BL)); }
+        add(body, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring, true), 128, 0.016, 6, true), M.grey, 0, 0, 0);
+        // (the glint of the bubble's two catch-lights is the environment's: no frame bars across it)
+      }
+      // ---- the cockpit: down inside the body, two grey seats side by side, the dash across the front with its readout,
+      // the wheel in front of the driver (the right seat)
+      M.lsSeat = new THREE.MeshStandardMaterial({ color: 0x6e6a64, roughness: 0.8 });
+      M.lsTub = new THREE.MeshStandardMaterial({ color: 0x4a4540, roughness: 0.9, side: THREE.DoubleSide });
+      const FL = 0.58;
+      add(body, new THREE.BoxGeometry(1.5, 0.03, 1.6), M.lsTub, 0, FL, 0.2);
+      const seatZ = 0.4;
+      for (const sx of [-1, 1]) {
+        add(body, rbox(0.42, 0.12, 0.44, 0.05), M.lsSeat, sx * 0.24, 0.66, seatZ);
+        add(body, rbox(0.42, 0.56, 0.12, 0.05), M.lsSeat, sx * 0.24, 0.94, seatZ + 0.25, 0.16, 0, 0);
+      }
+      add(body, rbox(2 * CKW + 0.2, 0.2, 0.26, 0.06), M.lsTub, 0, 1.0, CK0 + 0.06);
+      add(body, rbox(0.4, 0.05, 0.14, 0.02), M.black, -0.18, 1.1, CK0 + 0.1, -0.35, 0, 0);
+      for (let k = 0; k < 5; k++) add(body, new THREE.CylinderGeometry(0.016, 0.016, 0.02, 12), k % 2 ? M.amber : M.tail, -0.34 + k * 0.05, 1.105, CK0 + 0.05);
+      const DX = 0.24;
+      SW = steering(V3(DX, 1.0, CK0 + 0.36), 0.75, 0.13, 'thin');
+      tubeAB(body, V3(DX, 0.98, CK0 + 0.22), V3(DX, 1.0, CK0 + 0.33), 0.018, M.black);
+      cluster = { parent: body, pos: V3(DX, 1.08, CK0 + 0.21), rot: -0.75, w: 0.14, h: 0.07 };
+      M.hair.color.setHex(0xb08a46); M.pants.color.setHex(0xcfc6b2);
+      driver = person({ hip: V3(DX, 0.72, seatZ + 0.02), lean: 0.2, hands: [V3(DX - 0.12, 1.0, CK0 + 0.4), V3(DX + 0.12, 1.0, CK0 + 0.4)],
+        knee: { dx: 0.1, y: 0.82, z: CK0 + 0.18 }, foot: { dx: 0.12, y: 0.62, z: CK0 + 0.0 }, helmet: false, torsoW: 0.34 });
+      P.hideCockpit.push(driver);
+      // ---- the turbines: a nacelle each, its intake facing forward round a red lip, the fan inside turning with the
+      // spool, the case weathered like the body, tapering back to a dark exhaust; on their stalks and pylon
+      // (the cowlings: weathered silver-grey with a dark red band behind the intake; v runs along the nacelle)
+      const podTex = canvasTex(512, 256, (g2, w, h) => {
+        g2.fillStyle = '#8f8c86'; g2.fillRect(0, 0, w, h);
+        let s2 = 3; const r2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
+        for (let k = 0; k < 200; k++) { const x = r2() * w, y = r2() * h, r = 2 + r2() * r2() * 22;
+          g2.fillStyle = r2() < 0.45 ? `rgba(${150 + r2() * 30},${146 + r2() * 26},${138 + r2() * 20},${0.4 + r2() * 0.5})` : r2() < 0.75 ? 'rgba(96,70,52,0.45)' : 'rgba(150,84,58,0.5)';
+          g2.beginPath(); g2.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2); g2.fill(); }
+        g2.fillStyle = '#6e2219'; g2.fillRect(0, h * (1 - 0.56), w, h * 0.1);
+        for (let k = 0; k < 40; k++) { const x = r2() * w, y = h * (1 - 0.56) + r2() * h * 0.1; g2.fillStyle = 'rgba(143,140,134,0.8)'; g2.fillRect(x, y, 3 + r2() * 10, 2 + r2() * 5); }
+      });
+      podTex.wrapS = podTex.wrapT = THREE.RepeatWrapping;
+      M.lsPod = new THREE.MeshStandardMaterial({ map: podTex, roughness: 0.7, metalness: 0.3 });
+      M.lsLip = new THREE.MeshStandardMaterial({ color: 0xb02a20, roughness: 0.55, metalness: 0.2 });
+      M.lsDuct = new THREE.MeshStandardMaterial({ color: 0x1a1816, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide });
+      const latheZ = (pts, seg) => { const g2 = new THREE.LatheGeometry(pts.map(([r, z]) => new THREE.Vector2(r, z)), seg || 32); g2.rotateX(Math.PI / 2); return g2; };
+      const PL = 0.66, PR = 0.155;
+      const podGeo = latheZ([[PR - 0.035, 0.03], [PR - 0.012, 0.0], [PR, 0.04], [PR + 0.012, 0.14], [PR + 0.012, 0.38], [PR - 0.01, 0.52], [PR - 0.05, PL - 0.04], [PR - 0.07, PL]], 36);
+      const ductGeo = latheZ([[PR - 0.035, 0.03], [PR - 0.045, 0.16]], 32);
+      P.jetFans = [];
+      const pod = (x, y, z, bare) => {
+        const pg = new THREE.Group(); pg.position.set(x, y, z); body.add(pg);
+        if (bare) {
+          // (Luke's: the left one's cowling is gone - the bare engine inside, a ribbed core with its pipes, between the
+          // intake ring and the exhaust cone, on three bars)
+          add(pg, latheZ([[PR - 0.015, 0.0], [PR + 0.008, 0.05], [PR + 0.008, 0.16], [PR - 0.03, 0.2]], 36), M.lsPod, 0, 0, 0);
+          add(pg, latheZ([[0.085, 0.18], [0.1, 0.24], [0.1, 0.5], [0.08, PL - 0.05], [PR - 0.07, PL]], 28), M.steel, 0, 0, 0);
+          for (let k = 0; k < 6; k++) add(pg, new THREE.TorusGeometry(0.102, 0.011, 6, 28), M.alu, 0, 0, 0.25 + k * 0.05);
+          for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; tubeAB(pg, V3(Math.cos(a) * (PR - 0.01), Math.sin(a) * (PR - 0.01), 0.16), V3(Math.cos(a) * 0.09, Math.sin(a) * 0.09, PL - 0.04), 0.009, M.steel, 6); }
+          pipe(pg, [V3(0.06, 0.1, 0.2), V3(0.13, 0.06, 0.33), V3(0.12, -0.02, 0.48), V3(0.07, -0.08, 0.58)], 0.012, M.alu, 6);
+          pipe(pg, [V3(-0.08, 0.09, 0.22), V3(-0.12, 0.0, 0.38), V3(-0.09, -0.08, 0.52)], 0.01, M.chrome, 6);
+        } else add(pg, podGeo, M.lsPod, 0, 0, 0);
+        add(pg, ductGeo, M.lsDuct, 0, 0, 0, 0, 0, 0, false);
+        const lip = new THREE.TorusGeometry(PR - 0.022, 0.022, 10, 36); add(pg, lip, M.lsLip, 0, 0, 0.012);
+        // (the fan: a dark disc and its blades, with the spinner)
+        const fan = new THREE.Group(); fan.position.z = 0.16; pg.add(fan);
+        add(fan, new THREE.CircleGeometry(PR - 0.045, 28), M.black, 0, 0, 0.002, 0, Math.PI, 0, false);
+        for (let k = 0; k < 11; k++) { const b2 = add(fan, new THREE.BoxGeometry(0.01, PR - 0.06, 0.02), M.steel, 0, 0, -0.004, 0, 0, 0, false); b2.geometry.translate(0, (PR - 0.06) / 2, 0); b2.rotation.set(0, 0.45, k * 2 * Math.PI / 11, 'ZYX'); }
+        add(fan, new THREE.ConeGeometry(0.035, 0.06, 14), M.lsSlat, 0, 0, -0.03, -Math.PI / 2, 0, 0, false);
+        P.jetFans.push(fan);
+        // (the exhaust: a dark ring and a cone in it)
+        add(pg, new THREE.CircleGeometry(PR - 0.07, 24), M.lsDuct, 0, 0, PL - 0.002, 0, 0, 0, false);
+        add(pg, new THREE.ConeGeometry(0.04, 0.08, 14), M.steel, 0, 0, PL - 0.03, Math.PI / 2, 0, 0, false);
+        return pg;
+      };
+      // the two low ones off the back corners, each on a flat stalk from the back of the flank
+      M.lsPyl = new THREE.MeshStandardMaterial({ color: 0x6a6660, roughness: 0.6, metalness: 0.55 });
+      for (const sx of [-1, 1]) {
+        const x = sx * (W0 + 0.12), y = 0.82, z = ZT - 0.02;
+        pod(x, y, z, sx < 0);
+        add(body, rbox(0.3, 0.07, 0.36, 0.03), M.lsPyl, sx * (W0 - 0.04), y, ZT + 0.08);
+      }
+      // the third up on the centre line on a swept pylon, behind the bubble
+      { const x = 0, y = YT0 + 0.56, z = 1.06;
+        pod(x, y, z);
+        const sh = new THREE.Shape(); sh.moveTo(1.34, 0); sh.lineTo(1.15, 0); sh.lineTo(1.2, 0.5); sh.lineTo(1.42, 0.5); sh.closePath();
+        const pyl = new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 2 });
+        pyl.rotateY(-Math.PI / 2); pyl.translate(0.025, YT0 - 0.02, 0);
+        add(body, pyl, M.lsPyl, x, 0, 0);
+      }
+    };
     (B[CAR] || B.couch)();
     model.add(driver);
     const eye = driver.userData.eye;
@@ -3804,7 +4058,7 @@
     // ---------------------------------------------------------------- the display on the dash
     if (cluster) add(cluster.parent, new THREE.PlaneGeometry(cluster.w, cluster.h), M_cluster, cluster.pos.x, cluster.pos.y, cluster.pos.z + 0.002, cluster.rot, 0, 0, false);
     const EV = CAR === 'golf' ? ENGINE !== 'busa' && ENGINE !== 'jet' && ENGINE !== 'mega' : CAR === 'cyber' || (opts.engine || 'ev') === 'ev' && (CAR === 'mini' || CAR === 'scooter' || CAR === 'razor');
-    const JETC = CAR === 'golf' && (ENGINE === 'jet' || ENGINE === 'mega');
+    const JETC = CAR === 'golf' && (ENGINE === 'jet' || ENGINE === 'mega') || CAR === 'landspeeder';
 
     // ---------------------------------------------------------------- wheels
     function carcass(R, W, rim) {
@@ -4136,6 +4390,8 @@
       rootG.add(corner);
       const flip = new THREE.Group(); if (left) flip.rotation.y = Math.PI; corner.add(flip);
       const spin = new THREE.Group(); flip.add(spin);
+      // (the landspeeder has none: its four corners are the repulsors' pads, invisible)
+      if (P.noWheels) { wheels.push({ corner, flip, spin, left, front: frontW, side, stock: [], pkg: [] }); continue; }
       const stock = [add(spin, G.carc, M.rubber, 0, 0, 0)].concat(G.tr ? [add(spin, G.tr, M.rubber, 0, 0, 0)] : []);
       const pkg = [add(spin, G.pk.carc, M.rubber, 0, 0, 0), add(spin, G.pk.tr, M.rubber, 0, 0, 0)]; for (const m of pkg) m.visible = false;
       rim(spin, G.R, G.W, G.rimR, CAR === 'diesel' && !frontW ? 'dualR' : wheelStyle.rim);
@@ -4246,6 +4502,7 @@
     // (the thrust tune grows the engine: the game hands over its diameter against stock)
     function setJetSize(sz) { if (jetSize && Math.abs(sz - jetSz) > 1e-3) { jetSz = sz; jetSize(sz); } }
     function setJet(N, ab, thr, dt) {
+      if (P.jetFans) for (const f of P.jetFans) f.rotation.z += N * 60 * dt;    // (the landspeeder's three turbines)
       if (!jetFx) return;
       jetFx.t += dt;
       if (jetFan) jetFan.rotation.z += N * 45 * dt;

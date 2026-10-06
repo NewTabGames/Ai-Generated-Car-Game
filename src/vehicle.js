@@ -356,6 +356,18 @@
       muX: 0.95, muY: 0.9, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.1, relaxY: 0.18,
       B: 1.7, C: 1.4, E: -0.2, heatCap: 500, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.002, prep: 1.0,
       crr: [1.1, 1.1, 1.1, 1.05, 1, 1.1] },
+    // the landspeeder's repulsor field under each corner: not rubber on the ground but the field pressing on whatever is
+    // under it - its hold is the same on tarmac, dirt, sand or water (the landspeeder's surfMu / surfCrr are flat too),
+    // a little less than a road tyre's and soft sideways, slow to build (a long relaxation) and slow to let go, so it
+    // slides gently and carves; almost no drag
+    repulsor: { name: 'Repulsor field', short: 'Repulsors', width: 0.6,
+      muX: 0.85, muY: 0.74, loose: 0.85, looseY: 0.74, sandKx: 1, sandKy: 1, sandCrr: 1, kappaPeak: 0.18, alphaPeak: 0.16, relaxX: 0.35, relaxY: 0.9,
+      B: 1.5, C: 1.3, E: -0.1, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0 },
+    // (the back pads hold harder sideways than the front ones and let go later: past the limit it runs wide, nose
+    // first, rather than swapping ends - with the same hold on both it spun at full lock)
+    repulsorR: { name: 'Repulsor field', short: 'Repulsors', width: 0.6,
+      muX: 0.85, muY: 0.88, loose: 0.85, looseY: 0.88, sandKx: 1, sandKy: 1, sandCrr: 1, kappaPeak: 0.18, alphaPeak: 0.2, relaxX: 0.35, relaxY: 0.9,
+      B: 1.5, C: 1.3, E: -0.1, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0 },
     // Porta Potty and Turbo Scooter: 10 in pneumatic scooter / cart tyres
     tiny10: { name: '10 x 3.00 pneumatic', short: '10 in tyres', width: 0.076,
       muX: 0.9, muY: 0.82, loose: 0.95, kappaPeak: 0.11, alphaPeak: 0.13, relaxX: 0.08, relaxY: 0.14,
@@ -542,7 +554,7 @@
   function OFFROAD_PKG(car, cls, kind) {
     if (car === 'puller') return { front: 'tractorFrontLug', rear: 'pullingR2' };
     if (car === 'dragster') return cls === 'tad' ? { front: 'sandRib', rear: 'paddleTA' } : { front: cls === 'fc' ? 'sandRibFC' : 'sandRib', rear: 'paddleTF' };
-    if (car === 'monster' || car === 'avenger') return { front: 'monsterMud', rear: 'monsterMud' };
+    if (car === 'monster' || car === 'avenger' || car === 'firetruck') return { front: 'monsterMud', rear: 'monsterMud' };
     if (car === 'trophy') return kind === 'paddle' ? { front: 'ttRib', rear: 'ttPaddle' } : { front: 'ttMud', rear: 'ttMud' };
     if (car === 'buggy') return kind === 'knobby' ? { front: 'buggyKnobF', rear: 'buggyKnobR' } : { front: 'buggyRib', rear: 'buggyPaddle' };
     if (car === 'kart') return { front: 'kartKnobF', rear: 'kartKnobR' };
@@ -1055,6 +1067,7 @@
         if (s.tyreEnvelope) this._envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
         else {
           world.ground(hx, hz, g);
+          if (s.hover) this._onWater(g);
           let nx = g.nx, ny = g.ny, nz = g.nz;
           let ndd = -(nx * dirX + ny * dirY + nz * dirZ);
           let sl = 1e9;
@@ -1064,6 +1077,7 @@
             if (sl < w.sMax + 0.35) {
               const cx = hx + dirX * sl - nx * r, cz = hz + dirZ * sl - nz * r;
               world.ground(cx, cz, g);
+              if (s.hover) this._onWater(g);
               nx = g.nx; ny = g.ny; nz = g.nz;
               ndd = -(nx * dirX + ny * dirY + nz * dirZ);
               hpN = nx * (hx - cx) + ny * (hy - g.h) + nz * (hz - cz);
@@ -1280,7 +1294,7 @@
         const heat = (0.55 * Ft * ss + 0.03 * Fzn * avx) * (wet < 1 ? 0.12 : 1);     // (the water carries most of it away)
         const cool = (w.temp - 25) * (22 + 9 * avx);
         w.temp += h * (heat - cool) / ty.heatCap;
-        if (w.surface === 0 && rho > 0.8) squeal = Math.max(squeal, Math.min(1, (rho - 0.8) / 1.2) * Math.min(1, Fzn / 3000));
+        if (w.surface === 0 && rho > 0.8 && !s.hover) squeal = Math.max(squeal, Math.min(1, (rho - 0.8) / 1.2) * Math.min(1, Fzn / 3000));
         // rolling resistance torque (applied below)
         w.rrT = -s.surfCrr[w.surface] * (ty.crr ? ty.crr[w.surface] : 1) * Fzn * r * clamp(w.omega * r / 0.4, -1, 1);
       }
@@ -1848,6 +1862,12 @@
       }
     }
 
+    // (hover: a repulsor field presses on water as on land - over a lake it rides the surface, not the bed)
+    _onWater(g) {
+      const wl = this.world.C.WATER_LEVEL;
+      if (g.h < wl) { g.h = wl; g.nx = 0; g.ny = 1; g.nz = 0; g.surface = 4; }
+    }
+
     // jet (the jet golf cart): a small turbojet behind the seats. The throttle sets the spool (N1: the compressor's speed as
     // a fraction of its 100 %) and the turbine chases it - lazily off idle, where it has to get the air moving (~3 s idle to
     // full), quicker coming down. Thrust climbs steeply with the spool (~3 % of full at idle, which the brakes hold) and
@@ -1866,7 +1886,7 @@
       this.stalled = false; this.fuelCut = false; this.boost = 0; this.nosActive = false;
       const cmd = this.running && this.gear > 0 && !this.park ? clamp(inp.throttle, 0, 1) * this.escCut : 0;
       const tgt = this.cranking ? 0.22 : this.running ? J.idle + (1 - J.idle) * cmd : 0;
-      const e = tgt - N, rate = e > 0 ? (this.running ? 0.05 + 0.42 * N * N : 0.14) : this.running ? 0.5 : 0.09;
+      const e = tgt - N, rate = (e > 0 ? (this.running ? 0.05 + 0.42 * N * N : 0.14) : this.running ? 0.5 : 0.09) * (this.running ? J.spool || 1 : 1);
       N += clamp(e * 5 * h, -rate * h, rate * h);
       this.jetN = N;
       const x = Math.pow(clamp((N - 0.2) / 0.8, 0, 1.05), 2.2);
@@ -3489,6 +3509,67 @@
   } };
   // (the cowcatcher off: 350 kg lighter, a touch less on the nose, the body ending at the bumper)
   CARS.busderby.cow = { on: {}, off: { mass: 7450, frontWeight: 0.43, bodyFront: -3.35, bodyPts: derbyPts(1.15, 0.43, false) } };
+  // The X-34 landspeeder: 2.95 m of body (3.5 m over the turbines), 1.7 m wide, held ~half a metre off the ground by its
+  // repulsors and pushed by three small turbines on the back - ~2,600 N between them (585 lbf). The physics' four
+  // 'wheels' are the repulsor field's pads (hover): invisible, out at the body's edges (a narrower base tipped the inside
+  // pads off the ground in a hard turn), 45 cm from the body down to whatever is under it, soft (~1.2 Hz) and long in
+  // travel, so it floats over the bumps; their hold (TIRES.repulsor) is the same on every surface and on water,
+  // and nothing drives them - the thrust pushes, the field brakes and steers it (the front pads
+  // turn), and backs it up in R (the jet's reverse motor, through the pads). 470 kg with its pilot. ~155 mph, where the
+  // drag meets the thrust; the turbines spool up quicker than a turbojet (~1 s)
+  const lsPts = (cg, fw) => ccPts(cg, fw, 2.2, [...ccBox(0.84, 0.5, 1.12, -1.6, 1.33), [0, 1.7, 0.33], [-0.5, 1.6, 0.0], [0.5, 1.6, 0.0],
+    [-0.96, 0.82, 1.95], [0.96, 0.82, 1.95], [-0.42, 1.78, 1.5], [0, 0.5, 0], [0, 0.7, -1.62]]);
+  CARS.landspeeder = { name: 'X-34 Landspeeder', short: 'Landspeeder', car: '3 TURBINES · REPULSORLIFT', hp: 0, tq: 0, cc: true, kbLat: 7, spec: {
+    name: 'X-34 Landspeeder', hover: true,
+    mass: 470, Ipitch: 420, Iyaw: 480, Iroll: 120, cgHeight: 0.78, wheelbase: 2.2, frontWeight: 0.47,
+    trackF: 1.55, trackR: 1.55, wheelRadius: 0.45, wheelInertiaF: 0.6, wheelInertiaR: 0.6,
+    frontTire: 'repulsor', rearTire: 'repulsorR', Fz0: 1200, loadSens: 0.05,
+    surfMu: [1, 1, 1, 1, 1, 1, 1], surfCrr: [0.012, 0.012, 0.012, 0.012, 0.012, 0.012, 0.012],
+    // (damped near critically, with no blow-off: at ~0.4 of critical it pitched into the whoops' rhythm and flipped)
+    springF: 7000, springR: 7400, dampBumpF: 1500, dampRebF: 1700, dampBumpR: 1600, dampRebR: 1800, dampKnee: 1.0,
+    arbF: 12000, arbR: 6000, travelUp: 0.24, travelDown: 0.22, suspS0: 0.2,
+    suspProg: { x0: 0.5, k: 5, damp: 3 }, bumpStopK: 300000, bumpStopC: 6000, bumpStopRebC: 4000,
+    brakeTorqueF: 700, brakeTorqueR: 640, handbrakeTorque: 640, noABS: false, noESC: false,
+    maxSteer: 0.42, steerRate: 2.6, steerRatio: 12, ackermann: 0, rearToe: 0,
+    electric: false, idleRpm: 3000, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+    torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0,
+    autoRatios: [1], autoRev: 2.2, autoFinal: 12, noCoastBlip: true, engineTc: true,
+    dragClutch: EV_CLUTCH, lsdPreload: 2, lsdRamp: 0, driveEff: 0.9,
+    jet: { thrust: 2600, ab: 0, idle: 0.3, rpm100: 10000, ram: 0.003, y: 0.05, z: 1.0, revTq: 22, revRpm: 3000, spool: 2.6 },
+    // (the field resists a spin, more the faster it goes: with the fronts past their limit at speed nothing else damped
+    // the yaw, and it snaked; without the rubber's give it needs it)
+    aeroDamp: [0.5, 6, 25], CdA: 0.68, ClA: 0,
+    bodyHalfW: 0.84, bodyFront: -1.6, bodyRear: 1.95, bodyBottom: 0.5 - 0.78, bodyTop: 1.7 - 0.78, bodyPts: lsPts(0.78, 0.47),
+  } };
+  // The jet fire truck - ALL STAR FIRE DEPT's ABLAZE, the All Star Monster Truck Tour's jet-powered flame-throwing
+  // monster fire truck: a cab-forward fire engine's cab and hose-bed body on a monster truck's chassis (the 4-link, the
+  // nitrogen shocks, planetary axles, 66x43.00-25 tyres and four-wheel steer), its wheelbase cut to 2.7 m - the tyres
+  // all but touch - under a 4.8 m body. A Westinghouse J34 turbojet with an afterburner lies in the box, its tailpipe out
+  // of the back: ~3,400 lbf dry, ~4,900 lit (a flame out of the back). It pushes the truck along; nothing drives the
+  // wheels forwards (in R a hydraulic motor on the transfer case turns them). ~13,000 lb, the J34 and its fuel high up
+  // in the box. 0-60 in ~11.5 s, ~135 mph
+  const cgF = 1.4, fwF = 0.46, wbF = 2.7, zcF = wbF * (fwF - 0.5);
+  const PF = (x, y, z) => [x, y - cgF, z + zcF];
+  const fBody = [];
+  for (const z0 of [-wbF / 2, wbF / 2]) for (const sx of [-1, 1]) fBody.push(PF(sx * 1.88, 1.54, z0), PF(sx * 1.88, 0.84, z0 - 0.72), PF(sx * 1.88, 0.84, z0 + 0.72), PF(sx * 1.36, 1.68, z0));
+  for (const sx of [-1, 1]) {
+    fBody.push(PF(sx * 1.2, 1.5, -2.15), PF(sx * 1.2, 3.0, -2.12), PF(sx * 1.22, 1.55, 2.62), PF(sx * 1.22, 3.25, 2.62), PF(sx * 1.22, 3.25, -0.15), PF(sx * 1.2, 3.0, -1.0),
+      PF(sx * 1.12, 4.05, 0.0), PF(sx * 1.12, 4.05, 2.45), PF(sx * 0.5, 0.95, -1.4), PF(sx * 0.5, 0.95, 1.6));
+  }
+  fBody.push(PF(0, 1.62, 3.62), PF(0, 2.28, 3.62), PF(0, 0.95, 0));
+  CARS.firetruck = { name: 'Jet Fire Truck', short: 'Jet Fire Truck', car: 'J34 TURBOJET', hp: 0, tq: 0, cc: true, kbLat: 5, spec: Object.assign(JSON.parse(JSON.stringify(CARS.monster.spec)), {
+    name: 'Jet Fire Truck "ABLAZE"',
+    mass: 5900, Ipitch: 11200, Iyaw: 10600, Iroll: 6700, cgHeight: cgF, wheelbase: wbF, frontWeight: fwF, Fz0: 16500,
+    // (the monster's springs and shocks scaled for the weight: the same sag and the same 30 in of travel)
+    springF: 67000, springR: 78000, dampBumpF: 18800, dampRebF: 26000, dampBumpR: 21000, dampRebR: 30000, arbF: 15000, arbR: 12500,
+    brakeTorqueF: 11000, brakeTorqueR: 11000, handbrakeTorque: 11000, rearSteerMax: 0.5,
+    electric: false, idleRpm: 3000, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
+    torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, transbrake: false, launchRpm: undefined,
+    autoRatios: [1], autoRev: 1.76, autoFinal: 19.5, noCoastBlip: true, engineTc: true, dragClutch: EV_CLUTCH,
+    jet: { thrust: 15100, ab: 0.45, idle: 0.3, rpm100: 10000, ram: 0.0012, y: 0.3, z: 2.0, revTq: 500, revRpm: 2500, spool: 1.7, size: 2.6 },
+    CdA: 8.0,
+    bodyHalfW: 1.9, bodyFront: -2.15 + zcF, bodyRear: 3.62 + zcF, bodyBottom: 0.95 - cgF, bodyTop: 4.05 - cgF, bodyPts: fBody,
+  }) };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
   // backwards, falling off towards ~190 rpm: ~540 W at 100 rpm; ~13 mph flat out) and the balance: side to side as a bike
@@ -3504,7 +3585,7 @@
     springF: 22000, springR: 22000, dampBumpF: 420, dampRebF: 520, dampBumpR: 420, dampRebR: 520,
     arbF: 0, arbR: 0, travelUp: 0.03, travelDown: 0.03, suspS0: 0.04, rearToe: 0,
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
-    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4,
+    maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4, kbAScale: 3.5,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
     uni: { kp: 300, kd: 35 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
