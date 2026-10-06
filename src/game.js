@@ -426,6 +426,16 @@
           info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
           snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
       } },
+    landspeeder: { btn: 'LANDSPEEDER', sub: 'Luke\'s X-34 · it floats half a metre up on its repulsors, no wheels · three turbines push it · ~155 mph', paint: 'Landspeeder Rust', tc: 1, cam: [0.95, 0.95], noPkg: true, road: true,
+      hint: 'Landspeeder: shift up (E) for DRIVE and open the throttle - the three turbines on the back spool up in a second and push it along on its repulsors, half a metre off the ground: no wheels, so it carves and slides the same over tarmac, dirt, sand and water. ~0.5 g off the line, ~155 mph flat out. The repulsors brake it (S) and back it up (R). It floats over the bumps - and drops off a crest like anything else.',
+      info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty rust-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
+      trans: 'Repulsorlift · turbine thrust', tyres: 'Repulsor field',
+      snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.5, rpmRef: 10000, open: 1, fmul: 1.6, deep: 0, loud: 0.3, race: 0 } },
+    firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
+      hint: 'Jet fire truck: shift up (E) for DRIVE and open the throttle - the J34 in the box spools up in a couple of seconds and shoves; floor it and the afterburner lights, a long flame out of the tailpipe. Nothing drives the wheels: it rolls on them and brakes and steers with them - G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). 0-60 ~11 s, ~135 mph, so brake early: it\'s 13,000 lb. R backs it up on a hydraulic motor.',
+      info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its slatted hose bed, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack over it and a silver hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis cut to a 2.7 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66x43.00-25 tyres on 25 in wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
+      trans: 'Jet thrust · hydraulic reverse · 4WS', tyres: '66x43.00-25 paddles',
+      snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 0.9, rpmRef: 10000, open: 1, fmul: 0.9, deep: 0.5, loud: 1, race: 0 } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph), pedal a geared-hub one (~35 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
       info: 'A 24 in unicycle: a silver rim on 36 spokes, a 24 x 2.125 tyre, a black frame, the saddle with its yellow bumpers, cranks straight on the hub and platform pedals · the rider is the engine (~70 Nm at the cranks from a standstill, ~540 W at 100 rpm) and the balance - fore and aft over the one wheel, leaning into the turns · 81 kg with the rider · 0-10 mph ~2.3 s, ~14 mph',
@@ -448,7 +458,7 @@
   };
   // (CCD: the car's entry with its engine's changes over it)
   const CC = !!CC_CARS[S.car], CCD = CC ? Object.assign({}, CC_CARS[S.car], (CC_CARS[S.car].eng || {})[S[CC_CARS[S.car].optKey]] || {}) : null;
-  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster' || S.car === 'avenger', KART = S.car === 'kart', MOWER = S.car === 'mower';
+  const PULLER = S.car === 'puller', DRAGSTER = S.car === 'dragster', MONSTER = S.car === 'monster' || S.car === 'avenger' || S.car === 'firetruck', KART = S.car === 'kart', MOWER = S.car === 'mower';
   const BIG = PULLER || DRAGSTER || MONSTER || KART || MOWER || CC;     // race engines: their own sound set-up, rumble and shake
   const ROADCC = CC && !!CCD.road;                                        // (...but a road car among them - the Ram - doesn't shake)
   const CARDEF = PULLER ? VEH.CARS.puller.make(S.pullerEng) : DRAGSTER ? VEH.CARS.dragster.make(S.dragClass) : MONSTER ? VEH.CARS[S.car]
@@ -567,6 +577,7 @@
   // ------------------------------------------------------------------ Fun tab: live tuning (saved per car)
   const STOCK = JSON.parse(JSON.stringify(veh.spec));
   const JET = !!STOCK.jet;                      // (the jet golf cart: thrust, no driven wheels)
+  const HOVER = !!STOCK.hover;                  // (the landspeeder: repulsors for wheels)
   const tuneDefaults = () => ({
     power: 1, boost: STOCK.boostMax, stretch: 1, limiter: STOCK.limiterRpm, nolimit: false, idle: STOCK.idleRpm, inertia: 1, nos: 0, pops: STOCK.popScale !== undefined ? STOCK.popScale : 1, whine: 1,
     finalAuto: STOCK.autoFinal, finalManual: STOCK.manualFinal, shiftTime: STOCK.shiftTimeWOT || 0.22, launch: STOCK.launchRpm || 4000, gov: true,
@@ -644,6 +655,11 @@
     TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
     TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
     // (the Mega Jet, a streamliner: 600 mph stock, Stage 2 ~700 (a touch sleeker), Unhinged 800 - its wings cost drag)
+    // (the landspeeder: no wings - downforce would only press its pads into the ground)
+    if (HOVER) {
+      TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
+      TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.2, grip: 1.35, brakes: 1.5, whine: 1.5, smoke: 2 });
+    }
     if (STOCK.jet.size > 2) {
       TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2, drag: 0.95 });
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
@@ -660,7 +676,7 @@
     if (id === 'unicycle') return UNIM.build(THREE, Object.assign(o, { engine: def.engine || 'pedal', wheelRadiusF: s.wheelRadiusF || s.wheelRadius }));
     if (id === 'bike') return BIKEM.build(THREE, Object.assign(o, { engine: def.engine || 'stock', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     return id === 'puller' ? PULL.build(THREE, Object.assign(o, { engine: def.engine })) : id === 'dragster' ? DRAGM.build(THREE, Object.assign(o, { cls: def.cls }))
-      : id === 'monster' || id === 'avenger' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
+      : id === 'monster' || id === 'avenger' || id === 'firetruck' ? MON.build(THREE, Object.assign(o, { body: id })) : id === 'kart' ? KRT.build(THREE, Object.assign(o, { cls: def.cls }))
       : id === 'mower' ? MOW.build(THREE, Object.assign(o, { cls: def.cls, wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }))
       : CC_CARS[id] ? CRU.build(THREE, Object.assign(o, { car: id, engine: def.engine || 'ev', wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius, cow: id !== S.car || S.busCow !== false })) : CAR.build(THREE, o);
   }
@@ -703,8 +719,9 @@
   // (keyboard steering: a car that tips over well short of 1 g - the scooter, the porta potty - is steered to its own limit)
   if (CC && CARDEF.kbLat) input.kbGeom = { wb: sp.wheelbase, maxSteer: sp.maxSteer, aLat: CARDEF.kbLat };
   input.rawSteer = !!sp.steerAScale;           // (the RC truck and the unicycle scale their own lock with speed: the keys and the stick go in raw)
-  // (...a held key still turns only as hard as kbAScale, m/s^2 - the unicycle's rider can't lean past ~0.35 g)
-  input.rawKbK = sp.steerAScale && sp.kbAScale ? Math.min(1, sp.kbAScale / sp.steerAScale) : 1;
+  // (...a held key still turns only as hard as kbAScale, m/s^2 - the unicycle's rider can't lean past ~0.35 g - but at a
+  // walking pace, where both limits are past full lock, it still gets the whole lock: the cut is the ratio of the two)
+  if (sp.steerAScale && sp.kbAScale) input.rawKb = { wb: sp.wheelbase, maxSteer: sp.maxSteer, a: sp.kbAScale, A: sp.steerAScale };
   const hud = new HUDM.HUD(W); hud.units = S.units;
   const perf = new HUDM.PerfTimers(); perf.rollout = S.rollout;
 
@@ -1005,7 +1022,7 @@
     function stats() {
       const e10 = DEMON && S.fuel === 'e10', ratedHp = e10 ? 900 : CARDEF.hp, ratedTq = e10 ? 810 : CARDEF.tq;
       const p = peakFigures(veh.spec), hp = ratedHp * p.hp / STOCK_PEAK.hp, tq = ratedTq * p.tq / STOCK_PEAK.tq, lb = tune.mass * 2.20462;
-      if (JET) { const lbf = veh.spec.jet.thrust * (veh.spec.torqueScale || 1) / 4.448; statsEl.innerHTML = `<b>${Math.round(lbf)} lbf</b> of thrust · ${Math.round(lbf * (1 + veh.spec.jet.ab))} lbf with the afterburner · ${Math.round(lb).toLocaleString()} lb` + (tune.gravity !== 1 ? ` · ${tune.gravity.toFixed(2)} g` : ''); return; }
+      if (JET) { const lbf = veh.spec.jet.thrust * (veh.spec.torqueScale || 1) / 4.448; statsEl.innerHTML = `<b>${Math.round(lbf)} lbf</b> of thrust · ` + (veh.spec.jet.ab ? `${Math.round(lbf * (1 + veh.spec.jet.ab))} lbf with the afterburner · ` : '') + `${Math.round(lb).toLocaleString()} lb` + (tune.gravity !== 1 ? ` · ${tune.gravity.toFixed(2)} g` : ''); return; }
       statsEl.innerHTML = `<b>${Math.round(hp).toLocaleString()} hp</b> · ${Math.round(tq).toLocaleString()} lb-ft · ${Math.round(lb).toLocaleString()} lb · ${(lb / hp).toFixed(2)} lb/hp` +
         (tune.nos ? ` · +${tune.nos} hp nitrous` : '') + (tune.gravity !== 1 ? ` · ${tune.gravity.toFixed(2)} g` : '');
     }
@@ -1141,10 +1158,11 @@
       if (CC && CCD.toggle) add(row(CCD.toggle.label, CCD.toggle.note + ' · changing it restarts the game',
         seg([[true, CCD.toggle.on], [false, CCD.toggle.off]], S[CCD.toggle.key] !== false, (v) => { if (carLocked() || v === (S[CCD.toggle.key] !== false)) return; S[CCD.toggle.key] = v; saveS(); location.reload(); })));
       if (MONSTER) {
-        add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
+        if (!CC) add(row('Monster truck', '12,000 lb · supercharged 540 ci methanol big-block, ~1,500 hp · 2-speed race automatic · locked transfer case, planetary axles with lockers - all four wheels always driven · 66x43.00-25 hand-cut tyres · 30 in of travel · no traction control, no ABS', el('<span></span>')));
         add(row('Rear steering (G)', 'AUTO: the rears counter-steer at low speed for tight turns and straighten out as you go faster · CRAB: they follow the fronts, so it slides sideways · MANUAL: the real thing - hold , or . to swing them, they stay where you leave them · FRONT: rears locked straight',
           seg([['auto', 'Auto'], ['crab', 'Crab'], ['manual', 'Manual'], ['front', 'Front only']], S.rsMode, (v) => { S.rsMode = v; G.rearMan = 0; })));
-        add(row('In the air', 'The tyres weigh 645 lb each: spin them up with the GAS and the truck rocks back (nose up); stab the BRAKE and it pitches nose down. Lift off the gas to fly level. Land on the down slopes.', el('<span></span>')));
+        if (CC) add(row('In the air', 'Nothing drives the tyres, so the GAS does nothing to them in the air - the jet pushes along the truck as it flies; stab the BRAKE and the stopping tyres pitch it nose down. Land on the down slopes.', el('<span></span>')));
+        else add(row('In the air', 'The tyres weigh 645 lb each: spin them up with the GAS and the truck rocks back (nose up); stab the BRAKE and it pitches nose down. Lift off the gas to fly level. Land on the down slopes.', el('<span></span>')));
         add(row('Air assist', 'On: like a seasoned driver’s feet plus a spotter - it looks ahead to the slope you’ll land on, eases off the gas (or brake) before the truck rotates past it, catches a nose that’s way off, gently levels the truck in pitch and roll while it flies, and feathers the gas as you touch down (spinning rears would kick it over backwards). Holding the gas over a jump no longer flips it; a truck that rolled over on a ramp’s edge before it took off is still a crash. Off: all yours - backflips, front flips and crashes',
           seg([[true, 'On'], [false, 'Off (do your own flips)']], S.airAssist !== false, (v) => { S.airAssist = v; })));
       }
@@ -1486,7 +1504,16 @@
       // peak slip. A gripping tyre always creeps a little, and that creep in m/s grows with speed, so slip speed alone
       // laid rubber on every hard (but tidy) acceleration
       const past = clamp((w.rho - 1.0) / 1.5, 0, 1);
-      if (w.surface === 0 || w.surface === 5) {
+      if (HOVER) {
+        // (a repulsor: no rubber, no ruts - its wash blows the loose ground up from under it, more the faster it goes and
+        // the harder the turbines push; a mist off water)
+        skids.break(i);
+        if (w.surface !== 0 && w.surface !== 5) {
+          const amt = clamp(speed / 30, 0, 1) * 0.7 + 0.3 * clamp(veh.thrEff, 0, 1);
+          rate = amt * (w.surface === 4 ? 40 : 26); alpha = 0.06 + 0.12 * amt; shade = w.surface === 4 ? 0 : w.surface === 3 ? 1.25 : w.surface === 6 ? 0.55 : 1;
+          size = 0.5 + 0.4 * amt; grow = 1.6 + amt; life = 1.2 + amt; up = 0.6;
+        }
+      } else if (w.surface === 0 || w.surface === 5) {
         const heat = clamp((w.temp - 40) / 55, 0.25, 1);
         const amt = clamp((slip - 3.2) / 11, 0, 1) * heat * clamp(w.Fz / 2500, 0, 1) * clamp((w.rho - 0.9) / 0.6, 0, 1);
         rate = amt * 150; alpha = 0.22 + 0.4 * amt; grow = 1.4 + 2.2 * amt; life = 2.4 + 2.5 * amt;
@@ -1540,7 +1567,9 @@
   const _sv = new THREE.Vector3(), _sd = new THREE.Vector3();
   function soot(dt) {
     if (!veh.running) return;
-    const K = CCD.soot || 0.3, thr = clamp(veh.thrEff, 0, 1), lag = Math.max(0, thr - (veh.spool || 0));
+    // (soot: 0 - the derby bus's gas big-blocks - is none at all, not the default)
+    const K = CCD.soot !== undefined ? CCD.soot : 0.3, thr = clamp(veh.thrEff, 0, 1), lag = Math.max(0, thr - (veh.spool || 0));
+    if (!K) return;
     const amt = clamp((1.7 * lag + 0.3 * thr * thr * clamp(veh.rpm() / sp.redlineRpm + 0.3, 0, 1.2)) * K, 0, 2.4);
     const idle = K > 0.5 ? 0.04 : 0.015;
     G.sootAcc = (G.sootAcc || 0) + dt * (amt > 0.02 ? 6 + 45 * Math.min(1.6, amt) : 3) * smoke.budget * tune.smoke;
@@ -1597,7 +1626,7 @@
       if (vw.tyre && vw.growMax && w.tire.grow) vw.tyre.morphTargetInfluences[0] = clamp((w.radius / w.tire.radius - 1) / vw.growMax, 0, 1);
       // tell the smoke where this tyre is, so puffs fade into it instead of slicing through it
       vw.corner.getWorldPosition(_v); _v2.set(1, 0, 0).applyQuaternion(vw.corner.getWorldQuaternion(_q));
-      smoke.setWheel(i, _v, _v2, w.radius, (w.tire.width || 0.3) / 2 + 0.02);
+      smoke.setWheel(i, _v, _v2, HOVER ? 0 : w.radius, (w.tire.width || 0.3) / 2 + 0.02);    // (no tyre for a repulsor's wash to fade into)
     }
     if (TANK) turretFollow(dt);
     if (car.afterWheels) car.afterWheels();
@@ -1735,6 +1764,7 @@
       pitch = Math.max(pitch, clamp(w.slipSpeed / 25, 0, 1));
     }
     squeal = Math.max(squeal, spin * 0.9);
+    if (HOVER) { squeal = 0; spin = 0; }        // (repulsors: nothing to squeal)
     const rw = veh.wheels[2];
     const speed = Math.hypot(veh.vx, veh.vy, veh.vz);
     audio.update({
@@ -1748,7 +1778,7 @@
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
-      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0, road: HOVER ? 0.3 : 1,
     });
   }
   function processEvents() {
@@ -1767,7 +1797,7 @@
     if (G.rumbleT > 0) return;
     G.rumbleT = 0.1;
     let strong = 0, weak = 0;
-    for (const w of veh.wheels) if (w.contact) {
+    for (const w of veh.wheels) if (w.contact && !HOVER) {
       strong = Math.max(strong, clamp((w.slipSpeed - 2) / 20, 0, 0.6));
       if (w.surface > 0) weak = Math.max(weak, clamp(Math.abs(veh.forwardSpeed) / 30, 0, 0.5));
     }

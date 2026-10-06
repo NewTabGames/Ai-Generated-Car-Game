@@ -44,7 +44,8 @@ class CarSynth {
       nos: 0,      // nitrous spraying, 0..1
       turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
       diesel: 0,   // a diesel's injection knock, 0..1
-      rc: 0 };     // an RC car's motor and drivetrain (1 brushless, 2 brushed)
+      rc: 0,       // an RC car's motor and drivetrain (1 brushless, 2 brushed)
+      road: 1 };   // the tyres' roar on the road and the gravel's patter (a repulsor: a little air under it)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -236,14 +237,14 @@ class CarSynth {
     const sqAmp = Math.pow(Math.min(1, c.squeal), 1.25) * 0.55 * c.fxVol;
     const spin = Math.min(1, c.spin);
     const spd = c.speed;
-    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1);
+    const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1) * c.road;
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
     const hard = c.surf < 0.5 || (c.surf > 4.5 && c.surf < 5.5);
     // (an RC truck's ~10 mm blocks buzz, higher and quieter, from walking pace)
     const humAmp = (c.hum || 0) * (hard ? 1 : 0.3) * (rcM ? Math.min(1, spd / 8) * 0.35 : Math.min(1, Math.pow(spd / 28, 1.5)) * 0.9) * c.fxVol * (interior > 0.5 ? 1.2 : 0.75);
     if (humAmp > 1e-4) { const hf = rcM ? 80 + spd * 95 : 40 + spd * 15.6; this.setBP(this.hum1, hf, 5); this.setBP(this.hum2, hf * 2.03, 7); }
-    const gravelRate = c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0;
+    const gravelRate = (c.surf === 1 || c.surf === 3 ? Math.min(0.02, spd * 0.0009) : c.surf === 2 ? spd * 0.00015 : 0) * (c.road < 0.5 ? 0 : 1);
     const windAmp = Math.min(1.4, Math.pow(spd / 75, 2)) * 0.28 * c.fxVol * (interior > 0.5 ? 0.55 : 1) * (rcM ? 0.35 : 1);
     // an RC motor: its note rides the current (louder on the throttle, a little on every rev-up) and fades out to a stop;
     // the controller's switching squeal is loudest pulling away at part throttle and gone by half speed

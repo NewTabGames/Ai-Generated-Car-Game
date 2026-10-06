@@ -221,13 +221,13 @@
         // speed-sensitive ratio so a 180 deg wheel feels like the real 14.4:1 rack at speed:
         // full lock ~31 deg parking, ~15 deg at 30 mph, ~6 deg at 70 mph, ~3 deg at 120 mph
         const vs = Math.abs(speed) / 11;
-        // (rawSteer: the vehicle scales its own lock with speed - the RC truck)
+        // (rawSteer: the vehicle scales its own lock with speed - the RC truck, the unicycle)
         if (!this.rawSteer) steer *= 1 - clamp(st.steerSpeedSens, 0, 1) * (1 - 1 / (1 + vs * Math.sqrt(vs)));
       } else {
         let ks = this.kbSteer;
         // keyboard: limit lock at speed, optional gentle countersteer help
         if (!this.rawSteer) ks *= physSteerLimit(speed, 10, 0.02, this.kbGeom);
-        else ks *= this.rawKbK || 1;
+        else if (this.rawKb) { const k = this.rawKb, f = (a) => Math.min(1, Math.atan(k.wb * a / Math.max(0.25, speed * speed)) / k.maxSteer); ks *= f(k.a) / f(k.A); }
         if (st.kbCountersteer && vehicleYawHint !== undefined && tgt === 0) ks = clamp(ks + vehicleYawHint * 0.5, -1, 1);
         steer = ks; thr = Math.max(kbThr, padThr); brk = Math.max(kbBrk, padBrk); clu = this.kb('clutch') ? 1 : padClu;
       }
