@@ -4,7 +4,7 @@
 // pads close together it snaked - and not roll), whoops at 40-140 mph (it pitched into their rhythm and flipped on
 // lightly damped pads), over a lake (the field rides the water: it mustn't sink or drown its turbines), reverse.
 // Fire truck: launch and top speed on the J34, the afterburner lighting floored, 60-0, keyboard turns (no rollover
-// on its tall box), reverse on the hydraulic motor.
+// on its tall box), reverse on the hydraulic motor, the arena's jumps with the gas held.
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694;
 const world = (wl, surf, ground) => ({ C: { WATER_LEVEL: wl }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; },
@@ -83,6 +83,25 @@ console.log('== firetruck');
   console.log('  kb turn ' + row.join(' · ')); }
 { const { v } = mk('firetruck'); v.gear = -1; for (let t = 0; t < 5; t += 1 / 120) { v.input.throttle = 1; v.step(1 / 120); }
   console.log(`  reverse 5 s: ${(v.forwardSpeed * MPH).toFixed(1)} mph`); check(v.forwardSpeed * MPH < -5, 'no reverse'); }
+// the arena's big gap jump and tabletop with the gas held and air assist on (the monster test's check): the jet's gas
+// can't fly it - the assist once cut the jet over every jump and it nosed over and flipped at 34 mph
+{ const WG = require('../src/worldgen.js'); WG.setMap('arena');
+  const TB = WG.ARENA_OBS.find((o) => o.kind === 'table'), GP = WG.ARENA_OBS.find((o) => o.kind === 'gap'), row = [];
+  for (const [name, x, z, mphs] of [['gap', GP.x0, GP.z0 + 52, [28, 34, 40]], ['table', TB.x0, TB.z0 + TB.len + 31, [28, 34, 40]]]) for (const mph of mphs) {
+    const sp = JSON.parse(JSON.stringify(CARS.firetruck.spec)), v = new Vehicle(WG, sp); v.setTires(sp.frontTire, sp.rearTire);
+    v.reset(x, WG.ground(x, z, {}).h, z, 0, -1); v.running = true; v.park = false; v.gear = 1; v.tcMode = 3; v.input.airAssist = true; v.jetN = 1;
+    v.vz = -mph / MPH; for (const w of v.wheels) w.omega = mph / MPH / w.radius;
+    let flew = 0, landT = null, minUp = 1, tdP = 0;
+    for (let t = 0; t < 9; t += 1 / 240) {
+      v.input.throttle = v.airborne || flew > 0.3 ? 1 : v.forwardSpeed * MPH < mph ? 1 : 0.25; if (v.airborne) flew += 1 / 240;
+      v.step(1 / 240);
+      if (!v.airborne && flew > 0.3 && landT === null) { landT = t; tdP = Math.asin(-2 * (v.qy * v.qz - v.qx * v.qw)) * 57.3; }
+      if (landT !== null) { minUp = Math.min(minUp, 1 - 2 * (v.qx * v.qx + v.qz * v.qz)); if (t - landT > 1.5) break; }
+    }
+    row.push(`${name}@${mph}: ${landT === null ? 'no jump' : minUp < 0.3 ? 'FLIPPED' : (tdP > 0 ? '+' : '') + tdP.toFixed(0) + '°'}`);
+    check(landT !== null && minUp >= 0.3 && isFinite(v.px), `${name} jump at ${mph} mph with the gas held: flipped`);
+  }
+  console.log('  arena jumps, gas held, air assist: ' + row.join(' · ')); }
 
 if (bad) { console.log(`FAIL: ${bad} check(s)`); process.exit(1); }
 console.log('ok');

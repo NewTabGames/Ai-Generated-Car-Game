@@ -219,7 +219,7 @@
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { landspeeder: 0xa5714b, coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { landspeeder: 0xa8754f, coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -3803,8 +3803,8 @@
     // it at the back of each flank, another grille across the nose; a big clear bubble far back over the two seats (the
     // pilot on the right); three turbines - two low on stalks off the back corners (the left one's cowling gone, its
     // bare engine showing) and one up on a swept pylon on the centre line behind the bubble - their intakes facing
-    // forward round red lips, the fans inside turning with the spool, the exhausts dark, the cowlings silver-grey with a
-    // dark red band. Dusty rust-brown paint under a dark red stripe, sand-scoured down to grey primer, and to bare metal
+    // forward round red lips, the fans inside turning with the spool, the exhausts dark, the cowlings red-orange worn to
+    // grey. Dusty tan-brown paint under a dark red stripe, sand-scoured down to grey primer, and to bare metal
     // round the nose. It floats on its repulsors half a metre up: no wheels (the physics' four pads are invisible)
     B.landspeeder = () => {
       P.noWheels = true; WF = 0.2; WR = 0.2;
@@ -3864,7 +3864,7 @@
         g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
         g.setIndex(idx); g.computeVertexNormals();
         // the livery, unwrapped (u along the body from the nose, v round it from the belly to the deck's centre line):
-        // dusty rust-brown paint, faded and sand-scoured - tan dust, grey primer showing through, bare metal worn
+        // dusty tan-brown paint, faded and sand-scoured - tan dust, grey primer showing through, bare metal worn
         // through at the nose - the dark red stripe along the crease, the dark recesses of the grille and the vents
         const vG0 = vAt(0.64), vG1 = vAt(0.93), vS0 = vAt(0.975), vS1 = vAt(1.02), vCr = vAt(0.965);
         const zG0 = -1.36, zG1 = 0.9;
@@ -3872,7 +3872,8 @@
         const livery = canvasTex(2048, 1024, () => {});
         const drawLivery = (hex) => {
           const cv = livery.image, g2 = cv.getContext('2d'), w = cv.width, h = cv.height, X = (z) => uAt(z) * w, Y = (v) => (1 - v) * h;
-          const base = new THREE.Color(hex), css = (c, k, a) => `rgba(${Math.round(clamp(c.r * k, 0, 1) * 255)},${Math.round(clamp(c.g * k, 0, 1) * 255)},${Math.round(clamp(c.b * k, 0, 1) * 255)},${a === undefined ? 1 : a})`;
+          // (sRGB components for the canvas - a THREE.Color holds them linear: drawn as they were, the paint came out dark and red)
+          const base = new THREE.Color(hex).convertLinearToSRGB(), css = (c, k, a) => `rgba(${Math.round(clamp(c.r * k, 0, 1) * 255)},${Math.round(clamp(c.g * k, 0, 1) * 255)},${Math.round(clamp(c.b * k, 0, 1) * 255)},${a === undefined ? 1 : a})`;
           seed = 7;
           g2.fillStyle = css(base, 1); g2.fillRect(0, 0, w, h);
           // (the belly darker and dirtier, the deck sun-faded)
@@ -3903,28 +3904,28 @@
           stad(zG0, zG1, vG0, vG1, false); g2.fillStyle = '#12100e'; g2.fill(); g2.lineWidth = 6; g2.strokeStyle = 'rgba(40,22,14,0.85)'; g2.stroke();
           stad(0.94, 1.18, vAt(0.74), vAt(0.93), true); g2.fillStyle = '#0e0c0a'; g2.fill();
           stad(1.2, 1.36, vAt(0.8), vAt(0.95), true); g2.fill();
-          // (the back panel between the turbines, darker)
-          g2.fillStyle = css(base, 0.55); g2.fillRect(X(ZT - 0.03), 0, w - X(ZT - 0.03), h);
           // grime streaks back along the flanks from the grille and the nose
           for (let k = 0; k < 110; k++) { const x = rnd() * w, y = Y(vG1) + rnd() * (Y(0.18) - Y(vG1)); g2.strokeStyle = `rgba(52,30,18,${0.07 + rnd() * 0.12})`; g2.lineWidth = 2 + rnd() * 7;
             g2.beginPath(); g2.moveTo(x, y); g2.lineTo(x + 30 + rnd() * 140, y + (rnd() - 0.3) * 10); g2.stroke(); }
           // sand settled on the deck
           for (let k = 0; k < 160; k++) { const x = rnd() * w, y = Y(0.82 + rnd() * 0.18), r = 10 + rnd() * 40; gr = g2.createRadialGradient(x, y, 0, x, y, r);
             gr.addColorStop(0, 'rgba(201,169,122,0.28)'); gr.addColorStop(1, 'rgba(201,169,122,0)'); g2.fillStyle = gr; g2.fillRect(x - r, y - r, 2 * r, 2 * r); }
+          // (the back panel between the turbines, darker)
+          g2.fillStyle = css(base, 0.55); g2.fillRect(X(ZT - 0.03), 0, w - X(ZT - 0.03), h);
           // (the nose's blunt face is the first few centimetres of u spread over it all: anything with detail there smears
           // into a starburst - so it gets a plain wash, worn metal into the paint by height, faded into the rest)
           const xN = X(ZN + 0.14);
-          for (let y = 0; y < h; y += 4) { const v = 1 - y / h, c = new THREE.Color(hex).lerp(new THREE.Color(0x968f84), 0.45 + 0.25 * Math.sin(v * 9.0) * Math.sin(v * 3.1));
+          for (let y = 0; y < h; y += 4) { const v = 1 - y / h, c = new THREE.Color(hex).lerp(new THREE.Color(0x968f84), 0.45 + 0.25 * Math.sin(v * 9.0) * Math.sin(v * 3.1)).convertLinearToSRGB();
             gr = g2.createLinearGradient(0, 0, xN, 0); gr.addColorStop(0, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(0.75, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(1, css(c, 1, 0));
             g2.fillStyle = gr; g2.fillRect(0, y, xN, 4); }
           livery.needsUpdate = true;
         };
         drawLivery(paintHex);
         P.repaint = (hex) => drawLivery(hex);
-        M.lsBody = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.78, metalness: 0.18 });
+        M.lsBody = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.78, metalness: 0.05 });
         add(body, g, M.lsBody, 0, 0, 0);
         // (the body's inside, seen through the cockpit opening)
-        M.lsIn = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.9, side: THREE.BackSide });
+        M.lsIn = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.9, side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 });
         add(body, g, M.lsIn, 0, 0, 0, 0, 0, 0, false);
         // the grille: chrome slats across its recess, standing a little proud of the flank, each following the body's
         // curve round the nose and stopping where the recess rounds off
@@ -3991,15 +3992,15 @@
       P.hideCockpit.push(driver);
       // ---- the turbines: a nacelle each, its intake facing forward round a red lip, the fan inside turning with the
       // spool, the case weathered like the body, tapering back to a dark exhaust; on their stalks and pylon
-      // (the cowlings: weathered silver-grey with a dark red band behind the intake; v runs along the nacelle)
+      // (the cowlings: red-orange, worn through to grey, a darker red band behind the intake; v runs along the nacelle)
       const podTex = canvasTex(512, 256, (g2, w, h) => {
-        g2.fillStyle = '#8f8c86'; g2.fillRect(0, 0, w, h);
+        g2.fillStyle = '#a0503a'; g2.fillRect(0, 0, w, h);
         let s2 = 3; const r2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
         for (let k = 0; k < 200; k++) { const x = r2() * w, y = r2() * h, r = 2 + r2() * r2() * 22;
-          g2.fillStyle = r2() < 0.45 ? `rgba(${150 + r2() * 30},${146 + r2() * 26},${138 + r2() * 20},${0.4 + r2() * 0.5})` : r2() < 0.75 ? 'rgba(96,70,52,0.45)' : 'rgba(150,84,58,0.5)';
+          g2.fillStyle = r2() < 0.45 ? `rgba(${140 + r2() * 30},${136 + r2() * 26},${128 + r2() * 20},${0.45 + r2() * 0.45})` : r2() < 0.75 ? 'rgba(96,60,44,0.45)' : 'rgba(190,120,80,0.45)';
           g2.beginPath(); g2.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2); g2.fill(); }
         g2.fillStyle = '#6e2219'; g2.fillRect(0, h * (1 - 0.56), w, h * 0.1);
-        for (let k = 0; k < 40; k++) { const x = r2() * w, y = h * (1 - 0.56) + r2() * h * 0.1; g2.fillStyle = 'rgba(143,140,134,0.8)'; g2.fillRect(x, y, 3 + r2() * 10, 2 + r2() * 5); }
+        for (let k = 0; k < 40; k++) { const x = r2() * w, y = h * (1 - 0.56) + r2() * h * 0.1; g2.fillStyle = 'rgba(160,80,58,0.8)'; g2.fillRect(x, y, 3 + r2() * 10, 2 + r2() * 5); }
       });
       podTex.wrapS = podTex.wrapT = THREE.RepeatWrapping;
       M.lsPod = new THREE.MeshStandardMaterial({ map: podTex, roughness: 0.7, metalness: 0.3 });

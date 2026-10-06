@@ -426,15 +426,15 @@
           info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
           snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
       } },
-    landspeeder: { btn: 'LANDSPEEDER', sub: 'Luke\'s X-34 · it floats half a metre up on its repulsors, no wheels · three turbines push it · ~155 mph', paint: 'Landspeeder Rust', tc: 1, cam: [0.95, 0.95], noPkg: true, road: true,
+    landspeeder: { btn: 'LANDSPEEDER', sub: 'Luke\'s X-34 · it floats half a metre up on its repulsors, no wheels · three turbines push it · ~155 mph', paint: 'Landspeeder Brown', tc: 1, cam: [0.95, 0.95], noPkg: true, road: true,
       hint: 'Landspeeder: shift up (E) for DRIVE and open the throttle - the three turbines on the back spool up in a second and push it along on its repulsors, half a metre off the ground: no wheels, so it carves and slides the same over tarmac, dirt, sand and water. ~0.5 g off the line, ~155 mph flat out. The repulsors brake it (S) and back it up (R). It floats over the bumps - and drops off a crest like anything else.',
-      info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty rust-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
+      info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty tan-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
       trans: 'Repulsorlift · turbine thrust', tyres: 'Repulsor field',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.5, rpmRef: 10000, open: 1, fmul: 1.6, deep: 0, loud: 0.3, race: 0 } },
-    firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
+    firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in flotation tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
       hint: 'Jet fire truck: shift up (E) for DRIVE and open the throttle - the J34 in the box spools up in a couple of seconds and shoves; floor it and the afterburner lights, a long flame out of the tailpipe. Nothing drives the wheels: it rolls on them and brakes and steers with them - G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). 0-60 ~11 s, ~135 mph, so brake early: it\'s 13,000 lb. R backs it up on a hydraulic motor.',
-      info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its slatted hose bed, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack over it and a silver hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis cut to a 2.7 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66x43.00-25 tyres on 25 in wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
-      trans: 'Jet thrust · hydraulic reverse · 4WS', tyres: '66x43.00-25 paddles',
+      info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its ribbed hose-bed band, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack and a polished hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis on a 3.3 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66 in flotation tyres on plain grey steel wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
+      trans: 'Jet thrust · hydraulic reverse · 4WS', tyres: '66 in flotation tyres',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 0.9, rpmRef: 10000, open: 1, fmul: 0.9, deep: 0.5, loud: 1, race: 0 } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph), pedal a geared-hub one (~35 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
@@ -660,7 +660,7 @@
       TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.2, grip: 1.35, brakes: 1.5, whine: 1.5, smoke: 2 });
     }
-    if (STOCK.jet.size > 2) {
+    if (STOCK.jet.size > 2 && !MONSTER) {      // (the Mega Jet - not the fire truck's J34, as big but no streamliner)
       TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2, drag: 0.95 });
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
     }
@@ -2499,7 +2499,8 @@
           g.emit[i] += rate * dt * bud;
           if (g.emit[i] < 1) continue;
           m.wheels[i].corner.getWorldPosition(_gv);
-          const gy = groundH(_gv.x, _gv.z); smoke.setGround(gy);
+          // (a landspeeder's wash over a lake comes off the water, not the bed)
+          const gy = gv.spec.hover && W.hasWater ? Math.max(groundH(_gv.x, _gv.z), W.C.WATER_LEVEL) : groundH(_gv.x, _gv.z); smoke.setGround(gy);
           while (g.emit[i] >= 1) {
             g.emit[i] -= 1;
             smoke.emit(_gv.x + (Math.random() - 0.5) * 0.3, gy + 0.15 + Math.random() * 0.1, _gv.z + (Math.random() - 0.5) * 0.3,
@@ -2529,12 +2530,13 @@
   function voiceParams(g) {
     const st = g.st, snd = g.snd, id = g.prof.c, dp = id === 'dragpak', dm = id === 'demon', bm = g.gv.spec.boostMax || 0;
     return { rpm: st.rpm, load: st.load, thr: st.thr, cut: st.fl & 128 ? 1 : 0, boost: st.boost, run: st.fl & 8 ? 1 : 0, crank: st.fl & 64 ? 1 : 0,
-      squeal: st.sq, sqPitch: 0.5, spin: st.sq * 0.8, speed: 0, surf: 0, interior: 0, horn: st.fl & 16 ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol * 0.7,
+      // (a landspeeder's dust isn't tyre smoke: no squeal from it)
+      squeal: g.gv.spec.hover ? 0 : st.sq, sqPitch: 0.5, spin: g.gv.spec.hover ? 0 : st.sq * 0.8, speed: 0, surf: 0, interior: 0, horn: st.fl & 16 ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol * 0.7,
       rough: snd.rough || 0, whine: g.big ? snd.whine : dp ? 1.7 : dm ? 1.45 : 1, rpmRef: g.big ? snd.rpmRef : dp ? 8800 : 6200, hum: 0,
       boostRef: Math.max(g.big ? bm : dp ? 24 : 11.6, bm), race: g.big ? snd.race : dp ? 1 : 0,
       nEng: snd.nEng, cyl: snd.cyl, fmul: snd.fmul, deep: snd.deep, loud: snd.loud, open: snd.open, whK: snd.whK, whPure: snd.whPure,
       pipe: snd.pipe ? clamp((st.rpm - snd.pipe[0]) / (snd.pipe[1] - snd.pipe[0]), 0, 1) : 0, vt: snd.vt || 0, surge: snd.surge || 0, ev: snd.ev || 0,
-      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1, turbo: snd.turbo || 0, diesel: snd.diesel || 0 };
+      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1, turbo: snd.turbo || 0, diesel: snd.diesel || 0, road: g.gv.spec.hover ? 0.3 : 1 };
   }
   // ---- racing in a room: points, invisible walls, a reset every 30 s
   // Points come for ground covered along the course: on the road, 1 a metre times a streak that builds the longer you
@@ -2918,7 +2920,7 @@
     // no tyre smoke in the cockpit view (it filled the cabin on burnouts); still shown from the chase cams. A diesel's
     // smoke is the point of it, though: in its cockpit the smoke stays, only the puffs right round your head (in the cab)
     // fading out - you see the stack's soot roll up past the windshield and trail off in the mirrors
-    const SOOTCAB = G.started && cam.mode === 2 && !!(car.sootTips && car.sootTips.length);
+    const SOOTCAB = G.started && cam.mode === 2 && !!(car.sootTips && car.sootTips.length) && !(CC && CCD.soot === 0);
     smoke.mesh.visible = !(G.started && cam.mode === 2) || SOOTCAB;
     smoke.setNear(SOOTCAB ? 1.5 : 0);
     // live mirrors in the cockpit: one mirror per frame, round-robin
