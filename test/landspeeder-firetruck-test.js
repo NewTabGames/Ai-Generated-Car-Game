@@ -2,7 +2,7 @@
 // Landspeeder: it hovers (the repulsor pads loaded at its ride height), launch (0-60, top speed after 40 s), 60-0,
 // full lock at 20-140 mph (it must settle into a steady turn - with the same hold front and back it spun, and with the
 // pads close together it snaked - and not roll), whoops at 40-140 mph (it pitched into their rhythm and flipped on
-// lightly damped pads), over a lake (the field rides the water: it mustn't sink or drown its turbines), reverse.
+// lightly damped pads), off a kicker and All Ramps' first jump (it mustn't nose over in the air), over a lake (the field rides the water: it mustn't sink or drown its turbines), reverse.
 // Fire truck: launch and top speed on the J34, the afterburner lighting floored, 60-0, keyboard turns (no rollover
 // on its tall box), reverse on the hydraulic motor, the arena's jumps with the gas held.
 const { Vehicle, CARS } = require('../src/vehicle.js');
@@ -60,6 +60,41 @@ console.log('== landspeeder');
   for (let t = 0; t < 10; t += 1 / 120) { v.input.throttle = 1; v.step(1 / 120); }
   console.log(`  over a lake: CG ${v.py.toFixed(2)} m over the bed (the water 0.5 m up), ${(v.forwardSpeed * MPH).toFixed(0)} mph after 10 s, in water ${v.inWater}, running ${v.running}`);
   check(v.py > 1.2 && !v.inWater && v.running && v.forwardSpeed * MPH > 60, 'it sank into the lake'); }
+// off a 28 deg kicker floored and coasting: the pads still on the ramp throw the nose down as the fronts leave it, and
+// with nothing in the air to answer that (the thrust 5 cm above the CG only added to it) it nosed over 70-90 deg at 63
+// mph, landed on its nose and rolled - the field's stabilisers (airLevel) level it for the landing
+{ const ang = 28 * Math.PI / 180, row = [];
+  const kick = world(-1e4, 3, (x, z, o) => { const d = -z - 60, on = d > 0 && d < 6; o.h = on ? d * Math.tan(ang) : 0; o.nx = 0; o.ny = on ? Math.cos(ang) : 1; o.nz = on ? Math.sin(ang) : 0; o.surface = 3; return o; });
+  for (const [mph, gas] of [[45, 1], [63, 1], [63, 0]]) {
+    const { v } = mk('landspeeder', kick), u = mph / MPH; v.vz = -u; for (const w of v.wheels) w.omega = u / w.radius; v.jetN = 1;
+    let flew = 0, landP = null, minUp = 1;
+    for (let t = 0; t < 10; t += 1 / 240) {
+      v.input.throttle = v.airborne ? gas : (v.forwardSpeed * MPH < mph ? 1 : 0.3); v.step(1 / 240);
+      if (v.airborne) flew += 1 / 240; else if (flew > 0.3 && landP === null) landP = pitchOf(v) * 57.3;
+      if (landP !== null) minUp = Math.min(minUp, 1 - 2 * (v.qx * v.qx + v.qz * v.qz));
+    }
+    row.push(`${mph} mph ${gas ? 'floored' : 'coasting'}: ${landP === null ? 'no jump' : minUp < 0.3 ? 'ROLLED' : (landP > 0 ? '+' : '') + landP.toFixed(0) + '°'}`);
+    check(landP !== null && minUp >= 0.3 && Math.abs(landP) < 30 && isFinite(v.px), `kicker at ${mph} mph ${gas ? 'floored' : 'coasting'}: nosed over`);
+  }
+  console.log('  off a 28° kicker (landing pitch) ' + row.join(' · ')); }
+// and All Ramps' gap jump dead ahead of the spawn (where it was found), floored and coasting, up to its top speed -
+// judged on the first landing (any faster and it lands on the next cell's jump)
+{ const WG = require('../src/worldgen.js'); WG.setMap('ramps');
+  const S = WG.RAMPS_SPAWN, row = [];
+  for (const [mph, gas] of [[45, 1], [63, 1], [100, 1], [130, 1], [45, 0], [63, 0], [100, 0]]) {
+    const sp = JSON.parse(JSON.stringify(CARS.landspeeder.spec)), v = new Vehicle(WG, sp); v.setTires(sp.frontTire, sp.rearTire);
+    v.reset(S.x, WG.ground(S.x, S.z, {}).h, S.z, 0, -1); v.running = true; v.park = false; v.gear = 1; v.tcMode = 1; v.jetN = 1;
+    v.vz = -mph / MPH; for (const w of v.wheels) w.omega = mph / MPH / w.radius;
+    let flew = 0, landT = null, landP = null, minUp = 1;
+    for (let t = 0; t < 14; t += 1 / 240) {
+      v.input.throttle = flew > 0 ? gas : v.forwardSpeed * MPH < mph ? 1 : 0.3; v.step(1 / 240);
+      if (v.airborne) flew += 1 / 240; else if (flew > 0.3 && landT === null) { landT = t; landP = pitchOf(v) * 57.3; }
+      if (landT !== null) { minUp = Math.min(minUp, 1 - 2 * (v.qx * v.qx + v.qz * v.qz)); if (t - landT > 1) break; }
+    }
+    row.push(`${mph} ${gas ? 'floored' : 'coasting'}: ${landT === null ? 'no jump' : minUp < 0.3 ? 'ROLLED' : (landP > 0 ? '+' : '') + landP.toFixed(0) + '°'}`);
+    check(landT !== null && minUp >= 0.3 && Math.abs(landP) < 30 && isFinite(v.px), `All Ramps' spawn jump at ${mph} mph ${gas ? 'floored' : 'coasting'}: nosed over`);
+  }
+  console.log('  All Ramps spawn jump (landing pitch) ' + row.join(' · ')); }
 { const { v } = mk('landspeeder'); v.gear = -1; for (let t = 0; t < 4; t += 1 / 120) { v.input.throttle = 1; v.step(1 / 120); }
   console.log(`  reverse 4 s: ${(v.forwardSpeed * MPH).toFixed(1)} mph`); check(v.forwardSpeed * MPH < -5, 'no reverse'); }
 
