@@ -954,7 +954,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && W.map !== 'dunes' && !W.track;
+    water.visible = W.hasWater;
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting

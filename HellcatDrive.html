@@ -1849,7 +1849,9 @@
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
-    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
+    setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; },
+    // (the maps with lakes: the open country - none by the tracks, in the stadium, the desert or on the flat maps)
+    get hasWater() { return MAP !== 'tarmac' && MAP !== 'arena' && MAP !== 'ramps' && MAP !== 'dunes' && !TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
     arenaCarDent: (c, x, z) => carDent(c, (x - c.x) * c.flip, z - c.z),
     C, smooth, hash01, hashInt, mulberry32, makeSimplex,
@@ -2779,33 +2781,36 @@
         const tgtP = Math.atan(-(nx * fx + nz * fz) / ny1) * 57.2958 + 4, tgtR = Math.atan(-(nx * rx + nz * rz) / (ny1 * fl)) * 57.2958;
         this.aaTgtP = tgtP / 57.2958; this.aaTgtR = tgtR / 57.2958; this.aaTL = tl;
         const e = ahead - tgtP;
-        if (inp.throttle > 0) inp.throttle *= clamp((16 - e) / 14, 0, 1);
+        // (a jet - the fire truck: its gas drives no wheels, so it can't lift the nose and isn't touched; the brake still
+        // drops it, and the nudge below works harder)
+        const jet = !!s.jet;
+        if (inp.throttle > 0 && !jet) inp.throttle *= clamp((16 - e) / 14, 0, 1);
         if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
         // and the feet do the flying: stab the brake to bring a rising nose down, rev the wheels to lift a dropping one
         // (you hear it working) - from 8 deg off the landing attitude, all in by ~22
         this.aaAuto = 0;
         if (e > 8) { const b = clamp((e - 8) / 14, 0, 1); if (b > inp.brake) { inp.brake = b; this.aaAuto = -b; } }
-        if (e < -8) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
+        if (e < -8 && !jet) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
       } else {
         this.aaAir = 0;
         if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
           // touchdown: feather the gas until the rears match the ground, and don't let it rear up over backwards off the
           // landing (a wheelie on the way out is fine; one still climbing past 25 deg isn't)
           const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
-          if (this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
-          if (ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
+          if (!this.spec.jet && this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+          if (!this.spec.jet && ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
         }
       }
     }
     // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 0.5 rad/s^2 in
-    // pitch and 1 in roll - a light hand: the pedals do most of the work - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
+    // pitch (1.6 for a jet truck, whose gas can't fly it) and 1 in roll - a light hand: the pedals do most of the work - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
     // past ~85 deg: a truck that rolled over on the ramp's edge before it left the ground is beyond saving)
     _aaTorque(m00, m10, m20, m02, m12, m22, m11) {
       const s = this.spec, fade = clamp(((this.aaAir || 0) - 0.08) / 0.2, 0, 1);
       if (fade <= 0 || m11 < 0.1 || this.aaTgtP === undefined) return null;
       const pitch = Math.asin(clamp(-m12, -1, 1)), roll = Math.asin(clamp(m10, -1, 1));
       const wP = this.wx * m00 + this.wy * m10 + this.wz * m20, wR = this.wx * m02 + this.wy * m12 + this.wz * m22;
-      const A = 0.5 * fade, AR = 1.0 * fade, kp = 3.5, kd = 3;
+      const A = (s.jet ? 1.6 : 0.5) * fade, AR = 1.0 * fade, kp = 3.5, kd = 3;    // (a jet truck: no pedals to fly it with)
       const aP = clamp(kp * (this.aaTgtP - pitch) - kd * wP, -A, A), aR = clamp(kp * (this.aaTgtR - roll) - kd * wR, -AR, AR);
       const tP = aP * s.Ipitch, tR = aR * s.Iroll;
       const T = this._aaT || (this._aaT = [0, 0, 0]);
@@ -3727,8 +3732,10 @@
       }
     }
 
-    // (hover: a repulsor field presses on water as on land - over a lake it rides the surface, not the bed)
+    // (hover: a repulsor field presses on water as on land - over a lake it rides the surface, not the bed; not on a
+    // map with no lakes, where the ground below the water level is just a dip)
     _onWater(g) {
+      if (this.world.hasWater === false) return;
       const wl = this.world.C.WATER_LEVEL;
       if (g.h < wl) { g.h = wl; g.nx = 0; g.ny = 1; g.nz = 0; g.surface = 4; }
     }
@@ -5408,20 +5415,20 @@
   } };
   // The jet fire truck - ALL STAR FIRE DEPT's ABLAZE, the All Star Monster Truck Tour's jet-powered flame-throwing
   // monster fire truck: a cab-forward fire engine's cab and hose-bed body on a monster truck's chassis (the 4-link, the
-  // nitrogen shocks, planetary axles, 66x43.00-25 tyres and four-wheel steer), its wheelbase cut to 2.7 m - the tyres
-  // all but touch - under a 4.8 m body. A Westinghouse J34 turbojet with an afterburner lies in the box, its tailpipe out
+  // nitrogen shocks, planetary axles, four-wheel steer, 66 in flotation tyres), its wheelbase cut to 3.3 m under a 5.2 m
+  // body. A Westinghouse J34 turbojet with an afterburner lies in the box, its tailpipe out
   // of the back: ~3,400 lbf dry, ~4,900 lit (a flame out of the back). It pushes the truck along; nothing drives the
   // wheels forwards (in R a hydraulic motor on the transfer case turns them). ~13,000 lb, the J34 and its fuel high up
   // in the box. 0-60 in ~11.5 s, ~135 mph
-  const cgF = 1.4, fwF = 0.46, wbF = 2.7, zcF = wbF * (fwF - 0.5);
+  const cgF = 1.4, fwF = 0.46, wbF = 3.3, zcF = wbF * (fwF - 0.5);
   const PF = (x, y, z) => [x, y - cgF, z + zcF];
   const fBody = [];
   for (const z0 of [-wbF / 2, wbF / 2]) for (const sx of [-1, 1]) fBody.push(PF(sx * 1.88, 1.54, z0), PF(sx * 1.88, 0.84, z0 - 0.72), PF(sx * 1.88, 0.84, z0 + 0.72), PF(sx * 1.36, 1.68, z0));
   for (const sx of [-1, 1]) {
-    fBody.push(PF(sx * 1.2, 1.5, -2.15), PF(sx * 1.2, 3.0, -2.12), PF(sx * 1.22, 1.55, 2.62), PF(sx * 1.22, 3.25, 2.62), PF(sx * 1.22, 3.25, -0.15), PF(sx * 1.2, 3.0, -1.0),
-      PF(sx * 1.12, 4.05, 0.0), PF(sx * 1.12, 4.05, 2.45), PF(sx * 0.5, 0.95, -1.4), PF(sx * 0.5, 0.95, 1.6));
+    fBody.push(PF(sx * 1.2, 1.72, -2.55), PF(sx * 1.2, 3.0, -2.5), PF(sx * 1.22, 1.5, 2.67), PF(sx * 1.22, 3.32, 2.67), PF(sx * 1.22, 3.32, -0.07), PF(sx * 1.2, 3.0, -1.2),
+      PF(sx * 1.1, 3.68, 2.35), PF(sx * 0.5, 0.95, -1.7), PF(sx * 0.5, 0.95, 1.7));
   }
-  fBody.push(PF(0, 1.62, 3.62), PF(0, 2.28, 3.62), PF(0, 0.95, 0));
+  fBody.push(PF(-1.1, 3.94, 0.03), PF(-1.1, 3.94, 2.35), PF(0, 1.62, 3.67), PF(0, 2.28, 3.67), PF(0, 0.95, 0));
   CARS.firetruck = { name: 'Jet Fire Truck', short: 'Jet Fire Truck', car: 'J34 TURBOJET', hp: 0, tq: 0, cc: true, kbLat: 5, spec: Object.assign(JSON.parse(JSON.stringify(CARS.monster.spec)), {
     name: 'Jet Fire Truck "ABLAZE"',
     mass: 5900, Ipitch: 11200, Iyaw: 10600, Iroll: 6700, cgHeight: cgF, wheelbase: wbF, frontWeight: fwF, Fz0: 16500,
@@ -5431,9 +5438,9 @@
     electric: false, idleRpm: 3000, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
     torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, transbrake: false, launchRpm: undefined,
     autoRatios: [1], autoRev: 1.76, autoFinal: 19.5, noCoastBlip: true, engineTc: true, dragClutch: EV_CLUTCH,
-    jet: { thrust: 15100, ab: 0.45, idle: 0.3, rpm100: 10000, ram: 0.0012, y: 0.3, z: 2.0, revTq: 500, revRpm: 2500, spool: 1.7, size: 2.6 },
+    jet: { thrust: 15100, ab: 0.45, idle: 0.3, rpm100: 10000, ram: 0.0012, y: 0, z: 2.0, revTq: 500, revRpm: 2500, spool: 1.7, size: 2.6 },
     CdA: 8.0,
-    bodyHalfW: 1.9, bodyFront: -2.15 + zcF, bodyRear: 3.62 + zcF, bodyBottom: 0.95 - cgF, bodyTop: 4.05 - cgF, bodyPts: fBody,
+    bodyHalfW: 1.9, bodyFront: -2.55 + zcF, bodyRear: 3.67 + zcF, bodyBottom: 0.95 - cgF, bodyTop: 3.94 - cgF, bodyPts: fBody,
   }) };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over
@@ -7195,7 +7202,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
     // (the Car Crushers 2 cars' colours)
-    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e, 'Landspeeder Rust': 0xa5714b, 'Fire Engine Red': 0xc4161c,
+    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e, 'Landspeeder Brown': 0xa8754f, 'Fire Engine Red': 0xc4161c,
   };
 
   // ------------------------------------------------------------------ builder
@@ -9904,7 +9911,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
    behind the glass - a scooped hood, a chrome grille and sealed-beam headlights, an open bed with rails, a tailgate)
    in a livery drawn for the current paint.
    Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
-   The ABLAZE jet fire truck (opts.body 'firetruck') is the same chassis cut to a 2.7 m wheelbase under a cab-forward fire
+   The ABLAZE jet fire truck (opts.body 'firetruck') is the same chassis on a 3.3 m wheelbase under a cab-forward fire
    cab and a hose-bed box with a J34's tailpipe out of the back (no big-block: setJet draws its afterburner's flame).
    Returns the same interface as HCCarModel.build, plus afterWheels() (the game calls it once the wheels are placed). */
 (function (root) {
@@ -9988,7 +9995,6 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); return g;
     }
-    const uvScale = (g, su, sv) => { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); return g; };
 
     // smooth shading for the extruded body: average the normals of faces meeting at a point when they're within maxDeg
     // of each other - the rounded edges (bevels) come out smooth, the real creases stay sharp
@@ -10412,16 +10418,17 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // ALL STAR FIRE DEPT's jet monster fire truck, as the photo has it: a cab-forward fire cab - a flat front with a big
     // two-pane windshield, a tall narrow window ahead of each door, the door with its window, a chrome grab handle at its
     // front edge, ALLSTAR on a black plate under the window, a gold Maltese cross on the cab's front corner, the black
-    // roof edge with a light bar, mirrors out on arms - then an open crew step under the roof (grey diamond plate low, a
-    // black brace up to the roof), then the tall box: its sides slatted along the top round the hose bed, the ABLAZE flame
-    // logo at the front, ALL STAR - the cross - FIRE DEPT. in gold leaf on a darker recessed panel framed in steel, a
-    // flourish under it, the wheel opening cut square over the back tyre and trimmed in chrome, reflective tape along the
-    // bottom and chevrons up the back corners; a red ladder rack arching over the box; at the back a silver hood sloping
-    // over a dark grille and, under it, the J34's grey tailpipe a metre out of the back wall
+    // roof edge with a light bar, mirrors out on arms, a rounded arch over the front tyre - then an open crew step under
+    // the roof (a plain grey panel low, a dark screen above behind a black brace), then the tall box: a ribbed band along
+    // its top round the hose bed, the ABLAZE flame logo (a parallelogram leaning back, flames off its edges) at the front,
+    // ALL STAR - the cross - FIRE DEPT. in gold leaf between steel strips, a flourish under it, a shallow notch over the
+    // back tyre trimmed in chrome, reflective tape along the bottom and chevrons up the back corners; a red ladder rack
+    // along its left side and a hoop across the back; at the back a polished hood sloping over a dark grille and, under
+    // it, the J34's grey tailpipe a metre out of the back wall. Proportions fitted to the photo off the box's corners
     function bodyFiretruck() {
       const bodyG = new THREE.Group(); model.add(bodyG);
       const cabG = new THREE.Group(); bodyG.add(cabG);
-      const ZC0 = -2.15, ZD0 = -1.76, ZD1 = -0.8, ZC1 = -0.7, ZB0 = -0.12, ZB1 = 2.62, HC = 1.2, HB = 1.22;
+      const ZC0 = -2.55, ZD0 = -2.0, ZD1 = -1.05, ZC1 = -0.95, ZB0 = -0.07, ZB1 = 2.67, HC = 1.2, HB = 1.22;
       const YC0 = 1.72, YCS = 1.45, YCR = 3.0, YB0 = 1.47, YBT = 2.85, YBS = 3.32;
       const LZ0 = ZC0 - 0.02, LZ1 = ZB1 + 0.02, LY0 = 1.4, LY1 = 3.3;
       const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -10431,13 +10438,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       M.ftIn = new THREE.MeshStandardMaterial({ color: 0x3a0a0c, roughness: 0.8, side: THREE.DoubleSide });
       M.ftGlass = new THREE.MeshPhysicalMaterial({ color: 0x0a0e12, roughness: 0.03, metalness: 0.2, transparent: true, opacity: 0.55, envMapIntensity: 2.2, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
       M.ftPipe = new THREE.MeshStandardMaterial({ color: 0x9a9894, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide });
-      // (diamond plate: the crew step, the hood over the jet's intake)
-      const dTex = canvasTex(128, 128, (g, w, h) => {
-        g.fillStyle = '#9a9ea4'; g.fillRect(0, 0, w, h); g.fillStyle = '#c9ccd0'; g.strokeStyle = '#6d7076'; g.lineWidth = 2;
-        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.save(); g.translate(x * 32 + (y & 1) * 16 + 8, y * 32 + 16); g.rotate((y & 1) ? 0.8 : -0.8); g.fillRect(-11, -3, 22, 6); g.strokeRect(-11, -3, 22, 6); g.restore(); }
-      });
-      dTex.wrapS = dTex.wrapT = THREE.RepeatWrapping;
-      M.ftPlate = new THREE.MeshStandardMaterial({ map: dTex, roughness: 0.35, metalness: 0.85, side: THREE.DoubleSide });
+      M.ftHood = new THREE.MeshStandardMaterial({ color: 0xd6d9dc, roughness: 0.12, metalness: 1, side: THREE.DoubleSide });   // (polished stainless)
+      M.ftGrey = new THREE.MeshStandardMaterial({ color: 0xa9adb2, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide });
       // ---- a flat side panel in the body's (z, y), with holes, at x = sx * hw - its uvs on the side's livery canvas
       // (right side: the front at the canvas's right, so the lettering reads on both)
       function sideGeo(outline, holes, sx, hw) {
@@ -10456,19 +10458,23 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         arc(z1 - r, y0 + r, -Math.PI / 2); arc(z1 - r, y1 - r, 0); arc(z0 + r, y1 - r, Math.PI / 2); arc(z0 + r, y0 + r, Math.PI); return out; };
       // the windows: the narrow one ahead of the door, the door's
       const WIN1 = rr(ZC0 + 0.08, 2.12, ZD0 - 0.06, 2.82, 0.04), WIN2 = rr(ZD0 + 0.1, 2.15, ZD1 - 0.1, 2.84, 0.05);
+      // the wheel openings: the box's a shallow notch over the back tyre as the photo has it, the cab's a rounded one over
+      // the front - dark tubs behind both take the tyres when the suspension's compressed (they're mostly outboard)
+      const AR = [[zR - 0.55, YB0], [zR - 0.35, 1.78], [zR + 0.6, 1.78], [zR + 0.8, YB0]], AF = [zF - 0.63, zF + 0.65], AFY = 1.95;
       // ---- the livery: one canvas a side over the cab and the box
       const liv = [0, 1].map(() => canvasTex(2048, 816, () => {}));
       function drawSide(c, left, paint) {
         const g = c.getContext('2d'), w = c.width, h = c.height;
         const X = (z) => (left ? (z - LZ0) : (LZ1 - z)) / (LZ1 - LZ0) * w, Y = (y) => (1 - (y - LY0) / (LY1 - LY0)) * h, S = w / (LZ1 - LZ0);
         const R = (z0, y0, z1, y1) => [Math.min(X(z0), X(z1)), Y(y1), Math.abs(X(z1) - X(z0)), Y(y0) - Y(y1)];
-        const col = new THREE.Color(paint), dk = (k) => `rgb(${Math.round(col.r * 255 * k)},${Math.round(col.g * 255 * k)},${Math.round(col.b * 255 * k)})`;
+        // (the paint's sRGB components - a THREE.Color holds them linear, which drew every shade of it far too dark)
+        const col = new THREE.Color(paint).convertLinearToSRGB(), dk = (k) => `rgb(${Math.round(col.r * 255 * k)},${Math.round(col.g * 255 * k)},${Math.round(col.b * 255 * k)})`;
         g.fillStyle = hex(paint); g.fillRect(0, 0, w, h);
         // (a little sun and wear in the paint)
         for (let k = 0; k < 60; k++) { const x = Math.random() * w, y = Math.random() * h, r = 30 + Math.random() * 120, gr = g.createRadialGradient(x, y, 0, x, y, r);
           gr.addColorStop(0, `rgba(255,255,255,${0.02 + Math.random() * 0.04})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
         // the door's seams, the cab's lower edge
-        g.strokeStyle = dk(0.45); g.lineWidth = 4; g.strokeRect(...R(ZD0, 1.78, ZD1, 2.96));
+        g.strokeStyle = dk(0.45); g.lineWidth = 4; g.strokeRect(...R(ZD0, 1.99, ZD1, 2.96));
         g.fillStyle = dk(0.6); g.fillRect(...R(LZ0, YC0, ZC1, YC0 + 0.03));
         // ALLSTAR on a black plate under the door's window
         { const [x, y, ww, hh] = R(ZD0 + 0.12, 1.98, ZD1 - 0.12, 2.1); g.fillStyle = '#0d0d0f'; g.fillRect(x, y, ww, hh);
@@ -10476,32 +10482,36 @@ registerProcessor('hellcat-synth', HellcatProcessor);
           g.lineWidth = 4; g.strokeStyle = '#8a1014'; g.strokeText('ALLSTAR', 0, 2, ww * 0.94); g.fillStyle = '#f2f2ee'; g.fillText('ALLSTAR', 0, 2, ww * 0.94); g.restore();
           g.fillStyle = '#ffd21a'; star(g, x + ww * 0.08, y + hh * 0.5, hh * 0.3); }
         // reflective tape along the cab's and the box's lower edges
-        g.fillStyle = '#f4f4f0'; for (let z = ZC0 + 0.15; z < ZC1 - 0.1; z += 0.32) g.fillRect(...R(z, YC0 + 0.07, z + 0.12, YC0 + 0.11));
-        for (let z = ZB0 + 0.12; z < ZB1 - 0.15; z += 0.32) if (z < 0.33 || z > 2.3) g.fillRect(...R(z, YB0 + 0.06, z + 0.12, YB0 + 0.1));
+        g.fillStyle = '#f4f4f0'; for (let z = ZC0 + 0.04; z < ZC1 - 0.1; z += 0.32) if (z < AF[0] - 0.14 || z > AF[1]) g.fillRect(...R(z, YC0 + 0.07, z + 0.12, YC0 + 0.11));
+        for (let z = ZB0 + 0.12; z < ZB1 - 0.15; z += 0.32) if (z < AR[0][0] - 0.14 || z > AR[3][0]) g.fillRect(...R(z, YB0 + 0.06, z + 0.12, YB0 + 0.1));
         // the gold Maltese cross on the cab's front corner
-        cross(g, X(ZC0 + 0.28), Y(1.95), 0.16 * S);
+        cross(g, X(ZC0 + 0.13), Y(1.9), 0.1 * S);
         // ---- the box
         // (its top edge: a steel strip under the slats)
         g.fillStyle = '#b8bcc2'; g.fillRect(...R(ZB0, YBT - 0.05, ZB1, YBT));
-        // the ABLAZE logo: flames round a slanted plate, the name in flame letters
-        { const cx = X(0.5), cy = Y(2.18), s = S;
-          g.save(); g.translate(cx, cy); g.transform(1, 0, -0.32, 1, 0, 0);
-          const fl = (k, col2, lw) => { g.beginPath(); const n = 22;
-            for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, rx = 0.36 * s * k, ry = 0.3 * s * k, sp = i % 2 ? 1 : 1.18 + 0.12 * Math.sin(i * 1.7);
-              const x = Math.cos(a) * rx * sp * (Math.cos(a) > 0 ? 1.05 : 1), y = Math.sin(a) * ry * sp - (Math.sin(a) < 0 ? 0.06 * s * Math.abs(Math.cos(a * 3)) : 0); i ? g.lineTo(x, y) : g.moveTo(x, y); }
-            g.closePath(); if (lw) { g.lineWidth = lw; g.strokeStyle = col2; g.stroke(); } else { g.fillStyle = col2; g.fill(); } };
-          fl(1.08, '#ff9a1a'); fl(0.96, '#ffd84a'); fl(0.88, '#c8141a');
-          g.font = `italic 900 ${0.12 * s}px Impact, "Arial Black", Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-          g.lineWidth = 6; g.strokeStyle = '#7a1a08'; g.strokeText('ALL STAR', 0, -0.11 * s); g.fillStyle = '#ffe06a'; g.fillText('ALL STAR', 0, -0.11 * s);
-          const gr = g.createLinearGradient(0, -0.02 * s, 0, 0.16 * s); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.5, '#ffb82a'); gr.addColorStop(1, '#ff5a10');
-          g.font = `italic 900 ${0.22 * s}px Impact, "Arial Black", Arial`; g.lineWidth = 10; g.strokeStyle = '#5a1206'; g.strokeText('ABLAZE', 0, 0.07 * s); g.fillStyle = gr; g.fillText('ABLAZE', 0, 0.07 * s);
-          g.lineWidth = 5; g.strokeStyle = '#ffd84a'; g.beginPath(); g.moveTo(-0.3 * s, 0.2 * s); g.lineTo(0.3 * s, 0.17 * s); g.stroke();
+        // the ABLAZE logo: a tall parallelogram leaning back, flames licking off its edges, the name in flame letters
+        { const cx = X(0.47), cy = Y(2.2), s = S, hw = 0.25 * s, hh = 0.36 * s, sk = 0.42;
+          g.save(); g.translate(cx, cy); g.transform(1, 0, left ? sk : -sk, 1, 0, 0);
+          // (the flames: tongues off each edge, orange under yellow)
+          const tongues = (k, col2) => { g.beginPath(); const n = 9, pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+            for (let e = 0; e < 4; e++) { const [ax, ay] = pts[e], [bx, by] = pts[(e + 1) % 4], nx = (by - ay), ny = -(bx - ax), nl = Math.hypot(nx, ny);
+              for (let i = 0; i < n; i++) { const t0 = i / n, t1 = (i + 0.5) / n, L = (0.05 + 0.04 * Math.sin(i * 2.3 + e)) * s * k;
+                g.lineTo(ax + (bx - ax) * t0, ay + (by - ay) * t0); g.quadraticCurveTo(ax + (bx - ax) * t1 + nx / nl * L * 1.6, ay + (by - ay) * t1 + ny / nl * L * 1.6 - L * 0.6, ax + (bx - ax) * (t1 + 0.5 / n), ay + (by - ay) * (t1 + 0.5 / n)); } }
+            g.closePath(); g.fillStyle = col2; g.fill(); };
+          tongues(1.15, '#ff7a14'); tongues(0.75, '#ffd23a');
+          const pg = g.createLinearGradient(0, -hh, 0, hh); pg.addColorStop(0, '#c8141a'); pg.addColorStop(1, '#8a0c10'); g.fillStyle = pg; g.fillRect(-hw, -hh, 2 * hw, 2 * hh);
+          g.strokeStyle = '#ffd23a'; g.lineWidth = 4; g.strokeRect(-hw, -hh, 2 * hw, 2 * hh);
+          g.font = `italic 900 ${0.1 * s}px Impact, "Arial Black", Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+          g.lineWidth = 6; g.strokeStyle = '#5a1206'; g.strokeText('ALL STAR', 0, -0.14 * s, 2 * hw * 0.9); g.fillStyle = '#ffe06a'; g.fillText('ALL STAR', 0, -0.14 * s, 2 * hw * 0.9);
+          const gr = g.createLinearGradient(0, -0.05 * s, 0, 0.2 * s); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.5, '#ffb82a'); gr.addColorStop(1, '#ff5a10');
+          g.font = `italic 900 ${0.19 * s}px Impact, "Arial Black", Arial`; g.lineWidth = 10; g.strokeStyle = '#5a1206';
+          for (const [t, y] of [['AB', 0.02], ['LAZE', 0.2]]) { g.strokeText(t, 0, y * s, 2 * hw * 0.95); g.fillStyle = gr; g.fillText(t, 0, y * s, 2 * hw * 0.95); }
           g.restore(); }
         // the gold-leaf panel: recessed a shade darker, framed in steel strips, ALL STAR - the cross - FIRE DEPT.
-        { const z0 = 1.02, z1 = 2.44, y0 = 2.08, y1 = 2.78;
-          g.fillStyle = dk(0.78); g.fillRect(...R(z0, y0, z1, y1));
-          g.strokeStyle = '#e0b84a'; g.lineWidth = 3; const r0 = R(z0 + 0.06, y0 + 0.05, z1 - 0.06, y1 - 0.05); g.strokeRect(...r0);
-          g.fillStyle = '#c9ccd0'; g.fillRect(...R(z0 - 0.03, y0 - 0.02, z0 + 0.01, y1 + 0.02)); g.fillRect(...R(z1 - 0.01, y0 - 0.02, z1 + 0.03, y1 + 0.02));
+        { const z0 = 1.07, z1 = 2.49, y0 = 2.06, y1 = 2.8;
+          g.fillStyle = dk(0.94); g.fillRect(...R(z0, y0, z1, y1));
+          g.fillStyle = '#c9ccd0'; g.fillRect(...R(z0 - 0.06, y0 - 0.02, z0, y1 + 0.02)); g.fillRect(...R(z1, y0 - 0.02, z1 + 0.06, y1 + 0.02));
+          g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(...R(z0, y0 - 0.02, z0 + 0.02, y1 + 0.02)); g.fillRect(...R(z1 - 0.02, y0 - 0.02, z1, y1 + 0.02));
           const gold = (txt, z, y, px) => { const gr = g.createLinearGradient(0, Y(y) - px / 2, 0, Y(y) + px / 2); gr.addColorStop(0, '#fff2a8'); gr.addColorStop(0.45, '#e0b23a'); gr.addColorStop(1, '#8a6412');
             g.font = `bold ${px}px Georgia, "Times New Roman", serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 4; g.strokeStyle = '#3a1a08'; g.strokeText(txt, X(z), Y(y)); g.fillStyle = gr; g.fillText(txt, X(z), Y(y)); };
           const zc = (z0 + z1) / 2;
@@ -10530,7 +10540,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       repaint(M.paint.color.getHex());
       // ---- the cab: its sides (the windows open, the bottom up over the front tyre), the flat front, the roof
       for (const [k, sx] of [[0, -1], [1, 1]]) {
-        add(cabG, sideGeo([[ZC0, YC0], [ZC1, YC0], [ZC1, YCR], [ZC0 + 0.045, YCR]], [WIN1, WIN2], sx, HC), livMat[k], 0, 0, 0);
+        add(cabG, sideGeo([[ZC0, YC0], [AF[0], YC0], [AF[0], AFY - 0.14], [AF[0] + 0.14, AFY], [AF[1] - 0.14, AFY], [AF[1], AFY - 0.14], [AF[1], YC0], [ZC1, YC0], [ZC1, YCR], [ZC0 + 0.045, YCR]], [WIN1, WIN2], sx, HC), livMat[k], 0, 0, 0);
+        pipeTo(cabG, [[AF[0], YC0], [AF[0], AFY - 0.14], [AF[0] + 0.14, AFY], [AF[1] - 0.14, AFY], [AF[1], AFY - 0.14], [AF[1], YC0]].map(([z, y]) => V3(sx * (HC + 0.01), y, z)), 0.02, M.black);
+        add(cabG, new THREE.BoxGeometry(HC - 0.75, AFY + 0.25 - YC0, AF[1] - AF[0]), M.ftDark, sx * (0.73 + (HC - 0.75) / 2), (YC0 + AFY + 0.25) / 2, (AF[0] + AF[1]) / 2);
         for (const W2 of [WIN1, WIN2]) { add(cabG, sideGeo(W2, [], sx, HC - 0.03), M.ftGlass, 0, 0, 0, 0, 0, 0, false); }
         // (the window frames: dark rubber)
         for (const W2 of [WIN1, WIN2]) add(cabG, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(W2.map(([z, y]) => V3(sx * (HC + 0.005), y, z)), true), 60, 0.015, 5, true), M.black, 0, 0, 0);
@@ -10540,7 +10552,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         tubeAB(cabG, V3(sx * HC, 2.2, ZC0 + 0.1), V3(sx * (HC + 0.32), 2.3, ZC0 + 0.02), 0.02, M.black);
         add(cabG, rbox(0.12, 0.42, 0.06, 0.02), M.black, sx * (HC + 0.34), 2.46, ZC0 + 0.02);
         // (the crew step behind the door: grey plate to the step's height, open above it, a black brace up to the roof)
-        add(bodyG, uvScale(new THREE.PlaneGeometry(ZB0 - ZC1, 2.12 - YCS), 2 * (ZB0 - ZC1), 2 * (2.12 - YCS)), M.ftPlate, sx * (HC - 0.02), (YCS + 2.12) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0);
+        add(bodyG, new THREE.PlaneGeometry(ZB0 - ZC1, 2.12 - YCS), M.ftGrey, sx * (HC - 0.02), (YCS + 2.12) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0);
+        add(bodyG, new THREE.PlaneGeometry(ZB0 - ZC1, YCR - 2.14), M.ftDark, sx * (HC - 0.05), (2.14 + YCR) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0, false);
+        add(bodyG, rbox(0.05, 0.05, ZB0 - ZC1, 0.015), M.alu, sx * (HC - 0.01), 2.13, (ZC1 + ZB0) / 2);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.14, ZC1 + 0.1), V3(sx * (HC - 0.03), 2.95, ZB0 - 0.05), 0.03, M.black);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.12, ZC1), V3(sx * (HC - 0.03), YCR, ZC1), 0.035, M.paint);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.12, ZB0 - 0.02), V3(sx * (HC - 0.03), YCR, ZB0 - 0.02), 0.035, M.paint);
@@ -10548,7 +10562,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       // (the cab's insides and the crew area's: dark)
       add(cabG, new THREE.PlaneGeometry(2 * HC, YCR - YC0), M.ftIn, 0, (YC0 + YCR) / 2, ZC1 + 0.002, 0, 0, 0, false);
       add(bodyG, new THREE.BoxGeometry(2 * HC - 0.06, 0.04, ZB0 - ZC1), M.ftDark, 0, 2.12, (ZC1 + ZB0) / 2);
-      add(bodyG, new THREE.BoxGeometry(2 * HC - 0.06, 0.04, ZB0 - ZC0), M.ftDark, 0, YC0 + 0.02, (ZC0 + ZB0) / 2);
+      add(bodyG, new THREE.BoxGeometry(1.44, 0.04, ZB0 - ZC0), M.ftDark, 0, YC0 + 0.02, (ZC0 + ZB0) / 2);
       // the front: a flat face raked back a touch, two windshield panes over a red panel, a chrome grille band, round
       // headlamps in their bezels, the amber turn lamps, a chrome bumper
       { const fg = new THREE.Group(); fg.position.set(0, YC0, ZC0); fg.rotation.x = 0.035; cabG.add(fg);
@@ -10577,9 +10591,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       for (let k = 0; k < 6; k++) add(bodyG, rbox(0.24, 0.12, 0.2, 0.05), k === 2 || k === 3 ? M.beaconB : M.beaconA, -0.68 + k * 0.272, YCR + 0.2, ZC0 + 0.3);
       for (let k = 0; k < 5; k++) add(bodyG, rbox(0.08, 0.05, 0.05, 0.015), M.amber, -0.4 + k * 0.2, YCR + 0.07, ZC0 + 0.08);
       for (const sx of [-1, 1]) tubeAB(bodyG, V3(sx * 0.9, YCR + 0.06, ZC0 + 0.9), V3(sx * 0.95, YCR + 0.75, ZC0 + 1.05), 0.008, M.black);
-      // ---- the box: its sides (the opening squared over the back tyre), the slatted rail along its top round the hose bed
-      // (dark inside), the front and back walls, corner posts
-      const AR = [[0.36, YB0], [0.68, 1.93], [2.02, 1.93], [2.34, YB0]];
+      // ---- the box: its sides (the notch over the back tyre), the ribbed band along its top round the hose bed, the front
+      // and back walls, corner posts
       for (const [k, sx] of [[0, -1], [1, 1]]) {
         add(bodyG, sideGeo([[ZB0, YB0], ...AR, [ZB1, YB0], [ZB1, YBT], [ZB0, YBT]], [], sx, HB), livMat[k], 0, 0, 0);
         // (the chrome trim round the opening)
@@ -10587,8 +10600,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         // the slats, their rails, and the hose bed's inner wall behind them
         add(bodyG, rbox(0.05, 0.05, ZB1 - ZB0, 0.015), M.alu, sx * (HB - 0.01), YBT + 0.005, (ZB0 + ZB1) / 2);
         add(bodyG, rbox(0.06, 0.05, ZB1 - ZB0, 0.02), M.paint, sx * (HB - 0.01), YBS, (ZB0 + ZB1) / 2);
-        for (let z = ZB0 + 0.05; z <= ZB1 - 0.04; z += 0.17) add(bodyG, rbox(0.035, YBS - YBT, 0.04, 0.01), M.paint, sx * (HB - 0.01), (YBT + YBS) / 2, z);
-        add(bodyG, new THREE.PlaneGeometry(ZB1 - ZB0, YBS - YBT), M.ftIn, sx * (HB - 0.14), (YBT + YBS) / 2, (ZB0 + ZB1) / 2, 0, sx * Math.PI / 2, 0, false);
+        for (let z = ZB0 + 0.05; z <= ZB1 - 0.04; z += 0.27) add(bodyG, rbox(0.04, YBS - YBT, 0.045, 0.012), M.paint, sx * (HB - 0.01), (YBT + YBS) / 2, z);
+        add(bodyG, new THREE.PlaneGeometry(ZB1 - ZB0, YBS - YBT), M.paint, sx * (HB - 0.035), (YBT + YBS) / 2, (ZB0 + ZB1) / 2, 0, sx * Math.PI / 2, 0, false);
         // (the corner posts and the bottom rub rail, black)
         for (const z of [ZB0, ZB1]) add(bodyG, rbox(0.07, YBS - YB0, 0.07, 0.02), M.paint, sx * (HB - 0.02), (YB0 + YBS) / 2, z);
         add(bodyG, rbox(0.06, 0.08, ZB1 - ZB0, 0.02), M.black, sx * (HB + 0.01), YB0 + 0.03, (ZB0 + ZB1) / 2);
@@ -10596,8 +10609,9 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       add(bodyG, new THREE.PlaneGeometry(2 * HB, YBS - YB0), M.paint, 0, (YB0 + YBS) / 2, ZB0, 0, 0, 0);
       add(bodyG, new THREE.BoxGeometry(2 * HB, 0.04, ZB1 - ZB0), M.ftIn, 0, YBT - 0.02, (ZB0 + ZB1) / 2);
       // the wheel well inside the opening (dark), the box's floor
-      for (const sx of [-1, 1]) add(bodyG, new THREE.PlaneGeometry(1.4, 1.4), M.ftDark, sx * 0.62, 1.92, 1.35, -Math.PI / 2, 0, 0, false);
-      for (const [z0, z1] of [[ZB0, 0.4], [2.3, ZB1]]) add(bodyG, new THREE.BoxGeometry(2 * HB - 0.04, 0.04, z1 - z0), M.ftDark, 0, YB0 + 0.02, (z0 + z1) / 2);
+      for (const sx of [-1, 1]) add(bodyG, new THREE.BoxGeometry(HB - 0.74, 0.75, AR[3][0] - AR[0][0]), M.ftDark, sx * (0.73 + (HB - 0.76) / 2), YB0 + 0.375, (AR[0][0] + AR[3][0]) / 2);
+      for (const [z0, z1] of [[ZB0, AR[0][0]], [AR[3][0], ZB1]]) add(bodyG, new THREE.BoxGeometry(2 * HB - 0.04, 0.04, z1 - z0), M.ftDark, 0, YB0 + 0.02, (z0 + z1) / 2);
+      add(bodyG, new THREE.BoxGeometry(1.44, 0.04, AR[3][0] - AR[0][0]), M.ftDark, 0, YB0 + 0.02, (AR[0][0] + AR[3][0]) / 2);
       // the back wall: red, the jet's tailpipe out of its lower middle, a dark grille over that under the sloping hood,
       // the tail lamps, the step under it
       { const sh = new THREE.Shape([[-HB, YB0], [HB, YB0], [HB, YBT], [-HB, YBT]].map(([x, y]) => new THREE.Vector2(x, y)));
@@ -10621,8 +10635,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         // the hood: a sloping sheet of diamond plate over the back of the hose bed, its sides closed
         const hz0 = ZB1 - 0.62, hz1 = ZB1 + 0.1, hy0 = YBS + 0.02, hy1 = 2.78;
         const hv = [[-HB + 0.06, hy0, hz0], [HB - 0.06, hy0, hz0], [HB - 0.06, hy1, hz1], [-HB + 0.06, hy1, hz1]];
-        add(bodyG, facesGeo(hv, [[0, 1, 2, 3]]), M.ftPlate, 0, 0, 0);
-        for (const sx of [-1, 1]) add(bodyG, facesGeo([[sx * (HB - 0.06), hy0, hz0], [sx * (HB - 0.06), hy1, hz1], [sx * (HB - 0.06), hy1, ZB1], [sx * (HB - 0.06), YBT, ZB1], [sx * (HB - 0.06), YBT, hz0]], [[0, 1, 2, 3, 4]]), M.ftPlate, 0, 0, 0);
+        add(bodyG, facesGeo(hv, [[0, 1, 2, 3]]), M.ftHood, 0, 0, 0);
+        for (const sx of [-1, 1]) add(bodyG, facesGeo([[sx * (HB - 0.06), hy0, hz0], [sx * (HB - 0.06), hy1, hz1], [sx * (HB - 0.06), hy1, ZB1], [sx * (HB - 0.06), YBT, ZB1], [sx * (HB - 0.06), YBT, hz0]], [[0, 1, 2, 3, 4]]), M.ftHood, 0, 0, 0);
       }
       // the J34's tailpipe: a grey steel tube a metre out of the back wall, sooted dark inside, its rim heat-stained
       const JY = 1.95, JR = 0.34, JZ0 = ZB1 - 0.4, JZ1 = ZB1 + 0.98;
@@ -10631,11 +10645,12 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       add(bodyG, new THREE.TorusGeometry(JR - 0.005, 0.012, 8, 40), new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.5, metalness: 0.7 }), 0, JY, JZ1);
       add(bodyG, new THREE.CircleGeometry(JR - 0.02, 32), M.black, 0, JY, JZ1 - 0.5, 0, Math.PI, 0, false);
       // ---- the ladder rack arching over the box: a red tube frame along each side, joined across front and back
-      for (const sx of [-1, 1]) pipeTo(bodyG, [V3(sx * 1.1, YBS, 0.0), V3(sx * 1.1, 3.95, 0.0), V3(sx * 1.1, 4.05, 0.12), V3(sx * 1.1, 4.05, 2.28), V3(sx * 1.1, 3.95, 2.4), V3(sx * 1.1, YBS, 2.4)], 0.045, M.rack, true);
-      for (const z of [0.12, 2.28]) tubeAB(bodyG, V3(-1.1, 4.05, z), V3(1.1, 4.05, z), 0.04, M.rack);
+      { const z0 = ZB0 + 0.1, z1 = ZB1 - 0.32, yT = YBS + 0.62, yH = YBS + 0.36, x = 1.1;
+        pipeTo(bodyG, [V3(-x, YBS, z0), V3(-x, yT - 0.1, z0), V3(-x, yT, z0 + 0.1), V3(-x, yT, z1 - 0.1), V3(-x, yT - 0.1, z1), V3(-x, YBS, z1)], 0.045, M.rack, true);
+        pipeTo(bodyG, [V3(-x, yH, z1), V3(x - 0.1, yH, z1), V3(x, yH - 0.1, z1), V3(x, YBS, z1)], 0.04, M.rack, true); }
       // ---- the jet's flame: a hot core and the plume round it, both additive - a shimmer dry, a long flame lit
       const flameMat = (core) => new THREE.ShaderMaterial({
-        uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 }, uK: { value: core ? 0.22 : 0.3 } },
+        uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 }, uK: { value: core ? 0.1 : 0.135 } },
         vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
         fragmentShader: `uniform float uAB; uniform float uThr; uniform float uT; uniform float uCore; uniform float uK; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
           void main() {
@@ -10915,7 +10930,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const hoops = new THREE.Group(); chassis.add(hoops);
     const RY = 1.02, UY = 1.92, CX = 0.44;
     // (the jet fire truck's: its rails end under the cab's front and the box's back)
-    const RF = FT ? -2.1 : -2.45, RB = FT ? 2.6 : 2.45, H = FT ? () => {} : (a, b) => tubeAB(hoops, a, b, 0.032, M.chassis, 10);
+    const RF = FT ? -2.45 : -2.45, RB = FT ? 2.65 : 2.45, H = FT ? () => {} : (a, b) => tubeAB(hoops, a, b, 0.032, M.chassis, 10);
     for (const sx of [-1, 1]) {
       const x = sx * CX;
       // main rails, kicked up at both ends
@@ -10938,7 +10953,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const SL = opts.body === 'avenger' ? 0.06 : 0;
     // (the fire truck's driver sits in its cab, on the left, over the front axle: the seat, the driver, the wheel and the
     // dash all moved there by OFF)
-    const OFF = FT ? V3(-0.55, -0.4, -1.42) : V3(0, 0, 0), seatG = new THREE.Group(); seatG.position.copy(OFF); chassis.add(seatG);
+    const OFF = FT ? V3(-0.55, -0.4, -1.75) : V3(0, 0, 0), seatG = new THREE.Group(); seatG.position.copy(OFF); chassis.add(seatG);
     add(seatG, rbox(0.56, 0.07, 0.55, 0.03), M.black, 0, 2.24 + SL, 0.12);
     add(seatG, rbox(0.56, 0.75, 0.08, 0.04), M.black, 0, 2.61 + SL, 0.4, -0.12, 0, 0);
     if (!FT) add(seatG, rbox(0.5, 0.34 + SL, 0.5, 0.03), M.alu, 0, 2.05 + SL / 2, 0.12);
@@ -11009,7 +11024,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const inside = new THREE.Group(); cage.add(inside);
     if (FT) {
       // (the fire truck's cab stays: you look out of its own windows - the dash across under the windshield)
-      add(inside, rbox(2.3, 0.26, 0.42, 0.05), M.black, 0, 2.1, -1.92);
+      add(inside, rbox(2.3, 0.26, 0.42, 0.05), M.black, 0, 2.1, -2.3);
     } else if (opts.body === 'avenger') {
       // (the AVENGER: its own cab seen from within, and a dash across under the windshield - behind the cab's skin)
       inside.add(BODY.cabIn);
@@ -11031,6 +11046,15 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // hand-cut paddle tread: chevron lugs across the crown and wrapping over the shoulders (mirrored for the left)
     // (deep: the off-road package's full-depth lugs - ~1 in taller, and the physics' rolling radius 2 cm bigger with them)
     function lugs(dir, deep) {
+      if (FT && !deep) {
+        // (the fire truck's flotation tyres: low bars curving across the crown, the shoulders smooth)
+        const list = [], N = 24;
+        for (let k = 0; k < N; k++) for (const side of [-1, 1]) {
+          for (const [o, a] of [[0.12, 0.25], [0.32, 0.5]]) { const b = new THREE.BoxGeometry(0.22, 0.025, 0.08); b.rotateY(-side * dir * a); b.translate(side * o, RT + 0.004, side * dir * (o - 0.1) * 0.6);
+            b.rotateX(k * Math.PI * 2 / N + (side > 0 ? Math.PI / N : 0)); list.push(b); }
+        }
+        return mergeGeos(list);
+      }
       const list = [], N = 34, lh = deep ? 0.075 : 0.055, ly = deep ? RT + 0.0225 : RT + 0.012;
       for (let k = 0; k < N; k++) {
         const phi = k * Math.PI * 2 / N;
@@ -11053,6 +11077,16 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     });
     const swMat = new THREE.MeshStandardMaterial({ map: swTex, transparent: true, alphaTest: 0.4, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 });
     function rim(g) {
+      if (FT) {
+        // (the fire truck's: plain painted steel, light grey - a rolled lip, the dish, the centre plate; no lettering)
+        M.ftWheel = M.ftWheel || new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide });
+        const lip = new THREE.TorusGeometry(RRIM + 0.015, 0.025, 10, 56); lip.rotateY(Math.PI / 2); add(g, lip, M.ftWheel, 0.47, 0, 0);
+        const dsh = new THREE.CylinderGeometry(0.2, RRIM, 0.3, 48, 1, true); dsh.rotateZ(Math.PI / 2); add(g, dsh, M.ftWheel, 0.33, 0, 0);
+        const brl = new THREE.CylinderGeometry(RRIM, RRIM, 0.95, 48, 1, true); brl.rotateZ(Math.PI / 2); add(g, brl, M.ftWheel, 0, 0, 0);
+        const plt = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 40); plt.rotateZ(Math.PI / 2); add(g, plt, M.ftWheel, 0.2, 0, 0);
+        const bck = new THREE.CircleGeometry(RRIM, 40); bck.rotateY(-Math.PI / 2); add(g, bck, M.steel, -0.44, 0, 0, 0, 0, 0, false);
+        return;
+      }
       // 25 in wheel: outer beadlock ring with bolts, deep dish, centre with the planetary hub
       const ring = new THREE.TorusGeometry(RRIM + 0.02, 0.03, 10, 56); ring.rotateY(Math.PI / 2); add(g, ring, M.polish, 0.47, 0, 0);
       const bl = new THREE.CylinderGeometry(RRIM + 0.05, RRIM + 0.05, 0.05, 56, 1, true); bl.rotateZ(Math.PI / 2); add(g, bl, FT ? M.alu : M.black, 0.47, 0, 0);
@@ -11154,7 +11188,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const headlights = [];
     for (const sx of [-1, 1]) {
       const sl = new THREE.SpotLight(0xf2f6ff, 0, 110, 0.5, 0.45, 1.4);
-      sl.position.set(sx * (FT ? 0.9 : 1.32), (FT ? 2.0 : 1.95) - cgH, (FT ? -2.2 : -3.0) + zOff);
+      sl.position.set(sx * (FT ? 0.9 : 1.32), (FT ? 2.0 : 1.95) - cgH, (FT ? -2.6 : -3.0) + zOff);
       sl.target.position.set(sx * 1.6, -cgH, -45 + zOff);
       rootG.add(sl); rootG.add(sl.target); sl.visible = false; headlights.push(sl);
     }
@@ -11209,7 +11243,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       const on = ab > 0.02 || thr > 0.3;
       J.outer.visible = J.core.visible = on;
       if (!on) return;
-      J.outer.scale.z = (0.35 + 1.9 * ab + 0.25 * thr) * 2.4; J.core.scale.z = (0.2 + 0.95 * ab + 0.1 * thr) * 2.4;
+      J.outer.scale.z = (0.35 + 1.9 * ab + 0.25 * thr) * 1.4; J.core.scale.z = (0.2 + 0.95 * ab + 0.1 * thr) * 1.4;
       for (const m of [J.outer.material, J.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = J.t; }
     }
     function setJetSize(sz) { BODY.jetFx.g.scale.setScalar(clamp(sz / 2.6, 0.7, 1.6)); }
@@ -12265,7 +12299,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     const latheGeo = (pts) => new THREE.LatheGeometry(pts.map(([r, d]) => new THREE.Vector2(r, d)), 28);
 
     // ---------------------------------------------------------------- materials
-    const DEF_PAINT = { landspeeder: 0xa5714b, coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
+    const DEF_PAINT = { landspeeder: 0xa8754f, coach: 0xf2f2ee, busderby: 0xf0a020, rc: 0x1f4fd1, superbird: 0xf0560c, hotrod: 0xb01020, chevelle: 0x0a0a0c, prius: 0x5f6266, sixseven: 0xc8cbcf, silverbullet: 0xc9cbc6, diesel: 0x1b3a94, ram: 0x0b0c0e, cyber: 0xaeb2b6, golf: 0xeeeeea, rally: 0x1e6fc4, couch: 0x7b4a2b, eggrod: 0xe6e6e3, banana: 0xf2c21b, bluebird: 0x2f6fd0, gtr: 0xb3121a, mini: 0xc6cf2e, potty: 0x3d7cc9, scooter: 0xb01020, razor: 0xf2570f }[CAR];
     const paintHex = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : DEF_PAINT;
     const M = {};
     const brushed = CAR !== 'cyber' ? null : (() => {
@@ -15849,8 +15883,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     // it at the back of each flank, another grille across the nose; a big clear bubble far back over the two seats (the
     // pilot on the right); three turbines - two low on stalks off the back corners (the left one's cowling gone, its
     // bare engine showing) and one up on a swept pylon on the centre line behind the bubble - their intakes facing
-    // forward round red lips, the fans inside turning with the spool, the exhausts dark, the cowlings silver-grey with a
-    // dark red band. Dusty rust-brown paint under a dark red stripe, sand-scoured down to grey primer, and to bare metal
+    // forward round red lips, the fans inside turning with the spool, the exhausts dark, the cowlings red-orange worn to
+    // grey. Dusty tan-brown paint under a dark red stripe, sand-scoured down to grey primer, and to bare metal
     // round the nose. It floats on its repulsors half a metre up: no wheels (the physics' four pads are invisible)
     B.landspeeder = () => {
       P.noWheels = true; WF = 0.2; WR = 0.2;
@@ -15910,7 +15944,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
         g.setIndex(idx); g.computeVertexNormals();
         // the livery, unwrapped (u along the body from the nose, v round it from the belly to the deck's centre line):
-        // dusty rust-brown paint, faded and sand-scoured - tan dust, grey primer showing through, bare metal worn
+        // dusty tan-brown paint, faded and sand-scoured - tan dust, grey primer showing through, bare metal worn
         // through at the nose - the dark red stripe along the crease, the dark recesses of the grille and the vents
         const vG0 = vAt(0.64), vG1 = vAt(0.93), vS0 = vAt(0.975), vS1 = vAt(1.02), vCr = vAt(0.965);
         const zG0 = -1.36, zG1 = 0.9;
@@ -15918,7 +15952,8 @@ registerProcessor('hellcat-synth', HellcatProcessor);
         const livery = canvasTex(2048, 1024, () => {});
         const drawLivery = (hex) => {
           const cv = livery.image, g2 = cv.getContext('2d'), w = cv.width, h = cv.height, X = (z) => uAt(z) * w, Y = (v) => (1 - v) * h;
-          const base = new THREE.Color(hex), css = (c, k, a) => `rgba(${Math.round(clamp(c.r * k, 0, 1) * 255)},${Math.round(clamp(c.g * k, 0, 1) * 255)},${Math.round(clamp(c.b * k, 0, 1) * 255)},${a === undefined ? 1 : a})`;
+          // (sRGB components for the canvas - a THREE.Color holds them linear: drawn as they were, the paint came out dark and red)
+          const base = new THREE.Color(hex).convertLinearToSRGB(), css = (c, k, a) => `rgba(${Math.round(clamp(c.r * k, 0, 1) * 255)},${Math.round(clamp(c.g * k, 0, 1) * 255)},${Math.round(clamp(c.b * k, 0, 1) * 255)},${a === undefined ? 1 : a})`;
           seed = 7;
           g2.fillStyle = css(base, 1); g2.fillRect(0, 0, w, h);
           // (the belly darker and dirtier, the deck sun-faded)
@@ -15949,28 +15984,28 @@ registerProcessor('hellcat-synth', HellcatProcessor);
           stad(zG0, zG1, vG0, vG1, false); g2.fillStyle = '#12100e'; g2.fill(); g2.lineWidth = 6; g2.strokeStyle = 'rgba(40,22,14,0.85)'; g2.stroke();
           stad(0.94, 1.18, vAt(0.74), vAt(0.93), true); g2.fillStyle = '#0e0c0a'; g2.fill();
           stad(1.2, 1.36, vAt(0.8), vAt(0.95), true); g2.fill();
-          // (the back panel between the turbines, darker)
-          g2.fillStyle = css(base, 0.55); g2.fillRect(X(ZT - 0.03), 0, w - X(ZT - 0.03), h);
           // grime streaks back along the flanks from the grille and the nose
           for (let k = 0; k < 110; k++) { const x = rnd() * w, y = Y(vG1) + rnd() * (Y(0.18) - Y(vG1)); g2.strokeStyle = `rgba(52,30,18,${0.07 + rnd() * 0.12})`; g2.lineWidth = 2 + rnd() * 7;
             g2.beginPath(); g2.moveTo(x, y); g2.lineTo(x + 30 + rnd() * 140, y + (rnd() - 0.3) * 10); g2.stroke(); }
           // sand settled on the deck
           for (let k = 0; k < 160; k++) { const x = rnd() * w, y = Y(0.82 + rnd() * 0.18), r = 10 + rnd() * 40; gr = g2.createRadialGradient(x, y, 0, x, y, r);
             gr.addColorStop(0, 'rgba(201,169,122,0.28)'); gr.addColorStop(1, 'rgba(201,169,122,0)'); g2.fillStyle = gr; g2.fillRect(x - r, y - r, 2 * r, 2 * r); }
+          // (the back panel between the turbines, darker)
+          g2.fillStyle = css(base, 0.55); g2.fillRect(X(ZT - 0.03), 0, w - X(ZT - 0.03), h);
           // (the nose's blunt face is the first few centimetres of u spread over it all: anything with detail there smears
           // into a starburst - so it gets a plain wash, worn metal into the paint by height, faded into the rest)
           const xN = X(ZN + 0.14);
-          for (let y = 0; y < h; y += 4) { const v = 1 - y / h, c = new THREE.Color(hex).lerp(new THREE.Color(0x968f84), 0.45 + 0.25 * Math.sin(v * 9.0) * Math.sin(v * 3.1));
+          for (let y = 0; y < h; y += 4) { const v = 1 - y / h, c = new THREE.Color(hex).lerp(new THREE.Color(0x968f84), 0.45 + 0.25 * Math.sin(v * 9.0) * Math.sin(v * 3.1)).convertLinearToSRGB();
             gr = g2.createLinearGradient(0, 0, xN, 0); gr.addColorStop(0, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(0.75, css(c, v < 0.25 ? 0.6 : 1)); gr.addColorStop(1, css(c, 1, 0));
             g2.fillStyle = gr; g2.fillRect(0, y, xN, 4); }
           livery.needsUpdate = true;
         };
         drawLivery(paintHex);
         P.repaint = (hex) => drawLivery(hex);
-        M.lsBody = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.78, metalness: 0.18 });
+        M.lsBody = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.78, metalness: 0.05 });
         add(body, g, M.lsBody, 0, 0, 0);
         // (the body's inside, seen through the cockpit opening)
-        M.lsIn = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.9, side: THREE.BackSide });
+        M.lsIn = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 0.9, side: THREE.BackSide, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 });
         add(body, g, M.lsIn, 0, 0, 0, 0, 0, 0, false);
         // the grille: chrome slats across its recess, standing a little proud of the flank, each following the body's
         // curve round the nose and stopping where the recess rounds off
@@ -16037,15 +16072,15 @@ registerProcessor('hellcat-synth', HellcatProcessor);
       P.hideCockpit.push(driver);
       // ---- the turbines: a nacelle each, its intake facing forward round a red lip, the fan inside turning with the
       // spool, the case weathered like the body, tapering back to a dark exhaust; on their stalks and pylon
-      // (the cowlings: weathered silver-grey with a dark red band behind the intake; v runs along the nacelle)
+      // (the cowlings: red-orange, worn through to grey, a darker red band behind the intake; v runs along the nacelle)
       const podTex = canvasTex(512, 256, (g2, w, h) => {
-        g2.fillStyle = '#8f8c86'; g2.fillRect(0, 0, w, h);
+        g2.fillStyle = '#a0503a'; g2.fillRect(0, 0, w, h);
         let s2 = 3; const r2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
         for (let k = 0; k < 200; k++) { const x = r2() * w, y = r2() * h, r = 2 + r2() * r2() * 22;
-          g2.fillStyle = r2() < 0.45 ? `rgba(${150 + r2() * 30},${146 + r2() * 26},${138 + r2() * 20},${0.4 + r2() * 0.5})` : r2() < 0.75 ? 'rgba(96,70,52,0.45)' : 'rgba(150,84,58,0.5)';
+          g2.fillStyle = r2() < 0.45 ? `rgba(${140 + r2() * 30},${136 + r2() * 26},${128 + r2() * 20},${0.45 + r2() * 0.45})` : r2() < 0.75 ? 'rgba(96,60,44,0.45)' : 'rgba(190,120,80,0.45)';
           g2.beginPath(); g2.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2); g2.fill(); }
         g2.fillStyle = '#6e2219'; g2.fillRect(0, h * (1 - 0.56), w, h * 0.1);
-        for (let k = 0; k < 40; k++) { const x = r2() * w, y = h * (1 - 0.56) + r2() * h * 0.1; g2.fillStyle = 'rgba(143,140,134,0.8)'; g2.fillRect(x, y, 3 + r2() * 10, 2 + r2() * 5); }
+        for (let k = 0; k < 40; k++) { const x = r2() * w, y = h * (1 - 0.56) + r2() * h * 0.1; g2.fillStyle = 'rgba(160,80,58,0.8)'; g2.fillRect(x, y, 3 + r2() * 10, 2 + r2() * 5); }
       });
       podTex.wrapS = podTex.wrapT = THREE.RepeatWrapping;
       M.lsPod = new THREE.MeshStandardMaterial({ map: podTex, roughness: 0.7, metalness: 0.3 });
@@ -19771,7 +19806,7 @@ float lampLight(float lat, float al){
       color: 0x16323c, roughness: 0.06, metalness: 0.05, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9,
     }));
     water.rotation.x = -Math.PI / 2; water.position.y = C.WATER_LEVEL; water.receiveShadow = true;
-    water.visible = W.map !== 'tarmac' && W.map !== 'arena' && W.map !== 'ramps' && W.map !== 'dunes' && !W.track;
+    water.visible = W.hasWater;
     scene.add(water);
 
     // ---------------------------------------------------------------- sky & lighting
@@ -21389,15 +21424,15 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           info: 'The derby bus with a blown 572 big-block: a roots blower, 900 hp, 850 lb-ft · a locked rear, bigger brakes, 4.10s · ~7.6 t · 0-60 ~11 s, 1/4 mile ~17.8 s at 81 mph, ~114 mph', soot: 0,
           snd: { nEng: 1, cyl: 8, fmul: 0.84, deep: 0.6, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 1.6, rpmRef: 6000, race: 1, rough: 0.35 } },
       } },
-    landspeeder: { btn: 'LANDSPEEDER', sub: 'Luke\'s X-34 · it floats half a metre up on its repulsors, no wheels · three turbines push it · ~155 mph', paint: 'Landspeeder Rust', tc: 1, cam: [0.95, 0.95], noPkg: true, road: true,
+    landspeeder: { btn: 'LANDSPEEDER', sub: 'Luke\'s X-34 · it floats half a metre up on its repulsors, no wheels · three turbines push it · ~155 mph', paint: 'Landspeeder Brown', tc: 1, cam: [0.95, 0.95], noPkg: true, road: true,
       hint: 'Landspeeder: shift up (E) for DRIVE and open the throttle - the three turbines on the back spool up in a second and push it along on its repulsors, half a metre off the ground: no wheels, so it carves and slides the same over tarmac, dirt, sand and water. ~0.5 g off the line, ~155 mph flat out. The repulsors brake it (S) and back it up (R). It floats over the bumps - and drops off a crest like anything else.',
-      info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty rust-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
+      info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty tan-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
       trans: 'Repulsorlift · turbine thrust', tyres: 'Repulsor field',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.5, rpmRef: 10000, open: 1, fmul: 1.6, deep: 0, loud: 0.3, race: 0 } },
-    firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
+    firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in flotation tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
       hint: 'Jet fire truck: shift up (E) for DRIVE and open the throttle - the J34 in the box spools up in a couple of seconds and shoves; floor it and the afterburner lights, a long flame out of the tailpipe. Nothing drives the wheels: it rolls on them and brakes and steers with them - G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). 0-60 ~11 s, ~135 mph, so brake early: it\'s 13,000 lb. R backs it up on a hydraulic motor.',
-      info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its slatted hose bed, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack over it and a silver hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis cut to a 2.7 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66x43.00-25 tyres on 25 in wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
-      trans: 'Jet thrust · hydraulic reverse · 4WS', tyres: '66x43.00-25 paddles',
+      info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its ribbed hose-bed band, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack and a polished hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis on a 3.3 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66 in flotation tyres on plain grey steel wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
+      trans: 'Jet thrust · hydraulic reverse · 4WS', tyres: '66 in flotation tyres',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 0.9, rpmRef: 10000, open: 1, fmul: 0.9, deep: 0.5, loud: 1, race: 0 } },
     unicycle: { btn: 'UNICYCLE', sub: 'A 24 in unicycle and its rider · pedal it (~14 mph), pedal a geared-hub one (~35 mph) or strap a jet engine behind the saddle (~85 mph) · lean into the turns', paint: 'Pitch Black', tc: 0, cam: [0.55, 0.85],
       hint: 'Unicycle: shift up (E) for DRIVE and pedal (the gas) - the cranks are on the hub, no gears: ~14 mph flat out. The rider keeps it balanced, leaning into the turns; it can\'t brake or turn hard (back-pedalling, ~0.25 g). R goes backwards.',
@@ -21623,7 +21658,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2 });
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.2, grip: 1.35, brakes: 1.5, whine: 1.5, smoke: 2 });
     }
-    if (STOCK.jet.size > 2) {
+    if (STOCK.jet.size > 2 && !MONSTER) {      // (the Mega Jet - not the fire truck's J34, as big but no streamliner)
       TUNE_PRESETS.stage2 = () => Object.assign(tuneDefaults(), { power: 1.35, grip: 1.1, brakes: 1.2, whine: 1.2, drag: 0.95 });
       TUNE_PRESETS.unhinged = () => Object.assign(tuneDefaults(), { power: 2.5, grip: 1.5, downforce: 2500, drag: 1.27, brakes: 1.6, stiff: 1.3, whine: 1.6, smoke: 2 });
     }
@@ -23462,7 +23497,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
           g.emit[i] += rate * dt * bud;
           if (g.emit[i] < 1) continue;
           m.wheels[i].corner.getWorldPosition(_gv);
-          const gy = groundH(_gv.x, _gv.z); smoke.setGround(gy);
+          // (a landspeeder's wash over a lake comes off the water, not the bed)
+          const gy = gv.spec.hover && W.hasWater ? Math.max(groundH(_gv.x, _gv.z), W.C.WATER_LEVEL) : groundH(_gv.x, _gv.z); smoke.setGround(gy);
           while (g.emit[i] >= 1) {
             g.emit[i] -= 1;
             smoke.emit(_gv.x + (Math.random() - 0.5) * 0.3, gy + 0.15 + Math.random() * 0.1, _gv.z + (Math.random() - 0.5) * 0.3,
@@ -23492,12 +23528,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   function voiceParams(g) {
     const st = g.st, snd = g.snd, id = g.prof.c, dp = id === 'dragpak', dm = id === 'demon', bm = g.gv.spec.boostMax || 0;
     return { rpm: st.rpm, load: st.load, thr: st.thr, cut: st.fl & 128 ? 1 : 0, boost: st.boost, run: st.fl & 8 ? 1 : 0, crank: st.fl & 64 ? 1 : 0,
-      squeal: st.sq, sqPitch: 0.5, spin: st.sq * 0.8, speed: 0, surf: 0, interior: 0, horn: st.fl & 16 ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol * 0.7,
+      // (a landspeeder's dust isn't tyre smoke: no squeal from it)
+      squeal: g.gv.spec.hover ? 0 : st.sq, sqPitch: 0.5, spin: g.gv.spec.hover ? 0 : st.sq * 0.8, speed: 0, surf: 0, interior: 0, horn: st.fl & 16 ? 1 : 0, vol: S.vol, engVol: S.engVol, fxVol: S.fxVol * 0.7,
       rough: snd.rough || 0, whine: g.big ? snd.whine : dp ? 1.7 : dm ? 1.45 : 1, rpmRef: g.big ? snd.rpmRef : dp ? 8800 : 6200, hum: 0,
       boostRef: Math.max(g.big ? bm : dp ? 24 : 11.6, bm), race: g.big ? snd.race : dp ? 1 : 0,
       nEng: snd.nEng, cyl: snd.cyl, fmul: snd.fmul, deep: snd.deep, loud: snd.loud, open: snd.open, whK: snd.whK, whPure: snd.whPure,
       pipe: snd.pipe ? clamp((st.rpm - snd.pipe[0]) / (snd.pipe[1] - snd.pipe[0]), 0, 1) : 0, vt: snd.vt || 0, surge: snd.surge || 0, ev: snd.ev || 0,
-      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1, turbo: snd.turbo || 0, diesel: snd.diesel || 0 };
+      jet: snd.jet || 0, ab: st.ab, nos: st.fl & 32 ? 1 : 0, jsz: g.prof.js || 1, turbo: snd.turbo || 0, diesel: snd.diesel || 0, road: g.gv.spec.hover ? 0.3 : 1 };
   }
   // ---- racing in a room: points, invisible walls, a reset every 30 s
   // Points come for ground covered along the course: on the road, 1 a metre times a streak that builds the longer you
@@ -23881,7 +23918,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // no tyre smoke in the cockpit view (it filled the cabin on burnouts); still shown from the chase cams. A diesel's
     // smoke is the point of it, though: in its cockpit the smoke stays, only the puffs right round your head (in the cab)
     // fading out - you see the stack's soot roll up past the windshield and trail off in the mirrors
-    const SOOTCAB = G.started && cam.mode === 2 && !!(car.sootTips && car.sootTips.length);
+    const SOOTCAB = G.started && cam.mode === 2 && !!(car.sootTips && car.sootTips.length) && !(CC && CCD.soot === 0);
     smoke.mesh.visible = !(G.started && cam.mode === 2) || SOOTCAB;
     smoke.setNear(SOOTCAB ? 1.5 : 0);
     // live mirrors in the cockpit: one mirror per frame, round-robin

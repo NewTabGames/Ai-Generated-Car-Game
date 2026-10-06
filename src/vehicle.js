@@ -914,33 +914,36 @@
         const tgtP = Math.atan(-(nx * fx + nz * fz) / ny1) * 57.2958 + 4, tgtR = Math.atan(-(nx * rx + nz * rz) / (ny1 * fl)) * 57.2958;
         this.aaTgtP = tgtP / 57.2958; this.aaTgtR = tgtR / 57.2958; this.aaTL = tl;
         const e = ahead - tgtP;
-        if (inp.throttle > 0) inp.throttle *= clamp((16 - e) / 14, 0, 1);
+        // (a jet - the fire truck: its gas drives no wheels, so it can't lift the nose and isn't touched; the brake still
+        // drops it, and the nudge below works harder)
+        const jet = !!s.jet;
+        if (inp.throttle > 0 && !jet) inp.throttle *= clamp((16 - e) / 14, 0, 1);
         if (inp.brake > 0) inp.brake *= clamp((e + 12) / 10, 0, 1);
         // and the feet do the flying: stab the brake to bring a rising nose down, rev the wheels to lift a dropping one
         // (you hear it working) - from 8 deg off the landing attitude, all in by ~22
         this.aaAuto = 0;
         if (e > 8) { const b = clamp((e - 8) / 14, 0, 1); if (b > inp.brake) { inp.brake = b; this.aaAuto = -b; } }
-        if (e < -8) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
+        if (e < -8 && !jet) { const t = clamp((-8 - e) / 14, 0, 1); if (t > inp.throttle) { inp.throttle = t; this.aaAuto = t; } }
       } else {
         this.aaAir = 0;
         if ((this.aaGnd = (this.aaGnd === undefined ? 9 : this.aaGnd) + dt) < 1.4) {
           // touchdown: feather the gas until the rears match the ground, and don't let it rear up over backwards off the
           // landing (a wheelie on the way out is fine; one still climbing past 25 deg isn't)
           const W = this.wheels, wr = 0.5 * (W[2].omega * W[2].radius + W[3].omega * W[3].radius), gs = Math.abs(this.forwardSpeed);
-          if (this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
-          if (ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
+          if (!this.spec.jet && this.aaGnd < 0.8 && pitch > 6 && wr > 1.25 * gs + 2) inp.throttle = Math.min(inp.throttle, 0.25);
+          if (!this.spec.jet && ahead > 25) inp.throttle = Math.min(inp.throttle, clamp((40 - ahead) / 15, 0, 1) * 0.5);
         }
       }
     }
     // (the air assist's nudge, per substep: PD on pitch and roll towards the landing attitude, capped at 0.5 rad/s^2 in
-    // pitch and 1 in roll - a light hand: the pedals do most of the work - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
+    // pitch (1.6 for a jet truck, whose gas can't fly it) and 1 in roll - a light hand: the pedals do most of the work - faded in over the first 0.2 s of a flight so it doesn't fight the take-off, and off once it's
     // past ~85 deg: a truck that rolled over on the ramp's edge before it left the ground is beyond saving)
     _aaTorque(m00, m10, m20, m02, m12, m22, m11) {
       const s = this.spec, fade = clamp(((this.aaAir || 0) - 0.08) / 0.2, 0, 1);
       if (fade <= 0 || m11 < 0.1 || this.aaTgtP === undefined) return null;
       const pitch = Math.asin(clamp(-m12, -1, 1)), roll = Math.asin(clamp(m10, -1, 1));
       const wP = this.wx * m00 + this.wy * m10 + this.wz * m20, wR = this.wx * m02 + this.wy * m12 + this.wz * m22;
-      const A = 0.5 * fade, AR = 1.0 * fade, kp = 3.5, kd = 3;
+      const A = (s.jet ? 1.6 : 0.5) * fade, AR = 1.0 * fade, kp = 3.5, kd = 3;    // (a jet truck: no pedals to fly it with)
       const aP = clamp(kp * (this.aaTgtP - pitch) - kd * wP, -A, A), aR = clamp(kp * (this.aaTgtR - roll) - kd * wR, -AR, AR);
       const tP = aP * s.Ipitch, tR = aR * s.Iroll;
       const T = this._aaT || (this._aaT = [0, 0, 0]);
@@ -1862,8 +1865,10 @@
       }
     }
 
-    // (hover: a repulsor field presses on water as on land - over a lake it rides the surface, not the bed)
+    // (hover: a repulsor field presses on water as on land - over a lake it rides the surface, not the bed; not on a
+    // map with no lakes, where the ground below the water level is just a dip)
     _onWater(g) {
+      if (this.world.hasWater === false) return;
       const wl = this.world.C.WATER_LEVEL;
       if (g.h < wl) { g.h = wl; g.nx = 0; g.ny = 1; g.nz = 0; g.surface = 4; }
     }
@@ -3543,20 +3548,20 @@
   } };
   // The jet fire truck - ALL STAR FIRE DEPT's ABLAZE, the All Star Monster Truck Tour's jet-powered flame-throwing
   // monster fire truck: a cab-forward fire engine's cab and hose-bed body on a monster truck's chassis (the 4-link, the
-  // nitrogen shocks, planetary axles, 66x43.00-25 tyres and four-wheel steer), its wheelbase cut to 2.7 m - the tyres
-  // all but touch - under a 4.8 m body. A Westinghouse J34 turbojet with an afterburner lies in the box, its tailpipe out
+  // nitrogen shocks, planetary axles, four-wheel steer, 66 in flotation tyres), its wheelbase cut to 3.3 m under a 5.2 m
+  // body. A Westinghouse J34 turbojet with an afterburner lies in the box, its tailpipe out
   // of the back: ~3,400 lbf dry, ~4,900 lit (a flame out of the back). It pushes the truck along; nothing drives the
   // wheels forwards (in R a hydraulic motor on the transfer case turns them). ~13,000 lb, the J34 and its fuel high up
   // in the box. 0-60 in ~11.5 s, ~135 mph
-  const cgF = 1.4, fwF = 0.46, wbF = 2.7, zcF = wbF * (fwF - 0.5);
+  const cgF = 1.4, fwF = 0.46, wbF = 3.3, zcF = wbF * (fwF - 0.5);
   const PF = (x, y, z) => [x, y - cgF, z + zcF];
   const fBody = [];
   for (const z0 of [-wbF / 2, wbF / 2]) for (const sx of [-1, 1]) fBody.push(PF(sx * 1.88, 1.54, z0), PF(sx * 1.88, 0.84, z0 - 0.72), PF(sx * 1.88, 0.84, z0 + 0.72), PF(sx * 1.36, 1.68, z0));
   for (const sx of [-1, 1]) {
-    fBody.push(PF(sx * 1.2, 1.5, -2.15), PF(sx * 1.2, 3.0, -2.12), PF(sx * 1.22, 1.55, 2.62), PF(sx * 1.22, 3.25, 2.62), PF(sx * 1.22, 3.25, -0.15), PF(sx * 1.2, 3.0, -1.0),
-      PF(sx * 1.12, 4.05, 0.0), PF(sx * 1.12, 4.05, 2.45), PF(sx * 0.5, 0.95, -1.4), PF(sx * 0.5, 0.95, 1.6));
+    fBody.push(PF(sx * 1.2, 1.72, -2.55), PF(sx * 1.2, 3.0, -2.5), PF(sx * 1.22, 1.5, 2.67), PF(sx * 1.22, 3.32, 2.67), PF(sx * 1.22, 3.32, -0.07), PF(sx * 1.2, 3.0, -1.2),
+      PF(sx * 1.1, 3.68, 2.35), PF(sx * 0.5, 0.95, -1.7), PF(sx * 0.5, 0.95, 1.7));
   }
-  fBody.push(PF(0, 1.62, 3.62), PF(0, 2.28, 3.62), PF(0, 0.95, 0));
+  fBody.push(PF(-1.1, 3.94, 0.03), PF(-1.1, 3.94, 2.35), PF(0, 1.62, 3.67), PF(0, 2.28, 3.67), PF(0, 0.95, 0));
   CARS.firetruck = { name: 'Jet Fire Truck', short: 'Jet Fire Truck', car: 'J34 TURBOJET', hp: 0, tq: 0, cc: true, kbLat: 5, spec: Object.assign(JSON.parse(JSON.stringify(CARS.monster.spec)), {
     name: 'Jet Fire Truck "ABLAZE"',
     mass: 5900, Ipitch: 11200, Iyaw: 10600, Iroll: 6700, cgHeight: cgF, wheelbase: wbF, frontWeight: fwF, Fz0: 16500,
@@ -3566,9 +3571,9 @@
     electric: false, idleRpm: 3000, limiterRpm: 10500, redlineRpm: 10000, shiftRpm: 10500, engineInertia: 0.02, fricA: 0.3, fricB: 0, starterTorque: 0,
     torqueCurve: [[0, 0], [20000, 0]], boostMax: 0, popScale: 0, transbrake: false, launchRpm: undefined,
     autoRatios: [1], autoRev: 1.76, autoFinal: 19.5, noCoastBlip: true, engineTc: true, dragClutch: EV_CLUTCH,
-    jet: { thrust: 15100, ab: 0.45, idle: 0.3, rpm100: 10000, ram: 0.0012, y: 0.3, z: 2.0, revTq: 500, revRpm: 2500, spool: 1.7, size: 2.6 },
+    jet: { thrust: 15100, ab: 0.45, idle: 0.3, rpm100: 10000, ram: 0.0012, y: 0, z: 2.0, revTq: 500, revRpm: 2500, spool: 1.7, size: 2.6 },
     CdA: 8.0,
-    bodyHalfW: 1.9, bodyFront: -2.15 + zcF, bodyRear: 3.62 + zcF, bodyBottom: 0.95 - cgF, bodyTop: 4.05 - cgF, bodyPts: fBody,
+    bodyHalfW: 1.9, bodyFront: -2.55 + zcF, bodyRear: 3.67 + zcF, bodyBottom: 0.95 - cgF, bodyTop: 3.94 - cgF, bodyPts: fBody,
   }) };
   // Unicycle: a 24 in unicycle and its rider - the cranks bolted straight to the hub, no gears, no freewheel, no brake but
   // the legs. The rider is the engine (~70 Nm at the cranks from a standstill, the most they can push without going over

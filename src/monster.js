@@ -8,7 +8,7 @@
    behind the glass - a scooped hood, a chrome grille and sealed-beam headlights, an open bed with rails, a tailgate)
    in a livery drawn for the current paint.
    Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
-   The ABLAZE jet fire truck (opts.body 'firetruck') is the same chassis cut to a 2.7 m wheelbase under a cab-forward fire
+   The ABLAZE jet fire truck (opts.body 'firetruck') is the same chassis on a 3.3 m wheelbase under a cab-forward fire
    cab and a hose-bed box with a J34's tailpipe out of the back (no big-block: setJet draws its afterburner's flame).
    Returns the same interface as HCCarModel.build, plus afterWheels() (the game calls it once the wheels are placed). */
 (function (root) {
@@ -92,7 +92,6 @@
       }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); return g;
     }
-    const uvScale = (g, su, sv) => { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); return g; };
 
     // smooth shading for the extruded body: average the normals of faces meeting at a point when they're within maxDeg
     // of each other - the rounded edges (bevels) come out smooth, the real creases stay sharp
@@ -516,16 +515,17 @@
     // ALL STAR FIRE DEPT's jet monster fire truck, as the photo has it: a cab-forward fire cab - a flat front with a big
     // two-pane windshield, a tall narrow window ahead of each door, the door with its window, a chrome grab handle at its
     // front edge, ALLSTAR on a black plate under the window, a gold Maltese cross on the cab's front corner, the black
-    // roof edge with a light bar, mirrors out on arms - then an open crew step under the roof (grey diamond plate low, a
-    // black brace up to the roof), then the tall box: its sides slatted along the top round the hose bed, the ABLAZE flame
-    // logo at the front, ALL STAR - the cross - FIRE DEPT. in gold leaf on a darker recessed panel framed in steel, a
-    // flourish under it, the wheel opening cut square over the back tyre and trimmed in chrome, reflective tape along the
-    // bottom and chevrons up the back corners; a red ladder rack arching over the box; at the back a silver hood sloping
-    // over a dark grille and, under it, the J34's grey tailpipe a metre out of the back wall
+    // roof edge with a light bar, mirrors out on arms, a rounded arch over the front tyre - then an open crew step under
+    // the roof (a plain grey panel low, a dark screen above behind a black brace), then the tall box: a ribbed band along
+    // its top round the hose bed, the ABLAZE flame logo (a parallelogram leaning back, flames off its edges) at the front,
+    // ALL STAR - the cross - FIRE DEPT. in gold leaf between steel strips, a flourish under it, a shallow notch over the
+    // back tyre trimmed in chrome, reflective tape along the bottom and chevrons up the back corners; a red ladder rack
+    // along its left side and a hoop across the back; at the back a polished hood sloping over a dark grille and, under
+    // it, the J34's grey tailpipe a metre out of the back wall. Proportions fitted to the photo off the box's corners
     function bodyFiretruck() {
       const bodyG = new THREE.Group(); model.add(bodyG);
       const cabG = new THREE.Group(); bodyG.add(cabG);
-      const ZC0 = -2.15, ZD0 = -1.76, ZD1 = -0.8, ZC1 = -0.7, ZB0 = -0.12, ZB1 = 2.62, HC = 1.2, HB = 1.22;
+      const ZC0 = -2.55, ZD0 = -2.0, ZD1 = -1.05, ZC1 = -0.95, ZB0 = -0.07, ZB1 = 2.67, HC = 1.2, HB = 1.22;
       const YC0 = 1.72, YCS = 1.45, YCR = 3.0, YB0 = 1.47, YBT = 2.85, YBS = 3.32;
       const LZ0 = ZC0 - 0.02, LZ1 = ZB1 + 0.02, LY0 = 1.4, LY1 = 3.3;
       const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -535,13 +535,8 @@
       M.ftIn = new THREE.MeshStandardMaterial({ color: 0x3a0a0c, roughness: 0.8, side: THREE.DoubleSide });
       M.ftGlass = new THREE.MeshPhysicalMaterial({ color: 0x0a0e12, roughness: 0.03, metalness: 0.2, transparent: true, opacity: 0.55, envMapIntensity: 2.2, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
       M.ftPipe = new THREE.MeshStandardMaterial({ color: 0x9a9894, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide });
-      // (diamond plate: the crew step, the hood over the jet's intake)
-      const dTex = canvasTex(128, 128, (g, w, h) => {
-        g.fillStyle = '#9a9ea4'; g.fillRect(0, 0, w, h); g.fillStyle = '#c9ccd0'; g.strokeStyle = '#6d7076'; g.lineWidth = 2;
-        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.save(); g.translate(x * 32 + (y & 1) * 16 + 8, y * 32 + 16); g.rotate((y & 1) ? 0.8 : -0.8); g.fillRect(-11, -3, 22, 6); g.strokeRect(-11, -3, 22, 6); g.restore(); }
-      });
-      dTex.wrapS = dTex.wrapT = THREE.RepeatWrapping;
-      M.ftPlate = new THREE.MeshStandardMaterial({ map: dTex, roughness: 0.35, metalness: 0.85, side: THREE.DoubleSide });
+      M.ftHood = new THREE.MeshStandardMaterial({ color: 0xd6d9dc, roughness: 0.12, metalness: 1, side: THREE.DoubleSide });   // (polished stainless)
+      M.ftGrey = new THREE.MeshStandardMaterial({ color: 0xa9adb2, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide });
       // ---- a flat side panel in the body's (z, y), with holes, at x = sx * hw - its uvs on the side's livery canvas
       // (right side: the front at the canvas's right, so the lettering reads on both)
       function sideGeo(outline, holes, sx, hw) {
@@ -560,19 +555,23 @@
         arc(z1 - r, y0 + r, -Math.PI / 2); arc(z1 - r, y1 - r, 0); arc(z0 + r, y1 - r, Math.PI / 2); arc(z0 + r, y0 + r, Math.PI); return out; };
       // the windows: the narrow one ahead of the door, the door's
       const WIN1 = rr(ZC0 + 0.08, 2.12, ZD0 - 0.06, 2.82, 0.04), WIN2 = rr(ZD0 + 0.1, 2.15, ZD1 - 0.1, 2.84, 0.05);
+      // the wheel openings: the box's a shallow notch over the back tyre as the photo has it, the cab's a rounded one over
+      // the front - dark tubs behind both take the tyres when the suspension's compressed (they're mostly outboard)
+      const AR = [[zR - 0.55, YB0], [zR - 0.35, 1.78], [zR + 0.6, 1.78], [zR + 0.8, YB0]], AF = [zF - 0.63, zF + 0.65], AFY = 1.95;
       // ---- the livery: one canvas a side over the cab and the box
       const liv = [0, 1].map(() => canvasTex(2048, 816, () => {}));
       function drawSide(c, left, paint) {
         const g = c.getContext('2d'), w = c.width, h = c.height;
         const X = (z) => (left ? (z - LZ0) : (LZ1 - z)) / (LZ1 - LZ0) * w, Y = (y) => (1 - (y - LY0) / (LY1 - LY0)) * h, S = w / (LZ1 - LZ0);
         const R = (z0, y0, z1, y1) => [Math.min(X(z0), X(z1)), Y(y1), Math.abs(X(z1) - X(z0)), Y(y0) - Y(y1)];
-        const col = new THREE.Color(paint), dk = (k) => `rgb(${Math.round(col.r * 255 * k)},${Math.round(col.g * 255 * k)},${Math.round(col.b * 255 * k)})`;
+        // (the paint's sRGB components - a THREE.Color holds them linear, which drew every shade of it far too dark)
+        const col = new THREE.Color(paint).convertLinearToSRGB(), dk = (k) => `rgb(${Math.round(col.r * 255 * k)},${Math.round(col.g * 255 * k)},${Math.round(col.b * 255 * k)})`;
         g.fillStyle = hex(paint); g.fillRect(0, 0, w, h);
         // (a little sun and wear in the paint)
         for (let k = 0; k < 60; k++) { const x = Math.random() * w, y = Math.random() * h, r = 30 + Math.random() * 120, gr = g.createRadialGradient(x, y, 0, x, y, r);
           gr.addColorStop(0, `rgba(255,255,255,${0.02 + Math.random() * 0.04})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
         // the door's seams, the cab's lower edge
-        g.strokeStyle = dk(0.45); g.lineWidth = 4; g.strokeRect(...R(ZD0, 1.78, ZD1, 2.96));
+        g.strokeStyle = dk(0.45); g.lineWidth = 4; g.strokeRect(...R(ZD0, 1.99, ZD1, 2.96));
         g.fillStyle = dk(0.6); g.fillRect(...R(LZ0, YC0, ZC1, YC0 + 0.03));
         // ALLSTAR on a black plate under the door's window
         { const [x, y, ww, hh] = R(ZD0 + 0.12, 1.98, ZD1 - 0.12, 2.1); g.fillStyle = '#0d0d0f'; g.fillRect(x, y, ww, hh);
@@ -580,32 +579,36 @@
           g.lineWidth = 4; g.strokeStyle = '#8a1014'; g.strokeText('ALLSTAR', 0, 2, ww * 0.94); g.fillStyle = '#f2f2ee'; g.fillText('ALLSTAR', 0, 2, ww * 0.94); g.restore();
           g.fillStyle = '#ffd21a'; star(g, x + ww * 0.08, y + hh * 0.5, hh * 0.3); }
         // reflective tape along the cab's and the box's lower edges
-        g.fillStyle = '#f4f4f0'; for (let z = ZC0 + 0.15; z < ZC1 - 0.1; z += 0.32) g.fillRect(...R(z, YC0 + 0.07, z + 0.12, YC0 + 0.11));
-        for (let z = ZB0 + 0.12; z < ZB1 - 0.15; z += 0.32) if (z < 0.33 || z > 2.3) g.fillRect(...R(z, YB0 + 0.06, z + 0.12, YB0 + 0.1));
+        g.fillStyle = '#f4f4f0'; for (let z = ZC0 + 0.04; z < ZC1 - 0.1; z += 0.32) if (z < AF[0] - 0.14 || z > AF[1]) g.fillRect(...R(z, YC0 + 0.07, z + 0.12, YC0 + 0.11));
+        for (let z = ZB0 + 0.12; z < ZB1 - 0.15; z += 0.32) if (z < AR[0][0] - 0.14 || z > AR[3][0]) g.fillRect(...R(z, YB0 + 0.06, z + 0.12, YB0 + 0.1));
         // the gold Maltese cross on the cab's front corner
-        cross(g, X(ZC0 + 0.28), Y(1.95), 0.16 * S);
+        cross(g, X(ZC0 + 0.13), Y(1.9), 0.1 * S);
         // ---- the box
         // (its top edge: a steel strip under the slats)
         g.fillStyle = '#b8bcc2'; g.fillRect(...R(ZB0, YBT - 0.05, ZB1, YBT));
-        // the ABLAZE logo: flames round a slanted plate, the name in flame letters
-        { const cx = X(0.5), cy = Y(2.18), s = S;
-          g.save(); g.translate(cx, cy); g.transform(1, 0, -0.32, 1, 0, 0);
-          const fl = (k, col2, lw) => { g.beginPath(); const n = 22;
-            for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, rx = 0.36 * s * k, ry = 0.3 * s * k, sp = i % 2 ? 1 : 1.18 + 0.12 * Math.sin(i * 1.7);
-              const x = Math.cos(a) * rx * sp * (Math.cos(a) > 0 ? 1.05 : 1), y = Math.sin(a) * ry * sp - (Math.sin(a) < 0 ? 0.06 * s * Math.abs(Math.cos(a * 3)) : 0); i ? g.lineTo(x, y) : g.moveTo(x, y); }
-            g.closePath(); if (lw) { g.lineWidth = lw; g.strokeStyle = col2; g.stroke(); } else { g.fillStyle = col2; g.fill(); } };
-          fl(1.08, '#ff9a1a'); fl(0.96, '#ffd84a'); fl(0.88, '#c8141a');
-          g.font = `italic 900 ${0.12 * s}px Impact, "Arial Black", Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-          g.lineWidth = 6; g.strokeStyle = '#7a1a08'; g.strokeText('ALL STAR', 0, -0.11 * s); g.fillStyle = '#ffe06a'; g.fillText('ALL STAR', 0, -0.11 * s);
-          const gr = g.createLinearGradient(0, -0.02 * s, 0, 0.16 * s); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.5, '#ffb82a'); gr.addColorStop(1, '#ff5a10');
-          g.font = `italic 900 ${0.22 * s}px Impact, "Arial Black", Arial`; g.lineWidth = 10; g.strokeStyle = '#5a1206'; g.strokeText('ABLAZE', 0, 0.07 * s); g.fillStyle = gr; g.fillText('ABLAZE', 0, 0.07 * s);
-          g.lineWidth = 5; g.strokeStyle = '#ffd84a'; g.beginPath(); g.moveTo(-0.3 * s, 0.2 * s); g.lineTo(0.3 * s, 0.17 * s); g.stroke();
+        // the ABLAZE logo: a tall parallelogram leaning back, flames licking off its edges, the name in flame letters
+        { const cx = X(0.47), cy = Y(2.2), s = S, hw = 0.25 * s, hh = 0.36 * s, sk = 0.42;
+          g.save(); g.translate(cx, cy); g.transform(1, 0, left ? sk : -sk, 1, 0, 0);
+          // (the flames: tongues off each edge, orange under yellow)
+          const tongues = (k, col2) => { g.beginPath(); const n = 9, pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+            for (let e = 0; e < 4; e++) { const [ax, ay] = pts[e], [bx, by] = pts[(e + 1) % 4], nx = (by - ay), ny = -(bx - ax), nl = Math.hypot(nx, ny);
+              for (let i = 0; i < n; i++) { const t0 = i / n, t1 = (i + 0.5) / n, L = (0.05 + 0.04 * Math.sin(i * 2.3 + e)) * s * k;
+                g.lineTo(ax + (bx - ax) * t0, ay + (by - ay) * t0); g.quadraticCurveTo(ax + (bx - ax) * t1 + nx / nl * L * 1.6, ay + (by - ay) * t1 + ny / nl * L * 1.6 - L * 0.6, ax + (bx - ax) * (t1 + 0.5 / n), ay + (by - ay) * (t1 + 0.5 / n)); } }
+            g.closePath(); g.fillStyle = col2; g.fill(); };
+          tongues(1.15, '#ff7a14'); tongues(0.75, '#ffd23a');
+          const pg = g.createLinearGradient(0, -hh, 0, hh); pg.addColorStop(0, '#c8141a'); pg.addColorStop(1, '#8a0c10'); g.fillStyle = pg; g.fillRect(-hw, -hh, 2 * hw, 2 * hh);
+          g.strokeStyle = '#ffd23a'; g.lineWidth = 4; g.strokeRect(-hw, -hh, 2 * hw, 2 * hh);
+          g.font = `italic 900 ${0.1 * s}px Impact, "Arial Black", Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+          g.lineWidth = 6; g.strokeStyle = '#5a1206'; g.strokeText('ALL STAR', 0, -0.14 * s, 2 * hw * 0.9); g.fillStyle = '#ffe06a'; g.fillText('ALL STAR', 0, -0.14 * s, 2 * hw * 0.9);
+          const gr = g.createLinearGradient(0, -0.05 * s, 0, 0.2 * s); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.5, '#ffb82a'); gr.addColorStop(1, '#ff5a10');
+          g.font = `italic 900 ${0.19 * s}px Impact, "Arial Black", Arial`; g.lineWidth = 10; g.strokeStyle = '#5a1206';
+          for (const [t, y] of [['AB', 0.02], ['LAZE', 0.2]]) { g.strokeText(t, 0, y * s, 2 * hw * 0.95); g.fillStyle = gr; g.fillText(t, 0, y * s, 2 * hw * 0.95); }
           g.restore(); }
         // the gold-leaf panel: recessed a shade darker, framed in steel strips, ALL STAR - the cross - FIRE DEPT.
-        { const z0 = 1.02, z1 = 2.44, y0 = 2.08, y1 = 2.78;
-          g.fillStyle = dk(0.78); g.fillRect(...R(z0, y0, z1, y1));
-          g.strokeStyle = '#e0b84a'; g.lineWidth = 3; const r0 = R(z0 + 0.06, y0 + 0.05, z1 - 0.06, y1 - 0.05); g.strokeRect(...r0);
-          g.fillStyle = '#c9ccd0'; g.fillRect(...R(z0 - 0.03, y0 - 0.02, z0 + 0.01, y1 + 0.02)); g.fillRect(...R(z1 - 0.01, y0 - 0.02, z1 + 0.03, y1 + 0.02));
+        { const z0 = 1.07, z1 = 2.49, y0 = 2.06, y1 = 2.8;
+          g.fillStyle = dk(0.94); g.fillRect(...R(z0, y0, z1, y1));
+          g.fillStyle = '#c9ccd0'; g.fillRect(...R(z0 - 0.06, y0 - 0.02, z0, y1 + 0.02)); g.fillRect(...R(z1, y0 - 0.02, z1 + 0.06, y1 + 0.02));
+          g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(...R(z0, y0 - 0.02, z0 + 0.02, y1 + 0.02)); g.fillRect(...R(z1 - 0.02, y0 - 0.02, z1, y1 + 0.02));
           const gold = (txt, z, y, px) => { const gr = g.createLinearGradient(0, Y(y) - px / 2, 0, Y(y) + px / 2); gr.addColorStop(0, '#fff2a8'); gr.addColorStop(0.45, '#e0b23a'); gr.addColorStop(1, '#8a6412');
             g.font = `bold ${px}px Georgia, "Times New Roman", serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 4; g.strokeStyle = '#3a1a08'; g.strokeText(txt, X(z), Y(y)); g.fillStyle = gr; g.fillText(txt, X(z), Y(y)); };
           const zc = (z0 + z1) / 2;
@@ -634,7 +637,9 @@
       repaint(M.paint.color.getHex());
       // ---- the cab: its sides (the windows open, the bottom up over the front tyre), the flat front, the roof
       for (const [k, sx] of [[0, -1], [1, 1]]) {
-        add(cabG, sideGeo([[ZC0, YC0], [ZC1, YC0], [ZC1, YCR], [ZC0 + 0.045, YCR]], [WIN1, WIN2], sx, HC), livMat[k], 0, 0, 0);
+        add(cabG, sideGeo([[ZC0, YC0], [AF[0], YC0], [AF[0], AFY - 0.14], [AF[0] + 0.14, AFY], [AF[1] - 0.14, AFY], [AF[1], AFY - 0.14], [AF[1], YC0], [ZC1, YC0], [ZC1, YCR], [ZC0 + 0.045, YCR]], [WIN1, WIN2], sx, HC), livMat[k], 0, 0, 0);
+        pipeTo(cabG, [[AF[0], YC0], [AF[0], AFY - 0.14], [AF[0] + 0.14, AFY], [AF[1] - 0.14, AFY], [AF[1], AFY - 0.14], [AF[1], YC0]].map(([z, y]) => V3(sx * (HC + 0.01), y, z)), 0.02, M.black);
+        add(cabG, new THREE.BoxGeometry(HC - 0.75, AFY + 0.25 - YC0, AF[1] - AF[0]), M.ftDark, sx * (0.73 + (HC - 0.75) / 2), (YC0 + AFY + 0.25) / 2, (AF[0] + AF[1]) / 2);
         for (const W2 of [WIN1, WIN2]) { add(cabG, sideGeo(W2, [], sx, HC - 0.03), M.ftGlass, 0, 0, 0, 0, 0, 0, false); }
         // (the window frames: dark rubber)
         for (const W2 of [WIN1, WIN2]) add(cabG, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(W2.map(([z, y]) => V3(sx * (HC + 0.005), y, z)), true), 60, 0.015, 5, true), M.black, 0, 0, 0);
@@ -644,7 +649,9 @@
         tubeAB(cabG, V3(sx * HC, 2.2, ZC0 + 0.1), V3(sx * (HC + 0.32), 2.3, ZC0 + 0.02), 0.02, M.black);
         add(cabG, rbox(0.12, 0.42, 0.06, 0.02), M.black, sx * (HC + 0.34), 2.46, ZC0 + 0.02);
         // (the crew step behind the door: grey plate to the step's height, open above it, a black brace up to the roof)
-        add(bodyG, uvScale(new THREE.PlaneGeometry(ZB0 - ZC1, 2.12 - YCS), 2 * (ZB0 - ZC1), 2 * (2.12 - YCS)), M.ftPlate, sx * (HC - 0.02), (YCS + 2.12) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0);
+        add(bodyG, new THREE.PlaneGeometry(ZB0 - ZC1, 2.12 - YCS), M.ftGrey, sx * (HC - 0.02), (YCS + 2.12) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0);
+        add(bodyG, new THREE.PlaneGeometry(ZB0 - ZC1, YCR - 2.14), M.ftDark, sx * (HC - 0.05), (2.14 + YCR) / 2, (ZC1 + ZB0) / 2, 0, sx * Math.PI / 2, 0, false);
+        add(bodyG, rbox(0.05, 0.05, ZB0 - ZC1, 0.015), M.alu, sx * (HC - 0.01), 2.13, (ZC1 + ZB0) / 2);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.14, ZC1 + 0.1), V3(sx * (HC - 0.03), 2.95, ZB0 - 0.05), 0.03, M.black);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.12, ZC1), V3(sx * (HC - 0.03), YCR, ZC1), 0.035, M.paint);
         tubeAB(bodyG, V3(sx * (HC - 0.03), 2.12, ZB0 - 0.02), V3(sx * (HC - 0.03), YCR, ZB0 - 0.02), 0.035, M.paint);
@@ -652,7 +659,7 @@
       // (the cab's insides and the crew area's: dark)
       add(cabG, new THREE.PlaneGeometry(2 * HC, YCR - YC0), M.ftIn, 0, (YC0 + YCR) / 2, ZC1 + 0.002, 0, 0, 0, false);
       add(bodyG, new THREE.BoxGeometry(2 * HC - 0.06, 0.04, ZB0 - ZC1), M.ftDark, 0, 2.12, (ZC1 + ZB0) / 2);
-      add(bodyG, new THREE.BoxGeometry(2 * HC - 0.06, 0.04, ZB0 - ZC0), M.ftDark, 0, YC0 + 0.02, (ZC0 + ZB0) / 2);
+      add(bodyG, new THREE.BoxGeometry(1.44, 0.04, ZB0 - ZC0), M.ftDark, 0, YC0 + 0.02, (ZC0 + ZB0) / 2);
       // the front: a flat face raked back a touch, two windshield panes over a red panel, a chrome grille band, round
       // headlamps in their bezels, the amber turn lamps, a chrome bumper
       { const fg = new THREE.Group(); fg.position.set(0, YC0, ZC0); fg.rotation.x = 0.035; cabG.add(fg);
@@ -681,9 +688,8 @@
       for (let k = 0; k < 6; k++) add(bodyG, rbox(0.24, 0.12, 0.2, 0.05), k === 2 || k === 3 ? M.beaconB : M.beaconA, -0.68 + k * 0.272, YCR + 0.2, ZC0 + 0.3);
       for (let k = 0; k < 5; k++) add(bodyG, rbox(0.08, 0.05, 0.05, 0.015), M.amber, -0.4 + k * 0.2, YCR + 0.07, ZC0 + 0.08);
       for (const sx of [-1, 1]) tubeAB(bodyG, V3(sx * 0.9, YCR + 0.06, ZC0 + 0.9), V3(sx * 0.95, YCR + 0.75, ZC0 + 1.05), 0.008, M.black);
-      // ---- the box: its sides (the opening squared over the back tyre), the slatted rail along its top round the hose bed
-      // (dark inside), the front and back walls, corner posts
-      const AR = [[0.36, YB0], [0.68, 1.93], [2.02, 1.93], [2.34, YB0]];
+      // ---- the box: its sides (the notch over the back tyre), the ribbed band along its top round the hose bed, the front
+      // and back walls, corner posts
       for (const [k, sx] of [[0, -1], [1, 1]]) {
         add(bodyG, sideGeo([[ZB0, YB0], ...AR, [ZB1, YB0], [ZB1, YBT], [ZB0, YBT]], [], sx, HB), livMat[k], 0, 0, 0);
         // (the chrome trim round the opening)
@@ -691,8 +697,8 @@
         // the slats, their rails, and the hose bed's inner wall behind them
         add(bodyG, rbox(0.05, 0.05, ZB1 - ZB0, 0.015), M.alu, sx * (HB - 0.01), YBT + 0.005, (ZB0 + ZB1) / 2);
         add(bodyG, rbox(0.06, 0.05, ZB1 - ZB0, 0.02), M.paint, sx * (HB - 0.01), YBS, (ZB0 + ZB1) / 2);
-        for (let z = ZB0 + 0.05; z <= ZB1 - 0.04; z += 0.17) add(bodyG, rbox(0.035, YBS - YBT, 0.04, 0.01), M.paint, sx * (HB - 0.01), (YBT + YBS) / 2, z);
-        add(bodyG, new THREE.PlaneGeometry(ZB1 - ZB0, YBS - YBT), M.ftIn, sx * (HB - 0.14), (YBT + YBS) / 2, (ZB0 + ZB1) / 2, 0, sx * Math.PI / 2, 0, false);
+        for (let z = ZB0 + 0.05; z <= ZB1 - 0.04; z += 0.27) add(bodyG, rbox(0.04, YBS - YBT, 0.045, 0.012), M.paint, sx * (HB - 0.01), (YBT + YBS) / 2, z);
+        add(bodyG, new THREE.PlaneGeometry(ZB1 - ZB0, YBS - YBT), M.paint, sx * (HB - 0.035), (YBT + YBS) / 2, (ZB0 + ZB1) / 2, 0, sx * Math.PI / 2, 0, false);
         // (the corner posts and the bottom rub rail, black)
         for (const z of [ZB0, ZB1]) add(bodyG, rbox(0.07, YBS - YB0, 0.07, 0.02), M.paint, sx * (HB - 0.02), (YB0 + YBS) / 2, z);
         add(bodyG, rbox(0.06, 0.08, ZB1 - ZB0, 0.02), M.black, sx * (HB + 0.01), YB0 + 0.03, (ZB0 + ZB1) / 2);
@@ -700,8 +706,9 @@
       add(bodyG, new THREE.PlaneGeometry(2 * HB, YBS - YB0), M.paint, 0, (YB0 + YBS) / 2, ZB0, 0, 0, 0);
       add(bodyG, new THREE.BoxGeometry(2 * HB, 0.04, ZB1 - ZB0), M.ftIn, 0, YBT - 0.02, (ZB0 + ZB1) / 2);
       // the wheel well inside the opening (dark), the box's floor
-      for (const sx of [-1, 1]) add(bodyG, new THREE.PlaneGeometry(1.4, 1.4), M.ftDark, sx * 0.62, 1.92, 1.35, -Math.PI / 2, 0, 0, false);
-      for (const [z0, z1] of [[ZB0, 0.4], [2.3, ZB1]]) add(bodyG, new THREE.BoxGeometry(2 * HB - 0.04, 0.04, z1 - z0), M.ftDark, 0, YB0 + 0.02, (z0 + z1) / 2);
+      for (const sx of [-1, 1]) add(bodyG, new THREE.BoxGeometry(HB - 0.74, 0.75, AR[3][0] - AR[0][0]), M.ftDark, sx * (0.73 + (HB - 0.76) / 2), YB0 + 0.375, (AR[0][0] + AR[3][0]) / 2);
+      for (const [z0, z1] of [[ZB0, AR[0][0]], [AR[3][0], ZB1]]) add(bodyG, new THREE.BoxGeometry(2 * HB - 0.04, 0.04, z1 - z0), M.ftDark, 0, YB0 + 0.02, (z0 + z1) / 2);
+      add(bodyG, new THREE.BoxGeometry(1.44, 0.04, AR[3][0] - AR[0][0]), M.ftDark, 0, YB0 + 0.02, (AR[0][0] + AR[3][0]) / 2);
       // the back wall: red, the jet's tailpipe out of its lower middle, a dark grille over that under the sloping hood,
       // the tail lamps, the step under it
       { const sh = new THREE.Shape([[-HB, YB0], [HB, YB0], [HB, YBT], [-HB, YBT]].map(([x, y]) => new THREE.Vector2(x, y)));
@@ -725,8 +732,8 @@
         // the hood: a sloping sheet of diamond plate over the back of the hose bed, its sides closed
         const hz0 = ZB1 - 0.62, hz1 = ZB1 + 0.1, hy0 = YBS + 0.02, hy1 = 2.78;
         const hv = [[-HB + 0.06, hy0, hz0], [HB - 0.06, hy0, hz0], [HB - 0.06, hy1, hz1], [-HB + 0.06, hy1, hz1]];
-        add(bodyG, facesGeo(hv, [[0, 1, 2, 3]]), M.ftPlate, 0, 0, 0);
-        for (const sx of [-1, 1]) add(bodyG, facesGeo([[sx * (HB - 0.06), hy0, hz0], [sx * (HB - 0.06), hy1, hz1], [sx * (HB - 0.06), hy1, ZB1], [sx * (HB - 0.06), YBT, ZB1], [sx * (HB - 0.06), YBT, hz0]], [[0, 1, 2, 3, 4]]), M.ftPlate, 0, 0, 0);
+        add(bodyG, facesGeo(hv, [[0, 1, 2, 3]]), M.ftHood, 0, 0, 0);
+        for (const sx of [-1, 1]) add(bodyG, facesGeo([[sx * (HB - 0.06), hy0, hz0], [sx * (HB - 0.06), hy1, hz1], [sx * (HB - 0.06), hy1, ZB1], [sx * (HB - 0.06), YBT, ZB1], [sx * (HB - 0.06), YBT, hz0]], [[0, 1, 2, 3, 4]]), M.ftHood, 0, 0, 0);
       }
       // the J34's tailpipe: a grey steel tube a metre out of the back wall, sooted dark inside, its rim heat-stained
       const JY = 1.95, JR = 0.34, JZ0 = ZB1 - 0.4, JZ1 = ZB1 + 0.98;
@@ -735,11 +742,12 @@
       add(bodyG, new THREE.TorusGeometry(JR - 0.005, 0.012, 8, 40), new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.5, metalness: 0.7 }), 0, JY, JZ1);
       add(bodyG, new THREE.CircleGeometry(JR - 0.02, 32), M.black, 0, JY, JZ1 - 0.5, 0, Math.PI, 0, false);
       // ---- the ladder rack arching over the box: a red tube frame along each side, joined across front and back
-      for (const sx of [-1, 1]) pipeTo(bodyG, [V3(sx * 1.1, YBS, 0.0), V3(sx * 1.1, 3.95, 0.0), V3(sx * 1.1, 4.05, 0.12), V3(sx * 1.1, 4.05, 2.28), V3(sx * 1.1, 3.95, 2.4), V3(sx * 1.1, YBS, 2.4)], 0.045, M.rack, true);
-      for (const z of [0.12, 2.28]) tubeAB(bodyG, V3(-1.1, 4.05, z), V3(1.1, 4.05, z), 0.04, M.rack);
+      { const z0 = ZB0 + 0.1, z1 = ZB1 - 0.32, yT = YBS + 0.62, yH = YBS + 0.36, x = 1.1;
+        pipeTo(bodyG, [V3(-x, YBS, z0), V3(-x, yT - 0.1, z0), V3(-x, yT, z0 + 0.1), V3(-x, yT, z1 - 0.1), V3(-x, yT - 0.1, z1), V3(-x, YBS, z1)], 0.045, M.rack, true);
+        pipeTo(bodyG, [V3(-x, yH, z1), V3(x - 0.1, yH, z1), V3(x, yH - 0.1, z1), V3(x, YBS, z1)], 0.04, M.rack, true); }
       // ---- the jet's flame: a hot core and the plume round it, both additive - a shimmer dry, a long flame lit
       const flameMat = (core) => new THREE.ShaderMaterial({
-        uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 }, uK: { value: core ? 0.22 : 0.3 } },
+        uniforms: { uAB: { value: 0 }, uThr: { value: 0 }, uT: { value: 0 }, uCore: { value: core ? 1 : 0 }, uK: { value: core ? 0.1 : 0.135 } },
         vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
         fragmentShader: `uniform float uAB; uniform float uThr; uniform float uT; uniform float uCore; uniform float uK; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
           void main() {
@@ -1019,7 +1027,7 @@
     const hoops = new THREE.Group(); chassis.add(hoops);
     const RY = 1.02, UY = 1.92, CX = 0.44;
     // (the jet fire truck's: its rails end under the cab's front and the box's back)
-    const RF = FT ? -2.1 : -2.45, RB = FT ? 2.6 : 2.45, H = FT ? () => {} : (a, b) => tubeAB(hoops, a, b, 0.032, M.chassis, 10);
+    const RF = FT ? -2.45 : -2.45, RB = FT ? 2.65 : 2.45, H = FT ? () => {} : (a, b) => tubeAB(hoops, a, b, 0.032, M.chassis, 10);
     for (const sx of [-1, 1]) {
       const x = sx * CX;
       // main rails, kicked up at both ends
@@ -1042,7 +1050,7 @@
     const SL = opts.body === 'avenger' ? 0.06 : 0;
     // (the fire truck's driver sits in its cab, on the left, over the front axle: the seat, the driver, the wheel and the
     // dash all moved there by OFF)
-    const OFF = FT ? V3(-0.55, -0.4, -1.42) : V3(0, 0, 0), seatG = new THREE.Group(); seatG.position.copy(OFF); chassis.add(seatG);
+    const OFF = FT ? V3(-0.55, -0.4, -1.75) : V3(0, 0, 0), seatG = new THREE.Group(); seatG.position.copy(OFF); chassis.add(seatG);
     add(seatG, rbox(0.56, 0.07, 0.55, 0.03), M.black, 0, 2.24 + SL, 0.12);
     add(seatG, rbox(0.56, 0.75, 0.08, 0.04), M.black, 0, 2.61 + SL, 0.4, -0.12, 0, 0);
     if (!FT) add(seatG, rbox(0.5, 0.34 + SL, 0.5, 0.03), M.alu, 0, 2.05 + SL / 2, 0.12);
@@ -1113,7 +1121,7 @@
     const inside = new THREE.Group(); cage.add(inside);
     if (FT) {
       // (the fire truck's cab stays: you look out of its own windows - the dash across under the windshield)
-      add(inside, rbox(2.3, 0.26, 0.42, 0.05), M.black, 0, 2.1, -1.92);
+      add(inside, rbox(2.3, 0.26, 0.42, 0.05), M.black, 0, 2.1, -2.3);
     } else if (opts.body === 'avenger') {
       // (the AVENGER: its own cab seen from within, and a dash across under the windshield - behind the cab's skin)
       inside.add(BODY.cabIn);
@@ -1135,6 +1143,15 @@
     // hand-cut paddle tread: chevron lugs across the crown and wrapping over the shoulders (mirrored for the left)
     // (deep: the off-road package's full-depth lugs - ~1 in taller, and the physics' rolling radius 2 cm bigger with them)
     function lugs(dir, deep) {
+      if (FT && !deep) {
+        // (the fire truck's flotation tyres: low bars curving across the crown, the shoulders smooth)
+        const list = [], N = 24;
+        for (let k = 0; k < N; k++) for (const side of [-1, 1]) {
+          for (const [o, a] of [[0.12, 0.25], [0.32, 0.5]]) { const b = new THREE.BoxGeometry(0.22, 0.025, 0.08); b.rotateY(-side * dir * a); b.translate(side * o, RT + 0.004, side * dir * (o - 0.1) * 0.6);
+            b.rotateX(k * Math.PI * 2 / N + (side > 0 ? Math.PI / N : 0)); list.push(b); }
+        }
+        return mergeGeos(list);
+      }
       const list = [], N = 34, lh = deep ? 0.075 : 0.055, ly = deep ? RT + 0.0225 : RT + 0.012;
       for (let k = 0; k < N; k++) {
         const phi = k * Math.PI * 2 / N;
@@ -1157,6 +1174,16 @@
     });
     const swMat = new THREE.MeshStandardMaterial({ map: swTex, transparent: true, alphaTest: 0.4, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 });
     function rim(g) {
+      if (FT) {
+        // (the fire truck's: plain painted steel, light grey - a rolled lip, the dish, the centre plate; no lettering)
+        M.ftWheel = M.ftWheel || new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide });
+        const lip = new THREE.TorusGeometry(RRIM + 0.015, 0.025, 10, 56); lip.rotateY(Math.PI / 2); add(g, lip, M.ftWheel, 0.47, 0, 0);
+        const dsh = new THREE.CylinderGeometry(0.2, RRIM, 0.3, 48, 1, true); dsh.rotateZ(Math.PI / 2); add(g, dsh, M.ftWheel, 0.33, 0, 0);
+        const brl = new THREE.CylinderGeometry(RRIM, RRIM, 0.95, 48, 1, true); brl.rotateZ(Math.PI / 2); add(g, brl, M.ftWheel, 0, 0, 0);
+        const plt = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 40); plt.rotateZ(Math.PI / 2); add(g, plt, M.ftWheel, 0.2, 0, 0);
+        const bck = new THREE.CircleGeometry(RRIM, 40); bck.rotateY(-Math.PI / 2); add(g, bck, M.steel, -0.44, 0, 0, 0, 0, 0, false);
+        return;
+      }
       // 25 in wheel: outer beadlock ring with bolts, deep dish, centre with the planetary hub
       const ring = new THREE.TorusGeometry(RRIM + 0.02, 0.03, 10, 56); ring.rotateY(Math.PI / 2); add(g, ring, M.polish, 0.47, 0, 0);
       const bl = new THREE.CylinderGeometry(RRIM + 0.05, RRIM + 0.05, 0.05, 56, 1, true); bl.rotateZ(Math.PI / 2); add(g, bl, FT ? M.alu : M.black, 0.47, 0, 0);
@@ -1258,7 +1285,7 @@
     const headlights = [];
     for (const sx of [-1, 1]) {
       const sl = new THREE.SpotLight(0xf2f6ff, 0, 110, 0.5, 0.45, 1.4);
-      sl.position.set(sx * (FT ? 0.9 : 1.32), (FT ? 2.0 : 1.95) - cgH, (FT ? -2.2 : -3.0) + zOff);
+      sl.position.set(sx * (FT ? 0.9 : 1.32), (FT ? 2.0 : 1.95) - cgH, (FT ? -2.6 : -3.0) + zOff);
       sl.target.position.set(sx * 1.6, -cgH, -45 + zOff);
       rootG.add(sl); rootG.add(sl.target); sl.visible = false; headlights.push(sl);
     }
@@ -1313,7 +1340,7 @@
       const on = ab > 0.02 || thr > 0.3;
       J.outer.visible = J.core.visible = on;
       if (!on) return;
-      J.outer.scale.z = (0.35 + 1.9 * ab + 0.25 * thr) * 2.4; J.core.scale.z = (0.2 + 0.95 * ab + 0.1 * thr) * 2.4;
+      J.outer.scale.z = (0.35 + 1.9 * ab + 0.25 * thr) * 1.4; J.core.scale.z = (0.2 + 0.95 * ab + 0.1 * thr) * 1.4;
       for (const m of [J.outer.material, J.core.material]) { m.uniforms.uAB.value = ab; m.uniforms.uThr.value = thr; m.uniforms.uT.value = J.t; }
     }
     function setJetSize(sz) { BODY.jetFx.g.scale.setScalar(clamp(sz / 2.6, 0.7, 1.6)); }
