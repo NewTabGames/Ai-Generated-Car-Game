@@ -29,14 +29,15 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    // the tracks (rally stages, the windy mower course): the distance from the centre line, baked once into a texture from
-    // worldgen's own line (0.1 m steps to 25.5 m) - the shader paints the road, its edges and verges from it
+    // the tracks (rally stages, the windy mower course, an offroad race's course): the distance from the centre line, baked
+    // once into a texture from worldgen's own line (0.1 m steps to 25.5 m) - the shader paints the road, its edges and
+    // verges from it - and in its second channel the zone of the course there (an offroad course's mud holes, washes...)
     const TRK = W.track, trkBox = new THREE.Vector4(0, 0, 1, 1);
     let trkTex = null;
     if (TRK) {
       const M = 26, res = TRK.kind === 'mow' ? 0.5 : 1, bx0 = TRK.box[0] - M, bz0 = TRK.box[1] - M;
       const w = Math.ceil((TRK.box[2] - TRK.box[0] + 2 * M) / res), h = Math.ceil((TRK.box[3] - TRK.box[1] + 2 * M) / res);
-      const df = new Float32Array(w * h).fill(25.5);
+      const df = new Float32Array(w * h).fill(25.5), zf = new Uint8Array(w * h);
       for (let i = 0; i < TRK.n; i++) {
         const j = (i + 1) % TRK.n, ax = TRK.x[i], az = TRK.z[i], dx = TRK.x[j] - ax, dz = TRK.z[j] - az, l2 = dx * dx + dz * dz || 1;
         const ia = Math.max(0, Math.floor((Math.min(ax, ax + dx) - 25.5 - bx0) / res)), ib = Math.min(w - 1, Math.ceil((Math.max(ax, ax + dx) + 25.5 - bx0) / res));
@@ -47,28 +48,29 @@ float lampLight(float lat, float al){
             const px = bx0 + (a + 0.5) * res - ax;
             let t = (px * dx + pz * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
             const ex = px - dx * t, ez = pz - dz * t, d = Math.sqrt(ex * ex + ez * ez), k = b * w + a;
-            if (d < df[k]) df[k] = d;
+            if (d < df[k]) { df[k] = d; zf[k] = TRK.zone ? TRK.zone[i] : 0; }
           }
         }
       }
-      const u8 = new Uint8Array(w * h);
-      for (let k = 0; k < w * h; k++) u8[k] = Math.round(Math.min(25.5, df[k]) * 10);
-      trkTex = new THREE.DataTexture(u8, w, h, THREE.RedFormat, THREE.UnsignedByteType);
+      const u8 = new Uint8Array(w * h * 2);
+      for (let k = 0; k < w * h; k++) { u8[k * 2] = Math.round(Math.min(25.5, df[k]) * 10); u8[k * 2 + 1] = zf[k]; }
+      trkTex = new THREE.DataTexture(u8, w, h, THREE.RGFormat, THREE.UnsignedByteType);
       trkTex.unpackAlignment = 1; trkTex.magFilter = THREE.LinearFilter; trkTex.minFilter = THREE.LinearMipmapLinearFilter; trkTex.generateMipmaps = true;
       trkTex.needsUpdate = true;
       trkBox.set(bx0, bz0, 1 / (w * res), 1 / (h * res));
     }
     const DUNEMAP = W.map === 'dunes';
     const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
-      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
-      uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 } };
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+      uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 },
+      uBiome: { value: TRK && TRK.kind === 'offroad' ? ['dunes', 'forest', 'desert', 'mud', 'mountain'].indexOf(TRK.biome) : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
       sh.vertexShader = 'attribute vec2 aData;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\n' +
         sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
   vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vData = aData; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nuniform sampler2D uTrk;\nuniform vec4 uTrkBox;\nuniform float uTrkW;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
+      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nuniform sampler2D uTrk;\nuniform vec4 uTrkBox;\nuniform float uTrkW;\nuniform float uBiome;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
         sh.fragmentShader
           .replace('#include <color_fragment>', `
   {
@@ -114,7 +116,74 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 7.5) {
+    if (uMap > 8.5) {
+      // ---- an offroad race: the terrain painted its own way, the course worn into it. td: metres from the centre line;
+      // zone: the course's mud holes (forest, 1), sandy washes (desert, 2), firm dry stretches (the bog, 3)
+      vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
+      vec4 tt = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv) : vec4(1.0, 0.0, 0.0, 0.0);
+      float td = tt.r * 25.5, zn = tt.g * 255.0;
+      float m1 = vnoise(P * 0.35), m2 = vnoise(P * 2.2), m3 = vnoise(P * 9.0);
+      float edge = uTrkW + (vnoise(P * 0.9) - 0.5) * 0.9 + (m3 - 0.5) * 0.3;
+      float onT = 1.0 - smoothstep(edge - 0.45, edge + 0.45, td);
+      float verge = 1.0 - smoothstep(uTrkW + 0.5, uTrkW + 3.2, td);
+      // (the lines everyone takes: packed darker, wandering a little)
+      float ruts = (exp(-pow((td - 1.0) / 0.5, 2.0)) + 0.6 * exp(-pow((td - uTrkW * 0.6) / 0.55, 2.0))) * (0.55 + 0.45 * vnoise(P * 0.5));
+      float slope = 1.0 - vWN.y;
+      vec3 base = col, trk = col, vg = col; float rT = 0.95;
+      if (uBiome < 0.5) {
+        // dunes: golden sand, wind ripples across it (none on the slip faces or far off); the course churned up -
+        // darker, rutted, no ripples left on it
+        vec2 U = vec2(0.96, 0.28);
+        float s1 = vnoise(P * 0.06), s2 = fbm3(P * 0.004 + 3.0), s4 = vnoise(P * 9.0);
+        vec3 c = mix(vec3(0.42, 0.24, 0.085), vec3(0.5, 0.3, 0.115), s1) * (0.94 + 0.05 * m2 + 0.03 * s4);
+        c = mix(c, vec3(0.46, 0.21, 0.065), smoothstep(0.55, 0.85, s2) * 0.4);
+        float slip = smoothstep(0.18, 0.4, dot(vWN.xz, U));
+        float rq = dot(P, U) / 0.3 + vnoise(P * 0.45) * 3.0 + vnoise(P * 2.1) * 0.6, rf = fract(rq);
+        float rip = rf < 0.78 ? rf / 0.78 : (1.0 - rf) / 0.22;
+        float rfade = (1.0 - smoothstep(6.0, 40.0, dist)) * (1.0 - smoothstep(0.2, 0.45, fwidth(rq))) * (1.0 - slip) * (1.0 - onT);
+        base = c * (1.0 + 0.05 * slip) * (1.0 + 0.1 * (rip - 0.5) * rfade);
+        trk = c * (0.86 + 0.08 * m2) * (1.0 - 0.18 * ruts);
+        vg = mix(base, trk, 0.5);
+      } else if (uBiome < 1.5) {
+        // forest: the woodland floor as it is; a brown dirt track, the mud holes black and wet
+        vec3 dirt = mix(vec3(0.2, 0.13, 0.075), vec3(0.27, 0.18, 0.1), m1) * (0.85 + 0.12 * m2 + 0.06 * m3) * (1.0 - 0.25 * ruts);
+        float mud = clamp(zn, 0.0, 1.0);
+        trk = mix(dirt, vec3(0.06, 0.045, 0.03) * (0.85 + 0.3 * m2), mud);
+        rT = mix(0.95, 0.32, mud * (0.6 + 0.4 * m1));
+        vg = mix(col, vec3(0.19, 0.14, 0.08) * (0.8 + 0.3 * m2), 0.65);
+      } else if (uBiome < 2.5) {
+        // desert: pale khaki hardpan with reddish streaks and gravel patches, banded red rock up the mesas; the course a
+        // lighter packed track, its washes pale loose sand, gravel thrown up along its edges
+        float s1 = vnoise(P * 0.05), s2 = fbm3(P * 0.006 + 2.0);
+        vec3 c = mix(vec3(0.27, 0.19, 0.11), vec3(0.33, 0.24, 0.14), s1) * (0.92 + 0.08 * m2 + 0.05 * m3);
+        c = mix(c, vec3(0.3, 0.15, 0.075), smoothstep(0.55, 0.85, s2) * 0.45);
+        c = mix(c, vec3(0.19, 0.17, 0.14) * (0.8 + 0.3 * m3), smoothstep(0.62, 0.8, vnoise(P * 0.12)) * 0.5);
+        vec3 band = mix(vec3(0.27, 0.13, 0.07), vec3(0.37, 0.2, 0.11), vnoise(vec2(P.x * 0.03 + P.y * 0.03, vWPos.y * 0.7)));
+        base = mix(c, band, smoothstep(0.25, 0.45, slope));
+        vec3 hard = mix(vec3(0.34, 0.26, 0.17), vec3(0.39, 0.3, 0.2), m1) * (0.9 + 0.08 * m2 + 0.05 * m3) * (1.0 - 0.2 * ruts);
+        trk = mix(hard, vec3(0.42, 0.3, 0.16) * (0.92 + 0.1 * m3), clamp(zn / 2.0, 0.0, 1.0));
+        vg = mix(base, vec3(0.23, 0.2, 0.17) * (0.85 + 0.3 * m3), 0.7);
+      } else if (uBiome < 3.5) {
+        // the bog: lush grass with soggy dark patches; the course dark glistening mud, water lying in the ruts, firmer
+        // lighter dirt over the rises
+        vec3 g = mix(vec3(0.12, 0.2, 0.05), vec3(0.17, 0.25, 0.07), m1) * (0.9 + 0.1 * m2 + 0.06 * m3);
+        base = mix(g, vec3(0.07, 0.09, 0.045), smoothstep(0.55, 0.8, vnoise(P * 0.08)) * 0.6);
+        float wet = smoothstep(0.5, 0.72, vnoise(P * 0.22)) * clamp(ruts * 1.4, 0.0, 1.0);
+        vec3 mud = mix(vec3(0.085, 0.06, 0.04), vec3(0.13, 0.095, 0.06), m2) * (0.9 + 0.1 * m3);
+        mud = mix(mud, vec3(0.035, 0.04, 0.035), wet);
+        float dry = clamp(zn / 3.0, 0.0, 1.0);
+        trk = mix(mud, vec3(0.22, 0.15, 0.09) * (0.85 + 0.15 * m2) * (1.0 - 0.2 * ruts), dry);
+        rT = mix(mix(0.5, 0.12, wet), 0.93, dry);
+        vg = mix(base, mud, 0.6);
+      } else {
+        // the mountain: alpine grass with the grey rock out on the slopes (and snow up top); the course grey gravel
+        vec3 grav = mix(vec3(0.26, 0.25, 0.23), vec3(0.34, 0.33, 0.3), m1) * (0.85 + 0.13 * m2 + 0.08 * m3) * (1.0 - 0.22 * ruts);
+        trk = grav;
+        vg = mix(col, vec3(0.31, 0.3, 0.28) * (0.8 + 0.3 * m3), 0.7);
+      }
+      col = mix(mix(base, vg, verge), trk, onT);
+      rough = mix(1.0, rT, onT);
+    } else if (uMap > 7.5) {
       // ---- Sand Dunes: warm golden sand - redder and paler patches, the slip faces (facing downwind) fresh, smooth and
       // a touch lighter, wind ripples across everything else (sharp crests, fading out with distance), old tyre tracks
       // wandering over it all; the packed hardpan at the start greyer and firmer, rutted where everyone's parked
@@ -528,16 +597,31 @@ float lampLight(float lat, float al){
         merge([blob(1.2, 1, 0, 5.4, 0, 1.3, 0.35, 21), blob(0.9, 1, 0.6, 4.6, 0.3, 1.2, 0.3, 22), blob(0.9, 1, -0.5, 4.9, -0.4, 1.2, 0.3, 23)]),
       ],
       bush: merge([blob(0.9, 1, 0, 0.45, 0, 0.75, 0.35, 31), blob(0.7, 1, 0.55, 0.35, 0.2, 0.7, 0.3, 32)]),
+      // (a saguaro: the column, a domed top; its two arms out and up)
+      cactusBody: merge([cyl(0.24, 0.27, 4.6, 10), (() => { const g = new THREE.SphereGeometry(0.24, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(0, 4.3, 0); return g; })()]),
+      cactusArms: merge([(() => { const g = new THREE.CylinderGeometry(0.15, 0.15, 0.55, 8); g.rotateZ(Math.PI / 2); g.translate(0.4, 1.9, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.15, 0.16, 1.5, 8); g.translate(0.62, 2.6, 0); return g; })(), (() => { const g = new THREE.SphereGeometry(0.15, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(0.62, 3.35, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.13, 0.13, 0.45, 8); g.rotateZ(Math.PI / 2); g.translate(-0.34, 2.5, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.13, 0.14, 1.1, 8); g.translate(-0.53, 3.0, 0); return g; })(), (() => { const g = new THREE.SphereGeometry(0.13, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(-0.53, 3.55, 0); return g; })()]),
       rock: (() => { const g = new THREE.IcosahedronGeometry(1, 1); jitterGeo(g, 0.55, 41); g.scale(1.2, 0.75, 1); g.translate(0, 0.2, 0); g.computeVertexNormals(); return g; })(),
     };
     const MAT = {
       trunk: [new THREE.MeshStandardMaterial({ color: 0x4a3526, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0x3f3024, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0xd9d4c7, roughness: 0.8 })],
       leaves: [new THREE.MeshStandardMaterial({ color: 0x24401f, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0x35521f, roughness: 0.92 }), new THREE.MeshStandardMaterial({ color: 0x5d7d2b, roughness: 0.9 })],
       bush: new THREE.MeshStandardMaterial({ color: 0x2e4a1a, roughness: 0.95 }),
+      cactus: new THREE.MeshStandardMaterial({ color: 0x46612f, roughness: 0.85 }),
       rock: new THREE.MeshStandardMaterial({ color: 0x77726b, roughness: 0.92, flatShading: true }),
       pole: new THREE.MeshStandardMaterial({ color: 0x5b4633, roughness: 0.9 }),
       wire: new THREE.LineBasicMaterial({ color: 0x151515 }),
     };
+    GEO.trunk.push(GEO.cactusBody); GEO.leaves.push(GEO.cactusArms); MAT.trunk.push(MAT.cactus); MAT.leaves.push(MAT.cactus);
+    // (an offroad course's scrub and stone: dry sage in the desert, bleached tufts on the dunes; red sandstone in the
+    // desert, grey granite up the mountain)
+    if (TRK && TRK.kind === 'offroad') {
+      const BC = { desert: 0x5e6040, dunes: 0x7a6a40, mountain: 0x34462a }[TRK.biome], RC = { desert: 0x94634a, mountain: 0x7a7874 }[TRK.biome];
+      if (BC) MAT.bush.color.setHex(BC);
+      if (RC) MAT.rock.color.setHex(RC);
+    }
     // buildings
     const winTex = (() => {
       const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
@@ -743,7 +827,7 @@ float lampLight(float lat, float al){
       const x0 = cx * CH, z0 = cz * CH;
       const g = new THREE.Group(); g.position.set(x0, 0, z0);
       const td = q.treeDensity;
-      for (let kind = 0; kind < 3; kind++) {
+      for (let kind = 0; kind < GEO.trunk.length; kind++) {
         const sel = [];
         for (let i = 0; i < cp.trees.length; i += 6) {
           if (cp.trees[i + 5] !== kind) continue;
@@ -1206,7 +1290,7 @@ void main(){
       const A = TP.arch, dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
       const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz);
       for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
-      const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : 'WINDY MOWER TRACK';
+      const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : W.map === 'offroad' ? 'OFFROAD RACE · ' + TRK.B.name.toUpperCase() : 'WINDY MOWER TRACK';
       const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
       { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
         g.fillStyle = '#f4f4f0'; g.fillRect(0, 32, 1024, 32); g.fillStyle = '#111'; g.font = 'italic 900 30px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -1215,6 +1299,20 @@ void main(){
       const banM = new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 });
       const banner = new THREE.Mesh(new THREE.BoxGeometry(A.w + 0.4, 0.8, 0.06), [dark, dark, dark, dark, banM, banM]);
       banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; tg.add(banner);
+      // (an offroad course: white marker stakes with an orange top down both edges; across the dunes, tall whip flags)
+      if (TP.stakes && TP.stakes.length) {
+        const dun = TRK.biome === 'dunes', m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+        const parts = dun
+          ? [[new THREE.CylinderGeometry(0.012, 0.016, 3.6, 5).translate(0, 1.8, 0), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })],
+            [(() => { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0.75, -0.17); sh.lineTo(0, -0.42); sh.closePath(); return new THREE.ShapeGeometry(sh).translate(0.012, 3.58, 0); })(), new THREE.MeshStandardMaterial({ color: 0xff5a10, roughness: 0.7, side: THREE.DoubleSide, emissive: 0x401000 })]]
+          : [[new THREE.BoxGeometry(0.05, 1.0, 0.05).translate(0, 0.42, 0), new THREE.MeshStandardMaterial({ color: 0xe8e6df, roughness: 0.8 })],
+            [new THREE.BoxGeometry(0.058, 0.17, 0.058).translate(0, 0.86, 0), new THREE.MeshStandardMaterial({ color: 0xff5a10, roughness: 0.6, emissive: 0x2a0a00 })]];
+        for (const [geo, mat] of parts) {
+          const im = new THREE.InstancedMesh(geo, mat, TP.stakes.length); im.castShadow = true;
+          TP.stakes.forEach((st, i) => { qq.setFromAxisAngle(up, W.hash01(i, 3, 17) * Math.PI * 2); pv.set(st.x, gh(st.x, st.z), st.z); m4.compose(pv, qq, one); im.setMatrixAt(i, m4); });
+          tg.add(im);
+        }
+      }
       const chkC = document.createElement('canvas'); chkC.width = 256; chkC.height = 16;
       { const g = chkC.getContext('2d'); for (let k = 0; k < 32; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#141414' : '#ecebe6'; g.fillRect(k * 8, r * 8, 8, 8); } }
       const chkT = new THREE.CanvasTexture(chkC); chkT.colorSpace = THREE.SRGBColorSpace;

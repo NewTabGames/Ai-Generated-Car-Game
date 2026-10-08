@@ -85,6 +85,28 @@ Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side a
 
 ---
 
+## 🏁 Game Modes
+
+**Game modes** on the title screen (or Esc → Modes). The first is **Offroad Racing**.
+
+### Offroad Racing
+
+A new offroad course is generated for every race - laid out from a random seed and the settings you pick - and you race it in laps: against the clock on your own, or against the room online.
+
+- **Map type** - the land it's generated on:
+  - **Dunes** - sand from horizon to horizon, the course marked by orange whip flags up the long faces and off the brinks.
+  - **Forest** - a dirt trail through the woods over rolling hills, with berms round the corners and mud holes in the dips.
+  - **Desert** - fast hardpack across open desert: whoops, sandy washes to cross, saguaros and scrub, mesas on the horizon.
+  - **Mud Bog** - a low, wet bog: mud most of the way, water lying in the ruts, firmer dirt over the rises.
+  - **Mountain** - gravel up and down the mountainside: cuttings and drops, pines below the tree line, snow up top.
+- **Length** (short ~2 km / medium ~3.5 km / long ~5.5 km a lap), **laps** (1 / 2 / 3 / 5 / 10), **corners** (flowing sweepers / mixed / technical - tight turns, esses and hairpins), **width**, **jumps** (none / some / lots - tabletops, and kickers with Lots, each with a JUMP sign 45 m before it) and **whoops** (runs of rollers ~9 m apart).
+- **How it's built:** a closed loop through control points at wandering radii round a centre, scaled to the length asked for, drawn again until it turns no tighter than the corner setting allows and never comes back near itself; the start goes on its straightest stretch. The ground under it follows the terrain's own - smoothed, its grades held to what a car can climb (cuttings through the crests, fills across the dips, the brows rounded off so you stay on the ground over them), level across, with berms round the outside of the tighter corners - and blends back into the land either side. Jumps only go on a straight that runs level or downhill through the landing, graded to an even slope first, so nothing rises up to meet you.
+- **Your car** - any car, set up your way: the Modes tab shows it, with a few that suit the terrain, and its Fun-tab tune is what races. The **air assist** (on by default, Modes tab) helps every vehicle over the jumps and brows: it eases the gas or brake in the air and nudges the car level for the slope it's landing on.
+- **The race:** the countdown runs by itself (and starts over if you open the menu before GO). Marker stakes line both edges (flags across the dunes), and invisible walls 12 m out stop shortcuts. The board (top right) shows your time, the lap and your last and best laps; Backspace puts you back on the course whenever you like. At the flag you get your time, every lap and your **personal best** for that course in that car - then race it again, take a new course, change the settings or go back to free roam.
+- **Course codes:** every course has one (e.g. `FOR-M3MR11-XRD30Q` - the terrain, length, laps, corners, width, jumps, whoops and seed). It's on the results and in the Modes tab; type a friend's in to race the very same course.
+
+---
+
 ## 🌐 Online Racing
 
 **Play online** on the title screen (or Esc → Online): one player hosts a room and gets a 5-letter code, friends type it in to join. Needs an internet connection; it runs on Firebase (anonymous guest sign-in, a Realtime Database), and the single-player game never touches the network.
@@ -95,6 +117,7 @@ Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side a
   - **Points** for ground covered along the course: on the road 1 point a metre, times a streak that builds the longer you stay on it (+0.1 every 40 m, up to ×3). Off the road it's a quarter of that and the streak's gone. Hitting a straw bale costs 100 and the streak. Driving backwards earns nothing, and what you gave up has to be made up first. The board (top right) ranks everyone.
   - **No shortcuts:** invisible walls run well off the road (10 m past the edge on the rally stages, 6 m on the mower tracks) and follow your own bit of the course, so you can't cut across to another bit of it. They're no guard rail: touching one throws the car about and bleeds its speed away. A car that ends up past them is put back where it was.
   - **Reset** (Backspace) once every 30 s - the timer's over the minimap, bottom left.
+- **Offroad Racing online:** host on the Offroad Race map and the room races the course you set up in Game modes (it goes out as its course code, so everyone generates the same one), in your car and tune. Change the course and everyone follows. Start the race from the grid as above; places go by laps and ground covered, then by finishing time once people finish, and a reset back onto the course is allowed every 10 s. Anyone who missed the start - they joined late or their tab was away - is put on the grid with their clock running since GO.
 - The others' cars are solid: a bump is shared by weight, and whichever game sees it sends the other car its share, so the car that's hit gets shoved. Their engines play from where they are, and their names float over them.
 - **Graphics → Tyre smoke & dust → Small** keeps a few little puffs at the tyres - no big drift smoke or dirt clouds to see through (the other players' cars too).
 
@@ -162,7 +185,7 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── input.js            # Keyboard, gamepad, and steering wheel input handling
 │   ├── net.js              # Online rooms over Firebase (guest sign-in, Realtime Database), loaded only when you go online
 │   ├── vehicle.js          # Vehicle dynamics, suspension, engine torque curves, transmission
-│   ├── worldgen.js         # Procedural road network, elevation, terrain, the Monster Arena's jumps / crushable cars, the Mower Track, the rally stages and the windy mower course (closed-loop tracks), the Sand Dunes
+│   ├── worldgen.js         # Procedural road network, elevation, terrain, the Monster Arena's jumps / crushable cars, the Mower Track, the rally stages and the windy mower course (closed-loop tracks), the Sand Dunes, Offroad Racing's generated courses
 │   └── worldrender.js      # Three.js world rendering, lighting, and foliage instancing
 ├── test/                   # Physics benchmarks and audio sanity tests
 └── viewer/                 # Standalone vehicle model viewer files
@@ -206,6 +229,8 @@ node test/rc-test.js
 node test/bus-test.js
 node test/landspeeder-firetruck-test.js
 node test/pops-test.js
+node test/offroad-course-test.js    # Offroad Racing: every terrain / length / corners - generation time, length, grades, jumps, surfaces, codes
+node test/offroad-drive-test.js     # Offroad Racing: a driver bot takes the trophy truck round a lap of each terrain (CARS, BIOMES, LEN, SEED)
 ```
 
 The tyre look test runs the game in headless Chromium, so it needs Playwright (`npm i -D playwright && npx playwright install chromium`; without it, it skips). It builds every vehicle - every title-screen car and More Cars card, each version - with every tyre choice the game offers it (the game's `tyreChoices()`), and fails if two choices are drawn the same. A new vehicle is checked automatically; a new tyre option belongs in `tyreChoices()` in `src/game.js`, and the vehicle's model has to show it in its `setTires(front, rear)`:

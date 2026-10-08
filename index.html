@@ -127,6 +127,26 @@
   #carPickTitle .carbtn.more { flex: 0 0 170px; }
   .carbtn.more.on { border-style: solid; }
   #moreCars { z-index: 30; }
+  /* Game modes (Offroad Racing's settings) and an offroad race's results */
+  #modes { z-index: 20; }
+  #modes .panel, #raceRes .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); text-align: left; }
+  #modes header, #raceRes header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  #modes header h2, #raceRes header h2 { margin: 0; font-size: 20px; font-style: italic; letter-spacing: 0.06em; }
+  #modes header h2 span, #raceRes header h2 span { color: var(--red); }
+  #modesBody { overflow: auto; padding: 10px 20px 18px; }
+  #raceRes { z-index: 15; }
+  #raceRes .panel { width: min(520px, 94vw); text-align: center; }
+  #rrBody { padding: 14px 22px 20px; }
+  .rrTime { font-size: 56px; font-weight: 900; font-style: italic; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .rrSub { color: var(--dim); font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; margin: 2px 0 12px; }
+  .rrSub.pb { color: #6dff7a; }
+  .rrLaps { max-width: 260px; margin: 0 auto 12px; text-align: left; }
+  .rrLaps div { display: flex; justify-content: space-between; padding: 2px 0; font-variant-numeric: tabular-nums; color: var(--dim); border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .rrLaps div.best { color: #fff; font-weight: 700; }
+  .rrMeta { color: var(--dim); font-size: 12px; line-height: 1.6; margin-bottom: 14px; }
+  .rrMeta b { color: #fff; letter-spacing: 0.08em; }
+  .rrBtns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .modecode { font-size: 15px; letter-spacing: 0.12em; color: #fff; font-weight: 700; }
   #moreCars .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); pointer-events: auto; }
   #moreCars header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   #moreCars header h2 { margin: 0; font-size: 20px; font-style: italic; letter-spacing: 0.06em; }
@@ -216,9 +236,10 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button><button data-map="offroad">Map: Offroad Race</button>
     </div>
-    <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
+    <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="modesBtn" style="pointer-events:auto">Game modes</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
+    <div id="modeTitle" style="margin-top:8px;font-size:13px;color:#ffb36b"></div>
     <div id="netTitle" style="margin-top:8px;font-size:13px;color:#9ab"></div>
     <div id="loadbar"><i></i></div>
     <div id="padstatus">Wheel users: press any button on your wheel so the browser can see it.</div>
@@ -247,6 +268,20 @@
   </div>
 </div>
 
+<div id="modes" class="overlay hidden">
+  <div class="panel">
+    <header><h2>GAME <span>MODES</span></h2><button class="btn small ghost" id="modesClose">Close</button></header>
+    <div id="modesBody"></div>
+  </div>
+</div>
+
+<div id="raceRes" class="overlay hidden">
+  <div class="panel">
+    <header><h2>OFFROAD <span>RACE</span></h2><span style="color:var(--dim);font-size:12px;letter-spacing:0.12em">FINISHED</span></header>
+    <div id="rrBody"></div>
+  </div>
+</div>
+
 <div id="wizard" class="overlay hidden">
   <div class="panel">
     <h3 id="wzStep">Wheel setup</h3>
@@ -258,8 +293,8 @@
   </div>
 </div>
 
-<script src="src/net.js?v=77bc70648c"></script>
-<script src="src/worldgen.js?v=e875707132"></script>
+<script src="src/net.js?v=7978749a8a"></script>
+<script src="src/worldgen.js?v=716dd09d3f"></script>
 <script src="src/vehicle.js?v=caf9bef8b9"></script>
 <script src="src/audio.js?v=d72e3e64ff"></script>
 <script src="src/input.js?v=edf1983a9d"></script>
@@ -275,9 +310,9 @@
 <script src="src/offroad.js?v=347b4c66b4"></script>
 <script src="src/atv.js?v=75aad340fb"></script>
 <script src="src/unicycle.js?v=30de75f58a"></script>
-<script src="src/worldrender.js?v=085d67a7c6"></script>
+<script src="src/worldrender.js?v=9483833a5c"></script>
 <script src="src/fx.js?v=09098f4e51"></script>
 <script src="src/hud.js?v=7f806ad16e"></script>
-<script src="src/game.js?v=bd139fd97d"></script>
+<script src="src/game.js?v=c9128376bb"></script>
 </body>
 </html>

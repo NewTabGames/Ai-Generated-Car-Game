@@ -1,6 +1,6 @@
 /* Hellcat Drive — online play over Firebase (Realtime Database + anonymous sign-in).
-   Rooms live at /rooms/<CODE>: meta { host, map, car, t, go } (the host's map and car are everyone's; go: when the race
-   starts, server time - 0 till the host starts one), players/<uid> { the car, its paint,
+   Rooms live at /rooms/<CODE>: meta { host, map, off, car, t, go } (the host's map and car are everyone's - off: an
+   offroad race's course code; go: when the race starts, server time - 0 till the host starts one), players/<uid> { the car, its paint,
    the name - written when you join or change car }, states/<uid> [ the car's pose and what it's doing, ~10 times a
    second ]. Every browser runs its own car's physics and publishes it; the others are drawn from those states. The
    Firebase SDK only loads when you go online, so the single-player game never touches the network.
@@ -50,13 +50,13 @@
 
     function makeCode() { let c = ''; for (let i = 0; i < 5; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return c; }
 
-    // host: a fresh room on your map
-    async function hostRoom(map, profile) {
+    // host: a fresh room on your map (an offroad race: its course code too)
+    async function hostRoom(map, profile, off) {
       await connect();
       let c = null;
       for (let k = 0; k < 6 && !c; k++) { const t = makeCode(); if (!(await D.get(r('rooms/' + t + '/meta'))).exists()) c = t; }
       if (!c) throw new Error('could not find a free room code');
-      await D.set(r('rooms/' + c + '/meta'), { host: uid, map, t: D.serverTimestamp() });
+      await D.set(r('rooms/' + c + '/meta'), Object.assign({ host: uid, map, t: D.serverTimestamp() }, off ? { off } : {}));
       return joinRoom(c, profile);
     }
 
@@ -105,8 +105,8 @@
       // (throttled by the game: ~10 a second)
       publish(state) { if (code) D.set(r('rooms/' + code + '/states/' + uid), state.map((v) => (typeof v === 'number' && !Number.isFinite(v) ? 0 : v))).catch(() => {}); },
       setProfile(profile) { if (code) D.update(r('rooms/' + code + '/players/' + uid), clean(profile)).catch(() => {}); },
-      // (a new map: no race on it till the host starts one)
-      setMap(map) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map, go: 0 }).catch(() => {}); },
+      // (a new map - or a new offroad course: no race on it till the host starts one)
+      setMap(map, off) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map, off: off || null, go: 0 }).catch(() => {}); },
       // (the host's car and its setup: everyone drives it)
       setCar(car) { if (code && host) D.update(r('rooms/' + code + '/meta'), { car: clean(car) }).catch(() => {}); },
       // (the host starts a race: GO in 4 s, server time - a moment to get it round, then 3, 2, 1)

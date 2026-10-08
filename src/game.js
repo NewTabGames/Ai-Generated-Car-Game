@@ -43,6 +43,8 @@
   }
   window.addEventListener('resize', resize); resize();
 
+  // (an offroad race: its course from the settings - the room's, online)
+  if (S.map === 'offroad') W.setOffroad(S.offCfg || null);
   W.setMap(S.map);
   const world = WR.create(THREE, scene, W, { viewDist: S.viewDist, treeDensity: S.treeDensity, shadows: S.shadows });
   world.setTime(S.time, renderer);
@@ -519,11 +521,13 @@
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   const DUNESMAP = S.map === 'dunes';
+  // (Offroad Racing: a generated course, raced in laps - against the clock, or the room)
+  const OFFMODE = S.map === 'offroad';
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
   // centre line, points every ~2 m - the track's own, or the Mower Track's oval)
-  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack'], COURSE = COURSE_MAPS.includes(S.map);
+  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad'], COURSE = COURSE_MAPS.includes(S.map);
   function ovalLine() {
     const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
     for (let k = 0; k < n; k++) {
@@ -562,13 +566,18 @@
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
+  if (OFFMODE) {
+    const T = W.track, O = W.offroad, J = T.feats.filter((f) => f.kind === 'jump').length;
+    TRACK_HINT.offroad = 'Offroad Race · ' + T.B.name + ': ' + (T.L / 1000).toFixed(1) + ' km, ' + O.laps + (O.laps > 1 ? ' laps' : ' lap') + ' - follow the marker stakes' + (O.biome === 'dunes' ? ' (the orange flags)' : '')
+      + (J ? ', ' + J + ' jump' + (J > 1 ? 's' : '') + ' (a JUMP sign before each)' : '') + '. The countdown starts by itself; Backspace puts you back on the course. Esc → Modes for a new course.';
+  }
   const spawn = S.netRoom && COURSE ? gridSpot(Math.floor(Math.random() * 8))        // (back in a room: somewhere on the grid)
     : DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
     : DUNESMAP ? { x: W.DUNES.SPAWN_X, y: W.ground(W.DUNES.SPAWN_X, W.DUNES.SPAWN_Z, {}).h, z: W.DUNES.SPAWN_Z, tx: 1, tz: 0 }
-    : TRKMAP ? W.trackSpawn()
+    : OFFMODE ? gridSpot(0) : TRKMAP ? W.trackSpawn()
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -761,7 +770,7 @@
     if (RACE.on) {
       if (raceHolding()) return;
       if (!auto) {
-        const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+        const wait = resetWait() - (performance.now() - RACE.resetT) / 1000;
         if (wait > 0) { hud.toast('Reset in ' + Math.ceil(wait) + ' s', 1.2); return; }
         RACE.resetT = performance.now(); raceLost();
       }
@@ -849,14 +858,15 @@
   canvas.addEventListener('wheel', (e) => { cam.zoom = clamp(cam.zoom * (e.deltaY > 0 ? 1.08 : 0.93), 0.6, 2.2); }, { passive: true });
 
   // ------------------------------------------------------------------ menu
-  const TABS = ['Drive', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
+  const TABS = ['Drive', 'Modes', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
     $('menu').classList.toggle('hidden', !v);
-    G.paused = v || !G.started;
+    G.paused = v || !G.started || !$('raceRes').classList.contains('hidden');
+    if (v && OFFMODE && !inRoom() && raceHolding()) RACE.go = 0;
     if (v) input.stopRumble();              // (paused: no vibration left running under the menu)
     if (audio.ready) audio.master.gain.setTargetAtTime(v ? 0.25 : 1, audio.ctx.currentTime, 0.1);
     if (v) renderMenu();
@@ -935,7 +945,7 @@
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
       const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
-      if (inRoom()) { /* online: the host picks the map */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      if (inRoom() || S.map === 'offroad') { /* online: the host picks the map; racing offroad, you stay on the course */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
@@ -1216,6 +1226,8 @@
       const clr = el('<button class="btn small ghost">Clear best times</button>');
       clr.addEventListener('click', () => { perf.clearBest(); hud.toast('Best times cleared'); });
       add(row('Performance timers', 'Stop fully, then launch — 0-60, 0-100, ¼ mile, 60-0 braking are timed automatically', clr));
+    } else if (curTab === 'Modes') {
+      renderModes(add);
     } else if (curTab === 'Fun') {
       renderFun(add);
     } else if (curTab === 'Controls') {
@@ -1458,7 +1470,8 @@
     // GTA-style flip: steering rolls a car that's on its roof or side back onto its wheels
     veh.input.flipAssist = true;
     // (monster truck) air assist: eases off whichever pedal would over-rotate it in the air, feathers the gas on landing
-    veh.input.airAssist = MONSTER && S.airAssist !== false;
+    // (racing offroad, every vehicle gets it - the jumps and brows are meant to be raced over)
+    veh.input.airAssist = (MONSTER || OFFMODE) && S.airAssist !== false;
     veh.input.revHold = !!A.rev;
     veh.input.lineLock = !!A.lineLock;
     G.horn = !!A.horn; G.lookBack = !!A.lookBack;
@@ -2011,7 +2024,7 @@
     LAP.prevS = s;
   }
   function lapUpdate() {
-    if (TRKMAP && G.started) return trackLap();
+    if (TRKMAP && G.started && !OFFMODE) return trackLap();
     if (!MOWTRACK || !G.started) return;
     const M = W.MOWT, z = veh.pz, onStraight = Math.abs(veh.px - M.R) < M.W / 2 + 1;
     if (z < -M.SL - M.R * 0.6) LAP.far = true;
@@ -2169,9 +2182,13 @@
     if (!inRoom() || !m) return;
     let why = '';
     if (ONLINE.net.isHost) {
-      if (m.map && m.map !== S.map) ONLINE.net.setMap(S.map);        // (the host's map is the room's)
+      const oc = OFFMODE ? OFF_CODE : null;
+      // (the host's map is the room's - and course; not while this page is on its way to a new one)
+      if (!ONLINE.reloading && ((m.map && m.map !== S.map) || (OFFMODE && m.off !== oc))) ONLINE.net.setMap(S.map, oc);
     } else {
       if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
+      // (an offroad race: the host's course, from its code)
+      if (m.map === 'offroad' && m.off && m.off !== (OFFMODE ? OFF_CODE : '')) { const c = W.offParse(m.off); if (c) { S.offCfg = c; if (!why) why = 'the host\'s offroad course'; } }
       const cs = m.car;
       if (cs && cs.c && (VEH.CARS[cs.c] || MORE_IDS.includes(cs.c))) {
         ownCarKeep();
@@ -2251,7 +2268,7 @@
     ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
     try {
       const net = netCreate(), map = MAP_NAMES[ONLINE.hostMap] ? ONLINE.hostMap : S.map;
-      await net.hostRoom(map, netProfile());
+      await net.hostRoom(map, netProfile(), map === 'offroad' ? W.offCode(offCfgNow()) : null);
       ONLINE.lastProf = JSON.stringify(netProfile());
       S.netRoom = net.code; saveS();
       if (map !== S.map) {
@@ -2549,10 +2566,13 @@
     hayT: 0, hayOn: new Set(), flash: '', flashT: 0, resetT: -1e9, walls: [], go: null, hold: null, cd: '', goT: 0, saveT: 0, boardT: 0, savedP: -1,
     wR: 0, wL: 0, bumpT: 0 };
   const RESET_WAIT = 30, HAY_PTS = 100, STREAK_M = 40, STREAK_MAX = 3, OFF_RATE = 0.25;
+  // (an offroad race: a reset whenever you like racing alone, every 10 s in a room)
+  const resetWait = () => OFFMODE ? (inRoom() ? 10 : 0) : RESET_WAIT;
+  const raceNow = () => (inRoom() ? ONLINE.net.serverNow() : Date.now());
   // (the walls: this far from the centre line - 10 m past the road's edge on the rally stages, well into the trees; 6 m
   // on the mower tracks, well behind the bales. Far enough out that going off costs you - the trees, the grass, a quarter
   // of the points - instead of being a guard rail to bounce along; still no way through to another bit of the course)
-  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : 6) : 0;
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : 6) : 0;
   function raceTrack(x, z) {
     const T = CRS_T, n = T.n, X = T.x, Z = T.z;
     const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
@@ -2660,7 +2680,7 @@
     }
   }
   function raceUpdate(dt) {
-    const on = COURSE && inRoom() && G.started;
+    const on = COURSE && (inRoom() || OFFMODE) && G.started;
     if (!on) { RACE.on = false; RACE.i = -1; RACE.prevS = null; RACE.walls.length = 0; return; }
     RACE.on = true;
     RACE.flashT -= dt;
@@ -2675,6 +2695,7 @@
     }
     raceWalls();
     raceBump(dt);
+    if (OFFMODE) { offProgress(dt); return; }
     // on the road: the car's middle inside the road's edge (a wheel or two off still counts)
     const T = CRS_T, onRoad = Math.abs(RACE.sd) < T.W / 2 + 0.5;
     if (!onRoad && RACE.road) raceLost();
@@ -2698,7 +2719,7 @@
     if (RACE.saveT <= 0) { RACE.saveT = 3; raceSave(); }
   }
   function raceSave() {
-    if (!inRoom() || RACE.go === null || Math.round(RACE.pts) === RACE.savedP) return;
+    if (!inRoom() || OFFMODE || RACE.go === null || Math.round(RACE.pts) === RACE.savedP) return;
     RACE.savedP = Math.round(RACE.pts);
     // (per tab, like the guest sign-in - two tabs are two players)
     try { sessionStorage.setItem('hc_netPts', JSON.stringify({ code: ONLINE.net.code, r: RACE.go, p: RACE.savedP })); } catch (e) { /* storage unavailable */ }
@@ -2714,11 +2735,12 @@
     if (first && go && ONLINE.net.serverNow() >= go) {
       // (back after a reload in a race that's on: the points you had in it)
       let k = null; try { k = JSON.parse(sessionStorage.getItem('hc_netPts')); } catch (e) { /* storage unavailable */ }
-      RACE.pts = k && k.code === ONLINE.net.code && k.r === go ? k.p : 0;
+      RACE.pts = !OFFMODE && k && k.code === ONLINE.net.code && k.r === go ? k.p : 0;
       RACE.savedP = Math.round(RACE.pts);
       return;
     }
     RACE.pts = 0; RACE.debt = 0; RACE.resetT = -1e9; RACE.savedP = -1; raceLost(); raceSave();
+    if (OFFMODE) offReset();
     if (COURSE && G.started) raceGrid();
   }
   function raceGrid() {
@@ -2726,7 +2748,7 @@
     putCar(gridSpot(ids.indexOf(ONLINE.net.uid) % 8));
     RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.hayOn.clear(); LAP.armed = false;
   }
-  const raceHolding = () => RACE.on && (!RACE.go || ONLINE.net.serverNow() < RACE.go);
+  const raceHolding = () => RACE.on && (!RACE.go || raceNow() < RACE.go);
   // (every frame of the hold: pinned where it stands - it can rev, in park / neutral, but not move; at GO, into drive)
   function raceHold() {
     if (raceHolding()) {
@@ -2738,7 +2760,14 @@
       RACE.prevS = null; RACE.i = -1;
       return true;
     }
-    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; }
+    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); }
+    else if (OFFMODE && RACE.go && ORACE.goAt !== RACE.go && !ORACE.fin) {
+      // (an offroad race this car missed the start of - it joined late, or its tab was away: off the grid now, its clock
+      // running since GO)
+      raceGrid(); veh.selectDrive(); offGo();
+      ORACE.t0 = ORACE.lapT0 = veh.time - Math.max(0, raceNow() - RACE.go) / 1000;
+    }
+    if (OFFMODE && RACE.go) ORACE.goAt = RACE.go;
     return false;
   }
   // (the countdown's beeps: a short low one for 3, 2, 1 and a long high one for GO)
@@ -2751,22 +2780,27 @@
   }
   // ---- the HUD: the points board (top right) and the reset timer (bottom left, over the map)
   function raceHud(dt) {
-    const bd = $('netBoard'), rc = $('resetCd'), cd = $('raceCd');
-    bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on);
+    const bd = $('netBoard'), rc = $('resetCd'), cd = $('raceCd'), RW = resetWait();
+    bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on || !RW);
     $('perf').style.display = RACE.on ? 'none' : '';
-    // the start: waiting for the host (who gets the Start button), then 3, 2, 1, GO
+    // the start: waiting for the host (who gets the Start button), then 3, 2, 1, GO. Racing offroad alone the countdown
+    // runs by itself (and starts over if the menu comes up before GO); finished in a room, your place and time
     let big = '', sub = '', btn = false;
     if (RACE.on) {
-      const left = RACE.go ? RACE.go - ONLINE.net.serverNow() : Infinity;
-      if (!RACE.go) {
-        big = 'ON THE GRID';
-        sub = ONLINE.net.isHost ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : 'Waiting for the host to start the race - you can rev meanwhile';
-        btn = ONLINE.net.isHost;
-      } else if (left > 3000) { big = 'GET READY'; sub = 'The race starts in a moment'; }
+      if (OFFMODE && !inRoom() && !RACE.go && !G.paused && !ORACE.fin) RACE.go = Date.now() + 4300;
+      const left = RACE.go ? RACE.go - raceNow() : Infinity, host = inRoom() && ONLINE.net.isHost;
+      if (OFFMODE && inRoom() && ORACE.fin && (ORACE.finT > 0 || host)) {
+        big = 'FINISHED · P' + offStandings().place; btn = host;
+        sub = lapFmt(ORACE.fin) + (host ? ' - start the next race when everyone\'s in (or Esc → Online)' : ' - wait for the host to start the next one');
+      } else if (!RACE.go) {
+        big = inRoom() ? 'ON THE GRID' : '';
+        sub = host ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : inRoom() ? 'Waiting for the host to start the race - you can rev meanwhile' : '';
+        btn = host;
+      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
       else if (left > 0) big = String(Math.ceil(left / 1000));
       else if (RACE.goT > 0) big = 'GO!';
     }
-    RACE.goT -= dt;
+    RACE.goT -= dt; ORACE.finT -= dt;
     if (big !== RACE.cd) {
       if (/^[123]$/.test(big)) raceBeep(false); else if (big === 'GO!') raceBeep(true);
       RACE.cd = big;
@@ -2776,14 +2810,16 @@
     }
     cd.querySelector('.cdSub').textContent = sub;
     cd.querySelector('button').classList.toggle('hidden', !btn);
+    cd.querySelector('button').textContent = OFFMODE && ORACE.fin ? 'Start the next race' : 'Start race';
     if (!RACE.on) return;
-    const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+    const wait = RW - (performance.now() - RACE.resetT) / 1000;
     rc.classList.toggle('ready', wait <= 0);
     rc.firstElementChild.textContent = wait > 0 ? 'Reset in ' + Math.ceil(wait) + ' s' : 'Reset ready · Backspace';
-    rc.querySelector('i').style.width = (wait > 0 ? 100 * (1 - wait / RESET_WAIT) : 100).toFixed(1) + '%';
+    rc.querySelector('i').style.width = (wait > 0 && RW ? 100 * (1 - wait / RW) : 100).toFixed(1) + '%';
     RACE.boardT -= dt;
     if (RACE.boardT > 0) return;
     RACE.boardT = 0.2;
+    if (OFFMODE) { offBoard(); return; }
     $('nbPts').textContent = Math.round(RACE.pts).toLocaleString();
     const mul = $('nbMul');
     mul.textContent = RACE.road ? '×' + RACE.streak.toFixed(1) : '×' + OFF_RATE;
@@ -2797,6 +2833,209 @@
     $('nbList').innerHTML = list.length < 2 ? '<div><span>Waiting for friends…</span></div>'
       : list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${Math.round(e.p).toLocaleString()}</span></div>`).join('');
   }
+  // ---- Offroad Racing: laps of a generated course, timed from GO. Progress is the course tracker's distance along the
+  // line - the one the walls follow - so going backwards (or round the walls) gains nothing: a lap counts once you've
+  // covered the course's length again since the last. Alone it's you against the clock, a personal best per course and
+  // car; in a room it's everyone in the host's car, placed by laps and ground covered, then by finishing time
+  const OFF_LAPS = OFFMODE ? W.offroad.laps : 0, OFF_CODE = OFFMODE ? W.offCode(W.offroad) : '';
+  const ORACE = { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0, goAt: null };
+  const offKey = () => OFF_CODE + '|' + TKEY;
+  const offCfgNow = () => (OFFMODE ? W.offroad : W.offNormalize(S.offCfg || null));
+  const offSeed = () => 1 + Math.floor(Math.random() * 2147483000);
+  function offReset() {
+    Object.assign(ORACE, { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0 });
+    $('raceRes').classList.add('hidden');
+  }
+  function offGo() { offReset(); ORACE.on = true; ORACE.t0 = veh.time; ORACE.lapT0 = veh.time; }
+  // (what goes out with the car: metres covered racing, minus the finishing time in hundredths once finished)
+  const offPub = () => (ORACE.fin ? -Math.round(ORACE.fin * 100) : ORACE.on ? Math.max(0, Math.round(ORACE.dist)) : 0);
+  const offCmp = (a, b) => ((a.p < 0) !== (b.p < 0) ? (a.p < 0 ? -1 : 1) : b.p - a.p);
+  function offStandings() {
+    const me = { n: S.netName, p: offPub(), me: true }, list = [me];
+    for (const g of ONLINE.ghosts.values()) { const L = g.snaps[g.snaps.length - 1]; list.push({ n: g.prof.n, p: L && L.length > 31 ? L[31] : 0 }); }
+    list.sort(offCmp);
+    return { list, place: list.indexOf(me) + 1 };
+  }
+  function offProgress(dt) {
+    if (ORACE.on && !ORACE.fin) {
+      const L = CRS_T.L;
+      if (ORACE.prevS === null) { ORACE.dist = RACE.s > L / 2 ? RACE.s - L : RACE.s; ORACE.prevS = RACE.s; }
+      else {
+        let ds = RACE.s - ORACE.prevS;
+        if (ds > L / 2) ds -= L; else if (ds < -L / 2) ds += L;
+        ORACE.prevS = RACE.s;
+        if (ds < 0) ORACE.debt -= ds;
+        else { const pay = Math.min(ds, ORACE.debt); ORACE.debt -= pay; ORACE.dist += ds - pay; }
+      }
+      ORACE.wrongT = veh.vx * RACE.tx + veh.vz * RACE.tz < -2 ? ORACE.wrongT + dt : 0;
+      while (!ORACE.fin && ORACE.dist >= (ORACE.lap + 1) * L) {
+        const t = veh.time - ORACE.lapT0; ORACE.laps.push(t); ORACE.lap++; ORACE.lapT0 = veh.time;
+        if (ORACE.lap >= OFF_LAPS) offFinish();
+        else { const b = Math.min(...ORACE.laps); hud.toast(`Lap ${ORACE.lap}: ${lapFmt(t)}${ORACE.lap > 1 && t <= b ? ' · fastest yet' : ''} - lap ${ORACE.lap + 1} of ${OFF_LAPS}`, 3); }
+      }
+    }
+    RACE.pts = offPub();
+  }
+  function offFinish() {
+    ORACE.fin = veh.time - ORACE.t0;
+    const best = Math.min(...ORACE.laps), key = offKey();
+    S.offPB = S.offPB || {};
+    const prev = S.offPB[key] ? Object.assign({}, S.offPB[key]) : null, isPB = !prev || ORACE.fin < prev.t;
+    S.offPB[key] = { t: isPB ? ORACE.fin : prev.t, lap: prev ? Math.min(prev.lap, best) : best, d: Date.now() };
+    const keys = Object.keys(S.offPB);
+    if (keys.length > 300) { keys.sort((a, b) => S.offPB[a].d - S.offPB[b].d); for (const k of keys.slice(0, keys.length - 300)) delete S.offPB[k]; }
+    saveS();
+    RACE.pts = offPub();
+    if (inRoom()) { ORACE.place = offStandings().place; ORACE.finT = 8; if (audio.ready) raceBeep(true); }
+    else offResults(isPB, prev, best);
+  }
+  // (racing alone, at the flag: the time, every lap, the personal best - and what next)
+  function offResults(isPB, prev, best) {
+    const d = prev ? ORACE.fin - prev.t : 0;
+    $('rrBody').innerHTML = `<div class="rrTime">${lapFmt(ORACE.fin)}</div>
+      <div class="rrSub ${isPB ? 'pb' : ''}">${isPB ? (prev ? 'New personal best · was ' + lapFmt(prev.t) : 'Your first time round this course') : 'Personal best ' + lapFmt(prev.t) + ' · ' + (d >= 0 ? '+' : '') + d.toFixed(2)}</div>
+      <div class="rrLaps">${ORACE.laps.map((t, k) => `<div class="${t === best ? 'best' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(t)}</span></div>`).join('')}</div>
+      <div class="rrMeta">${esc(W.track.B.name)} · ${(W.track.L / 1000).toFixed(1)} km × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
+      <div class="rrBtns"><button class="btn small" data-a="again">Race again</button><button class="btn small" data-a="new">New course</button><button class="btn small ghost" data-a="set">Change settings</button><button class="btn small ghost" data-a="roam">Free roam</button></div>`;
+    for (const b of $('rrBody').querySelectorAll('button')) b.addEventListener('click', () => offAction(b.dataset.a));
+    $('raceRes').classList.remove('hidden');
+    G.paused = true;
+    if (audio.ready) { raceBeep(true); audio.master.gain.setTargetAtTime(0.35, audio.ctx.currentTime, 0.2); }
+  }
+  function offAction(a) {
+    $('raceRes').classList.add('hidden');
+    if (audio.ready) audio.master.gain.setTargetAtTime(1, audio.ctx.currentTime, 0.1);
+    if (a === 'again') offRestart();
+    else if (a === 'new') offApply(Object.assign({}, W.offroad, { seed: offSeed() }));
+    else if (a === 'set') { curTab = 'Modes'; openMenu(true); }
+    else if (a === 'roam') offLeave();
+  }
+  // back on the grid, the clock reset, the countdown again (racing alone - a room's host starts it for everyone)
+  function offRestart() {
+    if (inRoom()) { if (ONLINE.net.isHost) ONLINE.net.startRace(); else hud.toast('The host starts the races', 2); return; }
+    offReset(); putCar(gridSpot(0));
+    RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.go = 0; RACE.resetT = -1e9;
+    G.paused = G.menu || !G.started;
+  }
+  // (a course to race: these settings - the room follows its host onto it)
+  function offApply(cfg) {
+    if (mapLocked()) return;
+    cfg = W.offNormalize(cfg);
+    if (S.map !== 'offroad') S.mapPrev = S.map;
+    S.offCfg = cfg; S.offDraft = Object.assign({}, cfg); S.map = 'offroad'; S.reopenModes = false; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap('offroad', W.offCode(cfg)); }
+    hud.toast('Generating the course - ' + W.offCode(cfg) + '…', 3);
+    setTimeout(() => location.reload(), 300);
+  }
+  function offLeave() {
+    if (mapLocked()) return;
+    S.map = S.mapPrev && S.mapPrev !== 'offroad' ? S.mapPrev : 'country'; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(S.map, null); }
+    location.reload();
+  }
+  function offBoard() {
+    const L = CRS_T.L, t = ORACE.fin || (ORACE.on ? veh.time - ORACE.t0 : 0), { list, place } = offStandings(), multi = inRoom() && list.length > 1;
+    $('nbPts').textContent = multi ? 'P' + place + ' / ' + list.length : lapFmt(t);
+    const mul = $('nbMul'); mul.textContent = ORACE.fin ? 'FINISHED' : 'LAP ' + Math.min(OFF_LAPS, ORACE.lap + 1) + '/' + OFF_LAPS; mul.className = '';
+    const st = $('nbSt'), last = ORACE.laps[ORACE.laps.length - 1], best = ORACE.laps.length ? Math.min(...ORACE.laps) : 0, pb = S.offPB && S.offPB[offKey()];
+    let msg, cls = '';
+    if (ORACE.on && !ORACE.fin && ORACE.wrongT > 1) { msg = 'Wrong way!'; cls = 'hay'; }
+    else if (RACE.flashT > 0) { msg = RACE.flash; cls = 'hay'; }
+    else if (multi) msg = lapFmt(t) + (last ? ' · last lap ' + lapFmt(last) : '');
+    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (L / 1000).toFixed(1) + ' km';
+    st.textContent = msg; st.className = cls;
+    $('nbList').innerHTML = multi
+      ? list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${e.p < 0 ? lapFmt(-e.p / 100) : 'Lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, e.p) / L) + 1)}</span></div>`).join('')
+      : inRoom() ? '<div><span>Waiting for friends…</span></div>'
+        : ORACE.laps.map((x, k) => `<div class="${x === best ? 'me' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(x)}</span></div>`).slice(-5).join('')
+          + (pb ? `<div><span>Personal best</span><span>${lapFmt(pb.t)}</span></div>` : '');
+  }
+
+  // ---- Game modes: Offroad Racing's settings - the Modes tab, and the title's Game modes. Changes are a draft till you
+  // generate a course from them
+  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null) };
+  const BIOME_TXT = {
+    dunes: 'Sand from horizon to horizon, the course flagged over the dunes - up the long faces and off the brinks. Paddles, big tyres and four-wheel drive',
+    forest: 'A dirt trail through the woods over rolling hills, berms round the corners, mud holes in the dips',
+    desert: 'Fast hardpack across open desert - whoops, sandy washes to cross, saguaros, mesas on the horizon',
+    mud: 'A low, wet bog: mud most of the way, firmer dirt over the rises - grip is everything',
+    mountain: 'Gravel up and down the mountainside: cuttings and drops, pines below the tree line, snow up top',
+  };
+  const BIOME_CARS = { dunes: ['buggy', 'trophy', 'atv', 'monster'], forest: ['rally', 'trophy', 'atv', 'buggy'], desert: ['trophy', 'buggy', 'atv', 'ram'], mud: ['monster', 'tank', 'trophy', 'diesel'], mountain: ['rally', 'trophy', 'atv', 'ram'] };
+  function renderModes(add) {
+    const D = MODE_D.d, guest = inRoom() && !ONLINE.net.isHost;
+    const set = (k) => (v) => { D[k] = v; S.offDraft = Object.assign({}, D); renderModesOverlay(); };
+    const sg = (opts, k) => seg(opts, D[k], set(k));
+    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">OFFROAD RACING</b>', 'A new offroad course generated for every race, on the kind of land you pick, laid out the way you set it here. '
+      + 'Race it in laps against the clock - or online, against the room: everyone in the host\'s car and tune.'
+      + (OFFMODE ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
+    if (guest) {
+      add(row('Online', 'The host picks the course and the car - you\'re racing ' + (OFFMODE ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' in their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
+      return;
+    }
+    add(el('<div class="sect">Terrain</div>'));
+    add(row('Map type', BIOME_TXT[D.biome], sg(W.OFF_OPTS.biome.map(([k]) => [k, W.OFF_BIOMES[k].name]), 'biome')));
+    add(el('<div class="sect">Course</div>'));
+    add(row('Length', 'Round the loop once', sg([['short', 'Short · 2 km'], ['medium', 'Medium · 3.5 km'], ['long', 'Long · 5.5 km']], 'len')));
+    add(row('Laps', '', sg([[1, '1'], [2, '2'], [3, '3'], [5, '5'], [10, '10']], 'laps')));
+    add(row('Corners', 'Flowing: fast sweepers · Mixed · Technical: tight turns, esses and hairpins', sg([['flowing', 'Flowing'], ['mixed', 'Mixed'], ['technical', 'Technical']], 'twist')));
+    add(row('Width', '', sg([['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide']], 'width')));
+    add(row('Jumps', 'Tabletops built into the straighter bits (kickers too, with Lots) - a JUMP sign before each', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'jumps')));
+    add(row('Whoops', 'Runs of rollers ~9 m apart: skim them flat out, or get bucked', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'whoops')));
+    add(el('<div class="sect">Car</div>'));
+    const ty = VEH.TIRES[tireR()], hp = Math.round((CARDEF.hp || 0) * (tune.power || 1));
+    const pickB = el('<button class="btn small ghost">Pick a car</button>');
+    pickB.addEventListener('click', () => { if (carLocked()) return; S.reopenModes = !G.started; saveS(); openMoreCars(); });
+    add(row(esc(carLabel(S.car, optOf())), (hp ? '~' + hp.toLocaleString() + ' hp · ' : '') + Math.round(tune.mass * 2.20462).toLocaleString() + ' lb' + (ty ? ' · ' + esc(ty.short || ty.name) : '') + (OFFROAD() ? ' (off-road package)' : '')
+      + (inRoom() ? ' · everyone in the room races it' : ''), pickB));
+    add(row('Good on ' + W.OFF_BIOMES[D.biome].name.toLowerCase(), 'Built for it - or give anything a go (the Drive tab has the off-road tyre packages)',
+      seg(BIOME_CARS[D.biome].map((id) => [id, carLabel(id)]), S.car, (id) => { if (id !== S.car && !carLocked()) { S.reopenModes = !G.started; saveS(); pickCar(id); } })));
+    const tuneB = el('<button class="btn small ghost">Tune it</button>');
+    tuneB.addEventListener('click', () => { $('modes').classList.add('hidden'); curTab = 'Fun'; openMenu(true); });
+    add(row('Setup', 'Power, weight, grip, gearing, suspension... on the Fun tab, saved for this car' + (inRoom() ? ' - the room races your tune' : ''), tuneB));
+    add(row('Air assist', 'Over the jumps and brows: it eases the gas or brake in the air and nudges the car level for the slope it\'ll land on, like a seasoned driver - Off and you fly it yourself',
+      seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
+    add(el('<div class="sect">Race</div>'));
+    const go = el('<button class="btn">Generate a new course &amp; race</button>');
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() })));
+    add(row('New course', 'A fresh random course with these settings' + (inRoom() ? ' - everyone in the room comes with you' : ''), go));
+    if (OFFMODE) {
+      const same = ['biome', 'len', 'twist', 'width', 'jumps', 'whoops'].every((k) => D[k] === W.offroad[k]);
+      const again = el(`<button class="btn small">${same && D.laps === W.offroad.laps ? 'Restart this race' : 'Race this course with these laps'}</button>`);
+      again.addEventListener('click', () => {
+        if (D.laps !== W.offroad.laps) { offApply(Object.assign({}, W.offroad, { laps: D.laps })); return; }
+        offRestart(); $('modes').classList.add('hidden'); openMenu(false);
+      });
+      const leave = el('<button class="btn small ghost">Leave - free roam</button>');
+      leave.addEventListener('click', () => offLeave());
+      const w = el('<div style="display:flex;gap:8px"></div>'); w.appendChild(again); w.appendChild(leave);
+      const pb = S.offPB && S.offPB[offKey()];
+      add(row('This course', '<b class="modecode">' + OFF_CODE + '</b>' + (pb ? ' · your best ' + lapFmt(pb.t) + ' (lap ' + lapFmt(pb.lap) + ')' : '') + (same ? '' : ' · the settings above make a different course - generate one to race them'), w));
+    }
+    const code = el('<input type="text" maxlength="20" placeholder="FOR-M3MR11-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
+    const load = el('<button class="btn small ghost">Race it</button>');
+    const doLoad = () => { const c = W.offParse(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C', 3); return; } offApply(c); };
+    load.addEventListener('click', doLoad);
+    code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
+    const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
+    add(row('Course code', 'Every course has one (on the results and here): type a friend\'s in to race the very same course', cw));
+  }
+  function renderModesOverlay() {
+    if ($('modes').classList.contains('hidden')) return;
+    const b = $('modesBody'); b.innerHTML = '';
+    renderModes((nd) => b.appendChild(nd));
+  }
+  function openModes() { $('modes').classList.remove('hidden'); renderModesOverlay(); }
+  $('modesClose').addEventListener('click', () => $('modes').classList.add('hidden'));
+  $('modesBtn').addEventListener('click', () => { if (G.loadDone || true) openModes(); });
+  $('moreClose').addEventListener('click', () => { if (S.reopenModes) { S.reopenModes = false; saveS(); } });
+  // (the title: what's loaded - and back to Game modes after a car was picked from it)
+  if (OFFMODE) {
+    const pb = S.offPB && S.offPB[offKey()];
+    $('modeTitle').textContent = 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
+  }
+  if (S.reopenModes) { S.reopenModes = false; saveS(); if (!S.netRoom) setTimeout(openModes, 200); }
+
   // (the others' cars are solid - our car's obstacle list gets their footprints - and so are the course's walls)
   veh.world.collidersNear = (x, z, r, c, b) => {
     W.collidersNear(x, z, r, c, b);
@@ -2812,6 +3051,8 @@
     add(row('Racing for points', 'On the race courses - the Windy Rally Stage, the Rally Stage, the Windy Mower Track and the Mower Track: points for ground covered along the course, on the road 1 a metre times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
       + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls well off the road stop shortcuts, '
       + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s. Everyone waits on the start grid till the host starts the race.', el('<span></span>')));
+    add(row('Offroad Racing', 'Host on the Offroad Race map and everyone races the course you set up in Game modes (Esc → Modes), in your car and tune: laps, places by ground covered, then by finishing time. '
+      + 'A reset back onto the course every 10 s.', el('<span></span>')));
     const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
     const name = inp('Your name', S.netName, 16, 170);
     name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
@@ -2821,7 +3062,8 @@
     else if (net.isHost) add(row('Car', 'Everyone drives the car you\'re in, set up your way (version, tyres, transmission, package, Fun-tab tune). Change any of it and they follow', carNow));
     else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
     if (!on) {
-      add(row('Map', 'For a room you host (the race courses score points)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      add(row('Map', 'For a room you host (the race courses score points; the Offroad Race is a race)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      if (ONLINE.hostMap === 'offroad') { const b = el('<button class="btn small ghost">Set up the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', 'From your Game modes settings: <b class="modecode">' + W.offCode(offCfgNow()) + '</b>', b)); }
       const hb = el('<button class="btn small">Host a game</button>');
       hb.addEventListener('click', () => onlineHost());
       add(row('Host', 'Opens a room on that map (loading it if you\'re not on it) and gives you its code to share', hb));
@@ -2836,13 +3078,14 @@
         el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
       if (net.isHost) {
         add(row('Map', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        if (OFFMODE) { const b = el('<button class="btn small ghost">Change the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS, b)); }
         if (COURSE) {
           const rb = el('<button class="btn small">Start race</button>');
           rb.addEventListener('click', () => { net.startRace(); openMenu(false); });
           add(row('Start race', 'Everyone back on the start grid with 0 points, a 3 s countdown (engines can rev), then GO - everyone\'s put in drive', rb));
         }
       }
-      const pts = (p) => '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
+      const pts = (p) => OFFMODE ? (p < 0 ? 'finished <b>' + lapFmt(-p / 100) + '</b>' : 'lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, p || 0) / CRS_T.L) + 1)) : '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
       const list = [`<b>${esc(S.netName)}</b> (you) · ${esc(carLabel(S.car, optOf()))} · ${pts(RACE.pts)}`]
         .concat([...ONLINE.ghosts.values()].map((g) => { const L = g.snaps[g.snaps.length - 1]; return `${esc(g.prof.n)} · ${esc(carLabel(g.prof.c, g.prof.o))} · ${pts(L && L.length > 31 ? L[31] : 0)}`; }));
       add(row('Drivers', list.length + ' in the room', el('<div style="text-align:right;font-size:13px;line-height:1.7">' + list.join('<br>') + '</div>')));
@@ -2867,7 +3110,7 @@
   // (back in the room you were in after a reload - a new car, the host's map)
   if (S.netRoom) onlineJoin(S.netRoom, true);
 
-  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE };
+  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE, ORACE, offApply, offRestart, openModes, onlineHost, onlineLeave };
   // (for the tests: every vehicle id and its options, and the builders the game itself uses - see tyreChoices)
   Object.assign(window.__hc, { VEH, buildModel, defOf, tyreChoices, carIds: ['hellcat', 'demon', 'dragpak', ...MORE_IDS],
     optionsOf: (id) => { const m = MORE_CARS.find((x) => x.id === id); return m && m.options ? m.options.map((o) => o[0]) : [undefined]; } });

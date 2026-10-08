@@ -127,6 +127,26 @@
   #carPickTitle .carbtn.more { flex: 0 0 170px; }
   .carbtn.more.on { border-style: solid; }
   #moreCars { z-index: 30; }
+  /* Game modes (Offroad Racing's settings) and an offroad race's results */
+  #modes { z-index: 20; }
+  #modes .panel, #raceRes .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); text-align: left; }
+  #modes header, #raceRes header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  #modes header h2, #raceRes header h2 { margin: 0; font-size: 20px; font-style: italic; letter-spacing: 0.06em; }
+  #modes header h2 span, #raceRes header h2 span { color: var(--red); }
+  #modesBody { overflow: auto; padding: 10px 20px 18px; }
+  #raceRes { z-index: 15; }
+  #raceRes .panel { width: min(520px, 94vw); text-align: center; }
+  #rrBody { padding: 14px 22px 20px; }
+  .rrTime { font-size: 56px; font-weight: 900; font-style: italic; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .rrSub { color: var(--dim); font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; margin: 2px 0 12px; }
+  .rrSub.pb { color: #6dff7a; }
+  .rrLaps { max-width: 260px; margin: 0 auto 12px; text-align: left; }
+  .rrLaps div { display: flex; justify-content: space-between; padding: 2px 0; font-variant-numeric: tabular-nums; color: var(--dim); border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .rrLaps div.best { color: #fff; font-weight: 700; }
+  .rrMeta { color: var(--dim); font-size: 12px; line-height: 1.6; margin-bottom: 14px; }
+  .rrMeta b { color: #fff; letter-spacing: 0.08em; }
+  .rrBtns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .modecode { font-size: 15px; letter-spacing: 0.12em; color: #fff; font-weight: 700; }
   #moreCars .panel { width: min(820px, 94vw); max-height: 90vh; background: rgba(12, 13, 16, 0.97); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6); pointer-events: auto; }
   #moreCars header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   #moreCars header h2 { margin: 0; font-size: 20px; font-style: italic; letter-spacing: 0.06em; }
@@ -216,9 +236,10 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button><button data-map="offroad">Map: Offroad Race</button>
     </div>
-    <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
+    <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="modesBtn" style="pointer-events:auto">Game modes</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
+    <div id="modeTitle" style="margin-top:8px;font-size:13px;color:#ffb36b"></div>
     <div id="netTitle" style="margin-top:8px;font-size:13px;color:#9ab"></div>
     <div id="loadbar"><i></i></div>
     <div id="padstatus">Wheel users: press any button on your wheel so the browser can see it.</div>
@@ -247,6 +268,20 @@
   </div>
 </div>
 
+<div id="modes" class="overlay hidden">
+  <div class="panel">
+    <header><h2>GAME <span>MODES</span></h2><button class="btn small ghost" id="modesClose">Close</button></header>
+    <div id="modesBody"></div>
+  </div>
+</div>
+
+<div id="raceRes" class="overlay hidden">
+  <div class="panel">
+    <header><h2>OFFROAD <span>RACE</span></h2><span style="color:var(--dim);font-size:12px;letter-spacing:0.12em">FINISHED</span></header>
+    <div id="rrBody"></div>
+  </div>
+</div>
+
 <div id="wizard" class="overlay hidden">
   <div class="panel">
     <h3 id="wzStep">Wheel setup</h3>
@@ -260,8 +295,8 @@
 
 <script>/* src/net.js */
 /* Hellcat Drive — online play over Firebase (Realtime Database + anonymous sign-in).
-   Rooms live at /rooms/<CODE>: meta { host, map, car, t, go } (the host's map and car are everyone's; go: when the race
-   starts, server time - 0 till the host starts one), players/<uid> { the car, its paint,
+   Rooms live at /rooms/<CODE>: meta { host, map, off, car, t, go } (the host's map and car are everyone's - off: an
+   offroad race's course code; go: when the race starts, server time - 0 till the host starts one), players/<uid> { the car, its paint,
    the name - written when you join or change car }, states/<uid> [ the car's pose and what it's doing, ~10 times a
    second ]. Every browser runs its own car's physics and publishes it; the others are drawn from those states. The
    Firebase SDK only loads when you go online, so the single-player game never touches the network.
@@ -311,13 +346,13 @@
 
     function makeCode() { let c = ''; for (let i = 0; i < 5; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return c; }
 
-    // host: a fresh room on your map
-    async function hostRoom(map, profile) {
+    // host: a fresh room on your map (an offroad race: its course code too)
+    async function hostRoom(map, profile, off) {
       await connect();
       let c = null;
       for (let k = 0; k < 6 && !c; k++) { const t = makeCode(); if (!(await D.get(r('rooms/' + t + '/meta'))).exists()) c = t; }
       if (!c) throw new Error('could not find a free room code');
-      await D.set(r('rooms/' + c + '/meta'), { host: uid, map, t: D.serverTimestamp() });
+      await D.set(r('rooms/' + c + '/meta'), Object.assign({ host: uid, map, t: D.serverTimestamp() }, off ? { off } : {}));
       return joinRoom(c, profile);
     }
 
@@ -366,8 +401,8 @@
       // (throttled by the game: ~10 a second)
       publish(state) { if (code) D.set(r('rooms/' + code + '/states/' + uid), state.map((v) => (typeof v === 'number' && !Number.isFinite(v) ? 0 : v))).catch(() => {}); },
       setProfile(profile) { if (code) D.update(r('rooms/' + code + '/players/' + uid), clean(profile)).catch(() => {}); },
-      // (a new map: no race on it till the host starts one)
-      setMap(map) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map, go: 0 }).catch(() => {}); },
+      // (a new map - or a new offroad course: no race on it till the host starts one)
+      setMap(map, off) { if (code && host) D.update(r('rooms/' + code + '/meta'), { map, off: off || null, go: 0 }).catch(() => {}); },
       // (the host's car and its setup: everyone drives it)
       setCar(car) { if (code && host) D.update(r('rooms/' + code + '/meta'), { car: clean(car) }).catch(() => {}); },
       // (the host starts a race: GO in 4 s, server time - a moment to get it round, then 3, 2, 1)
@@ -707,7 +742,28 @@
     const arch = { x: p.x, z: p.z, tx: p.tx, tz: p.tz, legs: [[p.x - p.tz * aw, p.z + p.tx * aw], [p.x + p.tz * aw, p.z - p.tx * aw]], w: 2 * aw };
     // (the mower course's bleachers: back from the outside of the start straight)
     const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 } : null;
-    trkPropList = { bales, chevrons, arch, stands };
+    // an offroad course: marker stakes down both edges every ~16 m (tall whip flags across the dunes, every ~20 m,
+    // side to side), and a JUMP sign 45 m before each jump, on the right
+    const stakes = [], signs = [];
+    if (T.kind === 'offroad') {
+      const dun = T.biome === 'dunes', step = dun ? 20 : 16, off = hw + (dun ? 1.8 : 1.1);
+      for (let k = 0, s = 20; s < T.L - 12; s += step, k++) {
+        for (const side of dun ? [k & 1 ? 1 : -1] : [-1, 1]) {
+          trackPoint(s, p);
+          const x = p.x - p.tz * side * off, z = p.z + p.tx * side * off;
+          if (trackQuery(x, z, q).d < off - 0.4) continue;
+          stakes.push({ x, z, side });
+        }
+      }
+      for (const f of T.feats) {
+        if (f.kind !== 'jump') continue;
+        trackPoint(f.s - 45, p);
+        const x = p.x - p.tz * (hw + 2.6), z = p.z + p.tx * (hw + 2.6);
+        if (trackQuery(x, z, q).d < hw + 2) continue;
+        signs.push({ x, y: terrainHeight(x, z), z, rot: Math.atan2(-p.tx, -p.tz), kind: 2 });
+      }
+    }
+    trkPropList = { bales, chevrons, arch, stands, stakes, signs };
     return trkPropList;
   }
   function trackYump(s) {
@@ -723,6 +779,284 @@
     const st = TRK.steep;
     return nLow1(x * 0.001, z * 0.001) * (12 + 5 * st) + nLow2(x * 0.0042 + 11.3, z * 0.0042 - 7.1) * (2.1 + 0.6 * st)
       + nDet(x * 0.012 + 3.3, z * 0.012 - 9.1) * 0.75;
+  }
+  // ---------------------------------------------------------------- Offroad Racing: a course generated from a seed
+  // A closed loop laid out from the race's settings and a seed: control points round a centre at wandering radii, a
+  // smooth centre line through them (scaled to the length asked for) - drawn again while it turns tighter than the
+  // setting allows or comes back too close to itself - started on its straightest stretch, heading -z from (0, 0). The
+  // ground under it follows the terrain's own, smoothed and with its grades held to what a car can climb (cuttings and
+  // fills where it can't), level across, with berms round the outside of the tighter corners; the jumps, whoops, mud
+  // holes and sandy washes are built into it; either side it blends back into the land - dunes, forest hills, desert
+  // with mesas off in the distance, a low wet bog, or mountainside. The same settings and seed give the same course
+  // anywhere (that's what an online room shares, and what a course code is)
+  const OFF_BIOMES = {
+    //            name, road width (m), smoothing (+/- samples of 2 m), steepest grade, verge blend (m), crests rounded
+    //            off (two passes of +/- that many samples)
+    dunes: { name: 'Dunes', W: 12, sm: 6, grade: 0.3, verge: 15, round: 6 },
+    forest: { name: 'Forest', W: 8, sm: 9, grade: 0.22, verge: 11, round: 9 },
+    desert: { name: 'Desert', W: 11, sm: 12, grade: 0.16, verge: 12, round: 9 },
+    mud: { name: 'Mud Bog', W: 9, sm: 12, grade: 0.12, verge: 10, round: 9 },
+    mountain: { name: 'Mountain', W: 8, sm: 12, grade: 0.2, verge: 16, round: 12 },
+  };
+  // (the settings, each with its code letter: a course code is terrain-length laps corners width jumps whoops-seed)
+  const OFF_OPTS = {
+    biome: [['dunes', 'DUN'], ['forest', 'FOR'], ['desert', 'DES'], ['mud', 'MUD'], ['mountain', 'MTN']],
+    len: [['short', 'S'], ['medium', 'M'], ['long', 'L']],
+    laps: [[1, '1'], [2, '2'], [3, '3'], [5, '5'], [10, 'X']],
+    twist: [['flowing', 'F'], ['mixed', 'M'], ['technical', 'T']],
+    width: [['narrow', 'N'], ['normal', 'R'], ['wide', 'W']],
+    jumps: [['none', '0'], ['some', '1'], ['lots', '2']],
+    whoops: [['none', '0'], ['some', '1'], ['lots', '2']],
+  };
+  const OFF_DEFAULT = { biome: 'forest', len: 'medium', laps: 3, twist: 'mixed', width: 'normal', jumps: 'some', whoops: 'some', seed: 20262 };
+  const OFF_LEN = { short: 2000, medium: 3500, long: 5500 };
+  function offNormalize(c) {
+    const o = Object.assign({}, OFF_DEFAULT);
+    if (c) for (const k of Object.keys(OFF_OPTS)) if (OFF_OPTS[k].some((p) => p[0] === c[k])) o[k] = c[k];
+    o.seed = c && Number.isFinite(+c.seed) ? Math.abs(Math.floor(+c.seed)) % 2147483647 : OFF_DEFAULT.seed;
+    return o;
+  }
+  function offCode(c) {
+    c = offNormalize(c);
+    const L = (k) => OFF_OPTS[k].find((p) => p[0] === c[k])[1];
+    return L('biome') + '-' + L('len') + L('laps') + L('twist') + L('width') + L('jumps') + L('whoops') + '-' + c.seed.toString(36).toUpperCase();
+  }
+  function offParse(code) {
+    const m = /^([A-Z]{3})-([SML])([1235X])([FMT])([NRW])([012])([012])-([0-9A-Z]{1,7})$/.exec(String(code || '').trim().toUpperCase());
+    if (!m) return null;
+    const P = (k, v) => { const p = OFF_OPTS[k].find((q) => q[1] === v); return p ? p[0] : undefined; };
+    const c = { biome: P('biome', m[1]), len: P('len', m[2]), laps: P('laps', m[3]), twist: P('twist', m[4]), width: P('width', m[5]), jumps: P('jumps', m[6]), whoops: P('whoops', m[7]), seed: parseInt(m[8], 36) };
+    return c.biome ? offNormalize(c) : null;
+  }
+  let OFF = offNormalize(null);
+  function setOffroad(c) { OFF = offNormalize(c); }
+  // (the terrain's own ground: sampled somewhere of its own in the noise for each seed)
+  let OFFX = 0, OFFZ = 0, OFFB = 'forest', OFFCX = 0, OFFCZ = 0, OFFRM = 1e4;
+  function offNatural(x, z) {
+    const X = x + OFFX, Z = z + OFFZ;
+    if (OFFB === 'dunes') return duneHeight(X, Z);
+    if (OFFB === 'desert') {
+      let h = nLow1(X * 0.0007, Z * 0.0007) * 12 + nLow2(X * 0.0028 + 4.1, Z * 0.0028 - 8.3) * 3.2 + nHill(X * 0.009, Z * 0.009) * 0.9 + nDet(X * 0.03, Z * 0.03) * 0.35;
+      // (mesas and buttes - flat tops, steep sides - only well out past the course)
+      const far = smooth(OFFRM + 140, OFFRM + 460, Math.hypot(x - OFFCX, z - OFFCZ));
+      if (far > 0) { const r = ridged(X * 0.0011, Z * 0.0011); h += far * (60 * smooth(0.5, 0.58, r) + 10 * r); }
+      return h;
+    }
+    if (OFFB === 'mud') return nLow1(X * 0.0012, Z * 0.0012) * 3.5 + nLow2(X * 0.005 + 2.2, Z * 0.005 - 6.1) * 0.9 + nDet(X * 0.04, Z * 0.04) * 0.3;
+    if (OFFB === 'mountain') { const r = ridged(X * 0.0011, Z * 0.0011); return nLow1(X * 0.0008, Z * 0.0008) * 40 + r * r * 90 + nHill(X * 0.004, Z * 0.004) * 9 + nDet(X * 0.03, Z * 0.03) * 1.2; }
+    return nLow1(X * 0.001, Z * 0.001) * 14 + nLow2(X * 0.0042 + 11.3, Z * 0.0042 - 7.1) * 2.6
+      + (nHill(X * 0.0031, Z * 0.0031) + 0.5 * nHill(X * 0.0071 + 3.1, Z * 0.0071 - 1.7)) * 12 + nDet(X * 0.028, Z * 0.028) + nDet(X * 0.085 + 5.2, Z * 0.085 - 3.3) * 0.25;
+  }
+  // a closed centripetal Catmull-Rom curve through P, a point every ~step (in P's units)
+  function crLoop(P, step) {
+    const n0 = P.length, out = [];
+    for (let i = 0; i < n0; i++) {
+      const p0 = P[(i - 1 + n0) % n0], p1 = P[i], p2 = P[(i + 1) % n0], p3 = P[(i + 2) % n0];
+      const tj = (a, b) => Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), 0.5) || 1e-3;
+      const t1 = tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+      const m = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+      for (let k = 0; k < m; k++) {
+        const t = t1 + (t2 - t1) * k / m;
+        const L = (a, b, ta, tb) => [(a[0] * (tb - t) + b[0] * (t - ta)) / (tb - ta), (a[1] * (tb - t) + b[1] * (t - ta)) / (tb - ta)];
+        const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+        out.push(L(L(A1, A2, 0, t2), L(A2, A3, t1, t3), t1, t2));
+      }
+    }
+    return out;
+  }
+  const loopLen = (Q) => { let L = 0; for (let i = 0; i < Q.length; i++) { const a = Q[i], b = Q[(i + 1) % Q.length]; L += Math.hypot(b[0] - a[0], b[1] - a[1]); } return L; };
+  // (resampled every d metres along it)
+  function resampleLoop(Q, d) {
+    const cum = [0];
+    for (let i = 1; i <= Q.length; i++) { const a = Q[i - 1], b = Q[i % Q.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+    const L = cum[Q.length], n = Math.max(8, Math.round(L / d)), out = [];
+    for (let k = 0, j = 0; k < n; k++) {
+      const t = k * L / n;
+      while (cum[j + 1] < t) j++;
+      const a = Q[j], b = Q[(j + 1) % Q.length], f = (t - cum[j]) / (cum[j + 1] - cum[j] || 1);
+      out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+    }
+    return out;
+  }
+  // signed radius of curvature at each point of a closed line (over an ~8 m chord, + turning left)
+  function loopRadii(Q, k4) {
+    const n = Q.length, R = new Float64Array(n);
+    for (let k = 0; k < n; k++) {
+      const a = Q[(k - k4 + n) % n], b = Q[k], c = Q[(k + k4) % n];
+      const cr = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      const r = Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1]) * Math.hypot(a[0] - c[0], a[1] - c[1]) / (2 * Math.abs(cr) + 1e-9);
+      R[k] = cr > 0 ? -r : r;
+    }
+    return R;
+  }
+  // does the line come within `sep` of itself anywhere further than `gap` metres along it (it's sampled every 2 m)?
+  function loopTooClose(Q, sep, gap) {
+    const n = Q.length, cell = sep, grid = new Map(), key = (i, j) => (i + 4096) * 8192 + (j + 4096), gk = Math.round(gap / 2);
+    for (let k = 0; k < n; k++) { const kk = key(Math.floor(Q[k][0] / cell), Math.floor(Q[k][1] / cell)); let l = grid.get(kk); if (!l) grid.set(kk, l = []); l.push(k); }
+    for (let k = 0; k < n; k += 2) {
+      const ci = Math.floor(Q[k][0] / cell), cj = Math.floor(Q[k][1] / cell);
+      for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+        const l = grid.get(key(i, j)); if (!l) continue;
+        for (const m of l) {
+          let ds = Math.abs(m - k); ds = Math.min(ds, n - ds);
+          if (ds > gk && Math.hypot(Q[m][0] - Q[k][0], Q[m][1] - Q[k][1]) < sep) return true;
+        }
+      }
+    }
+    return false;
+  }
+  function offGenerate(cfg) {
+    const B = OFF_BIOMES[cfg.biome], rnd = mulberry32((cfg.seed ^ 0x2545f491) + 7919 * (OFF_OPTS.biome.findIndex((p) => p[0] === cfg.biome) + 1));
+    const Ltar = OFF_LEN[cfg.len], tw = ['flowing', 'mixed', 'technical'].indexOf(cfg.twist);
+    const Wd = B.W * { narrow: 0.75, normal: 1, wide: 1.35 }[cfg.width], hw = Wd / 2;
+    const sep = 2 * (hw + B.verge) + 8, Rmin = [28, 17, 11][tw];
+    OFFB = cfg.biome; OFFX = (rnd() - 0.5) * 40000; OFFZ = (rnd() - 0.5) * 40000;
+    let Q = null;
+    for (let attempt = 0; attempt < 80 && !Q; attempt++) {
+      // the control points: round the centre, the radius wandering; the twistier settings add kinks between them
+      const N = [8, 11, 14][tw] + Math.floor(rnd() * 4), A = [0.26, 0.36, 0.44][tw], P = [];
+      for (let i = 0; i < N; i++) {
+        const a = (i + (rnd() - 0.5) * 0.55) / N * Math.PI * 2, r = 1 + A * (rnd() * 2 - 1);
+        P.push([Math.cos(a) * r, Math.sin(a) * r]);
+      }
+      if (tw > 0) {
+        for (let i = P.length - 1; i >= 0; i--) {
+          if (rnd() > [0, 0.45, 0.8][tw]) continue;
+          const a = P[i], b = P[(i + 1) % P.length], dx = b[0] - a[0], dz = b[1] - a[1], k = (rnd() - 0.5) * [0, 0.5, 0.8][tw];
+          P.splice(i + 1, 0, [(a[0] + b[0]) / 2 - dz * k, (a[1] + b[1]) / 2 + dx * k]);
+        }
+      }
+      // (to the length asked for, then a point every 2 m)
+      const sc = Ltar / loopLen(crLoop(P, 0.01));
+      const L2 = resampleLoop(crLoop(P.map(([x, z]) => [x * sc, z * sc]), 1), 2);
+      const R = loopRadii(L2, 4);
+      let ok = true;
+      for (let k = 0; k < L2.length && ok; k++) if (Math.abs(R[k]) < Rmin) ok = false;
+      if (ok && loopTooClose(L2, sep, Math.max(120, 3 * sep))) ok = false;
+      if (ok) Q = L2;
+    }
+    if (!Q) { Q = []; const n = Math.round(Ltar / 2), a = Ltar / (2 * Math.PI) * 1.25, b = Ltar / (2 * Math.PI) * 0.72; for (let k = 0; k < n; k++) { const t = k / n * Math.PI * 2; Q.push([Math.cos(t) * a, Math.sin(t) * b]); } }
+    if (rnd() < 0.5) Q.reverse();
+    // the start: the middle of its straightest 80 m, then the whole thing turned and moved so that's (0, 0) heading -z
+    const n = Q.length, R = loopRadii(Q, 4);
+    let k0 = 0, best = -1;
+    for (let k = 0; k < n; k += 2) { let mn = 1e9; for (let j = -20; j <= 20; j++) mn = Math.min(mn, Math.abs(R[(k + j + n) % n])); if (mn > best) { best = mn; k0 = k; } }
+    const a = Q[(k0 - 2 + n) % n], b = Q[(k0 + 2) % n], tl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    // (turned by -90 deg minus the heading there: its direction comes out (0, -1))
+    const c = -(b[1] - a[1]) / tl, s = -(b[0] - a[0]) / tl, o = Q[k0], pts = [];
+    for (let j = 0; j < n; j++) { const p = Q[(k0 + j) % n], dx = p[0] - o[0], dz = p[1] - o[1]; pts.push([dx * c - dz * s, dx * s + dz * c]); }
+    pts[0] = [0, 0];
+    const T = buildTrack({ W: Wd, kind: 'offroad', steep: 0, pts });
+    T.biome = cfg.biome; T.B = B; T.cfg = cfg; T.code = offCode(cfg);
+    // (how far the course reaches from its middle: the desert's mesas stay out past it)
+    OFFCX = T.cx; OFFCZ = T.cz; OFFRM = 0;
+    for (let k = 0; k < T.n; k++) OFFRM = Math.max(OFFRM, Math.hypot(T.x[k] - T.cx, T.z[k] - T.cz));
+    offProfile(T, rnd);
+    T.off = [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM];
+    return T;
+  }
+  // the course's ground along its centre line: the land's own, smoothed and grade-limited, then the features built in
+  function offProfile(T, rnd) {
+    const n = T.n, B = T.B, cfg = T.cfg, ds = T.L / n;
+    const avg = (src, M) => { const o = new Float64Array(n); let acc = 0; for (let j = -M; j <= M; j++) acc += src[(j + n) % n]; for (let k = 0; k < n; k++) { o[k] = acc / (2 * M + 1); acc += src[(k + M + 1) % n] - src[(k - M + n) % n]; } return o; };
+    // (grades held to the steepest a car can climb: halfway between the highest such line under the ground - cuttings
+    // through every crest - and the lowest over it - fills across every dip; each is a distance transform round the loop)
+    const lim = (src) => {
+      const g = B.grade * ds, U = Float64Array.from(src), D = Float64Array.from(src);
+      for (let r = 0; r < 2; r++) {
+        for (let k = 1; k < 2 * n; k++) { const i = k % n, p = (k - 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
+        for (let k = 2 * n - 2; k >= 0; k--) { const i = k % n, p = (k + 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
+      }
+      const o = new Float64Array(n); for (let i = 0; i < n; i++) o[i] = (U[i] + D[i]) / 2; return o;
+    };
+    // (where in the terrain's noise it goes: up the mountain and through the woods, the gentlest of a few tries - the
+    // least digging and filling; the dunes, the desert's swells and the bog as they come)
+    let best = null;
+    for (let t = 0; t < (T.biome === 'mountain' ? 6 : T.biome === 'forest' ? 3 : 1); t++) {
+      if (t) { OFFX = (rnd() - 0.5) * 40000; OFFZ = (rnd() - 0.5) * 40000; }
+      const h = new Float64Array(n); for (let k = 0; k < n; k++) h[k] = offNatural(T.x[k], T.z[k]);
+      // (then the crests and dips rounded off - a grade change spread over ~50-100 m, so a car stays on the ground over
+      // the brows up to ~75-95 mph instead of leaving them at 40)
+      const hb = avg(avg(lim(avg(h, B.sm)), B.round), B.round);
+      let cost = 0; for (let k = 0; k < n; k++) cost += Math.abs(hb[k] - h[k]);
+      if (!best || cost < best.cost) best = { cost, hb, ox: OFFX, oz: OFFZ };
+    }
+    OFFX = best.ox; OFFZ = best.oz; T.dig = best.cost / n;
+    const hc = Float64Array.from(best.hb); T.hb = Float32Array.from(best.hb);
+    const zone = new Uint8Array(n), used = new Uint8Array(n), feats = [];
+    const iOf = (s) => ((Math.round(s / ds) % n) + n) % n;
+    const free = (k, a, b) => { for (let j = a; j <= b; j++) if (used[(k + j + n) % n]) return false; return true; };
+    const take = (k, a, b) => { for (let j = a; j <= b; j++) used[(k + j + n) % n] = 1; };
+    take(0, -40, 40);                                   // (the start grid and the arch)
+    const straight = (k, a, b, Rm) => { for (let j = a; j <= b; j++) if (Math.abs(T.R[(k + j + n) % n]) < Rm) return false; return true; };
+    const pick = (count, a, b, Rm, place, ok) => {
+      for (let tries = 0, maxT = count * 80; tries < maxT && count > 0; tries++) {
+        const k = Math.floor(rnd() * n);
+        if (!free(k, a - 20, b + 20) || !straight(k, a, b, Rm) || (ok && !ok(k))) continue;
+        take(k, a - 20, b + 20); place(k); count--;
+      }
+    };
+    // jumps: tabletops, and with "lots" kickers too - up a ramp, over the top (or off the lip), down a landing. Only on a
+    // straight (a car flies straight on while a bend would carry on round under it) that runs level or downhill through
+    // the landing - nothing rising to meet you - and the ground there's graded to an even slope first
+    const level = (k) => { const a = T.hb[(k - 10 + n) % n], b = T.hb[k], c = T.hb[(k + 35) % n]; return c - b <= 0.35 && (c - a) / (45 * ds) >= -0.06; };
+    const grade = (k) => {
+      const a = hc[(k - 10 + n) % n], c = hc[(k + 35) % n];
+      for (let j = -18; j <= 43; j++) { const i = (k + j + n) % n, lin = a + (c - a) * Math.min(1, Math.max(0, (j + 10) / 45)), w = j < -10 ? (j + 18) / 8 : j > 35 ? (43 - j) / 8 : 1; hc[i] += (lin - hc[i]) * Math.max(0, Math.min(1, w)); }
+    };
+    const nJ = cfg.jumps === 'none' ? 0 : Math.max(1, Math.floor(T.L / (cfg.jumps === 'lots' ? 380 : 750)));
+    pick(nJ, -10, 35, cfg.jumps === 'lots' ? 120 : 180, (k) => {
+      grade(k);
+      // (a tabletop's face an even ~7-9 deg - a fast truck flies ~1 s and lands on the far side's down slope; a kicker
+      // steepens to ~11-15 deg at its lip)
+      const kick = cfg.jumps === 'lots' && rnd() < 0.45, A = kick ? 1.0 + rnd() * 0.3 : 1.2 + rnd() * 0.5;
+      const Lu = kick ? 8 : 10, Lt = kick ? 0 : 8 + rnd() * 6, Ld = kick ? 20 : 16;
+      for (let j = -2; j <= Math.ceil((Lu + Lt + Ld + 10) / ds); j++) {
+        const u = j * ds, i = (k + j + n) % n;
+        let y = 0;
+        if (u < 0) y = 0; else if (u < Lu) y = A * Math.pow(u / Lu, kick ? 1.6 : 1.15);
+        else if (u < Lu + Lt) y = A;
+        else if (u < Lu + Lt + Ld) { const t = (u - Lu - Lt) / Ld; y = A * (1 - t) - 0.3 * t; }
+        else if (u < Lu + Lt + Ld + 10) y = -0.3 * (1 - (u - Lu - Lt - Ld) / 10);
+        hc[i] += y;
+      }
+      feats.push({ s: T.s[k], kind: 'jump' });
+    }, level);
+    // whoops: a run of rollers ~9 m apart, on gentle ground (not down a mountainside into a bend)
+    const gentle = (k) => { for (let j = -5; j < 50; j++) if (Math.abs(T.hb[(k + j + 1) % n] - T.hb[(k + j + n) % n]) > 0.08 * ds) return false; return true; };
+    const nW = cfg.whoops === 'none' ? 0 : Math.max(1, Math.floor(T.L / (cfg.whoops === 'lots' ? 650 : 1300)));
+    pick(nW, 0, 45, 60, (k) => {
+      const P = 9, nR = 5 + Math.floor(rnd() * 4), A = (T.biome === 'desert' ? 0.62 : 0.45) + rnd() * 0.15;
+      for (let j = 0; j <= Math.round(nR * P / ds); j++) {
+        const u = j * ds, f = Math.min(1, u / P, (nR * P - u) / P);
+        hc[(k + j) % n] += A * Math.max(0, f) * (0.5 - 0.5 * Math.cos(2 * Math.PI * u / P));
+      }
+      feats.push({ s: T.s[k], kind: 'whoops' });
+    }, gentle);
+    // the terrain's own: mud holes in the dips through the woods; on the bog, firm dirt over the rises (mud everywhere
+    // else); sandy washes across the desert course
+    if (T.biome === 'forest' || T.biome === 'mud') {
+      for (let k = 0; k < n; k++) {
+        let lo = true, hi = true;
+        for (let j = 8; j <= 20 && (lo || hi); j += 4) { const a = hc[(k - j + n) % n], b = hc[(k + j) % n]; if (hc[k] > a - 0.25 || hc[k] > b - 0.25) lo = false; if (hc[k] < a + 0.25 || hc[k] < b + 0.25) hi = false; }
+        if (T.biome === 'forest' && lo && !used[k]) for (let j = -7; j <= 7; j++) zone[(k + j + n) % n] = 1;
+        if (T.biome === 'mud' && hi) for (let j = -9; j <= 9; j++) zone[(k + j + n) % n] = 3;
+      }
+      if (T.biome === 'forest') for (let k = 0; k < n; k++) if (zone[k] === 1) hc[k] -= 0.22;
+    }
+    if (T.biome === 'desert') {
+      for (let s = 220 + rnd() * 200; s < T.L - 120; s += 260 + rnd() * 260) {
+        const k = iOf(s), half = 5 + Math.floor(rnd() * 5);
+        if (!free(k, -half, half)) continue;
+        for (let j = -half - 4; j <= half + 4; j++) { const i = (k + j + n) % n, t = Math.min(1, (half + 4 - Math.abs(j)) / 4); hc[i] -= 0.7 * t; if (Math.abs(j) <= half) zone[i] = 2; }
+      }
+    }
+    T.hc = Float32Array.from(hc); T.zone = zone; T.feats = feats;
+  }
+  // the course's ground height s metres along it
+  function offProfileAt(s) {
+    const T = TRK, f = (((s % T.L) + T.L) % T.L) / T.L * T.n, i = Math.floor(f) % T.n, j = (i + 1) % T.n, u = f - Math.floor(f);
+    return T.hc[i] + (T.hc[j] - T.hc[i]) * u;
   }
   const _ttq = {}, _ftq = {}, _gtq = {}, _ptq = {};
 
@@ -1295,6 +1629,7 @@
       return m > 0 ? h0 + (duneHeight(x, z) - h0) * m : h0;
     }
     if (TRK) {
+      if (TRK.kind === 'offroad') return offTerrain(x, z);
       if (TRK.kind === 'mow') {
         // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
         const d = Math.hypot(x - TRK.cx, (z - TRK.cz) * 0.8);
@@ -1350,6 +1685,21 @@
     return h + m * det + m2 * hills + mount - lake;
   }
 
+  // an offroad course: level across at its own ground, a berm up round the outside of each tighter corner, blending back
+  // into the land over the verge
+  function offTerrain(x, z) {
+    const nat = offNatural(x, z), q = trackQuery(x, z, _ttq);
+    if (q.i < 0) return nat;
+    const T = TRK, hw = T.W / 2, d = q.d, hc = offProfileAt(q.s);
+    let y = d <= hw + 0.5 ? hc : hc + (nat - hc) * smooth(hw + 0.5, hw + T.B.verge, d);
+    const R = T.R[q.i];
+    if (Math.abs(R) < 45 && q.sd * R > 0) {          // (the outside: right of the line on a left-hander)
+      const b = 0.95 * Math.min(1, (45 - Math.abs(R)) / 25);
+      y += b * smooth(hw - 2, hw + 0.8, d) * (1 - smooth(hw + 2.5, hw + 6, d));
+    }
+    return y;
+  }
+
   // physics-grid height cache (LOD0 grid vertices)
   const gridCache = new Map();
   function gridHeight(ix, iz) {
@@ -1394,6 +1744,20 @@
     if (MAP === 'arena') { out.roadD = 1e4; out.surface = arenaSD(x, z) < 0 ? 3 : 0; return out; }   // clay floor, concrete outside
     if (MAP === 'ramps') { out.roadD = 1e4; out.surface = 3; return out; }   // All Ramps: groomed dirt everywhere
     if (MAP === 'dunes') { out.roadD = 1e4; out.surface = duneCampD(x, z) < DUNES.CAMP_R + 3 ? 3 : 6; return out; }   // sand, the packed hardpan
+    if (TRK && TRK.kind === 'offroad') {
+      // an offroad course: dunes all sand; the forest's dirt with mud holes in the dips; the desert's hardpack with sandy
+      // washes across it, gravel at its edges, sand and gravel patches off it; the bog mud but for firm dirt over the
+      // rises; the mountain's gravel, grass off it but gravel and scree on the steep bits
+      const q = trackQuery(x, z, _gtq), d = q.d, hw = TRK.W / 2, b = TRK.biome, zn = q.i >= 0 ? TRK.zone[q.i] : 0, nz = nDet(x * 0.05 + 40, z * 0.05);
+      out.roadD = d;
+      if (d < hw + 0.4) out.surface = b === 'dunes' ? 6 : b === 'forest' ? (zn === 1 ? 4 : 3) : b === 'desert' ? (zn === 2 ? 6 : 3) : b === 'mud' ? (zn === 3 ? 3 : 4) : 1;
+      else if (b === 'dunes') out.surface = 6;
+      else if (b === 'desert') out.surface = d < hw + 2.5 ? 1 : nz > 0.35 ? 6 : nz < -0.4 ? 1 : 3;
+      else if (b === 'mud') out.surface = d < hw + 2 || nz > 0.5 ? 4 : 2;
+      else if (b === 'mountain') out.surface = 1 - out.ny > 0.25 || d < hw + 2 ? 1 : 2;
+      else out.surface = d < hw + 1.5 || nz > 0.45 ? 3 : 2;
+      return out;
+    }
     if (TRK) {
       // rally stages: a gravel road (with a strip of loose stuff along its edges); the mower course: dirt. Grass or dirt off it
       const d = trackQuery(x, z, _gtq).d;
@@ -1416,6 +1780,14 @@
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+    if (TRK && TRK.kind === 'offroad') {
+      // (woods right up to the course in the forest; pines up the mountain; a few trees about the bog; none in the sand)
+      const b = TRK.biome;
+      if (b === 'dunes' || b === 'desert') return 0;
+      const X = x + OFFX, Z = z + OFFZ, f = nForest(X * 0.0016, Z * 0.0016) * 0.75 + nForest2(X * 0.0062, Z * 0.0062) * 0.35;
+      const base = b === 'forest' ? 0.6 + 0.4 * smooth(-0.3, 0.3, f) : b === 'mountain' ? 0.2 + 0.55 * smooth(-0.2, 0.4, f) : 0.06 + 0.3 * smooth(0, 0.5, f);
+      return base * smooth(TRK.W / 2 + 3, TRK.W / 2 + 9, trackQuery(x, z, _ftq).d);
+    }
     if (TRK) {
       if (TRK.kind === 'mow') return 0.7 * smooth(150, 330, Math.hypot(x - TRK.cx, z - TRK.cz)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
       // rally stages: woods, with fields opening up on the fast one; the windy one is forest nearly all the way, right up
@@ -1444,6 +1816,61 @@
       if (MAP === 'arena') for (const b of arenaWalls()) if (b.x >= x0 && b.x < x0 + CH && b.z >= z0 && b.z < z0 + CH) boxes.push(b);
       cp = { trees: new Float32Array(0), bushes: new Float32Array(0), rocks: new Float32Array(0), buildings, poles, signs, labels, lines, walls, circles, boxes };
       propCache.set(key, cp);
+      return cp;
+    }
+    if (TRK && TRK.kind === 'offroad') {
+      // an offroad course: its furniture (corner boards, bales on the hairpins, the arch's legs, the jump signs), the
+      // terrain's trees (none in the sand; saguaros dotted about the desert), bushes and rocks
+      const T = TRK, hw = T.W / 2, tq = _ptq, TP = trackProps(), bm = T.biome, inC = (x, z) => x >= x0 && x < x0 + CH && z >= z0 && z < z0 + CH;
+      const chevrons = [], tr = [], rk = [], bu = [];
+      for (const b of TP.bales) if (inC(b.x, b.z)) circles.push({ x: b.x, z: b.z, r: 0.6 });
+      for (const c of TP.chevrons) if (inC(c.x, c.z)) { chevrons.push(c); circles.push({ x: c.x, z: c.z, r: 0.1 }); }
+      for (const [lx, lz] of TP.arch.legs) if (inC(lx, lz)) circles.push({ x: lx, z: lz, r: 0.22 });
+      for (const sg of TP.signs) if (inC(sg.x, sg.z)) { signs.push(sg); circles.push({ x: sg.x, z: sg.z, r: 0.06 }); }
+      if (bm !== 'dunes' && bm !== 'desert') {
+        const cell = 7, nc = CH / cell | 0;
+        for (let a = 0; a < nc; a++) for (let b = 0; b < nc; b++) {
+          const gx = cx * nc + a, gz = cz * nc + b, r1 = hash01(gx, gz, 1);
+          const x = (a + 0.1 + 0.8 * hash01(gx, gz, 2)) * cell + x0, z = (b + 0.1 + 0.8 * hash01(gx, gz, 3)) * cell + z0;
+          const dens = forestDensity(x, z);
+          if (r1 > dens) continue;
+          const d = trackQuery(x, z, tq).d;
+          if (d < hw + 3 || (d < hw + 7 && r1 > dens * 0.5)) continue;
+          const y = terrainHeight(x, z);
+          if (bm === 'mountain' && y > 95 + 25 * hash01(gx, gz, 4)) continue;          // (the tree line)
+          const sl = Math.max(Math.abs(terrainHeight(x + 2, z) - y), Math.abs(terrainHeight(x, z + 2) - y)) / 2; if (sl > 0.9) continue;
+          const kn = nKind(x * 0.004, z * 0.004);
+          const kind = bm === 'mountain' ? (kn > -0.55 ? 0 : 2) : bm === 'mud' ? (kn > 0.05 ? 1 : 2) : kn > 0.25 ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1;
+          const sc = 0.75 + hash01(gx, gz, 6) * 0.65;
+          tr.push(x, y, z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
+          circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
+        }
+      }
+      // (rocks, cacti, bushes: their chances per 11 m cell)
+      const PR = { dunes: [0, 0, 0.025], forest: [0.05, 0, 0.33], desert: [0.07, 0.035, 0.2], mud: [0.015, 0, 0.38], mountain: [0.2, 0, 0.12] }[bm];
+      const bcell = 11, nb = CH / bcell | 0;
+      for (let a = 0; a < nb; a++) for (let b = 0; b < nb; b++) {
+        const gx = cx * nb + a, gz = cz * nb + b;
+        const x = (a + hash01(gx, gz, 21)) * bcell + x0, z = (b + hash01(gx, gz, 22)) * bcell + z0, r = hash01(gx, gz, 23);
+        if (r >= PR[0] + PR[1] + PR[2]) continue;
+        const d = trackQuery(x, z, tq).d;
+        if (d < hw + 1.5) continue;
+        const y = terrainHeight(x, z);
+        if (r < PR[0]) {
+          if (d < hw + 4) continue;
+          const sz = (bm === 'mountain' ? 0.6 : 0.4) + hash01(gx, gz, 24) * (bm === 'mountain' ? 2.0 : 1.4);
+          rk.push(x, y, z, sz, hash01(gx, gz, 25) * 6.283, hash01(gx, gz, 26));
+          if (sz > 0.8) circles.push({ x, z, r: sz * 0.85 });
+        } else if (r < PR[0] + PR[1]) {
+          if (d < hw + 6) continue;
+          const sc = 0.7 + hash01(gx, gz, 27) * 0.6;
+          tr.push(x, y, z, sc, hash01(gx, gz, 28) * 6.283, 3);
+          circles.push({ x, z, r: 0.3 * sc });
+        } else bu.push(x, y, z, (bm === 'dunes' ? 0.35 : 0.6) + hash01(gx, gz, 27) * 0.9, hash01(gx, gz, 28) * 6.283, 0);
+      }
+      cp = { trees: new Float32Array(tr), bushes: new Float32Array(bu), rocks: new Float32Array(rk), buildings, poles, signs, labels, lines, walls, circles, boxes, chevrons };
+      propCache.set(key, cp);
+      if (propCache.size > 400) propCache.delete(propCache.keys().next().value);
       return cp;
     }
     if (TRK) {
@@ -1842,14 +2269,17 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || TRACK_DEFS[m] ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || m === 'offroad' || TRACK_DEFS[m] ? m : 'country';
     TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
+    // (an offroad race: its course from the settings - generated once per course code - and where it sits in the noise)
+    if (MAP === 'offroad') { const k = 'off:' + offCode(OFF); TRK = trackCache[k] = trackCache[k] || offGenerate(OFF); [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM] = TRK.off; }
     trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
     setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; },
+    setOffroad, get offroad() { return OFF; }, offCode, offParse, offNormalize, OFF_BIOMES, OFF_OPTS, OFF_LEN, offNatural,
     // (the maps with lakes: the open country - none by the tracks, in the stadium, the desert or on the flat maps)
     get hasWater() { return MAP !== 'tarmac' && MAP !== 'arena' && MAP !== 'ramps' && MAP !== 'dunes' && !TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
@@ -18887,14 +19317,15 @@ float lampLight(float lat, float al){
     const rns = [], rew = [];
     for (let i = 0; i < 15; i++) { rns.push(new THREE.Vector4()); rew.push(new THREE.Vector4()); }
     const fNS = new Float32Array(60), fEW = new Float32Array(60);
-    // the tracks (rally stages, the windy mower course): the distance from the centre line, baked once into a texture from
-    // worldgen's own line (0.1 m steps to 25.5 m) - the shader paints the road, its edges and verges from it
+    // the tracks (rally stages, the windy mower course, an offroad race's course): the distance from the centre line, baked
+    // once into a texture from worldgen's own line (0.1 m steps to 25.5 m) - the shader paints the road, its edges and
+    // verges from it - and in its second channel the zone of the course there (an offroad course's mud holes, washes...)
     const TRK = W.track, trkBox = new THREE.Vector4(0, 0, 1, 1);
     let trkTex = null;
     if (TRK) {
       const M = 26, res = TRK.kind === 'mow' ? 0.5 : 1, bx0 = TRK.box[0] - M, bz0 = TRK.box[1] - M;
       const w = Math.ceil((TRK.box[2] - TRK.box[0] + 2 * M) / res), h = Math.ceil((TRK.box[3] - TRK.box[1] + 2 * M) / res);
-      const df = new Float32Array(w * h).fill(25.5);
+      const df = new Float32Array(w * h).fill(25.5), zf = new Uint8Array(w * h);
       for (let i = 0; i < TRK.n; i++) {
         const j = (i + 1) % TRK.n, ax = TRK.x[i], az = TRK.z[i], dx = TRK.x[j] - ax, dz = TRK.z[j] - az, l2 = dx * dx + dz * dz || 1;
         const ia = Math.max(0, Math.floor((Math.min(ax, ax + dx) - 25.5 - bx0) / res)), ib = Math.min(w - 1, Math.ceil((Math.max(ax, ax + dx) + 25.5 - bx0) / res));
@@ -18905,28 +19336,29 @@ float lampLight(float lat, float al){
             const px = bx0 + (a + 0.5) * res - ax;
             let t = (px * dx + pz * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
             const ex = px - dx * t, ez = pz - dz * t, d = Math.sqrt(ex * ex + ez * ez), k = b * w + a;
-            if (d < df[k]) df[k] = d;
+            if (d < df[k]) { df[k] = d; zf[k] = TRK.zone ? TRK.zone[i] : 0; }
           }
         }
       }
-      const u8 = new Uint8Array(w * h);
-      for (let k = 0; k < w * h; k++) u8[k] = Math.round(Math.min(25.5, df[k]) * 10);
-      trkTex = new THREE.DataTexture(u8, w, h, THREE.RedFormat, THREE.UnsignedByteType);
+      const u8 = new Uint8Array(w * h * 2);
+      for (let k = 0; k < w * h; k++) { u8[k * 2] = Math.round(Math.min(25.5, df[k]) * 10); u8[k * 2 + 1] = zf[k]; }
+      trkTex = new THREE.DataTexture(u8, w, h, THREE.RGFormat, THREE.UnsignedByteType);
       trkTex.unpackAlignment = 1; trkTex.magFilter = THREE.LinearFilter; trkTex.minFilter = THREE.LinearMipmapLinearFilter; trkTex.generateMipmaps = true;
       trkTex.needsUpdate = true;
       trkBox.set(bx0, bz0, 1 / (w * res), 1 / (h * res));
     }
     const DUNEMAP = W.map === 'dunes';
     const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
-      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
-      uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 } };
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+      uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 },
+      uBiome: { value: TRK && TRK.kind === 'offroad' ? ['dunes', 'forest', 'desert', 'mud', 'mountain'].indexOf(TRK.biome) : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
     terrainMat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, terrUniforms);
       sh.vertexShader = 'attribute vec2 aData;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\n' +
         sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
   vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vData = aData; vWN = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nuniform sampler2D uTrk;\nuniform vec4 uTrkBox;\nuniform float uTrkW;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
+      sh.fragmentShader = `uniform vec4 uRNS[15];\nuniform vec4 uREW[15];\nuniform float uWater;\nuniform float uMap;\nuniform float uLamp;\nuniform float uDirt;\nuniform float uPrep;\nuniform float uRamps;\nuniform sampler2D uTrk;\nuniform vec4 uTrkBox;\nuniform float uTrkW;\nuniform float uBiome;\nvarying vec3 vWPos;\nvarying vec2 vData;\nvarying vec3 vWN;\nfloat terrRough;\nvec3 terrGlow;\n` + GLSL_NOISE + GLSL_TARMAC +
         sh.fragmentShader
           .replace('#include <color_fragment>', `
   {
@@ -18972,7 +19404,74 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 7.5) {
+    if (uMap > 8.5) {
+      // ---- an offroad race: the terrain painted its own way, the course worn into it. td: metres from the centre line;
+      // zone: the course's mud holes (forest, 1), sandy washes (desert, 2), firm dry stretches (the bog, 3)
+      vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
+      vec4 tt = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv) : vec4(1.0, 0.0, 0.0, 0.0);
+      float td = tt.r * 25.5, zn = tt.g * 255.0;
+      float m1 = vnoise(P * 0.35), m2 = vnoise(P * 2.2), m3 = vnoise(P * 9.0);
+      float edge = uTrkW + (vnoise(P * 0.9) - 0.5) * 0.9 + (m3 - 0.5) * 0.3;
+      float onT = 1.0 - smoothstep(edge - 0.45, edge + 0.45, td);
+      float verge = 1.0 - smoothstep(uTrkW + 0.5, uTrkW + 3.2, td);
+      // (the lines everyone takes: packed darker, wandering a little)
+      float ruts = (exp(-pow((td - 1.0) / 0.5, 2.0)) + 0.6 * exp(-pow((td - uTrkW * 0.6) / 0.55, 2.0))) * (0.55 + 0.45 * vnoise(P * 0.5));
+      float slope = 1.0 - vWN.y;
+      vec3 base = col, trk = col, vg = col; float rT = 0.95;
+      if (uBiome < 0.5) {
+        // dunes: golden sand, wind ripples across it (none on the slip faces or far off); the course churned up -
+        // darker, rutted, no ripples left on it
+        vec2 U = vec2(0.96, 0.28);
+        float s1 = vnoise(P * 0.06), s2 = fbm3(P * 0.004 + 3.0), s4 = vnoise(P * 9.0);
+        vec3 c = mix(vec3(0.42, 0.24, 0.085), vec3(0.5, 0.3, 0.115), s1) * (0.94 + 0.05 * m2 + 0.03 * s4);
+        c = mix(c, vec3(0.46, 0.21, 0.065), smoothstep(0.55, 0.85, s2) * 0.4);
+        float slip = smoothstep(0.18, 0.4, dot(vWN.xz, U));
+        float rq = dot(P, U) / 0.3 + vnoise(P * 0.45) * 3.0 + vnoise(P * 2.1) * 0.6, rf = fract(rq);
+        float rip = rf < 0.78 ? rf / 0.78 : (1.0 - rf) / 0.22;
+        float rfade = (1.0 - smoothstep(6.0, 40.0, dist)) * (1.0 - smoothstep(0.2, 0.45, fwidth(rq))) * (1.0 - slip) * (1.0 - onT);
+        base = c * (1.0 + 0.05 * slip) * (1.0 + 0.1 * (rip - 0.5) * rfade);
+        trk = c * (0.86 + 0.08 * m2) * (1.0 - 0.18 * ruts);
+        vg = mix(base, trk, 0.5);
+      } else if (uBiome < 1.5) {
+        // forest: the woodland floor as it is; a brown dirt track, the mud holes black and wet
+        vec3 dirt = mix(vec3(0.2, 0.13, 0.075), vec3(0.27, 0.18, 0.1), m1) * (0.85 + 0.12 * m2 + 0.06 * m3) * (1.0 - 0.25 * ruts);
+        float mud = clamp(zn, 0.0, 1.0);
+        trk = mix(dirt, vec3(0.06, 0.045, 0.03) * (0.85 + 0.3 * m2), mud);
+        rT = mix(0.95, 0.32, mud * (0.6 + 0.4 * m1));
+        vg = mix(col, vec3(0.19, 0.14, 0.08) * (0.8 + 0.3 * m2), 0.65);
+      } else if (uBiome < 2.5) {
+        // desert: pale khaki hardpan with reddish streaks and gravel patches, banded red rock up the mesas; the course a
+        // lighter packed track, its washes pale loose sand, gravel thrown up along its edges
+        float s1 = vnoise(P * 0.05), s2 = fbm3(P * 0.006 + 2.0);
+        vec3 c = mix(vec3(0.27, 0.19, 0.11), vec3(0.33, 0.24, 0.14), s1) * (0.92 + 0.08 * m2 + 0.05 * m3);
+        c = mix(c, vec3(0.3, 0.15, 0.075), smoothstep(0.55, 0.85, s2) * 0.45);
+        c = mix(c, vec3(0.19, 0.17, 0.14) * (0.8 + 0.3 * m3), smoothstep(0.62, 0.8, vnoise(P * 0.12)) * 0.5);
+        vec3 band = mix(vec3(0.27, 0.13, 0.07), vec3(0.37, 0.2, 0.11), vnoise(vec2(P.x * 0.03 + P.y * 0.03, vWPos.y * 0.7)));
+        base = mix(c, band, smoothstep(0.25, 0.45, slope));
+        vec3 hard = mix(vec3(0.34, 0.26, 0.17), vec3(0.39, 0.3, 0.2), m1) * (0.9 + 0.08 * m2 + 0.05 * m3) * (1.0 - 0.2 * ruts);
+        trk = mix(hard, vec3(0.42, 0.3, 0.16) * (0.92 + 0.1 * m3), clamp(zn / 2.0, 0.0, 1.0));
+        vg = mix(base, vec3(0.23, 0.2, 0.17) * (0.85 + 0.3 * m3), 0.7);
+      } else if (uBiome < 3.5) {
+        // the bog: lush grass with soggy dark patches; the course dark glistening mud, water lying in the ruts, firmer
+        // lighter dirt over the rises
+        vec3 g = mix(vec3(0.12, 0.2, 0.05), vec3(0.17, 0.25, 0.07), m1) * (0.9 + 0.1 * m2 + 0.06 * m3);
+        base = mix(g, vec3(0.07, 0.09, 0.045), smoothstep(0.55, 0.8, vnoise(P * 0.08)) * 0.6);
+        float wet = smoothstep(0.5, 0.72, vnoise(P * 0.22)) * clamp(ruts * 1.4, 0.0, 1.0);
+        vec3 mud = mix(vec3(0.085, 0.06, 0.04), vec3(0.13, 0.095, 0.06), m2) * (0.9 + 0.1 * m3);
+        mud = mix(mud, vec3(0.035, 0.04, 0.035), wet);
+        float dry = clamp(zn / 3.0, 0.0, 1.0);
+        trk = mix(mud, vec3(0.22, 0.15, 0.09) * (0.85 + 0.15 * m2) * (1.0 - 0.2 * ruts), dry);
+        rT = mix(mix(0.5, 0.12, wet), 0.93, dry);
+        vg = mix(base, mud, 0.6);
+      } else {
+        // the mountain: alpine grass with the grey rock out on the slopes (and snow up top); the course grey gravel
+        vec3 grav = mix(vec3(0.26, 0.25, 0.23), vec3(0.34, 0.33, 0.3), m1) * (0.85 + 0.13 * m2 + 0.08 * m3) * (1.0 - 0.22 * ruts);
+        trk = grav;
+        vg = mix(col, vec3(0.31, 0.3, 0.28) * (0.8 + 0.3 * m3), 0.7);
+      }
+      col = mix(mix(base, vg, verge), trk, onT);
+      rough = mix(1.0, rT, onT);
+    } else if (uMap > 7.5) {
       // ---- Sand Dunes: warm golden sand - redder and paler patches, the slip faces (facing downwind) fresh, smooth and
       // a touch lighter, wind ripples across everything else (sharp crests, fading out with distance), old tyre tracks
       // wandering over it all; the packed hardpan at the start greyer and firmer, rutted where everyone's parked
@@ -19386,16 +19885,31 @@ float lampLight(float lat, float al){
         merge([blob(1.2, 1, 0, 5.4, 0, 1.3, 0.35, 21), blob(0.9, 1, 0.6, 4.6, 0.3, 1.2, 0.3, 22), blob(0.9, 1, -0.5, 4.9, -0.4, 1.2, 0.3, 23)]),
       ],
       bush: merge([blob(0.9, 1, 0, 0.45, 0, 0.75, 0.35, 31), blob(0.7, 1, 0.55, 0.35, 0.2, 0.7, 0.3, 32)]),
+      // (a saguaro: the column, a domed top; its two arms out and up)
+      cactusBody: merge([cyl(0.24, 0.27, 4.6, 10), (() => { const g = new THREE.SphereGeometry(0.24, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(0, 4.3, 0); return g; })()]),
+      cactusArms: merge([(() => { const g = new THREE.CylinderGeometry(0.15, 0.15, 0.55, 8); g.rotateZ(Math.PI / 2); g.translate(0.4, 1.9, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.15, 0.16, 1.5, 8); g.translate(0.62, 2.6, 0); return g; })(), (() => { const g = new THREE.SphereGeometry(0.15, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(0.62, 3.35, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.13, 0.13, 0.45, 8); g.rotateZ(Math.PI / 2); g.translate(-0.34, 2.5, 0); return g; })(),
+        (() => { const g = new THREE.CylinderGeometry(0.13, 0.14, 1.1, 8); g.translate(-0.53, 3.0, 0); return g; })(), (() => { const g = new THREE.SphereGeometry(0.13, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(-0.53, 3.55, 0); return g; })()]),
       rock: (() => { const g = new THREE.IcosahedronGeometry(1, 1); jitterGeo(g, 0.55, 41); g.scale(1.2, 0.75, 1); g.translate(0, 0.2, 0); g.computeVertexNormals(); return g; })(),
     };
     const MAT = {
       trunk: [new THREE.MeshStandardMaterial({ color: 0x4a3526, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0x3f3024, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0xd9d4c7, roughness: 0.8 })],
       leaves: [new THREE.MeshStandardMaterial({ color: 0x24401f, roughness: 0.95 }), new THREE.MeshStandardMaterial({ color: 0x35521f, roughness: 0.92 }), new THREE.MeshStandardMaterial({ color: 0x5d7d2b, roughness: 0.9 })],
       bush: new THREE.MeshStandardMaterial({ color: 0x2e4a1a, roughness: 0.95 }),
+      cactus: new THREE.MeshStandardMaterial({ color: 0x46612f, roughness: 0.85 }),
       rock: new THREE.MeshStandardMaterial({ color: 0x77726b, roughness: 0.92, flatShading: true }),
       pole: new THREE.MeshStandardMaterial({ color: 0x5b4633, roughness: 0.9 }),
       wire: new THREE.LineBasicMaterial({ color: 0x151515 }),
     };
+    GEO.trunk.push(GEO.cactusBody); GEO.leaves.push(GEO.cactusArms); MAT.trunk.push(MAT.cactus); MAT.leaves.push(MAT.cactus);
+    // (an offroad course's scrub and stone: dry sage in the desert, bleached tufts on the dunes; red sandstone in the
+    // desert, grey granite up the mountain)
+    if (TRK && TRK.kind === 'offroad') {
+      const BC = { desert: 0x5e6040, dunes: 0x7a6a40, mountain: 0x34462a }[TRK.biome], RC = { desert: 0x94634a, mountain: 0x7a7874 }[TRK.biome];
+      if (BC) MAT.bush.color.setHex(BC);
+      if (RC) MAT.rock.color.setHex(RC);
+    }
     // buildings
     const winTex = (() => {
       const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
@@ -19601,7 +20115,7 @@ float lampLight(float lat, float al){
       const x0 = cx * CH, z0 = cz * CH;
       const g = new THREE.Group(); g.position.set(x0, 0, z0);
       const td = q.treeDensity;
-      for (let kind = 0; kind < 3; kind++) {
+      for (let kind = 0; kind < GEO.trunk.length; kind++) {
         const sel = [];
         for (let i = 0; i < cp.trees.length; i += 6) {
           if (cp.trees[i + 5] !== kind) continue;
@@ -20064,7 +20578,7 @@ void main(){
       const A = TP.arch, dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
       const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz);
       for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
-      const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : 'WINDY MOWER TRACK';
+      const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : W.map === 'offroad' ? 'OFFROAD RACE · ' + TRK.B.name.toUpperCase() : 'WINDY MOWER TRACK';
       const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
       { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
         g.fillStyle = '#f4f4f0'; g.fillRect(0, 32, 1024, 32); g.fillStyle = '#111'; g.font = 'italic 900 30px Impact, "Arial Black", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -20073,6 +20587,20 @@ void main(){
       const banM = new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 });
       const banner = new THREE.Mesh(new THREE.BoxGeometry(A.w + 0.4, 0.8, 0.06), [dark, dark, dark, dark, banM, banM]);
       banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; tg.add(banner);
+      // (an offroad course: white marker stakes with an orange top down both edges; across the dunes, tall whip flags)
+      if (TP.stakes && TP.stakes.length) {
+        const dun = TRK.biome === 'dunes', m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+        const parts = dun
+          ? [[new THREE.CylinderGeometry(0.012, 0.016, 3.6, 5).translate(0, 1.8, 0), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })],
+            [(() => { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0.75, -0.17); sh.lineTo(0, -0.42); sh.closePath(); return new THREE.ShapeGeometry(sh).translate(0.012, 3.58, 0); })(), new THREE.MeshStandardMaterial({ color: 0xff5a10, roughness: 0.7, side: THREE.DoubleSide, emissive: 0x401000 })]]
+          : [[new THREE.BoxGeometry(0.05, 1.0, 0.05).translate(0, 0.42, 0), new THREE.MeshStandardMaterial({ color: 0xe8e6df, roughness: 0.8 })],
+            [new THREE.BoxGeometry(0.058, 0.17, 0.058).translate(0, 0.86, 0), new THREE.MeshStandardMaterial({ color: 0xff5a10, roughness: 0.6, emissive: 0x2a0a00 })]];
+        for (const [geo, mat] of parts) {
+          const im = new THREE.InstancedMesh(geo, mat, TP.stakes.length); im.castShadow = true;
+          TP.stakes.forEach((st, i) => { qq.setFromAxisAngle(up, W.hash01(i, 3, 17) * Math.PI * 2); pv.set(st.x, gh(st.x, st.z), st.z); m4.compose(pv, qq, one); im.setMatrixAt(i, m4); });
+          tg.add(im);
+        }
+      }
       const chkC = document.createElement('canvas'); chkC.width = 256; chkC.height = 16;
       { const g = chkC.getContext('2d'); for (let k = 0; k < 32; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#141414' : '#ecebe6'; g.fillRect(k * 8, r * 8, 8, 8); } }
       const chkT = new THREE.CanvasTexture(chkC); chkT.colorSpace = THREE.SRGBColorSpace;
@@ -21047,6 +21575,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   }
   window.addEventListener('resize', resize); resize();
 
+  // (an offroad race: its course from the settings - the room's, online)
+  if (S.map === 'offroad') W.setOffroad(S.offCfg || null);
   W.setMap(S.map);
   const world = WR.create(THREE, scene, W, { viewDist: S.viewDist, treeDensity: S.treeDensity, shadows: S.shadows });
   world.setTime(S.time, renderer);
@@ -21523,11 +22053,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   const DUNESMAP = S.map === 'dunes';
+  // (Offroad Racing: a generated course, raced in laps - against the clock, or the room)
+  const OFFMODE = S.map === 'offroad';
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
   // centre line, points every ~2 m - the track's own, or the Mower Track's oval)
-  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack'], COURSE = COURSE_MAPS.includes(S.map);
+  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad'], COURSE = COURSE_MAPS.includes(S.map);
   function ovalLine() {
     const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
     for (let k = 0; k < n; k++) {
@@ -21566,13 +22098,18 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
+  if (OFFMODE) {
+    const T = W.track, O = W.offroad, J = T.feats.filter((f) => f.kind === 'jump').length;
+    TRACK_HINT.offroad = 'Offroad Race · ' + T.B.name + ': ' + (T.L / 1000).toFixed(1) + ' km, ' + O.laps + (O.laps > 1 ? ' laps' : ' lap') + ' - follow the marker stakes' + (O.biome === 'dunes' ? ' (the orange flags)' : '')
+      + (J ? ', ' + J + ' jump' + (J > 1 ? 's' : '') + ' (a JUMP sign before each)' : '') + '. The countdown starts by itself; Backspace puts you back on the course. Esc → Modes for a new course.';
+  }
   const spawn = S.netRoom && COURSE ? gridSpot(Math.floor(Math.random() * 8))        // (back in a room: somewhere on the grid)
     : DRAGMAP ? { x: W.DRAG.LANE, y: 0, z: W.DRAG.SPAWN_Z, tx: 0, tz: -1 }
     : ARENAMAP ? W.nearestRoadSpot(W.ARENA.SPAWN_X, W.ARENA.SPAWN_Z, 0, -1)
     : RAMPSMAP ? { x: W.RAMPS_SPAWN.x, y: 0, z: W.RAMPS_SPAWN.z, tx: 0, tz: -1 }
     : MOWTRACK ? { x: W.MOWT.SPAWN_X, y: 0, z: W.MOWT.SPAWN_Z, tx: 0, tz: -1 }
     : DUNESMAP ? { x: W.DUNES.SPAWN_X, y: W.ground(W.DUNES.SPAWN_X, W.DUNES.SPAWN_Z, {}).h, z: W.DUNES.SPAWN_Z, tx: 1, tz: 0 }
-    : TRKMAP ? W.trackSpawn()
+    : OFFMODE ? gridSpot(0) : TRKMAP ? W.trackSpawn()
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
@@ -21765,7 +22302,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (RACE.on) {
       if (raceHolding()) return;
       if (!auto) {
-        const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+        const wait = resetWait() - (performance.now() - RACE.resetT) / 1000;
         if (wait > 0) { hud.toast('Reset in ' + Math.ceil(wait) + ' s', 1.2); return; }
         RACE.resetT = performance.now(); raceLost();
       }
@@ -21853,14 +22390,15 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   canvas.addEventListener('wheel', (e) => { cam.zoom = clamp(cam.zoom * (e.deltaY > 0 ? 1.08 : 0.93), 0.6, 2.2); }, { passive: true });
 
   // ------------------------------------------------------------------ menu
-  const TABS = ['Drive', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
+  const TABS = ['Drive', 'Modes', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
     $('menu').classList.toggle('hidden', !v);
-    G.paused = v || !G.started;
+    G.paused = v || !G.started || !$('raceRes').classList.contains('hidden');
+    if (v && OFFMODE && !inRoom() && raceHolding()) RACE.go = 0;
     if (v) input.stopRumble();              // (paused: no vibration left running under the menu)
     if (audio.ready) audio.master.gain.setTargetAtTime(v ? 0.25 : 1, audio.ctx.currentTime, 0.1);
     if (v) renderMenu();
@@ -21939,7 +22477,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
       const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
-      if (inRoom()) { /* online: the host picks the map */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      if (inRoom() || S.map === 'offroad') { /* online: the host picks the map; racing offroad, you stay on the course */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
@@ -22220,6 +22758,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const clr = el('<button class="btn small ghost">Clear best times</button>');
       clr.addEventListener('click', () => { perf.clearBest(); hud.toast('Best times cleared'); });
       add(row('Performance timers', 'Stop fully, then launch — 0-60, 0-100, ¼ mile, 60-0 braking are timed automatically', clr));
+    } else if (curTab === 'Modes') {
+      renderModes(add);
     } else if (curTab === 'Fun') {
       renderFun(add);
     } else if (curTab === 'Controls') {
@@ -22462,7 +23002,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     // GTA-style flip: steering rolls a car that's on its roof or side back onto its wheels
     veh.input.flipAssist = true;
     // (monster truck) air assist: eases off whichever pedal would over-rotate it in the air, feathers the gas on landing
-    veh.input.airAssist = MONSTER && S.airAssist !== false;
+    // (racing offroad, every vehicle gets it - the jumps and brows are meant to be raced over)
+    veh.input.airAssist = (MONSTER || OFFMODE) && S.airAssist !== false;
     veh.input.revHold = !!A.rev;
     veh.input.lineLock = !!A.lineLock;
     G.horn = !!A.horn; G.lookBack = !!A.lookBack;
@@ -23015,7 +23556,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     LAP.prevS = s;
   }
   function lapUpdate() {
-    if (TRKMAP && G.started) return trackLap();
+    if (TRKMAP && G.started && !OFFMODE) return trackLap();
     if (!MOWTRACK || !G.started) return;
     const M = W.MOWT, z = veh.pz, onStraight = Math.abs(veh.px - M.R) < M.W / 2 + 1;
     if (z < -M.SL - M.R * 0.6) LAP.far = true;
@@ -23173,9 +23714,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (!inRoom() || !m) return;
     let why = '';
     if (ONLINE.net.isHost) {
-      if (m.map && m.map !== S.map) ONLINE.net.setMap(S.map);        // (the host's map is the room's)
+      const oc = OFFMODE ? OFF_CODE : null;
+      // (the host's map is the room's - and course; not while this page is on its way to a new one)
+      if (!ONLINE.reloading && ((m.map && m.map !== S.map) || (OFFMODE && m.off !== oc))) ONLINE.net.setMap(S.map, oc);
     } else {
       if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
+      // (an offroad race: the host's course, from its code)
+      if (m.map === 'offroad' && m.off && m.off !== (OFFMODE ? OFF_CODE : '')) { const c = W.offParse(m.off); if (c) { S.offCfg = c; if (!why) why = 'the host\'s offroad course'; } }
       const cs = m.car;
       if (cs && cs.c && (VEH.CARS[cs.c] || MORE_IDS.includes(cs.c))) {
         ownCarKeep();
@@ -23255,7 +23800,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
     try {
       const net = netCreate(), map = MAP_NAMES[ONLINE.hostMap] ? ONLINE.hostMap : S.map;
-      await net.hostRoom(map, netProfile());
+      await net.hostRoom(map, netProfile(), map === 'offroad' ? W.offCode(offCfgNow()) : null);
       ONLINE.lastProf = JSON.stringify(netProfile());
       S.netRoom = net.code; saveS();
       if (map !== S.map) {
@@ -23553,10 +24098,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     hayT: 0, hayOn: new Set(), flash: '', flashT: 0, resetT: -1e9, walls: [], go: null, hold: null, cd: '', goT: 0, saveT: 0, boardT: 0, savedP: -1,
     wR: 0, wL: 0, bumpT: 0 };
   const RESET_WAIT = 30, HAY_PTS = 100, STREAK_M = 40, STREAK_MAX = 3, OFF_RATE = 0.25;
+  // (an offroad race: a reset whenever you like racing alone, every 10 s in a room)
+  const resetWait = () => OFFMODE ? (inRoom() ? 10 : 0) : RESET_WAIT;
+  const raceNow = () => (inRoom() ? ONLINE.net.serverNow() : Date.now());
   // (the walls: this far from the centre line - 10 m past the road's edge on the rally stages, well into the trees; 6 m
   // on the mower tracks, well behind the bales. Far enough out that going off costs you - the trees, the grass, a quarter
   // of the points - instead of being a guard rail to bounce along; still no way through to another bit of the course)
-  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : 6) : 0;
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : 6) : 0;
   function raceTrack(x, z) {
     const T = CRS_T, n = T.n, X = T.x, Z = T.z;
     const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
@@ -23664,7 +24212,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
   }
   function raceUpdate(dt) {
-    const on = COURSE && inRoom() && G.started;
+    const on = COURSE && (inRoom() || OFFMODE) && G.started;
     if (!on) { RACE.on = false; RACE.i = -1; RACE.prevS = null; RACE.walls.length = 0; return; }
     RACE.on = true;
     RACE.flashT -= dt;
@@ -23679,6 +24227,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     raceWalls();
     raceBump(dt);
+    if (OFFMODE) { offProgress(dt); return; }
     // on the road: the car's middle inside the road's edge (a wheel or two off still counts)
     const T = CRS_T, onRoad = Math.abs(RACE.sd) < T.W / 2 + 0.5;
     if (!onRoad && RACE.road) raceLost();
@@ -23702,7 +24251,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (RACE.saveT <= 0) { RACE.saveT = 3; raceSave(); }
   }
   function raceSave() {
-    if (!inRoom() || RACE.go === null || Math.round(RACE.pts) === RACE.savedP) return;
+    if (!inRoom() || OFFMODE || RACE.go === null || Math.round(RACE.pts) === RACE.savedP) return;
     RACE.savedP = Math.round(RACE.pts);
     // (per tab, like the guest sign-in - two tabs are two players)
     try { sessionStorage.setItem('hc_netPts', JSON.stringify({ code: ONLINE.net.code, r: RACE.go, p: RACE.savedP })); } catch (e) { /* storage unavailable */ }
@@ -23718,11 +24267,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (first && go && ONLINE.net.serverNow() >= go) {
       // (back after a reload in a race that's on: the points you had in it)
       let k = null; try { k = JSON.parse(sessionStorage.getItem('hc_netPts')); } catch (e) { /* storage unavailable */ }
-      RACE.pts = k && k.code === ONLINE.net.code && k.r === go ? k.p : 0;
+      RACE.pts = !OFFMODE && k && k.code === ONLINE.net.code && k.r === go ? k.p : 0;
       RACE.savedP = Math.round(RACE.pts);
       return;
     }
     RACE.pts = 0; RACE.debt = 0; RACE.resetT = -1e9; RACE.savedP = -1; raceLost(); raceSave();
+    if (OFFMODE) offReset();
     if (COURSE && G.started) raceGrid();
   }
   function raceGrid() {
@@ -23730,7 +24280,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     putCar(gridSpot(ids.indexOf(ONLINE.net.uid) % 8));
     RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.hayOn.clear(); LAP.armed = false;
   }
-  const raceHolding = () => RACE.on && (!RACE.go || ONLINE.net.serverNow() < RACE.go);
+  const raceHolding = () => RACE.on && (!RACE.go || raceNow() < RACE.go);
   // (every frame of the hold: pinned where it stands - it can rev, in park / neutral, but not move; at GO, into drive)
   function raceHold() {
     if (raceHolding()) {
@@ -23742,7 +24292,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       RACE.prevS = null; RACE.i = -1;
       return true;
     }
-    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; }
+    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); }
+    else if (OFFMODE && RACE.go && ORACE.goAt !== RACE.go && !ORACE.fin) {
+      // (an offroad race this car missed the start of - it joined late, or its tab was away: off the grid now, its clock
+      // running since GO)
+      raceGrid(); veh.selectDrive(); offGo();
+      ORACE.t0 = ORACE.lapT0 = veh.time - Math.max(0, raceNow() - RACE.go) / 1000;
+    }
+    if (OFFMODE && RACE.go) ORACE.goAt = RACE.go;
     return false;
   }
   // (the countdown's beeps: a short low one for 3, 2, 1 and a long high one for GO)
@@ -23755,22 +24312,27 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   }
   // ---- the HUD: the points board (top right) and the reset timer (bottom left, over the map)
   function raceHud(dt) {
-    const bd = $('netBoard'), rc = $('resetCd'), cd = $('raceCd');
-    bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on);
+    const bd = $('netBoard'), rc = $('resetCd'), cd = $('raceCd'), RW = resetWait();
+    bd.classList.toggle('hidden', !RACE.on); rc.classList.toggle('hidden', !RACE.on || !RW);
     $('perf').style.display = RACE.on ? 'none' : '';
-    // the start: waiting for the host (who gets the Start button), then 3, 2, 1, GO
+    // the start: waiting for the host (who gets the Start button), then 3, 2, 1, GO. Racing offroad alone the countdown
+    // runs by itself (and starts over if the menu comes up before GO); finished in a room, your place and time
     let big = '', sub = '', btn = false;
     if (RACE.on) {
-      const left = RACE.go ? RACE.go - ONLINE.net.serverNow() : Infinity;
-      if (!RACE.go) {
-        big = 'ON THE GRID';
-        sub = ONLINE.net.isHost ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : 'Waiting for the host to start the race - you can rev meanwhile';
-        btn = ONLINE.net.isHost;
-      } else if (left > 3000) { big = 'GET READY'; sub = 'The race starts in a moment'; }
+      if (OFFMODE && !inRoom() && !RACE.go && !G.paused && !ORACE.fin) RACE.go = Date.now() + 4300;
+      const left = RACE.go ? RACE.go - raceNow() : Infinity, host = inRoom() && ONLINE.net.isHost;
+      if (OFFMODE && inRoom() && ORACE.fin && (ORACE.finT > 0 || host)) {
+        big = 'FINISHED · P' + offStandings().place; btn = host;
+        sub = lapFmt(ORACE.fin) + (host ? ' - start the next race when everyone\'s in (or Esc → Online)' : ' - wait for the host to start the next one');
+      } else if (!RACE.go) {
+        big = inRoom() ? 'ON THE GRID' : '';
+        sub = host ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : inRoom() ? 'Waiting for the host to start the race - you can rev meanwhile' : '';
+        btn = host;
+      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
       else if (left > 0) big = String(Math.ceil(left / 1000));
       else if (RACE.goT > 0) big = 'GO!';
     }
-    RACE.goT -= dt;
+    RACE.goT -= dt; ORACE.finT -= dt;
     if (big !== RACE.cd) {
       if (/^[123]$/.test(big)) raceBeep(false); else if (big === 'GO!') raceBeep(true);
       RACE.cd = big;
@@ -23780,14 +24342,16 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     cd.querySelector('.cdSub').textContent = sub;
     cd.querySelector('button').classList.toggle('hidden', !btn);
+    cd.querySelector('button').textContent = OFFMODE && ORACE.fin ? 'Start the next race' : 'Start race';
     if (!RACE.on) return;
-    const wait = RESET_WAIT - (performance.now() - RACE.resetT) / 1000;
+    const wait = RW - (performance.now() - RACE.resetT) / 1000;
     rc.classList.toggle('ready', wait <= 0);
     rc.firstElementChild.textContent = wait > 0 ? 'Reset in ' + Math.ceil(wait) + ' s' : 'Reset ready · Backspace';
-    rc.querySelector('i').style.width = (wait > 0 ? 100 * (1 - wait / RESET_WAIT) : 100).toFixed(1) + '%';
+    rc.querySelector('i').style.width = (wait > 0 && RW ? 100 * (1 - wait / RW) : 100).toFixed(1) + '%';
     RACE.boardT -= dt;
     if (RACE.boardT > 0) return;
     RACE.boardT = 0.2;
+    if (OFFMODE) { offBoard(); return; }
     $('nbPts').textContent = Math.round(RACE.pts).toLocaleString();
     const mul = $('nbMul');
     mul.textContent = RACE.road ? '×' + RACE.streak.toFixed(1) : '×' + OFF_RATE;
@@ -23801,6 +24365,209 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     $('nbList').innerHTML = list.length < 2 ? '<div><span>Waiting for friends…</span></div>'
       : list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${Math.round(e.p).toLocaleString()}</span></div>`).join('');
   }
+  // ---- Offroad Racing: laps of a generated course, timed from GO. Progress is the course tracker's distance along the
+  // line - the one the walls follow - so going backwards (or round the walls) gains nothing: a lap counts once you've
+  // covered the course's length again since the last. Alone it's you against the clock, a personal best per course and
+  // car; in a room it's everyone in the host's car, placed by laps and ground covered, then by finishing time
+  const OFF_LAPS = OFFMODE ? W.offroad.laps : 0, OFF_CODE = OFFMODE ? W.offCode(W.offroad) : '';
+  const ORACE = { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0, goAt: null };
+  const offKey = () => OFF_CODE + '|' + TKEY;
+  const offCfgNow = () => (OFFMODE ? W.offroad : W.offNormalize(S.offCfg || null));
+  const offSeed = () => 1 + Math.floor(Math.random() * 2147483000);
+  function offReset() {
+    Object.assign(ORACE, { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0 });
+    $('raceRes').classList.add('hidden');
+  }
+  function offGo() { offReset(); ORACE.on = true; ORACE.t0 = veh.time; ORACE.lapT0 = veh.time; }
+  // (what goes out with the car: metres covered racing, minus the finishing time in hundredths once finished)
+  const offPub = () => (ORACE.fin ? -Math.round(ORACE.fin * 100) : ORACE.on ? Math.max(0, Math.round(ORACE.dist)) : 0);
+  const offCmp = (a, b) => ((a.p < 0) !== (b.p < 0) ? (a.p < 0 ? -1 : 1) : b.p - a.p);
+  function offStandings() {
+    const me = { n: S.netName, p: offPub(), me: true }, list = [me];
+    for (const g of ONLINE.ghosts.values()) { const L = g.snaps[g.snaps.length - 1]; list.push({ n: g.prof.n, p: L && L.length > 31 ? L[31] : 0 }); }
+    list.sort(offCmp);
+    return { list, place: list.indexOf(me) + 1 };
+  }
+  function offProgress(dt) {
+    if (ORACE.on && !ORACE.fin) {
+      const L = CRS_T.L;
+      if (ORACE.prevS === null) { ORACE.dist = RACE.s > L / 2 ? RACE.s - L : RACE.s; ORACE.prevS = RACE.s; }
+      else {
+        let ds = RACE.s - ORACE.prevS;
+        if (ds > L / 2) ds -= L; else if (ds < -L / 2) ds += L;
+        ORACE.prevS = RACE.s;
+        if (ds < 0) ORACE.debt -= ds;
+        else { const pay = Math.min(ds, ORACE.debt); ORACE.debt -= pay; ORACE.dist += ds - pay; }
+      }
+      ORACE.wrongT = veh.vx * RACE.tx + veh.vz * RACE.tz < -2 ? ORACE.wrongT + dt : 0;
+      while (!ORACE.fin && ORACE.dist >= (ORACE.lap + 1) * L) {
+        const t = veh.time - ORACE.lapT0; ORACE.laps.push(t); ORACE.lap++; ORACE.lapT0 = veh.time;
+        if (ORACE.lap >= OFF_LAPS) offFinish();
+        else { const b = Math.min(...ORACE.laps); hud.toast(`Lap ${ORACE.lap}: ${lapFmt(t)}${ORACE.lap > 1 && t <= b ? ' · fastest yet' : ''} - lap ${ORACE.lap + 1} of ${OFF_LAPS}`, 3); }
+      }
+    }
+    RACE.pts = offPub();
+  }
+  function offFinish() {
+    ORACE.fin = veh.time - ORACE.t0;
+    const best = Math.min(...ORACE.laps), key = offKey();
+    S.offPB = S.offPB || {};
+    const prev = S.offPB[key] ? Object.assign({}, S.offPB[key]) : null, isPB = !prev || ORACE.fin < prev.t;
+    S.offPB[key] = { t: isPB ? ORACE.fin : prev.t, lap: prev ? Math.min(prev.lap, best) : best, d: Date.now() };
+    const keys = Object.keys(S.offPB);
+    if (keys.length > 300) { keys.sort((a, b) => S.offPB[a].d - S.offPB[b].d); for (const k of keys.slice(0, keys.length - 300)) delete S.offPB[k]; }
+    saveS();
+    RACE.pts = offPub();
+    if (inRoom()) { ORACE.place = offStandings().place; ORACE.finT = 8; if (audio.ready) raceBeep(true); }
+    else offResults(isPB, prev, best);
+  }
+  // (racing alone, at the flag: the time, every lap, the personal best - and what next)
+  function offResults(isPB, prev, best) {
+    const d = prev ? ORACE.fin - prev.t : 0;
+    $('rrBody').innerHTML = `<div class="rrTime">${lapFmt(ORACE.fin)}</div>
+      <div class="rrSub ${isPB ? 'pb' : ''}">${isPB ? (prev ? 'New personal best · was ' + lapFmt(prev.t) : 'Your first time round this course') : 'Personal best ' + lapFmt(prev.t) + ' · ' + (d >= 0 ? '+' : '') + d.toFixed(2)}</div>
+      <div class="rrLaps">${ORACE.laps.map((t, k) => `<div class="${t === best ? 'best' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(t)}</span></div>`).join('')}</div>
+      <div class="rrMeta">${esc(W.track.B.name)} · ${(W.track.L / 1000).toFixed(1)} km × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
+      <div class="rrBtns"><button class="btn small" data-a="again">Race again</button><button class="btn small" data-a="new">New course</button><button class="btn small ghost" data-a="set">Change settings</button><button class="btn small ghost" data-a="roam">Free roam</button></div>`;
+    for (const b of $('rrBody').querySelectorAll('button')) b.addEventListener('click', () => offAction(b.dataset.a));
+    $('raceRes').classList.remove('hidden');
+    G.paused = true;
+    if (audio.ready) { raceBeep(true); audio.master.gain.setTargetAtTime(0.35, audio.ctx.currentTime, 0.2); }
+  }
+  function offAction(a) {
+    $('raceRes').classList.add('hidden');
+    if (audio.ready) audio.master.gain.setTargetAtTime(1, audio.ctx.currentTime, 0.1);
+    if (a === 'again') offRestart();
+    else if (a === 'new') offApply(Object.assign({}, W.offroad, { seed: offSeed() }));
+    else if (a === 'set') { curTab = 'Modes'; openMenu(true); }
+    else if (a === 'roam') offLeave();
+  }
+  // back on the grid, the clock reset, the countdown again (racing alone - a room's host starts it for everyone)
+  function offRestart() {
+    if (inRoom()) { if (ONLINE.net.isHost) ONLINE.net.startRace(); else hud.toast('The host starts the races', 2); return; }
+    offReset(); putCar(gridSpot(0));
+    RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.go = 0; RACE.resetT = -1e9;
+    G.paused = G.menu || !G.started;
+  }
+  // (a course to race: these settings - the room follows its host onto it)
+  function offApply(cfg) {
+    if (mapLocked()) return;
+    cfg = W.offNormalize(cfg);
+    if (S.map !== 'offroad') S.mapPrev = S.map;
+    S.offCfg = cfg; S.offDraft = Object.assign({}, cfg); S.map = 'offroad'; S.reopenModes = false; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap('offroad', W.offCode(cfg)); }
+    hud.toast('Generating the course - ' + W.offCode(cfg) + '…', 3);
+    setTimeout(() => location.reload(), 300);
+  }
+  function offLeave() {
+    if (mapLocked()) return;
+    S.map = S.mapPrev && S.mapPrev !== 'offroad' ? S.mapPrev : 'country'; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(S.map, null); }
+    location.reload();
+  }
+  function offBoard() {
+    const L = CRS_T.L, t = ORACE.fin || (ORACE.on ? veh.time - ORACE.t0 : 0), { list, place } = offStandings(), multi = inRoom() && list.length > 1;
+    $('nbPts').textContent = multi ? 'P' + place + ' / ' + list.length : lapFmt(t);
+    const mul = $('nbMul'); mul.textContent = ORACE.fin ? 'FINISHED' : 'LAP ' + Math.min(OFF_LAPS, ORACE.lap + 1) + '/' + OFF_LAPS; mul.className = '';
+    const st = $('nbSt'), last = ORACE.laps[ORACE.laps.length - 1], best = ORACE.laps.length ? Math.min(...ORACE.laps) : 0, pb = S.offPB && S.offPB[offKey()];
+    let msg, cls = '';
+    if (ORACE.on && !ORACE.fin && ORACE.wrongT > 1) { msg = 'Wrong way!'; cls = 'hay'; }
+    else if (RACE.flashT > 0) { msg = RACE.flash; cls = 'hay'; }
+    else if (multi) msg = lapFmt(t) + (last ? ' · last lap ' + lapFmt(last) : '');
+    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (L / 1000).toFixed(1) + ' km';
+    st.textContent = msg; st.className = cls;
+    $('nbList').innerHTML = multi
+      ? list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${e.p < 0 ? lapFmt(-e.p / 100) : 'Lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, e.p) / L) + 1)}</span></div>`).join('')
+      : inRoom() ? '<div><span>Waiting for friends…</span></div>'
+        : ORACE.laps.map((x, k) => `<div class="${x === best ? 'me' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(x)}</span></div>`).slice(-5).join('')
+          + (pb ? `<div><span>Personal best</span><span>${lapFmt(pb.t)}</span></div>` : '');
+  }
+
+  // ---- Game modes: Offroad Racing's settings - the Modes tab, and the title's Game modes. Changes are a draft till you
+  // generate a course from them
+  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null) };
+  const BIOME_TXT = {
+    dunes: 'Sand from horizon to horizon, the course flagged over the dunes - up the long faces and off the brinks. Paddles, big tyres and four-wheel drive',
+    forest: 'A dirt trail through the woods over rolling hills, berms round the corners, mud holes in the dips',
+    desert: 'Fast hardpack across open desert - whoops, sandy washes to cross, saguaros, mesas on the horizon',
+    mud: 'A low, wet bog: mud most of the way, firmer dirt over the rises - grip is everything',
+    mountain: 'Gravel up and down the mountainside: cuttings and drops, pines below the tree line, snow up top',
+  };
+  const BIOME_CARS = { dunes: ['buggy', 'trophy', 'atv', 'monster'], forest: ['rally', 'trophy', 'atv', 'buggy'], desert: ['trophy', 'buggy', 'atv', 'ram'], mud: ['monster', 'tank', 'trophy', 'diesel'], mountain: ['rally', 'trophy', 'atv', 'ram'] };
+  function renderModes(add) {
+    const D = MODE_D.d, guest = inRoom() && !ONLINE.net.isHost;
+    const set = (k) => (v) => { D[k] = v; S.offDraft = Object.assign({}, D); renderModesOverlay(); };
+    const sg = (opts, k) => seg(opts, D[k], set(k));
+    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">OFFROAD RACING</b>', 'A new offroad course generated for every race, on the kind of land you pick, laid out the way you set it here. '
+      + 'Race it in laps against the clock - or online, against the room: everyone in the host\'s car and tune.'
+      + (OFFMODE ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
+    if (guest) {
+      add(row('Online', 'The host picks the course and the car - you\'re racing ' + (OFFMODE ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' in their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
+      return;
+    }
+    add(el('<div class="sect">Terrain</div>'));
+    add(row('Map type', BIOME_TXT[D.biome], sg(W.OFF_OPTS.biome.map(([k]) => [k, W.OFF_BIOMES[k].name]), 'biome')));
+    add(el('<div class="sect">Course</div>'));
+    add(row('Length', 'Round the loop once', sg([['short', 'Short · 2 km'], ['medium', 'Medium · 3.5 km'], ['long', 'Long · 5.5 km']], 'len')));
+    add(row('Laps', '', sg([[1, '1'], [2, '2'], [3, '3'], [5, '5'], [10, '10']], 'laps')));
+    add(row('Corners', 'Flowing: fast sweepers · Mixed · Technical: tight turns, esses and hairpins', sg([['flowing', 'Flowing'], ['mixed', 'Mixed'], ['technical', 'Technical']], 'twist')));
+    add(row('Width', '', sg([['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide']], 'width')));
+    add(row('Jumps', 'Tabletops built into the straighter bits (kickers too, with Lots) - a JUMP sign before each', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'jumps')));
+    add(row('Whoops', 'Runs of rollers ~9 m apart: skim them flat out, or get bucked', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'whoops')));
+    add(el('<div class="sect">Car</div>'));
+    const ty = VEH.TIRES[tireR()], hp = Math.round((CARDEF.hp || 0) * (tune.power || 1));
+    const pickB = el('<button class="btn small ghost">Pick a car</button>');
+    pickB.addEventListener('click', () => { if (carLocked()) return; S.reopenModes = !G.started; saveS(); openMoreCars(); });
+    add(row(esc(carLabel(S.car, optOf())), (hp ? '~' + hp.toLocaleString() + ' hp · ' : '') + Math.round(tune.mass * 2.20462).toLocaleString() + ' lb' + (ty ? ' · ' + esc(ty.short || ty.name) : '') + (OFFROAD() ? ' (off-road package)' : '')
+      + (inRoom() ? ' · everyone in the room races it' : ''), pickB));
+    add(row('Good on ' + W.OFF_BIOMES[D.biome].name.toLowerCase(), 'Built for it - or give anything a go (the Drive tab has the off-road tyre packages)',
+      seg(BIOME_CARS[D.biome].map((id) => [id, carLabel(id)]), S.car, (id) => { if (id !== S.car && !carLocked()) { S.reopenModes = !G.started; saveS(); pickCar(id); } })));
+    const tuneB = el('<button class="btn small ghost">Tune it</button>');
+    tuneB.addEventListener('click', () => { $('modes').classList.add('hidden'); curTab = 'Fun'; openMenu(true); });
+    add(row('Setup', 'Power, weight, grip, gearing, suspension... on the Fun tab, saved for this car' + (inRoom() ? ' - the room races your tune' : ''), tuneB));
+    add(row('Air assist', 'Over the jumps and brows: it eases the gas or brake in the air and nudges the car level for the slope it\'ll land on, like a seasoned driver - Off and you fly it yourself',
+      seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
+    add(el('<div class="sect">Race</div>'));
+    const go = el('<button class="btn">Generate a new course &amp; race</button>');
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() })));
+    add(row('New course', 'A fresh random course with these settings' + (inRoom() ? ' - everyone in the room comes with you' : ''), go));
+    if (OFFMODE) {
+      const same = ['biome', 'len', 'twist', 'width', 'jumps', 'whoops'].every((k) => D[k] === W.offroad[k]);
+      const again = el(`<button class="btn small">${same && D.laps === W.offroad.laps ? 'Restart this race' : 'Race this course with these laps'}</button>`);
+      again.addEventListener('click', () => {
+        if (D.laps !== W.offroad.laps) { offApply(Object.assign({}, W.offroad, { laps: D.laps })); return; }
+        offRestart(); $('modes').classList.add('hidden'); openMenu(false);
+      });
+      const leave = el('<button class="btn small ghost">Leave - free roam</button>');
+      leave.addEventListener('click', () => offLeave());
+      const w = el('<div style="display:flex;gap:8px"></div>'); w.appendChild(again); w.appendChild(leave);
+      const pb = S.offPB && S.offPB[offKey()];
+      add(row('This course', '<b class="modecode">' + OFF_CODE + '</b>' + (pb ? ' · your best ' + lapFmt(pb.t) + ' (lap ' + lapFmt(pb.lap) + ')' : '') + (same ? '' : ' · the settings above make a different course - generate one to race them'), w));
+    }
+    const code = el('<input type="text" maxlength="20" placeholder="FOR-M3MR11-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
+    const load = el('<button class="btn small ghost">Race it</button>');
+    const doLoad = () => { const c = W.offParse(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C', 3); return; } offApply(c); };
+    load.addEventListener('click', doLoad);
+    code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
+    const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
+    add(row('Course code', 'Every course has one (on the results and here): type a friend\'s in to race the very same course', cw));
+  }
+  function renderModesOverlay() {
+    if ($('modes').classList.contains('hidden')) return;
+    const b = $('modesBody'); b.innerHTML = '';
+    renderModes((nd) => b.appendChild(nd));
+  }
+  function openModes() { $('modes').classList.remove('hidden'); renderModesOverlay(); }
+  $('modesClose').addEventListener('click', () => $('modes').classList.add('hidden'));
+  $('modesBtn').addEventListener('click', () => { if (G.loadDone || true) openModes(); });
+  $('moreClose').addEventListener('click', () => { if (S.reopenModes) { S.reopenModes = false; saveS(); } });
+  // (the title: what's loaded - and back to Game modes after a car was picked from it)
+  if (OFFMODE) {
+    const pb = S.offPB && S.offPB[offKey()];
+    $('modeTitle').textContent = 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
+  }
+  if (S.reopenModes) { S.reopenModes = false; saveS(); if (!S.netRoom) setTimeout(openModes, 200); }
+
   // (the others' cars are solid - our car's obstacle list gets their footprints - and so are the course's walls)
   veh.world.collidersNear = (x, z, r, c, b) => {
     W.collidersNear(x, z, r, c, b);
@@ -23816,6 +24583,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     add(row('Racing for points', 'On the race courses - the Windy Rally Stage, the Rally Stage, the Windy Mower Track and the Mower Track: points for ground covered along the course, on the road 1 a metre times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
       + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls well off the road stop shortcuts, '
       + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s. Everyone waits on the start grid till the host starts the race.', el('<span></span>')));
+    add(row('Offroad Racing', 'Host on the Offroad Race map and everyone races the course you set up in Game modes (Esc → Modes), in your car and tune: laps, places by ground covered, then by finishing time. '
+      + 'A reset back onto the course every 10 s.', el('<span></span>')));
     const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
     const name = inp('Your name', S.netName, 16, 170);
     name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
@@ -23825,7 +24594,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     else if (net.isHost) add(row('Car', 'Everyone drives the car you\'re in, set up your way (version, tyres, transmission, package, Fun-tab tune). Change any of it and they follow', carNow));
     else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
     if (!on) {
-      add(row('Map', 'For a room you host (the race courses score points)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      add(row('Map', 'For a room you host (the race courses score points; the Offroad Race is a race)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
+      if (ONLINE.hostMap === 'offroad') { const b = el('<button class="btn small ghost">Set up the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', 'From your Game modes settings: <b class="modecode">' + W.offCode(offCfgNow()) + '</b>', b)); }
       const hb = el('<button class="btn small">Host a game</button>');
       hb.addEventListener('click', () => onlineHost());
       add(row('Host', 'Opens a room on that map (loading it if you\'re not on it) and gives you its code to share', hb));
@@ -23840,13 +24610,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
       if (net.isHost) {
         add(row('Map', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
+        if (OFFMODE) { const b = el('<button class="btn small ghost">Change the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS, b)); }
         if (COURSE) {
           const rb = el('<button class="btn small">Start race</button>');
           rb.addEventListener('click', () => { net.startRace(); openMenu(false); });
           add(row('Start race', 'Everyone back on the start grid with 0 points, a 3 s countdown (engines can rev), then GO - everyone\'s put in drive', rb));
         }
       }
-      const pts = (p) => '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
+      const pts = (p) => OFFMODE ? (p < 0 ? 'finished <b>' + lapFmt(-p / 100) + '</b>' : 'lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, p || 0) / CRS_T.L) + 1)) : '<b>' + Math.round(p || 0).toLocaleString() + '</b> pts';
       const list = [`<b>${esc(S.netName)}</b> (you) · ${esc(carLabel(S.car, optOf()))} · ${pts(RACE.pts)}`]
         .concat([...ONLINE.ghosts.values()].map((g) => { const L = g.snaps[g.snaps.length - 1]; return `${esc(g.prof.n)} · ${esc(carLabel(g.prof.c, g.prof.o))} · ${pts(L && L.length > 31 ? L[31] : 0)}`; }));
       add(row('Drivers', list.length + ' in the room', el('<div style="text-align:right;font-size:13px;line-height:1.7">' + list.join('<br>') + '</div>')));
@@ -23871,7 +24642,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (back in the room you were in after a reload - a new car, the host's map)
   if (S.netRoom) onlineJoin(S.netRoom, true);
 
-  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE };
+  window.__hc = { veh, input, world, car, camera, scene, renderer, S, G, W, perf, audio, cam, THREE, smoke, ONLINE, RACE, ORACE, offApply, offRestart, openModes, onlineHost, onlineLeave };
   // (for the tests: every vehicle id and its options, and the builders the game itself uses - see tyreChoices)
   Object.assign(window.__hc, { VEH, buildModel, defOf, tyreChoices, carIds: ['hellcat', 'demon', 'dragpak', ...MORE_IDS],
     optionsOf: (id) => { const m = MORE_CARS.find((x) => x.id === id); return m && m.options ? m.options.map((o) => o[0]) : [undefined]; } });
