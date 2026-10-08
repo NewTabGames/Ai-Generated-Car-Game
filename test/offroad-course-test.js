@@ -1,5 +1,6 @@
 // Offroad Racing courses: every terrain x length x corners, a few seeds each - how long generating takes, the course's
-// length against the target, its tightest corner, how close it comes to itself (other than along it), the steepest grade
+// length against the target, the slope at the start (from the back of the grid past the line: near level, a few short
+// twisty ones up to ~8%), its tightest corner, how close it comes to itself (other than along it), the steepest grade
 // on it, the jumps / whoops built in, the surfaces on it, and that the same settings give the same course (the course
 // code round-trips). Env: SEEDS (default 4)
 const W = require('../src/worldgen.js');
@@ -19,9 +20,12 @@ for (const biome of Object.keys(W.OFF_BIOMES)) for (const len of ['short', 'medi
     // (surfaces down the middle of the course)
     const sc = {}, g = {}; for (let i = 0; i < T.n; i += 5) { W.ground(T.x[i], T.z[i], g); sc[surfName[g.surface]] = (sc[surfName[g.surface]] || 0) + 1; }
     const st = W.trackSpawn(), st0 = Math.hypot(st.x, st.z - 14) < 1.5 && st.tz < -0.98;
+    // (the start: the grid and the line want to be near level - the steepest grade from 72 m back to 20 m past the line)
+    let sg = 0; for (let j = -36; j <= 10; j++) { const a = (j + T.n) % T.n, b = (j + 1 + T.n) % T.n; sg = Math.max(sg, Math.abs(T.hc[b] - T.hc[a]) / (T.L / T.n)); }
     const J = T.feats.filter((f) => f.kind === 'jump').length, Wh = T.feats.filter((f) => f.kind === 'whoops').length;
-    if (ms > 2500 || Math.abs(T.L / W.OFF_LEN[len] - 1) > 0.05 || !st0 || gradeB > W.OFF_BIOMES[biome].grade + 0.005) bad++;
-    rows.push(`${code} ${ms}ms L ${Math.round(T.L)} Rmin ${rmin.toFixed(0)} close ${close.toFixed(0)} grade ${(gradeB * 100).toFixed(0)}% (${(grade * 100).toFixed(0)}% w/ jumps) dig ${T.dig.toFixed(1)} m J${J} W${Wh} ${Object.entries(sc).map(([a, b]) => a + ' ' + Math.round(100 * b / (T.n / 5)) + '%').join(' ')}${st0 ? '' : ' START?'}`);
+    const why = [ms > 2500 && 'SLOW', Math.abs(T.L / W.OFF_LEN[len] - 1) > 0.05 && 'LENGTH', gradeB > W.OFF_BIOMES[biome].grade + 0.005 && 'GRADE', sg > 0.1 && 'START SLOPE'].filter(Boolean);
+    if (why.length || !st0) bad++;
+    rows.push(`${code} start ${(sg * 100).toFixed(1)}% ${ms}ms L ${Math.round(T.L)} Rmin ${rmin.toFixed(0)} close ${close.toFixed(0)} grade ${(gradeB * 100).toFixed(0)}% (${(grade * 100).toFixed(0)}% w/ jumps) dig ${T.dig.toFixed(1)} m J${J} W${Wh} ${Object.entries(sc).map(([a, b]) => a + ' ' + Math.round(100 * b / (T.n / 5)) + '%').join(' ')}${st0 ? '' : ' START?'}${why.length ? ' PROBLEM: ' + why.join(', ') : ''}`);
   }
   console.log(`== ${biome} ${len} ${twist}\n  ` + rows.join('\n  '));
 }

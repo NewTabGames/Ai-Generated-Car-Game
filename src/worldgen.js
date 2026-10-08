@@ -411,10 +411,11 @@
   }
   let OFF = offNormalize(null);
   function setOffroad(c) { OFF = offNormalize(c); }
-  // (the terrain's own ground: sampled somewhere of its own in the noise for each seed)
-  let OFFX = 0, OFFZ = 0, OFFB = 'forest', OFFCX = 0, OFFCZ = 0, OFFRM = 1e4;
+  // (the terrain's own ground: sampled somewhere of its own in the noise for each seed - the noise turned and moved with
+  // the course, so the ground under it is the same wherever its start ends up)
+  let OFFX = 0, OFFZ = 0, OFFC = 1, OFFS = 0, OFFB = 'forest', OFFCX = 0, OFFCZ = 0, OFFRM = 1e4;
   function offNatural(x, z) {
-    const X = x + OFFX, Z = z + OFFZ;
+    const X = x * OFFC + z * OFFS + OFFX, Z = -x * OFFS + z * OFFC + OFFZ;
     if (OFFB === 'dunes') return duneHeight(X, Z);
     if (OFFB === 'desert') {
       let h = nLow1(X * 0.0007, Z * 0.0007) * 12 + nLow2(X * 0.0028 + 4.1, Z * 0.0028 - 8.3) * 3.2 + nHill(X * 0.009, Z * 0.009) * 0.9 + nDet(X * 0.03, Z * 0.03) * 0.35;
@@ -486,12 +487,32 @@
     }
     return false;
   }
+  // the course's own ground along a closed line (n points ds apart, at xs / zs): the terrain's, smoothed, its grades held to
+  // the steepest a car can climb - halfway between the highest such line under the ground (cuttings through every crest)
+  // and the lowest over it (fills across every dip), each a distance transform round the loop - then the crests and dips
+  // rounded off (a grade change spread over ~50-100 m, so a car stays on the ground over the brows up to ~75-95 mph
+  // instead of leaving them at 40). Returns it and the natural ground
+  const offAvg = (src, n, M) => { const o = new Float64Array(n); let acc = 0; for (let j = -M; j <= M; j++) acc += src[(j + n) % n]; for (let k = 0; k < n; k++) { o[k] = acc / (2 * M + 1); acc += src[(k + M + 1) % n] - src[(k - M + n) % n]; } return o; };
+  function offLim(src, n, g) {
+    const U = Float64Array.from(src), D = Float64Array.from(src);
+    for (let r = 0; r < 2; r++) {
+      for (let k = 1; k < 2 * n; k++) { const i = k % n, p = (k - 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
+      for (let k = 2 * n - 2; k >= 0; k--) { const i = k % n, p = (k + 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
+    }
+    const m = new Float64Array(n); for (let i = 0; i < n; i++) m[i] = (U[i] + D[i]) / 2;
+    return m;
+  }
+  function offBase(xs, zs, n, ds, B) {
+    const h = new Float64Array(n); for (let k = 0; k < n; k++) h[k] = offNatural(xs[k], zs[k]);
+    return { hb: offAvg(offAvg(offLim(offAvg(h, n, B.sm), n, B.grade * ds), n, B.round), n, B.round), h };
+  }
+  let T0dig = 0;
   function offGenerate(cfg) {
     const B = OFF_BIOMES[cfg.biome], rnd = mulberry32((cfg.seed ^ 0x2545f491) + 7919 * (OFF_OPTS.biome.findIndex((p) => p[0] === cfg.biome) + 1));
     const Ltar = OFF_LEN[cfg.len], tw = ['flowing', 'mixed', 'technical'].indexOf(cfg.twist);
     const Wd = B.W * { narrow: 0.75, normal: 1, wide: 1.35 }[cfg.width], hw = Wd / 2;
     const sep = 2 * (hw + B.verge) + 8, Rmin = [28, 17, 11][tw];
-    OFFB = cfg.biome; OFFX = (rnd() - 0.5) * 40000; OFFZ = (rnd() - 0.5) * 40000;
+    OFFB = cfg.biome; OFFC = 1; OFFS = 0; OFFCX = 0; OFFCZ = 0; OFFRM = 1e4;
     let Q = null;
     for (let attempt = 0; attempt < 80 && !Q; attempt++) {
       // the control points: round the centre, the radius wandering; the twistier settings add kinks between them
@@ -518,13 +539,32 @@
     }
     if (!Q) { Q = []; const n = Math.round(Ltar / 2), a = Ltar / (2 * Math.PI) * 1.25, b = Ltar / (2 * Math.PI) * 0.72; for (let k = 0; k < n; k++) { const t = k / n * Math.PI * 2; Q.push([Math.cos(t) * a, Math.sin(t) * b]); } }
     if (rnd() < 0.5) Q.reverse();
-    // the start: the middle of its straightest 80 m, then the whole thing turned and moved so that's (0, 0) heading -z
-    const n = Q.length, R = loopRadii(Q, 4);
-    let k0 = 0, best = -1;
-    for (let k = 0; k < n; k += 2) { let mn = 1e9; for (let j = -20; j <= 20; j++) mn = Math.min(mn, Math.abs(R[(k + j + n) % n])); if (mn > best) { best = mn; k0 = k; } }
+    // where in the terrain's noise it goes: up the mountain and through the woods, the gentlest of a few tries (the least
+    // digging and filling); the dunes, the desert's swells and the bog as they come
+    const n = Q.length, R = loopRadii(Q, 4), dsQ = loopLen(Q) / n, qx = Q.map((p) => p[0]), qz = Q.map((p) => p[1]);
+    let bestN = null;
+    for (let t = 0; t < (cfg.biome === 'mountain' ? 6 : cfg.biome === 'forest' ? 3 : 1); t++) {
+      OFFX = (rnd() - 0.5) * 40000; OFFZ = (rnd() - 0.5) * 40000;
+      const { hb, h } = offBase(qx, qz, n, dsQ, B);
+      let cost = 0; for (let k = 0; k < n; k++) cost += Math.abs(hb[k] - h[k]);
+      if (!bestN || cost < bestN.cost) bestN = { cost, hb, ox: OFFX, oz: OFFZ };
+    }
+    // the start: on a straight that's near level from the back of the grid to past the line (no more than 4% where there's
+    // anywhere like that; offProfile levels a pad under the grid in any case) - then the whole thing turned and moved so that's (0, 0) heading -z, the noise with it
+    const hq = bestN.hb;
+    let k0 = 0, best = -1e9;
+    for (let k = 0; k < n; k += 2) {
+      let mn = 1e9, gr = 0;
+      for (let j = -20; j <= 20; j++) mn = Math.min(mn, Math.abs(R[(k + j + n) % n]));
+      for (let j = -36; j <= 10; j++) gr = Math.max(gr, Math.abs(hq[(k + j + 1 + n) % n] - hq[(k + j + n) % n]) / dsQ);
+      // (a straight first - no tighter than ~90 m either side - then near level, then the straighter)
+      const sc = (mn >= 90 ? 1000 : mn * 10) - 2000 * Math.max(0, gr - 0.04) + Math.min(mn, 400) / 4;
+      if (sc > best) { best = sc; k0 = k; }
+    }
     const a = Q[(k0 - 2 + n) % n], b = Q[(k0 + 2) % n], tl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     // (turned by -90 deg minus the heading there: its direction comes out (0, -1))
     const c = -(b[1] - a[1]) / tl, s = -(b[0] - a[0]) / tl, o = Q[k0], pts = [];
+    OFFC = c; OFFS = s; OFFX = bestN.ox + o[0]; OFFZ = bestN.oz + o[1]; T0dig = bestN.cost / n;
     for (let j = 0; j < n; j++) { const p = Q[(k0 + j) % n], dx = p[0] - o[0], dz = p[1] - o[1]; pts.push([dx * c - dz * s, dx * s + dz * c]); }
     pts[0] = [0, 0];
     const T = buildTrack({ W: Wd, kind: 'offroad', steep: 0, pts });
@@ -533,37 +573,22 @@
     OFFCX = T.cx; OFFCZ = T.cz; OFFRM = 0;
     for (let k = 0; k < T.n; k++) OFFRM = Math.max(OFFRM, Math.hypot(T.x[k] - T.cx, T.z[k] - T.cz));
     offProfile(T, rnd);
-    T.off = [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM];
+    T.dig = T0dig;
+    T.off = [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM, OFFC, OFFS];
     return T;
   }
   // the course's ground along its centre line: the land's own, smoothed and grade-limited, then the features built in
   function offProfile(T, rnd) {
     const n = T.n, B = T.B, cfg = T.cfg, ds = T.L / n;
-    const avg = (src, M) => { const o = new Float64Array(n); let acc = 0; for (let j = -M; j <= M; j++) acc += src[(j + n) % n]; for (let k = 0; k < n; k++) { o[k] = acc / (2 * M + 1); acc += src[(k + M + 1) % n] - src[(k - M + n) % n]; } return o; };
-    // (grades held to the steepest a car can climb: halfway between the highest such line under the ground - cuttings
-    // through every crest - and the lowest over it - fills across every dip; each is a distance transform round the loop)
-    const lim = (src) => {
-      const g = B.grade * ds, U = Float64Array.from(src), D = Float64Array.from(src);
-      for (let r = 0; r < 2; r++) {
-        for (let k = 1; k < 2 * n; k++) { const i = k % n, p = (k - 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
-        for (let k = 2 * n - 2; k >= 0; k--) { const i = k % n, p = (k + 1) % n; if (U[i] > U[p] + g) U[i] = U[p] + g; if (D[i] < D[p] - g) D[i] = D[p] - g; }
-      }
-      const o = new Float64Array(n); for (let i = 0; i < n; i++) o[i] = (U[i] + D[i]) / 2; return o;
-    };
-    // (where in the terrain's noise it goes: up the mountain and through the woods, the gentlest of a few tries - the
-    // least digging and filling; the dunes, the desert's swells and the bog as they come)
-    let best = null;
-    for (let t = 0; t < (T.biome === 'mountain' ? 6 : T.biome === 'forest' ? 3 : 1); t++) {
-      if (t) { OFFX = (rnd() - 0.5) * 40000; OFFZ = (rnd() - 0.5) * 40000; }
-      const h = new Float64Array(n); for (let k = 0; k < n; k++) h[k] = offNatural(T.x[k], T.z[k]);
-      // (then the crests and dips rounded off - a grade change spread over ~50-100 m, so a car stays on the ground over
-      // the brows up to ~75-95 mph instead of leaving them at 40)
-      const hb = avg(avg(lim(avg(h, B.sm)), B.round), B.round);
-      let cost = 0; for (let k = 0; k < n; k++) cost += Math.abs(hb[k] - h[k]);
-      if (!best || cost < best.cost) best = { cost, hb, ox: OFFX, oz: OFFZ };
-    }
-    OFFX = best.ox; OFFZ = best.oz; T.dig = best.cost / n;
-    const hc = Float64Array.from(best.hb); T.hb = Float32Array.from(best.hb);
+    let { hb } = offBase(T.x, T.z, n, ds, B);
+    // (the start: a pad under the grid and the line, no steeper than 4% from 72 m back to 20 m past it, eased into the
+    // course over 50 m either side)
+    { const a = hb[(n - 36) % n], b = hb[10 % n], L0 = 46 * ds, sl = Math.max(-0.04, Math.min(0.04, (b - a) / L0));
+      let mean = 0; for (let j = -36; j <= 10; j++) mean += hb[(j + n) % n]; mean /= 47;
+      for (let j = -61; j <= 35; j++) { const i = (j + n) % n, lin = mean + sl * (j + 13) * ds, w = j < -36 ? (j + 61) / 25 : j > 10 ? (35 - j) / 25 : 1, ww = w * w * (3 - 2 * w); hb[i] += (lin - hb[i]) * ww; }
+      // (and where that meets ground already at the steepest a car climbs, the grades held to it again)
+      hb = offAvg(offLim(hb, n, B.grade * ds * 0.97), n, 2); }
+    const hc = Float64Array.from(hb); T.hb = Float32Array.from(hb);
     const zone = new Uint8Array(n), used = new Uint8Array(n), feats = [];
     const iOf = (s) => ((Math.round(s / ds) % n) + n) % n;
     const free = (k, a, b) => { for (let j = a; j <= b; j++) if (used[(k + j + n) % n]) return false; return true; };
@@ -620,10 +645,11 @@
       for (let k = 0; k < n; k++) {
         let lo = true, hi = true;
         for (let j = 8; j <= 20 && (lo || hi); j += 4) { const a = hc[(k - j + n) % n], b = hc[(k + j) % n]; if (hc[k] > a - 0.25 || hc[k] > b - 0.25) lo = false; if (hc[k] < a + 0.25 || hc[k] < b + 0.25) hi = false; }
-        if (T.biome === 'forest' && lo && !used[k]) for (let j = -7; j <= 7; j++) zone[(k + j + n) % n] = 1;
+        if (T.biome === 'forest' && lo && free(k, -9, 9)) for (let j = -7; j <= 7; j++) zone[(k + j + n) % n] = 1;
         if (T.biome === 'mud' && hi) for (let j = -9; j <= 9; j++) zone[(k + j + n) % n] = 3;
       }
-      if (T.biome === 'forest') for (let k = 0; k < n; k++) if (zone[k] === 1) hc[k] -= 0.22;
+      // (the forest's mud holes: dished ~0.2 m - eased in, not a step)
+      if (T.biome === 'forest') { const z1 = offAvg(Float64Array.from(zone, (v) => (v === 1 ? 1 : 0)), n, 4); for (let k = 0; k < n; k++) hc[k] -= 0.22 * z1[k]; }
     }
     if (T.biome === 'desert') {
       for (let s = 220 + rnd() * 200; s < T.L - 120; s += 260 + rnd() * 260) {
@@ -1365,7 +1391,7 @@
       // (woods right up to the course in the forest; pines up the mountain; a few trees about the bog; none in the sand)
       const b = TRK.biome;
       if (b === 'dunes' || b === 'desert') return 0;
-      const X = x + OFFX, Z = z + OFFZ, f = nForest(X * 0.0016, Z * 0.0016) * 0.75 + nForest2(X * 0.0062, Z * 0.0062) * 0.35;
+      const X = x * OFFC + z * OFFS + OFFX, Z = -x * OFFS + z * OFFC + OFFZ, f = nForest(X * 0.0016, Z * 0.0016) * 0.75 + nForest2(X * 0.0062, Z * 0.0062) * 0.35;
       const base = b === 'forest' ? 0.6 + 0.4 * smooth(-0.3, 0.3, f) : b === 'mountain' ? 0.2 + 0.55 * smooth(-0.2, 0.4, f) : 0.06 + 0.3 * smooth(0, 0.5, f);
       return base * smooth(TRK.W / 2 + 3, TRK.W / 2 + 9, trackQuery(x, z, _ftq).d);
     }
@@ -1853,7 +1879,7 @@
     MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || m === 'offroad' || TRACK_DEFS[m] ? m : 'country';
     TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
     // (an offroad race: its course from the settings - generated once per course code - and where it sits in the noise)
-    if (MAP === 'offroad') { const k = 'off:' + offCode(OFF); TRK = trackCache[k] = trackCache[k] || offGenerate(OFF); [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM] = TRK.off; }
+    if (MAP === 'offroad') { const k = 'off:' + offCode(OFF); TRK = trackCache[k] = trackCache[k] || offGenerate(OFF); [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM, OFFC, OFFS] = TRK.off; }
     trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;

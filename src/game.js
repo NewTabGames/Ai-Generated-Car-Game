@@ -581,6 +581,9 @@
     : S.map === 'straight' ? W.nearestRoadSpot(0, 0, 0, -1) : W.map === 'tarmac' ? W.nearestRoadSpot(W.TARMAC.SPAWN_X, W.TARMAC.SPAWN_Z, 0, -1)
     : W.nearestRoadSpot(30, 40, 0, -1);
   veh.reset(spawn.x, spawn.y, spawn.z, spawn.tx, spawn.tz);
+  // (an offroad race's grid isn't always dead level - the car's put down level, so let it settle onto its wheels before
+  // the title shows it sitting there)
+  if (OFFMODE) { veh.input.brake = 1; for (let i = 0; i < 180; i++) veh.step(1 / 120); veh.input.brake = 0; }
   const sp = veh.spec;
 
   // ------------------------------------------------------------------ Fun tab: live tuning (saved per car)
