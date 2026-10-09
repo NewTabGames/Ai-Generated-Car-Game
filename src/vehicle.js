@@ -1007,7 +1007,19 @@
       // a 10 cm wheelbase turns on fractions of a degree at speed: full lock spun the one and asked the other for a turn
       // no rider can make, and a clamp at that lock put all of the turn in the stick's first tenth. The game passes the
       // keys and the stick in raw for these)
-      if (s.steerAScale) target *= Math.min(1, Math.atan(s.wheelbase * s.steerAScale / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
+      // (on a banked turn - a BMX berm - the bank carries some of the turn: the ground tilted down towards the inside of it,
+      // across the way it's heading, lets the rider lean into that much more - g x the tilt's tangent. Its own lean
+      // doesn't count: the tilt's measured across its heading, level)
+      if (s.steerAScale) {
+        let A = s.steerAScale;
+        if (target !== 0) {
+          const hl = Math.hypot(m00, m20) || 1, rx = m00 / hl, rz = m20 / hl;
+          let nr = 0, ny = 0, c = 0;
+          for (const w of W) if (w.contact) { nr += w.nx * rx + w.nz * rz; ny += w.ny; c++; }
+          if (c) { const b = nr / Math.max(0.3 * c, ny) * (target > 0 ? 1 : -1); if (b > 0) A += GRAV * Math.min(1, b); }
+        }
+        target *= Math.min(1, Math.atan(s.wheelbase * A / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
+      }
       // (gyro: an RC truck's stability gyro - Traxxas' TSM and the like. It reads the yaw rate and steers against any
       // rotation beyond what the steering asks for, so the tail stepping out is caught with countersteer before it
       // spins; softer in Track, off with TC Off. The servo's speed still limits it)
@@ -1428,10 +1440,11 @@
       }
       // a unicycle (uni): one wheel - nothing ahead of it or behind it to stand on. The rider balances it fore and aft as
       // they do on the real thing (pedalling the wheel back under themselves), here a pitch torque that holds the frame
-      // upright; side to side it balances as a bike does (bike). Off the ground it lets go
-      if (s.uni && anyContact) {
+      // upright; side to side it balances as a bike does (bike). Off the ground - over a jump - the rider still holds it
+      // fairly upright (arms out, the wheel spun or checked under them), a share of the grip they have on the ground (air)
+      if (s.uni && (anyContact || s.uni.air)) {
         const U = s.uni, pitch = Math.asin(clamp(-m12, -1, 1)), pRate = wx * m00 + wy * m10 + wz * m20;   // (+ nose up)
-        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate);
+        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate) * (anyContact ? 1 : U.air);
         Tx += m00 * Tp; Ty += m10 * Tp; Tz += m20 * Tp;
       }
 
@@ -3598,7 +3611,7 @@
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
     maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4, kbAScale: 3.5,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
-    uni: { kp: 300, kd: 35 },
+    uni: { kp: 300, kd: 35, air: 0.5 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
     electric: true, idleRpm: 0, limiterRpm: 480, redlineRpm: 200, shiftRpm: 480, engineInertia: 0.05, fricA: 0.6, fricB: 0.3, starterTorque: 0,
     // (lb-ft at the cranks against cadence: what legs give, the most at a standstill)

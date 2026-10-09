@@ -28,6 +28,19 @@
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('hc_settings')) || {}); } catch (e) { S = Object.assign({}, DEFAULTS); }
   if (S.ver !== DEFAULTS.ver) { S.tcMode = DEFAULTS.tcMode; S.ver = DEFAULTS.ver; }
   const saveS = () => { try { localStorage.setItem('hc_settings', JSON.stringify(S)); } catch (e) { /* storage unavailable */ } };
+  // (the game modes' generated race tracks - Offroad Racing's courses and Unicycle Racing's BMX tracks: where their
+  // settings are kept, their course codes)
+  const GMODES = {
+    offroad: { key: 'offCfg', draft: 'offDraft', set: W.setOffroad, cfg: () => W.offroad, code: W.offCode, parse: W.offParse, norm: W.offNormalize, name: 'Offroad Race', what: 'offroad course' },
+    uni: { key: 'uniCfg', draft: 'uniDraft', set: W.setUni, cfg: () => W.uni, code: W.uniCode, parse: W.uniParse, norm: W.uniNormalize, name: 'Unicycle Racing', what: 'BMX track' },
+  };
+  // (Unicycle Racing: everyone on a unicycle - the version the race was set up with - your own vehicle kept for after;
+  // anywhere else, it comes back)
+  if (S.map === 'uni') {
+    // (a guest in a room has their own car kept already - netOwn - so it's only yours when you're not one)
+    if (S.car !== 'unicycle' && !S.netOwn && !S.carBeforeUni) S.carBeforeUni = { car: S.car, uniEng: S.uniEng, tcMode: S.tcMode };
+    S.car = 'unicycle'; S.uniEng = W.uniNormalize(S.uniCfg || null).ver;
+  } else if (S.carBeforeUni && !S.netOwn) { Object.assign(S, S.carBeforeUni); delete S.carBeforeUni; }
 
   // ------------------------------------------------------------------ renderer / scene
   const canvas = $('gl');
@@ -43,8 +56,8 @@
   }
   window.addEventListener('resize', resize); resize();
 
-  // (an offroad race: its course from the settings - the room's, online)
-  if (S.map === 'offroad') W.setOffroad(S.offCfg || null);
+  // (an offroad race, a unicycle race: its track from the settings - the room's, online)
+  if (GMODES[S.map]) GMODES[S.map].set(S[GMODES[S.map].key] || null);
   W.setMap(S.map);
   const world = WR.create(THREE, scene, W, { viewDist: S.viewDist, treeDensity: S.treeDensity, shadows: S.shadows });
   world.setTime(S.time, renderer);
@@ -521,13 +534,14 @@
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   const DUNESMAP = S.map === 'dunes';
-  // (Offroad Racing: a generated course, raced in laps - against the clock, or the room)
-  const OFFMODE = S.map === 'offroad';
+  // (the game modes: a generated track - Offroad Racing's course, Unicycle Racing's BMX track - raced in laps, against the
+  // clock or the room)
+  const OFFMODE = !!GMODES[S.map], UNIMODE = S.map === 'uni', GM = GMODES[S.map] || null;
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
   // centre line, points every ~2 m - the track's own, or the Mower Track's oval)
-  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad'], COURSE = COURSE_MAPS.includes(S.map);
+  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad', 'uni'], COURSE = COURSE_MAPS.includes(S.map);
   function ovalLine() {
     const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
     for (let k = 0; k < n; k++) {
@@ -556,8 +570,13 @@
     o.x = T.x[i] + (T.x[j] - T.x[i]) * u; o.z = T.z[i] + (T.z[j] - T.z[i]) * u; o.tx = tx / tl; o.tz = tz / tl;
     return o;
   }
-  // a start-grid slot behind the line (k 0..7: two across, rows 10 m apart)
+  // a start-grid slot behind the line (k 0..7: two across, rows 10 m apart; on the BMX track's gate, eight across it)
   function gridSpot(k) {
+    if (UNIMODE) {
+      const p = coursePoint(-1.6 - 2.4 * Math.floor(k / 8), {}), lat = ((k % 8) - 3.5) * Math.min(0.85, (CRS_T.W - 1) / 8);
+      const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
+      return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
+    }
     const p = coursePoint(-10 - 10 * (k >> 1), {}), lat = (k & 1 ? 1 : -1) * Math.min(2, CRS_T.W / 2 - 1.3);
     const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
     return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
@@ -566,7 +585,11 @@
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
-  if (OFFMODE) {
+  if (UNIMODE) {
+    const T = W.track, U = W.uni;
+    TRACK_HINT.uni = 'Unicycle Racing: a ' + Math.round(T.L) + ' m BMX track, ' + U.laps + (U.laps > 1 ? ' laps' : ' lap') + ' - down the start hill when the gate drops, over the rollers, doubles and tabletops, round the berms'
+      + (U.bank === 'flat' ? '' : ' (lean into them high up the bowl - the bank carries you round faster)') + '. The countdown starts by itself; Backspace puts you back on the track. Esc → Modes for a new track.';
+  } else if (OFFMODE) {
     const T = W.track, O = W.offroad, J = T.feats.filter((f) => f.kind === 'jump').length;
     TRACK_HINT.offroad = 'Offroad Race · ' + T.B.name + ': ' + (T.L / 1000).toFixed(1) + ' km, ' + O.laps + (O.laps > 1 ? ' laps' : ' lap') + ' - follow the marker stakes' + (O.biome === 'dunes' ? ' (the orange flags)' : '')
       + (J ? ', ' + J + ' jump' + (J > 1 ? 's' : '') + ' (a JUMP sign before each)' : '') + '. The countdown starts by itself; Backspace puts you back on the course. Esc → Modes for a new course.';
@@ -863,7 +886,7 @@
   // ------------------------------------------------------------------ menu
   const TABS = ['Drive', 'Modes', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race', uni: 'Unicycle Racing' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
@@ -926,6 +949,7 @@
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
     if (carLocked()) { $('moreCars').classList.add('hidden'); return; }
+    if (S.map === 'uni' && id !== 'unicycle') { hud.toast('Unicycle Racing: everyone rides a unicycle - Esc → Modes to pick the version, or leave the race', 3.5); $('moreCars').classList.add('hidden'); return; }
     const m = MORE_CARS.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
@@ -948,7 +972,7 @@
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
       const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
-      if (inRoom() || S.map === 'offroad') { /* online: the host picks the map; racing offroad, you stay on the course */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      if (inRoom() || GMODES[S.map]) { /* online: the host picks the map; racing a game mode, you stay on its track */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
@@ -2191,7 +2215,7 @@
     } else {
       if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
       // (an offroad race: the host's course, from its code)
-      if (m.map === 'offroad' && m.off && m.off !== (OFFMODE ? OFF_CODE : '')) { const c = W.offParse(m.off); if (c) { S.offCfg = c; if (!why) why = 'the host\'s offroad course'; } }
+      if (GMODES[m.map] && m.off && m.off !== (OFFMODE && W.map === m.map ? OFF_CODE : '')) { const c = GMODES[m.map].parse(m.off); if (c) { S[GMODES[m.map].key] = c; if (!why) why = 'the host\'s ' + GMODES[m.map].what; } }
       const cs = m.car;
       if (cs && cs.c && (VEH.CARS[cs.c] || MORE_IDS.includes(cs.c))) {
         ownCarKeep();
@@ -2271,7 +2295,7 @@
     ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
     try {
       const net = netCreate(), map = MAP_NAMES[ONLINE.hostMap] ? ONLINE.hostMap : S.map;
-      await net.hostRoom(map, netProfile(), map === 'offroad' ? W.offCode(offCfgNow()) : null);
+      await net.hostRoom(map, netProfile(), modeCode(map));
       ONLINE.lastProf = JSON.stringify(netProfile());
       S.netRoom = net.code; saveS();
       if (map !== S.map) {
@@ -2575,7 +2599,7 @@
   // (the walls: this far from the centre line - 10 m past the road's edge on the rally stages, well into the trees; 6 m
   // on the mower tracks, well behind the bales. Far enough out that going off costs you - the trees, the grass, a quarter
   // of the points - instead of being a guard rail to bounce along; still no way through to another bit of the course)
-  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : 6) : 0;
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : CRS_T.kind === 'uni' ? 4 : 6) : 0;
   function raceTrack(x, z) {
     const T = CRS_T, n = T.n, X = T.x, Z = T.z;
     const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
@@ -2755,7 +2779,7 @@
   // (every frame of the hold: pinned where it stands - it can rev, in park / neutral, but not move; at GO, into drive)
   function raceHold() {
     if (raceHolding()) {
-      if (!RACE.hold) RACE.hold = { x: veh.px, z: veh.pz };
+      if (!RACE.hold) { RACE.hold = { x: veh.px, z: veh.pz }; if (UNIMODE) world.uniGate(false); }
       veh.px = RACE.hold.x; veh.pz = RACE.hold.z; veh.vx = 0; veh.vz = 0; veh.wy = 0;
       if (sp.jet) { if (veh.park || veh.gear < 1) veh.selectDrive(); }      // (a jet spools up in drive - its throttle does nothing in park)
       else if (veh.transType === 'auto') veh.park = true;
@@ -2763,7 +2787,7 @@
       RACE.prevS = null; RACE.i = -1;
       return true;
     }
-    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); }
+    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); if (UNIMODE) world.uniGate(true); }
     else if (OFFMODE && RACE.go && ORACE.goAt !== RACE.go && !ORACE.fin) {
       // (an offroad race this car missed the start of - it joined late, or its tab was away: off the grid now, its clock
       // running since GO)
@@ -2799,7 +2823,7 @@
         big = inRoom() ? 'ON THE GRID' : '';
         sub = host ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : inRoom() ? 'Waiting for the host to start the race - you can rev meanwhile' : '';
         btn = host;
-      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
+      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km') + ' · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
       else if (left > 0) big = String(Math.ceil(left / 1000));
       else if (RACE.goT > 0) big = 'GO!';
     }
@@ -2840,10 +2864,12 @@
   // line - the one the walls follow - so going backwards (or round the walls) gains nothing: a lap counts once you've
   // covered the course's length again since the last. Alone it's you against the clock, a personal best per course and
   // car; in a room it's everyone in the host's car, placed by laps and ground covered, then by finishing time
-  const OFF_LAPS = OFFMODE ? W.offroad.laps : 0, OFF_CODE = OFFMODE ? W.offCode(W.offroad) : '';
+  const OFF_LAPS = OFFMODE ? GM.cfg().laps : 0, OFF_CODE = OFFMODE ? GM.code(GM.cfg()) : '';
   const ORACE = { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0, goAt: null };
   const offKey = () => OFF_CODE + '|' + TKEY;
-  const offCfgNow = () => (OFFMODE ? W.offroad : W.offNormalize(S.offCfg || null));
+  const offCfgNow = () => (S.map === 'offroad' ? W.offroad : W.offNormalize(S.offCfg || null));
+  // (a mode's track as it stands - the one loaded, or the settings it'll be generated from - and its code)
+  const modeCode = (map) => (GMODES[map] ? GMODES[map].code(map === S.map ? GMODES[map].cfg() : GMODES[map].norm(S[GMODES[map].key] || null)) : null);
   const offSeed = () => 1 + Math.floor(Math.random() * 2147483000);
   function offReset() {
     Object.assign(ORACE, { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0 });
@@ -2895,10 +2921,11 @@
   // (racing alone, at the flag: the time, every lap, the personal best - and what next)
   function offResults(isPB, prev, best) {
     const d = prev ? ORACE.fin - prev.t : 0;
+    $('raceRes').querySelector('h2').innerHTML = UNIMODE ? 'UNICYCLE <span>RACE</span>' : 'OFFROAD <span>RACE</span>';
     $('rrBody').innerHTML = `<div class="rrTime">${lapFmt(ORACE.fin)}</div>
       <div class="rrSub ${isPB ? 'pb' : ''}">${isPB ? (prev ? 'New personal best · was ' + lapFmt(prev.t) : 'Your first time round this course') : 'Personal best ' + lapFmt(prev.t) + ' · ' + (d >= 0 ? '+' : '') + d.toFixed(2)}</div>
       <div class="rrLaps">${ORACE.laps.map((t, k) => `<div class="${t === best ? 'best' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(t)}</span></div>`).join('')}</div>
-      <div class="rrMeta">${esc(W.track.B.name)} · ${(W.track.L / 1000).toFixed(1)} km × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
+      <div class="rrMeta">${esc(W.track.B.name)} · ${UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km'} × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
       <div class="rrBtns"><button class="btn small" data-a="again">Race again</button><button class="btn small" data-a="new">New course</button><button class="btn small ghost" data-a="set">Change settings</button><button class="btn small ghost" data-a="roam">Free roam</button></div>`;
     for (const b of $('rrBody').querySelectorAll('button')) b.addEventListener('click', () => offAction(b.dataset.a));
     $('raceRes').classList.remove('hidden');
@@ -2909,7 +2936,7 @@
     $('raceRes').classList.add('hidden');
     if (audio.ready) audio.master.gain.setTargetAtTime(1, audio.ctx.currentTime, 0.1);
     if (a === 'again') offRestart();
-    else if (a === 'new') offApply(Object.assign({}, W.offroad, { seed: offSeed() }));
+    else if (a === 'new') offApply(Object.assign({}, GM.cfg(), { seed: offSeed() }), S.map);
     else if (a === 'set') { curTab = 'Modes'; openMenu(true); }
     else if (a === 'roam') offLeave();
   }
@@ -2920,19 +2947,22 @@
     RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.go = 0; RACE.resetT = -1e9;
     G.paused = G.menu || !G.started;
   }
-  // (a course to race: these settings - the room follows its host onto it)
-  function offApply(cfg) {
+  // (a track to race: these settings for that mode - the room follows its host onto it. A unicycle race puts everyone on
+  // a unicycle, the version it's set up with)
+  function offApply(cfg, mode) {
     if (mapLocked()) return;
-    cfg = W.offNormalize(cfg);
-    if (S.map !== 'offroad') S.mapPrev = S.map;
-    S.offCfg = cfg; S.offDraft = Object.assign({}, cfg); S.map = 'offroad'; S.reopenModes = false; saveS();
-    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap('offroad', W.offCode(cfg)); }
-    hud.toast('Generating the course - ' + W.offCode(cfg) + '…', 3);
+    mode = GMODES[mode] ? mode : 'offroad';
+    const M = GMODES[mode]; cfg = M.norm(cfg);
+    if (!GMODES[S.map]) S.mapPrev = S.map;
+    if (mode === 'uni') { if (S.map !== 'uni' && S.car !== 'unicycle' && !S.netOwn) S.carBeforeUni = { car: S.car, uniEng: S.uniEng, tcMode: S.tcMode }; S.car = 'unicycle'; S.uniEng = cfg.ver; }
+    S[M.key] = cfg; S[M.draft] = Object.assign({}, cfg); S.map = mode; S.reopenModes = false; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(mode, M.code(cfg)); }
+    hud.toast('Generating the ' + M.what + ' - ' + M.code(cfg) + '…', 3);
     setTimeout(() => location.reload(), 300);
   }
   function offLeave() {
     if (mapLocked()) return;
-    S.map = S.mapPrev && S.mapPrev !== 'offroad' ? S.mapPrev : 'country'; saveS();
+    S.map = S.mapPrev && !GMODES[S.mapPrev] ? S.mapPrev : 'country'; saveS();
     if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(S.map, null); }
     location.reload();
   }
@@ -2945,7 +2975,7 @@
     if (ORACE.on && !ORACE.fin && ORACE.wrongT > 1) { msg = 'Wrong way!'; cls = 'hay'; }
     else if (RACE.flashT > 0) { msg = RACE.flash; cls = 'hay'; }
     else if (multi) msg = lapFmt(t) + (last ? ' · last lap ' + lapFmt(last) : '');
-    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (L / 1000).toFixed(1) + ' km';
+    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (UNIMODE ? Math.round(L) + ' m' : (L / 1000).toFixed(1) + ' km');
     st.textContent = msg; st.className = cls;
     $('nbList').innerHTML = multi
       ? list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${e.p < 0 ? lapFmt(-e.p / 100) : 'Lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, e.p) / L) + 1)}</span></div>`).join('')
@@ -2956,7 +2986,10 @@
 
   // ---- Game modes: Offroad Racing's settings - the Modes tab, and the title's Game modes. Changes are a draft till you
   // generate a course from them
-  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null) };
+  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null), mode: GMODES[S.map] ? S.map : S.modeTab === 'uni' ? 'uni' : 'offroad' };
+  const UNI_D = { d: W.uniNormalize(S.uniDraft || S.uniCfg || null) };
+  // (a course code typed in: either kind - it takes you to its mode)
+  const parseAnyCode = (t) => { const c = W.offParse(t); if (c) return [c, 'offroad']; const u = W.uniParse(t); return u ? [u, 'uni'] : null; };
   const BIOME_TXT = {
     dunes: 'Sand from horizon to horizon, the course flagged over the dunes - up the long faces and off the brinks. Paddles, big tyres and four-wheel drive',
     forest: 'A dirt trail through the woods over rolling hills, berms round the corners, mud holes in the dips',
@@ -2966,12 +2999,14 @@
   };
   const BIOME_CARS = { dunes: ['buggy', 'trophy', 'atv', 'monster'], forest: ['rally', 'trophy', 'atv', 'buggy'], desert: ['trophy', 'buggy', 'atv', 'ram'], mud: ['monster', 'tank', 'trophy', 'diesel'], mountain: ['rally', 'trophy', 'atv', 'ram'] };
   function renderModes(add) {
+    add(row('Game mode', '', seg([['offroad', 'Offroad Racing'], ['uni', 'Unicycle Racing']], MODE_D.mode, (v) => { MODE_D.mode = v; S.modeTab = v; renderModesOverlay(); })));
+    if (MODE_D.mode === 'uni') { renderUniModes(add); return; }
     const D = MODE_D.d, guest = inRoom() && !ONLINE.net.isHost;
     const set = (k) => (v) => { D[k] = v; S.offDraft = Object.assign({}, D); renderModesOverlay(); };
     const sg = (opts, k) => seg(opts, D[k], set(k));
     add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">OFFROAD RACING</b>', 'A new offroad course generated for every race, on the kind of land you pick, laid out the way you set it here. '
       + 'Race it in laps against the clock - or online, against the room: everyone in the host\'s car and tune.'
-      + (OFFMODE ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
+      + (S.map === 'offroad' ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
     if (guest) {
       add(row('Online', 'The host picks the course and the car - you\'re racing ' + (OFFMODE ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' in their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
       return;
@@ -3000,9 +3035,9 @@
       seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
     add(el('<div class="sect">Race</div>'));
     const go = el('<button class="btn">Generate a new course &amp; race</button>');
-    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() })));
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() }), 'offroad'));
     add(row('New course', 'A fresh random course with these settings' + (inRoom() ? ' - everyone in the room comes with you' : ''), go));
-    if (OFFMODE) {
+    if (S.map === 'offroad') {
       const same = ['biome', 'len', 'twist', 'width', 'jumps', 'whoops'].every((k) => D[k] === W.offroad[k]);
       const again = el(`<button class="btn small">${same && D.laps === W.offroad.laps ? 'Restart this race' : 'Race this course with these laps'}</button>`);
       again.addEventListener('click', () => {
@@ -3017,11 +3052,61 @@
     }
     const code = el('<input type="text" maxlength="20" placeholder="FOR-M3MR11-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
     const load = el('<button class="btn small ghost">Race it</button>');
-    const doLoad = () => { const c = W.offParse(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C', 3); return; } offApply(c); };
+    const doLoad = () => { const c = parseAnyCode(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C or UNI-PBM3M1B-1A2B3', 3); return; } offApply(c[0], c[1]); };
     load.addEventListener('click', doLoad);
     code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
     const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
     add(row('Course code', 'Every course has one (on the results and here): type a friend\'s in to race the very same course', cw));
+  }
+  // Unicycle Racing's settings: the unicycle everyone rides, the BMX track's size, length, laps, jumps, rhythm sections
+  // and berms
+  function renderUniModes(add) {
+    const D = UNI_D.d, guest = inRoom() && !ONLINE.net.isHost, here = UNIMODE;
+    const set = (k) => (v) => { D[k] = v; S.uniDraft = Object.assign({}, D); renderModesOverlay(); };
+    const sg = (opts, k) => seg(opts, D[k], set(k));
+    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">UNICYCLE RACING</b>', 'BMX on one wheel: a new BMX-style track generated for every race - the start hill and its gate, berms, rollers, rhythm sections, doubles, tabletops - and everyone on unicycles. '
+      + 'Race it in laps against the clock, or online against the room: the host picks the track and the unicycle.'
+      + (here ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + Math.round(W.track.L) + ' m × ' + OFF_LAPS : ''), el('<span></span>')));
+    if (guest) {
+      add(row('Online', 'The host picks the track and the unicycle - you\'re racing ' + (here ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' on their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
+      return;
+    }
+    add(el('<div class="sect">Unicycle</div>'));
+    add(row('Everyone rides', 'Pedal: legs only, ~14 mph · Improved: a geared hub and a sprinter, ~35 mph · Jet: a model turbojet behind the saddle, ~85 mph - give it the Supercross size',
+      seg([['pedal', 'Pedal'], ['improved', 'Improved pedal'], ['jet', 'Jet']], D.ver, (v) => { if (v === 'jet' && D.ver !== 'jet') D.size = 'super'; set('ver')(v); })));   // (the jet's too quick for a BMX-size track: onto Supercross - it can go back)
+    add(el('<div class="sect">Track</div>'));
+    add(row('Size', 'BMX: a tight track for pedal power · Supercross: everything ~1.8 × as big, for the faster unicycles', sg([['bmx', 'BMX'], ['super', 'Supercross']], 'size')));
+    add(row('Length', 'Short and medium: four straights and three berms · long: six and five', sg([['short', 'Short'], ['medium', 'Medium'], ['long', 'Long']], 'len')));
+    add(row('Laps', '', sg([[1, '1'], [2, '2'], [3, '3'], [5, '5']], 'laps')));
+    add(row('Jumps', 'How big the doubles, tabletops and step-ups are', sg([['small', 'Small'], ['medium', 'Medium'], ['big', 'Big']], 'jumps')));
+    add(row('Rhythm sections', 'Runs of little rollers one after another', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'rhythm')));
+    add(row('Berms', 'Flat turns, or banked bowls - ride up into them and they carry you round faster (Steep: more so)', sg([['flat', 'Flat'], ['banked', 'Banked'], ['steep', 'Steep']], 'bank')));
+    add(row('Air assist', 'Over the jumps: it keeps the unicycle level in the air for the landing - Off and you fly it yourself',
+      seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
+    add(el('<div class="sect">Race</div>'));
+    const go = el('<button class="btn">Generate a new track &amp; race</button>');
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() }), 'uni'));
+    add(row('New track', 'A fresh random BMX track with these settings' + (inRoom() ? ' - everyone in the room comes with you, on that unicycle' : ''), go));
+    if (here) {
+      const U = W.uni, same = ['ver', 'size', 'len', 'jumps', 'rhythm', 'bank'].every((k) => D[k] === U[k]);
+      const again = el(`<button class="btn small">${same && D.laps === U.laps ? 'Restart this race' : 'Race this track with these laps'}</button>`);
+      again.addEventListener('click', () => {
+        if (D.laps !== U.laps) { offApply(Object.assign({}, U, { laps: D.laps }), 'uni'); return; }
+        offRestart(); $('modes').classList.add('hidden'); openMenu(false);
+      });
+      const leave = el('<button class="btn small ghost">Leave - free roam</button>');
+      leave.addEventListener('click', () => offLeave());
+      const w = el('<div style="display:flex;gap:8px"></div>'); w.appendChild(again); w.appendChild(leave);
+      const pb = S.offPB && S.offPB[offKey()];
+      add(row('This track', '<b class="modecode">' + OFF_CODE + '</b>' + (pb ? ' · your best ' + lapFmt(pb.t) + ' (lap ' + lapFmt(pb.lap) + ')' : '') + (same ? '' : ' · the settings above make a different track - generate one to race them'), w));
+    }
+    const code = el('<input type="text" maxlength="20" placeholder="UNI-PBM3M1B-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
+    const load = el('<button class="btn small ghost">Race it</button>');
+    const doLoad = () => { const c = parseAnyCode(code.value); if (!c) { hud.toast('That isn\'t a track code - they look like UNI-PBM3M1B-1A2B3', 3); return; } offApply(c[0], c[1]); };
+    load.addEventListener('click', doLoad);
+    code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
+    const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
+    add(row('Track code', 'Every track has one (on the results and here): type a friend\'s in to race the very same track', cw));
   }
   function renderModesOverlay() {
     if ($('modes').classList.contains('hidden')) return;
@@ -3035,7 +3120,7 @@
   // (the title: what's loaded - and back to Game modes after a car was picked from it)
   if (OFFMODE) {
     const pb = S.offPB && S.offPB[offKey()];
-    $('modeTitle').textContent = 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
+    $('modeTitle').textContent = (UNIMODE ? 'Unicycle Racing · BMX track · ' + Math.round(W.track.L) + ' m' : 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km') + ' × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
   }
   if (S.reopenModes) { S.reopenModes = false; saveS(); if (!S.netRoom) setTimeout(openModes, 200); }
 
@@ -3054,8 +3139,8 @@
     add(row('Racing for points', 'On the race courses - the Windy Rally Stage, the Rally Stage, the Windy Mower Track and the Mower Track: points for ground covered along the course, on the road 1 a metre times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
       + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls well off the road stop shortcuts, '
       + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s. Everyone waits on the start grid till the host starts the race.', el('<span></span>')));
-    add(row('Offroad Racing', 'Host on the Offroad Race map and everyone races the course you set up in Game modes (Esc → Modes), in your car and tune: laps, places by ground covered, then by finishing time. '
-      + 'A reset back onto the course every 10 s.', el('<span></span>')));
+    add(row('Offroad Racing · Unicycle Racing', 'Host on the Offroad Race or Unicycle Racing map and everyone races the track you set up in Game modes (Esc → Modes) - offroad in your car and tune, BMX on the unicycle you picked: laps, places by ground covered, then by finishing time. '
+      + 'A reset back onto the track every 10 s.', el('<span></span>')));
     const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
     const name = inp('Your name', S.netName, 16, 170);
     name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
@@ -3066,7 +3151,7 @@
     else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
     if (!on) {
       add(row('Map', 'For a room you host (the race courses score points; the Offroad Race is a race)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
-      if (ONLINE.hostMap === 'offroad') { const b = el('<button class="btn small ghost">Set up the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', 'From your Game modes settings: <b class="modecode">' + W.offCode(offCfgNow()) + '</b>', b)); }
+      if (GMODES[ONLINE.hostMap]) { const b = el('<button class="btn small ghost">Set it up</button>'); b.addEventListener('click', () => { MODE_D.mode = ONLINE.hostMap; curTab = 'Modes'; renderMenu(); }); add(row(ONLINE.hostMap === 'uni' ? 'Track' : 'Course', 'From your Game modes settings: <b class="modecode">' + modeCode(ONLINE.hostMap) + '</b>', b)); }
       const hb = el('<button class="btn small">Host a game</button>');
       hb.addEventListener('click', () => onlineHost());
       add(row('Host', 'Opens a room on that map (loading it if you\'re not on it) and gives you its code to share', hb));
@@ -3081,7 +3166,7 @@
         el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
       if (net.isHost) {
         add(row('Map', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
-        if (OFFMODE) { const b = el('<button class="btn small ghost">Change the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS, b)); }
+        if (OFFMODE) { const b = el('<button class="btn small ghost">Change it</button>'); b.addEventListener('click', () => { MODE_D.mode = S.map; curTab = 'Modes'; renderMenu(); }); add(row(UNIMODE ? 'Track' : 'Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km') + ' × ' + OFF_LAPS, b)); }
         if (COURSE) {
           const rb = el('<button class="btn small">Start race</button>');
           rb.addEventListener('click', () => { net.startRace(); openMenu(false); });

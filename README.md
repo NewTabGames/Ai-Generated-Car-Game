@@ -87,7 +87,7 @@ Rolled over? Every vehicle flips back GTA-style: when it's on its roof or side a
 
 ## 🏁 Game Modes
 
-**Game modes** on the title screen (or Esc → Modes). The first is **Offroad Racing**.
+**Game modes** on the title screen (or Esc → Modes): **Offroad Racing** and **Unicycle Racing**.
 
 ### Offroad Racing
 
@@ -105,6 +105,16 @@ A new offroad course is generated for every race - laid out from a random seed a
 - **The race:** the countdown runs by itself (and starts over if you open the menu before GO). Marker stakes line both edges (flags across the dunes), and invisible walls 12 m out stop shortcuts. The board (top right) shows your time, the lap and your last and best laps; Backspace puts you back on the course whenever you like. At the flag you get your time, every lap and your **personal best** for that course in that car - then race it again, take a new course, change the settings or go back to free roam.
 - **Course codes:** every course has one (e.g. `FOR-M3MR11-XRD30Q` - the terrain, length, laps, corners, width, jumps, whoops and seed). It's on the results and in the Modes tab; type a friend's in to race the very same course.
 
+### Unicycle Racing
+
+BMX on one wheel: a new BMX-style track is generated for every race - red clay over a mown field, a start hill with a gate, berms, rollers, rhythm sections, doubles, tabletops and step-ups - and everyone races it on unicycles.
+
+- **Everyone rides** the same unicycle: **Pedal** (legs only, ~14 mph), **Improved pedal** (a geared hub and a sprinter, ~35 mph) or **Jet** (the model turbojet, ~85 mph). Your own vehicle is kept and comes back when you pick another map.
+- **Size** - **BMX** (a tight track for pedal power, ~330-650 m a lap, a 3.6 m start hill) or **Supercross** (everything ~1.8 × as big, ~600-1,150 m a lap - the one for the jet). **Length** (short / medium: four straights joined by three berms · long: six and five), **laps** (1 / 2 / 3 / 5), **jumps** (small / medium / big doubles, tabletops and step-ups), **rhythm sections** (none / some / lots - runs of little rollers) and **berms** (flat, banked or steep).
+- **How it's built:** straights side by side, joined by 180° berms at alternate ends, the loop closed by a sweeping return round the outside; the start hill drops from the gate onto the first straight, with the grandstands alongside. The berms are bowls - ride up the bank and it carries you round faster than a flat turn would (the steering lets you turn as tight as the bank holds you). The track's surface is exact (not the terrain's 2 m grid), so the lips and landings are as sharp as they're drawn.
+- **The race:** eight to a row behind the gate; it drops at GO. The board shows your time, lap and laps; Backspace puts you back on the track. **Air assist** (on by default) keeps the unicycle level in the air for the landing - turn it off to fly it yourself. Results and personal bests work as for Offroad Racing.
+- **Track codes** (e.g. `UNI-JSS2M1S-39U` - the unicycle, size, length, laps, jumps, rhythm, berms and seed) are on the results and in the Modes tab; the Modes tab takes either kind of code.
+
 ---
 
 ## 🌐 Online Racing
@@ -118,6 +128,7 @@ A new offroad course is generated for every race - laid out from a random seed a
   - **No shortcuts:** invisible walls run well off the road (10 m past the edge on the rally stages, 6 m on the mower tracks) and follow your own bit of the course, so you can't cut across to another bit of it. They're no guard rail: touching one throws the car about and bleeds its speed away. A car that ends up past them is put back where it was.
   - **Reset** (Backspace) once every 30 s - the timer's over the minimap, bottom left.
 - **Offroad Racing online:** host on the Offroad Race map and the room races the course you set up in Game modes (it goes out as its course code, so everyone generates the same one), in your car and tune. Change the course and everyone follows. Start the race from the grid as above; places go by laps and ground covered, then by finishing time once people finish, and a reset back onto the course is allowed every 10 s. Anyone who missed the start - they joined late or their tab was away - is put on the grid with their clock running since GO.
+- **Unicycle Racing online:** host on the Unicycle Racing map and the room races your BMX track, everyone on the unicycle you picked for it - the same as Offroad Racing online, the gate dropping at GO. Leaving the room keeps you on the track; your own vehicle's back when you pick another map.
 - The others' cars are solid: a bump is shared by weight, and whichever game sees it sends the other car its share, so the car that's hit gets shoved. Their engines play from where they are, and their names float over them.
 - **Graphics → Tyre smoke & dust → Small** keeps a few little puffs at the tyres - no big drift smoke or dirt clouds to see through (the other players' cars too).
 
@@ -185,7 +196,7 @@ Supports standard controllers (Xbox, PlayStation) and PC racing wheels (PXN, Log
 │   ├── input.js            # Keyboard, gamepad, and steering wheel input handling
 │   ├── net.js              # Online rooms over Firebase (guest sign-in, Realtime Database), loaded only when you go online
 │   ├── vehicle.js          # Vehicle dynamics, suspension, engine torque curves, transmission
-│   ├── worldgen.js         # Procedural road network, elevation, terrain, the Monster Arena's jumps / crushable cars, the Mower Track, the rally stages and the windy mower course (closed-loop tracks), the Sand Dunes, Offroad Racing's generated courses
+│   ├── worldgen.js         # Procedural road network, elevation, terrain, the Monster Arena's jumps / crushable cars, the Mower Track, the rally stages and the windy mower course (closed-loop tracks), the Sand Dunes, Offroad Racing's generated courses, Unicycle Racing's BMX tracks
 │   └── worldrender.js      # Three.js world rendering, lighting, and foliage instancing
 ├── test/                   # Physics benchmarks and audio sanity tests
 └── viewer/                 # Standalone vehicle model viewer files
@@ -231,6 +242,8 @@ node test/landspeeder-firetruck-test.js
 node test/pops-test.js
 node test/offroad-course-test.js    # Offroad Racing: every terrain / length / corners - generation time, length, grades, jumps, surfaces, codes
 node test/offroad-drive-test.js     # Offroad Racing: a driver bot takes the trophy truck round a lap of each terrain (CARS, BIOMES, LEN, SEED)
+node test/unirace-track-test.js     # Unicycle Racing: every size / length / jumps / berms - the gate level, the start hill, no steps in the surface, codes
+node test/unirace-ride-test.js      # Unicycle Racing: a rider bot laps each unicycle on flat / banked / steep berms (VERS, SIZE, LEN, BANK, SEED)
 ```
 
 The tyre look test runs the game in headless Chromium, so it needs Playwright (`npm i -D playwright && npx playwright install chromium`; without it, it skips). It builds every vehicle - every title-screen car and More Cars card, each version - with every tyre choice the game offers it (the game's `tyreChoices()`), and fails if two choices are drawn the same. A new vehicle is checked automatically; a new tyre option belongs in `tyreChoices()` in `src/game.js`, and the vehicle's model has to show it in its `setTires(front, rear)`:

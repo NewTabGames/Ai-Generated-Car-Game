@@ -236,7 +236,7 @@
       <button class="carbtn more" data-more="1"><b>MORE CARS</b><span>go-karts · monster truck · couch car…</span></button>
     </div>
     <div id="mapPick" class="seg" style="justify-content:center;margin:0 0 16px;pointer-events:auto">
-      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button><button data-map="offroad">Map: Offroad Race</button>
+      <button data-map="country">Map: Countryside</button><button data-map="tarmac">Map: All Road</button><button data-map="prepcountry">Map: Prepped Countryside</button><button data-map="preptarmac">Map: Prepped All Road</button><button data-map="straight">Map: Straightaway</button><button data-map="drag">Map: Drag Strip</button><button data-map="dirtdrag">Map: Dirt Drag</button><button data-map="arena">Map: Monster Arena</button><button data-map="ramps">Map: All Ramps</button><button data-map="mowtrack">Map: Mower Track</button><button data-map="mowwind">Map: Windy Mower Track</button><button data-map="rally">Map: Rally Stage</button><button data-map="rallywind">Map: Windy Rally Stage</button><button data-map="dunes">Map: Sand Dunes</button><button data-map="offroad">Map: Offroad Race</button><button data-map="uni">Map: Unicycle Racing</button>
     </div>
     <button class="btn" id="startBtn">Start engine</button> <button class="btn ghost" id="modesBtn" style="pointer-events:auto">Game modes</button> <button class="btn ghost" id="onlineBtn" style="pointer-events:auto">Play online</button>
     <div id="modeTitle" style="margin-top:8px;font-size:13px;color:#ffb36b"></div>
@@ -614,7 +614,7 @@
     }
     const cum = [0];
     for (let i = 1; i <= raw.length; i++) { const a = raw[i - 1], b = raw[i % raw.length]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
-    const Ltot = cum[raw.length], n = Math.round(Ltot / 2), T = { W: def.W, kind: def.kind, steep: def.steep, n, L: Ltot };
+    const Ltot = cum[raw.length], n = Math.round(Ltot / (def.step || 2)), T = { W: def.W, kind: def.kind, steep: def.steep, n, L: Ltot };
     T.x = new Float64Array(n); T.z = new Float64Array(n); T.s = new Float64Array(n + 1); T.tx = new Float64Array(n); T.tz = new Float64Array(n); T.R = new Float64Array(n);
     for (let k = 0, j = 0; k < n; k++) {
       const t = k * Ltot / n;
@@ -716,7 +716,7 @@
     if (T.kind === 'mow') {
       const nB = Math.round(T.L / 1.25);
       for (let k = 0; k < nB; k++) { const s = k * T.L / nB; for (const side of [-1, 1]) bale(s, side, hw + 0.55); }
-    } else {
+    } else if (T.kind !== 'uni') {
       // corners: runs of the centre line tighter than 45 m; boards from just before the tightest point, on the outside
       const n = T.n, tight = (k) => Math.abs(T.R[k]) < 45;
       let k0 = 0; while (tight(k0) && k0 < n) k0++;
@@ -741,7 +741,8 @@
     const aw = hw + (T.kind === 'mow' ? 1.3 : 2.2);
     const arch = { x: p.x, z: p.z, tx: p.tx, tz: p.tz, legs: [[p.x - p.tz * aw, p.z + p.tx * aw], [p.x + p.tz * aw, p.z - p.tx * aw]], w: 2 * aw };
     // (the mower course's bleachers: back from the outside of the start straight)
-    const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 } : null;
+    const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 }
+      : T.kind === 'uni' ? { x: hw + 3, z0: -Math.min(T.uE.Lr + 50, T.uTurns[0].s0 - 8), z1: -(T.uE.Lr + 4), d: 6 } : null;   // (the BMX track's: along its first straight - ending before the first berm, which comes sooner on a long track's shorter straights)
     // an offroad course: marker stakes down both edges every ~16 m (tall whip flags across the dunes, every ~20 m,
     // side to side), and a JUMP sign 45 m before each jump, on the right
     const stakes = [], signs = [];
@@ -1083,6 +1084,209 @@
   function offProfileAt(s) {
     const T = TRK, f = (((s % T.L) + T.L) % T.L) / T.L * T.n, i = Math.floor(f) % T.n, j = (i + 1) % T.n, u = f - Math.floor(f);
     return T.hc[i] + (T.hc[j] - T.hc[i]) * u;
+  }
+  // ---------------------------------------------------------------- Unicycle Racing: a BMX-style track from a seed
+  // A BMX track in a field: straights side by side, joined end to end by 180 deg berms (banked turns), the last one
+  // coming back round the outside of the berms and climbing to the start hill - the start gate on top, the start / finish
+  // line at the gate, the first straight down its steep face. Rollers, rhythm sections, doubles, tabletops and step-ups
+  // along the straights, red clay all over. Its shapes are too fine for the 2 m terrain grid, so its height is worked
+  // out exactly (uniHeight - what the tyre rolls on) and drawn as its own fine mesh, the terrain sunk a little under it
+  const UNI_OPTS = {
+    ver: [['pedal', 'P'], ['improved', 'I'], ['jet', 'J']],
+    size: [['bmx', 'B'], ['super', 'S']],
+    len: [['short', 'S'], ['medium', 'M'], ['long', 'L']],
+    laps: [[1, '1'], [2, '2'], [3, '3'], [5, '5']],
+    jumps: [['small', 'S'], ['medium', 'M'], ['big', 'B']],
+    rhythm: [['none', '0'], ['some', '1'], ['lots', '2']],
+    bank: [['flat', 'F'], ['banked', 'B'], ['steep', 'S']],
+  };
+  const UNI_DEFAULT = { ver: 'pedal', size: 'bmx', len: 'medium', laps: 3, jumps: 'medium', rhythm: 'some', bank: 'banked', seed: 31415 };
+  function uniNormalize(c) {
+    const o = Object.assign({}, UNI_DEFAULT);
+    if (c) for (const k of Object.keys(UNI_OPTS)) if (UNI_OPTS[k].some((p) => p[0] === c[k])) o[k] = c[k];
+    o.seed = c && Number.isFinite(+c.seed) ? Math.abs(Math.floor(+c.seed)) % 2147483647 : UNI_DEFAULT.seed;
+    return o;
+  }
+  function uniCode(c) {
+    c = uniNormalize(c);
+    const L = (k) => UNI_OPTS[k].find((p) => p[0] === c[k])[1];
+    return 'UNI-' + L('ver') + L('size') + L('len') + L('laps') + L('jumps') + L('rhythm') + L('bank') + '-' + c.seed.toString(36).toUpperCase();
+  }
+  function uniParse(code) {
+    const m = /^UNI-([PIJ])([BS])([SML])([1235])([SMB])([012])([FBS])-([0-9A-Z]{1,7})$/.exec(String(code || '').trim().toUpperCase());
+    if (!m) return null;
+    const P = (k, v) => { const p = UNI_OPTS[k].find((q) => q[1] === v); return p ? p[0] : undefined; };
+    return uniNormalize({ ver: P('ver', m[1]), size: P('size', m[2]), len: P('len', m[3]), laps: P('laps', m[4]), jumps: P('jumps', m[5]), rhythm: P('rhythm', m[6]), bank: P('bank', m[7]), seed: parseInt(m[8], 36) });
+  }
+  let UNI = uniNormalize(null);
+  function setUni(c) { UNI = uniNormalize(c); }
+  function uniGenerate(cfg) {
+    const rnd = mulberry32((cfg.seed ^ 0x1b873593) + 104729);
+    const K = cfg.size === 'super' ? 1.8 : 1, J = { small: 0.7, medium: 1, big: 1.35 }[cfg.jumps] * (cfg.size === 'super' ? 1.4 : 1);
+    const Wd = cfg.size === 'super' ? 9 : 7, hw = Wd / 2;
+    const N = cfg.len === 'long' ? 6 : 4, Lx = (cfg.len === 'short' ? 34 + rnd() * 10 : 50 + rnd() * 16) * K;
+    const Rb = (9 + rnd() * 1.5) * K, D = 2 * Rb, r2 = Rb + hw + 12 * K, Lg = 4;
+    // the centre line, a point every metre, from the start gate (Lg along the first straight) round to it again; the
+    // straights run along +x, side by side up +z
+    const P = [], marks = [];
+    let sAcc = 0;
+    const push = (x, z) => { if (P.length) { const a = P[P.length - 1]; sAcc += Math.hypot(x - a[0], z - a[1]); } P.push([x, z]); };
+    const line = (ax, az, bx, bz) => { const m = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az))); for (let k = 0; k < m; k++) push(ax + (bx - ax) * k / m, az + (bz - az) * k / m); };
+    const arc = (cx, cz, r, a0, a1) => { const m = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r)); for (let k = 0; k < m; k++) { const a = a0 + (a1 - a0) * k / m; push(cx + r * Math.cos(a), cz + r * Math.sin(a)); } };
+    const turns = [], straights = [];
+    for (let i = 0; i < N; i++) {
+      const z0 = i * D, dir = i % 2 === 0 ? 1 : -1, s0 = sAcc;
+      if (dir > 0) line(i === 0 ? Lg : 0, z0, Lx, z0); else line(Lx, z0, 0, z0);
+      straights.push([s0, sAcc]);
+      if (i < N - 1) {
+        const t0 = sAcc;
+        if (dir > 0) arc(Lx, z0 + Rb, Rb, -Math.PI / 2, Math.PI / 2); else arc(0, z0 + Rb, Rb, -Math.PI / 2, -1.5 * Math.PI);
+        turns.push({ s0: t0, s1: sAcc, kind: 'berm' });
+      }
+    }
+    // (the way back: round the outside of the left-hand berms, up to the start hill, into the first straight)
+    const zN = (N - 1) * D, sBack = sAcc;
+    let t0 = sAcc; arc(0, zN - r2, r2, Math.PI / 2, Math.PI); turns.push({ s0: t0, s1: sAcc, kind: 'sweep' });
+    line(-r2, zN - r2, -r2, r2);
+    t0 = sAcc; arc(0, r2, r2, Math.PI, 1.5 * Math.PI); turns.push({ s0: t0, s1: sAcc, kind: 'sweep' });
+    line(0, 0, Lg, 0);
+    void marks;
+    // (into the world: the gate at (0, 0), the first straight heading -z)
+    const c = 0, sn = -1, pts = P.map(([x, z]) => [(x - Lg) * c - z * sn, (x - Lg) * sn + z * c]);
+    pts[0] = [0, 0];
+    const T = buildTrack({ W: Wd, kind: 'uni', steep: 0, pts, step: 1 });
+    T.biome = 'uni'; T.cfg = cfg; T.code = uniCode(cfg); T.B = { name: 'BMX Track', verge: 8 };
+    // (the same course measured two ways - my running total and the fitted line's - scaled into the line's)
+    const kS = T.L / sAcc;
+    // the ground along it: the start hill - the gate on a level top, its steep face down into the first straight - then
+    // the field, and the long gentle climb back up to the gate round the last two turns
+    const Hs = 3.6 * K, Lr = 16 * K, sClimb = sBack * kS, sTop = T.L - 12 * K;
+    T.uE = { Hs, Lr, sClimb, sTop, L: T.L };
+    // the berms: bowls - level on the inside, curving up ever steeper to the outside edge, ~2 m up (banked) or ~2.8 m
+    // (steep); the two sweeping turns home are left level, and so's the start hill's top
+    const Hb = { flat: 0, banked: 2.0, steep: 2.8 }[cfg.bank] * (K > 1 ? 1.4 : 1);
+    T.uTurns = turns.filter((t) => t.kind === 'berm').map((t) => {
+      const s0 = t.s0 * kS, s1 = t.s1 * kS, iMid = Math.round((s0 + s1) / 2 / T.L * T.n) % T.n;
+      return { s0, s1, H: Hb, sg: Math.sign(T.R[iMid]) || 1, ramp: 7 * K };
+    });
+    // the features down the straights: rollers, rhythm sections, doubles, tabletops, step-ups - one after another with
+    // room between them, clear of the turns and the start hill's face
+    const feats = [], kinds = [['roller', 1], ['double', 1], ['table', 1.2], ['step', 0.8]];
+    if (cfg.rhythm !== 'none') kinds.push(['rhythm', cfg.rhythm === 'lots' ? 3 : 1.2]);
+    const wsum = kinds.reduce((a, k) => a + k[1], 0);
+    straights.forEach(([a, b], i) => {
+      let pos = (i === 0 ? Lr + 10 * K : a * kS + 10 * K);
+      const end = b * kS - 10 * K;
+      for (;;) {
+        let r = rnd() * wsum, kind = kinds[0][0];
+        for (const [k, w] of kinds) { if ((r -= w) <= 0) { kind = k; break; } }
+        const f = { kind, s: pos, h: 0, parts: [] };
+        if (kind === 'roller') { f.parts.push([0, 4.6 * K, 0.5 * J]); }
+        else if (kind === 'rhythm') { const n = 4 + Math.floor(rnd() * 3); for (let k = 0; k < n; k++) f.parts.push([k * 3.8 * K, 3.8 * K, 0.42 * J]); }
+        else if (kind === 'double') { const h = 0.9 * J; f.parts.push([0, 5 * K, h], [8 * K, 5 * K, h]); }
+        else if (kind === 'table') { f.table = { up: 4.5 * K, top: (3 + rnd() * 2) * K, down: 5 * K, h: 1.0 * J }; }
+        else { f.table = { up: 4.5 * K, top: 5 * K, down: 7 * K, h: 1.1 * J, step: true }; }
+        f.len = f.table ? f.table.up + f.table.top + f.table.down : Math.max(...f.parts.map((p) => p[0] + p[1]));
+        if (pos + f.len > end) break;
+        feats.push(f);
+        pos += f.len + (5 + rnd() * 4) * K;
+      }
+    });
+    T.uFeats = feats;
+    T.feats = feats.map((f) => ({ s: f.s, kind: f.kind === 'rhythm' ? 'whoops' : 'jump' }));
+    // (a ground profile for the parts of the game that read one: the course's height down its middle)
+    T.hc = new Float32Array(T.n); for (let k = 0; k < T.n; k++) T.hc[k] = uniElev(T, T.s[k]) + uniFeat(T, T.s[k]);
+    T.hb = T.hc; T.zone = new Uint8Array(T.n); T.dig = 0;
+    T.off = ['uni', 0, 0, T.cx, T.cz, 1e4, 1, 0];
+    return T;
+  }
+  const uniSm = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+  // the base: the start hill's face down from the gate, the field, the climb back up, the level top
+  function uniElev(T, s) {
+    const E = T.uE; s = ((s % E.L) + E.L) % E.L;
+    if (s < E.Lr) return E.Hs * (0.5 + 0.5 * Math.cos(Math.PI * s / E.Lr));
+    if (s >= E.sTop) return E.Hs;
+    if (s > E.sClimb) return E.Hs * uniSm((s - E.sClimb) / (E.sTop - E.sClimb));
+    return 0;
+  }
+  // the features: a cosine hump for each roller (a rhythm section is a run of them), a double's two; a tabletop's face up,
+  // its flat top and its landing down; a step-up's face up to a higher top and a long gentle way down
+  function uniFeat(T, s) {
+    const F = T.uFeats;
+    let lo = 0, hi = F.length - 1, f = null;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (F[m].s <= s) { f = F[m]; lo = m + 1; } else hi = m - 1; }
+    if (!f || s > f.s + f.len) return 0;
+    const u = s - f.s;
+    if (f.table) {
+      const t = f.table;
+      if (u < t.up) return t.h * uniSm(u / t.up);
+      if (u < t.up + t.top) return t.h;
+      return t.h * (1 - uniSm((u - t.up - t.top) / t.down));
+    }
+    for (const [a, l, h] of f.parts) if (u >= a && u <= a + l) return h * (0.5 - 0.5 * Math.cos(2 * Math.PI * (u - a) / l));
+    return 0;
+  }
+  // the berm at s: how high its outside edge stands (t) and which way it faces (+1: a left-hander, its outside on the
+  // right), eased in and out
+  function uniBank(T, s, out) {
+    out.t = 0; out.sg = 1;
+    for (const b of T.uTurns) {
+      if (s < b.s0 - b.ramp || s > b.s1 + b.ramp) continue;
+      const w = s < b.s0 ? uniSm((s - b.s0 + b.ramp) / b.ramp) : s > b.s1 ? uniSm((b.s1 + b.ramp - s) / b.ramp) : 1;
+      if (w * b.H > out.t) { out.t = w * b.H; out.sg = b.sg; }
+    }
+    return out;
+  }
+  // the field: dead level round the track, low rolling country well back from it
+  function uniField(x, z) {
+    const T = TRK, d = Math.hypot(x - T.cx, (z - T.cz) * 0.9);
+    return d < 160 ? 0 : smooth(160, 520, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 18 + nDet(x * 0.02, z * 0.02) * 1.2);
+  }
+  const _uq = { i: -1, d: 1e4, s: 0 }, _ub = { t: 0, sg: 1 }, UQN = 24, _ucD = new Float64Array(UQN), _ucS = new Float64Array(UQN), _ucL = new Float64Array(UQN), _ucUsed = new Float64Array(8);
+  // one bit of the track's solid at a point (d m off its line, lat across it, + right): on the track the surface - level
+  // across the straights, the berms' bowls up to the outside - and past its edges the mound it stands on sloping down to
+  // the field, its foot wider the taller it stands
+  function uniPart(T, s, sd, d, field) {
+    const hw = T.W / 2, base = uniElev(T, s) + uniFeat(T, s), bk = uniBank(T, s, _ub), lat = sd * bk.sg;
+    const top = (l) => { const u = (Math.max(-hw, Math.min(hw, l)) + hw) / T.W; return base + bk.t * u * u; };
+    if (d <= hw) return top(lat);
+    const e = top(lat), V = 1 + 1.2 * Math.max(0, e - field);
+    return e + (field - e) * smooth(hw, hw + V, d);
+  }
+  /** The BMX track's surface height at (x, z). Where two bits of the track come close - a berm's back and the way home -
+   *  their mounds meet as the higher of the two: each bit nearby (its own nearest point, further than 25 m along the
+   *  track from the others') is worked out and the highest wins, so there's never a step where one hands over to the
+   *  next. _uq holds the nearest point */
+  function uniHeight(x, z) {
+    const T = TRK, field = uniField(x, z), hw = T.W / 2, reach = hw + 9;
+    _uq.i = -1; _uq.d = 1e4;
+    const list = T.grid.get((Math.floor(x / TRK_CELL) + 32768) * 65536 + (Math.floor(z / TRK_CELL) + 32768));
+    if (!list) return field;
+    let nc = 0;
+    for (let k = 0; k < list.length; k++) {
+      const i = list[k], j = i + 1 === T.n ? 0 : i + 1, ax = T.x[i], az = T.z[i], dx = T.x[j] - ax, dz = T.z[j] - az;
+      let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz); t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
+      if (d > reach) continue;
+      // (kept in order of distance, the nearest UQN)
+      let m;
+      if (nc < UQN) m = nc++;
+      else { if (d >= _ucD[UQN - 1]) continue; m = UQN - 1; }
+      while (m > 0 && _ucD[m - 1] > d) { _ucD[m] = _ucD[m - 1]; _ucS[m] = _ucS[m - 1]; _ucL[m] = _ucL[m - 1]; m--; }
+      const tl = Math.hypot(dx, dz) || 1;
+      _ucD[m] = d; _ucS[m] = T.s[i] + (T.s[i + 1] - T.s[i]) * t; _ucL[m] = ((x - px) * -dz + (z - pz) * dx) / tl;
+    }
+    if (!nc) return field;
+    _uq.i = 1; _uq.d = _ucD[0]; _uq.s = _ucS[0]; _uq.sd = _ucL[0];
+    let h = -1e9, nu = 0;
+    for (let k = 0; k < nc && nu < 8; k++) {
+      let near = false;
+      for (let u = 0; u < nu; u++) { let ds = Math.abs(_ucS[k] - _ucUsed[u]); ds = Math.min(ds, T.L - ds); if (ds < 25) { near = true; break; } }
+      if (near) continue;
+      _ucUsed[nu++] = _ucS[k];
+      h = Math.max(h, uniPart(T, _ucS[k], _ucL[k], _ucD[k], field));
+    }
+    return Math.max(h, field);
   }
   const _ttq = {}, _ftq = {}, _gtq = {}, _ptq = {};
 
@@ -1656,6 +1860,8 @@
     }
     if (TRK) {
       if (TRK.kind === 'offroad') return offTerrain(x, z);
+      // (the BMX track: its own fine mesh lies over the terrain's, which is sunk 0.3 m under it)
+      if (TRK.kind === 'uni') { const h = uniHeight(x, z); return _uq.i >= 0 && _uq.d < TRK.W / 2 + 1 ? h - 0.3 : h; }
       if (TRK.kind === 'mow') {
         // (the windy mower course: a dead flat field like the oval's, rolling country well back from it)
         const d = Math.hypot(x - TRK.cx, (z - TRK.cz) * 0.8);
@@ -1742,6 +1948,15 @@
   const _gri = {};
   /** Ground query matching the LOD0 render mesh triangulation. */
   function ground(x, z, out) {
+    if (TRK && TRK.kind === 'uni') {
+      // the BMX track: its surface worked out exactly (the grid's 2 m is too coarse for a roller), the slope from either
+      // side; red clay (dirt) on the track and its mounds, grass in the field
+      const h = uniHeight(x, z), d = _uq.d, e = 0.12, dx = (uniHeight(x + e, z) - uniHeight(x - e, z)) / (2 * e), dz = (uniHeight(x, z + e) - uniHeight(x, z - e)) / (2 * e);
+      const il = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
+      out.h = h; out.nx = -dx * il; out.ny = il; out.nz = -dz * il; out.roadD = d;
+      out.surface = d < TRK.W / 2 + 3 || h > uniField(x, z) + 0.15 ? 3 : 2;
+      return out;
+    }
     const G = C.GRID;
     const gx = x / G, gz = z / G;
     const ix = Math.floor(gx), iz = Math.floor(gz);
@@ -1806,6 +2021,11 @@
   function forestDensity(x, z) {
     if (MAP === 'tarmac' || MAP === 'arena' || MAP === 'ramps' || MAP === 'dunes') return 0;
     if (MAP === 'mowtrack') return 0.7 * smooth(150, 330, Math.hypot(x, z)) * smooth(0.0, 0.5, nForest(x * 0.002, z * 0.002) + 0.3);
+    if (TRK && TRK.kind === 'uni') {
+      // (the BMX venue: mown grass round the track, trees about the field and woods beyond)
+      const d = trackQuery(x, z, _ftq).d, f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
+      return (0.12 + 0.5 * smooth(-0.2, 0.4, f)) * smooth(TRK.W / 2 + 14, TRK.W / 2 + 34, d) * (0.3 + 0.7 * smooth(120, 260, Math.hypot(x - TRK.cx, z - TRK.cz)));
+    }
     if (TRK && TRK.kind === 'offroad') {
       // (woods right up to the course in the forest; pines up the mountain; a few trees about the bog; none in the sand)
       const b = TRK.biome;
@@ -1917,12 +2137,12 @@
         const d = trackQuery(x, z, tq).d;
         if (d < hw + 3 || (d < hw + 7 && r1 > dens * 0.5)) continue;
         const y = terrainHeight(x, z);
-        if (T.kind !== 'mow') { const sl = Math.max(Math.abs(terrainHeight(x + 2, z) - y), Math.abs(terrainHeight(x, z + 2) - y)) / 2; if (sl > 0.9) continue; }
+        if (T.kind !== 'mow' && T.kind !== 'uni') { const sl = Math.max(Math.abs(terrainHeight(x + 2, z) - y), Math.abs(terrainHeight(x, z + 2) - y)) / 2; if (sl > 0.9) continue; }
         const kn = nKind(x * 0.004, z * 0.004), kind = kn > 0.25 || (T.steep && kn > -0.1) ? 0 : kn < -0.45 && hash01(gx, gz, 5) < 0.5 ? 2 : 1, sc = 0.75 + hash01(gx, gz, 6) * 0.65;
         tr.push(x, y, z, sc, hash01(gx, gz, 7) * Math.PI * 2, kind);
         circles.push({ x, z, r: (kind === 0 ? 0.28 : kind === 2 ? 0.2 : 0.36) * sc });
       }
-      if (T.kind !== 'mow') {
+      if (T.kind !== 'mow' && T.kind !== 'uni') {
         const bcell = 11, nb = CH / bcell | 0;
         for (let a = 0; a < nb; a++) for (let b = 0; b < nb; b++) {
           const gx = cx * nb + a, gz = cz * nb + b;
@@ -2295,17 +2515,19 @@
   function setMap(m) {
     PREP = m === 'prepcountry' || m === 'preptarmac';
     if (PREP) m = m === 'preptarmac' ? 'tarmac' : 'country';
-    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || m === 'offroad' || TRACK_DEFS[m] ? m : 'country';
+    MAP = m === 'straight' || m === 'drag' || m === 'dirtdrag' || m === 'tarmac' || m === 'arena' || m === 'mowtrack' || m === 'ramps' || m === 'dunes' || m === 'offroad' || m === 'uni' || TRACK_DEFS[m] ? m : 'country';
     TRK = TRACK_DEFS[MAP] ? (trackCache[MAP] = trackCache[MAP] || buildTrack(TRACK_DEFS[MAP])) : null;
     // (an offroad race: its course from the settings - generated once per course code - and where it sits in the noise)
     if (MAP === 'offroad') { const k = 'off:' + offCode(OFF); TRK = trackCache[k] = trackCache[k] || offGenerate(OFF); [OFFB, OFFX, OFFZ, OFFCX, OFFCZ, OFFRM, OFFC, OFFS] = TRK.off; }
+    // (a unicycle race: its BMX track from the settings)
+    if (MAP === 'uni') { const k = 'uni:' + uniCode(UNI); TRK = trackCache[k] = trackCache[k] || uniGenerate(UNI); }
     trkPropList = null;
     jumpCache.clear();
     roadCache.clear(); gridCache.clear(); propCache.clear(); rampCache.clear(); spawnRampV = undefined;
   }
   const W = {
     setMap, get map() { return MAP; }, get prep() { return PREP; }, get track() { return TRK; },
-    setOffroad, get offroad() { return OFF; }, offCode, offParse, offNormalize, OFF_BIOMES, OFF_OPTS, OFF_LEN, offNatural,
+    setOffroad, get offroad() { return OFF; }, setUni, get uni() { return UNI; }, uniCode, uniParse, uniNormalize, UNI_OPTS, uniHeight, offCode, offParse, offNormalize, OFF_BIOMES, OFF_OPTS, OFF_LEN, offNatural,
     // (the maps with lakes: the open country - none by the tracks, in the stadium, the desert or on the flat maps)
     get hasWater() { return MAP !== 'tarmac' && MAP !== 'arena' && MAP !== 'ramps' && MAP !== 'dunes' && !TRK; }, trackQuery, trackPoint, trackProps, trackSpawn, TRACK_DEFS, DRAG_MARKS, RAMPS_SPAWN, jumpsInChunk, jumpHeight, DRAG, TARMAC, MOWT, mowtD, mowtrackBales, DUNES,
     ARENA, ARENA_OBS, ARENA_CARS, CAR_L, CAR_W, arenaHeight, arenaSD, arenaCrush, arenaResetCars, arenaWalls, arenaCarHeight: (c, x, z) => carHeight(c, x, z, null),
@@ -3330,7 +3552,19 @@
       // a 10 cm wheelbase turns on fractions of a degree at speed: full lock spun the one and asked the other for a turn
       // no rider can make, and a clamp at that lock put all of the turn in the stick's first tenth. The game passes the
       // keys and the stick in raw for these)
-      if (s.steerAScale) target *= Math.min(1, Math.atan(s.wheelbase * s.steerAScale / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
+      // (on a banked turn - a BMX berm - the bank carries some of the turn: the ground tilted down towards the inside of it,
+      // across the way it's heading, lets the rider lean into that much more - g x the tilt's tangent. Its own lean
+      // doesn't count: the tilt's measured across its heading, level)
+      if (s.steerAScale) {
+        let A = s.steerAScale;
+        if (target !== 0) {
+          const hl = Math.hypot(m00, m20) || 1, rx = m00 / hl, rz = m20 / hl;
+          let nr = 0, ny = 0, c = 0;
+          for (const w of W) if (w.contact) { nr += w.nx * rx + w.nz * rz; ny += w.ny; c++; }
+          if (c) { const b = nr / Math.max(0.3 * c, ny) * (target > 0 ? 1 : -1); if (b > 0) A += GRAV * Math.min(1, b); }
+        }
+        target *= Math.min(1, Math.atan(s.wheelbase * A / Math.max(0.25, vFwd * vFwd)) / s.maxSteer);
+      }
       // (gyro: an RC truck's stability gyro - Traxxas' TSM and the like. It reads the yaw rate and steers against any
       // rotation beyond what the steering asks for, so the tail stepping out is caught with countersteer before it
       // spins; softer in Track, off with TC Off. The servo's speed still limits it)
@@ -3751,10 +3985,11 @@
       }
       // a unicycle (uni): one wheel - nothing ahead of it or behind it to stand on. The rider balances it fore and aft as
       // they do on the real thing (pedalling the wheel back under themselves), here a pitch torque that holds the frame
-      // upright; side to side it balances as a bike does (bike). Off the ground it lets go
-      if (s.uni && anyContact) {
+      // upright; side to side it balances as a bike does (bike). Off the ground - over a jump - the rider still holds it
+      // fairly upright (arms out, the wheel spun or checked under them), a share of the grip they have on the ground (air)
+      if (s.uni && (anyContact || s.uni.air)) {
         const U = s.uni, pitch = Math.asin(clamp(-m12, -1, 1)), pRate = wx * m00 + wy * m10 + wz * m20;   // (+ nose up)
-        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate);
+        const Tp = s.Ipitch * (U.kp * (0 - pitch) - U.kd * pRate) * (anyContact ? 1 : U.air);
         Tx += m00 * Tp; Ty += m10 * Tp; Tz += m20 * Tp;
       }
 
@@ -5921,7 +6156,7 @@
     brakeTorqueF: 17, brakeTorqueR: 17, handbrakeTorque: 0, noABS: true, noESC: true,
     maxSteer: 0.15, steerRate: 3, steerRatio: 1, ackermann: 0, steerAScale: 4, kbAScale: 3.5,
     bike: { kp: 160, kd: 30, vMin: 0.6, maxLean: 0.45, yawK: 30, alignK: 12, selfK: 0.5 },
-    uni: { kp: 300, kd: 35 },
+    uni: { kp: 300, kd: 35, air: 0.5 },
     // (the legs' own curve sets the top cadence: a motor's limiter, faded in over 250 rpm, would cap it at ~150)
     electric: true, idleRpm: 0, limiterRpm: 480, redlineRpm: 200, shiftRpm: 480, engineInertia: 0.05, fricA: 0.6, fricB: 0.3, starterTorque: 0,
     // (lb-ft at the cranks against cadence: what legs give, the most at a standstill)
@@ -19375,7 +19610,7 @@ float lampLight(float lat, float al){
     }
     const DUNEMAP = W.map === 'dunes';
     const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
-      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'uni' ? 10 : TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
       uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 },
       uBiome: { value: TRK && TRK.kind === 'offroad' ? ['dunes', 'forest', 'desert', 'mud', 'mountain'].indexOf(TRK.biome) : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -19430,7 +19665,21 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 8.5) {
+    if (uMap > 9.5) {
+      // ---- the BMX track's venue: a mown field (light and dark stripes) round red clay mounds - the start hill's sides,
+      // the backs of the berms, the jumps' wings - the track itself its own mesh on top
+      vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
+      float td = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv).r * 25.5 : 25.5;
+      float m1 = vnoise(P * 0.35), m2 = vnoise(P * 2.2), m3 = vnoise(P * 9.0);
+      float sf = fract(P.x / 8.0 + 0.25), stripe = smoothstep(0.47, 0.53, sf) * (1.0 - smoothstep(0.97, 1.0, sf)) + (1.0 - smoothstep(0.0, 0.03, sf));
+      vec3 g = mix(vec3(0.15, 0.26, 0.065), vec3(0.19, 0.31, 0.085), m1) * (0.9 + 0.1 * m2 + 0.08 * m3) * mix(0.92, 1.06, stripe);
+      g = mix(g, col, smoothstep(24.0, 25.4, td) * 0.35);
+      vec3 clay = mix(vec3(0.42, 0.15, 0.06), vec3(0.5, 0.21, 0.09), m1) * (0.88 + 0.1 * m2 + 0.06 * m3);
+      float mound = max(1.0 - smoothstep(uTrkW + 0.6, uTrkW + 1.6, td), smoothstep(0.06, 0.3, vWPos.y) * (1.0 - smoothstep(14.0, 18.0, td)));
+      float edge = (vnoise(P * 1.3) - 0.5) * 0.25;
+      col = mix(g, clay, clamp(mound + edge * mound, 0.0, 1.0));
+      rough = 0.97;
+    } else if (uMap > 8.5) {
       // ---- an offroad race: the terrain painted its own way, the course worn into it. td: metres from the centre line;
       // zone: the course's mud holes (forest, 1), sandy washes (desert, 2), firm dry stretches (the bog, 3)
       vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
@@ -20447,8 +20696,73 @@ void main(){
       return p;
     }
     const _tv = new THREE.Vector3();
+    // ---------------------------------------------------------------- the BMX track (Unicycle Racing): the track's own fine
+    // mesh - red clay, packed darker down the middle where everyone rides, tyre lines, white chalk down both edges - laid
+    // on worldgen's exact surface (what the tyre rolls on); the start gate on the hill (eight numbered lanes, a plate that
+    // drops at GO), START over it, flags round the hill's top
+    const gate = { mesh: null, a: 0, want: 0 };
+    function uniVenue(tg, dark) {
+      const T = W.track, hw = T.W / 2, ex = 1.4, half = hw + ex, nl = Math.max(12, Math.round(2 * half / 0.35)), ds = 0.5, ns = Math.ceil(T.L / ds);
+      const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');
+      g.fillStyle = '#a4502e'; g.fillRect(0, 0, 256, 512);
+      for (let i = 0; i < 2600; i++) { const v = Math.random(); g.fillStyle = v < 0.5 ? 'rgba(80,30,14,0.18)' : 'rgba(214,140,96,0.16)'; g.fillRect(Math.random() * 256, Math.random() * 512, 2 + Math.random() * 5, 2 + Math.random() * 5); }
+      const u0 = ex / (2 * half) * 256, u1 = 256 - u0;
+      // (packed darker down the middle; tyre lines wandering along it)
+      const grd = g.createLinearGradient(u0, 0, u1, 0); grd.addColorStop(0, 'rgba(60,20,8,0)'); grd.addColorStop(0.5, 'rgba(60,20,8,0.28)'); grd.addColorStop(1, 'rgba(60,20,8,0)');
+      g.fillStyle = grd; g.fillRect(u0, 0, u1 - u0, 512);
+      g.strokeStyle = 'rgba(55,18,8,0.35)'; g.lineWidth = 1.5;
+      for (let k = 0; k < 9; k++) { g.beginPath(); let x = u0 + 10 + Math.random() * (u1 - u0 - 20); g.moveTo(x, 0); for (let y = 0; y <= 512; y += 32) { x += (Math.random() - 0.5) * 3; g.lineTo(x, y); } g.stroke(); }
+      // (the mounds either side of the edges: drier, lighter clay)
+      g.fillStyle = 'rgba(200,120,80,0.22)'; g.fillRect(0, 0, u0, 512); g.fillRect(u1, 0, 256 - u1, 512);
+      // (white chalk down both edges, worn in places)
+      for (const u of [u0, u1]) for (let y = 0; y < 512; y += 4) { g.fillStyle = 'rgba(240,236,226,' + (0.55 + Math.random() * 0.4).toFixed(2) + ')'; g.fillRect(u - 1.6, y, 3.2, 4); }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+      const pos = new Float32Array((ns + 1) * (nl + 1) * 3), uv = new Float32Array((ns + 1) * (nl + 1) * 2), idx = [], p = {};
+      for (let i = 0; i <= ns; i++) {
+        W.trackPoint(Math.min(T.L, i * ds), p);
+        for (let j = 0; j <= nl; j++) {
+          const lat = -half + 2 * half * j / nl, x = p.x - p.tz * lat, z = p.z + p.tx * lat, k = i * (nl + 1) + j;
+          pos[k * 3] = x; pos[k * 3 + 1] = W.uniHeight(x, z) + 0.012; pos[k * 3 + 2] = z;
+          uv[k * 2] = j / nl; uv[k * 2 + 1] = i * ds / 8;
+        }
+      }
+      for (let i = 0; i < ns; i++) for (let j = 0; j < nl; j++) { const a = i * (nl + 1) + j, b = a + 1, cc = a + nl + 1, d = cc + 1; idx.push(a, cc, b, b, cc, d); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+      if (geo.attributes.normal.getY(Math.floor(nl / 2)) < 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; } geo.setIndex(idx); geo.computeVertexNormals(); }
+      const track = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 })); track.receiveShadow = true; tg.add(track);
+      // the start gate: two posts, the plate across the track hinged at its foot (eight lanes, numbered), START over it
+      W.trackPoint(0, p);
+      const gy = W.uniHeight(p.x, p.z), rot = Math.atan2(-p.tx, -p.tz), gg = new THREE.Group(); gg.position.set(p.x, gy, p.z); gg.rotation.y = rot; tg.add(gg);
+      const lc = document.createElement('canvas'); lc.width = 512; lc.height = 64; const lg = lc.getContext('2d');
+      const lcol = ['#d22', '#26c', '#eb2', '#2a2', '#e70', '#a3c', '#2bb', '#eee'];
+      for (let k = 0; k < 8; k++) { lg.fillStyle = lcol[k]; lg.fillRect(k * 64, 0, 64, 64); lg.fillStyle = k === 2 || k === 7 ? '#111' : '#fff'; lg.font = 'bold 44px Arial'; lg.textAlign = 'center'; lg.textBaseline = 'middle'; lg.fillText(String(k + 1), k * 64 + 32, 34); }
+      const lt = new THREE.CanvasTexture(lc); lt.colorSpace = THREE.SRGBColorSpace;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(T.W - 0.2, 0.6, 0.05).translate(0, 0.3, 0), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: lt, roughness: 0.6 }), new THREE.MeshStandardMaterial({ map: lt, roughness: 0.6 })]);
+      plate.rotation.order = 'YXZ'; plate.castShadow = true; gg.add(plate); gate.mesh = plate;
+      for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.6, 0.12), dark); post.position.set(sx * (hw + 0.35), 1.3, 0.2); post.castShadow = true; gg.add(post); }
+      const bc = document.createElement('canvas'); bc.width = 1024; bc.height = 96; const bg = bc.getContext('2d');
+      bg.fillStyle = '#c4161c'; bg.fillRect(0, 0, 1024, 96); bg.fillStyle = '#fff'; bg.font = 'italic 900 54px Impact, "Arial Black", Arial'; bg.textAlign = 'center'; bg.textBaseline = 'middle'; bg.fillText('START  ·  UNICYCLE RACING  ·  FINISH', 512, 50);
+      const bt = new THREE.CanvasTexture(bc); bt.colorSpace = THREE.SRGBColorSpace; const bm = new THREE.MeshStandardMaterial({ map: bt, roughness: 0.7 });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(T.W + 0.9, 0.7, 0.08), [dark, dark, dark, dark, bm, bm]); bar.position.set(0, 2.45, 0.2); bar.castShadow = true; gg.add(bar);
+      // (the start line, chalked across)
+      const sl = new THREE.Mesh(new THREE.PlaneGeometry(T.W, 0.14), new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+      sl.rotation.x = -Math.PI / 2; sl.position.set(0, 0.03, -0.12); gg.add(sl);
+      // (flags round the top of the hill)
+      const fm = [0xd22020, 0xf2c200, 0x2050c8, 0x20a040].map((cl) => new THREE.MeshStandardMaterial({ color: cl, roughness: 0.7, side: THREE.DoubleSide }));
+      for (let k = 0; k < 6; k++) {
+        W.trackPoint(-2 - k * 3.2, p);
+        for (const sx of [-1, 1]) {
+          const x = p.x - p.tz * sx * (hw + 1.0), z = p.z + p.tx * sx * (hw + 1.0), y = W.uniHeight(x, z);
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 4.2, 6), dark); pole.position.set(x, y + 2.1, z); tg.add(pole);
+          const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), fm[(k + (sx > 0 ? 1 : 0)) % 4]); fl.position.set(x + 0.46, y + 3.85, z); tg.add(fl);
+        }
+      }
+    }
+    // (the gate: 0 up, 1 down - it swings over in a third of a second)
+    function uniGate(open) { gate.want = open ? 1 : 0; if (!open) gate.a = 0; }
     function frame(dt, camera, focus) {
       skyUniforms.uTime.value += dt;
+      if (gate.mesh && gate.a !== gate.want) { gate.a = gate.want > gate.a ? Math.min(1, gate.a + dt * 3) : 0; gate.mesh.rotation.x = -gate.a * gate.a * 1.45; }
       sky.position.copy(camera.position);
       water.position.x = Math.round(camera.position.x / 50) * 50; water.position.z = Math.round(camera.position.z / 50) * 50;
       waterNormal.offset.x += dt * 0.01; waterNormal.offset.y += dt * 0.006;
@@ -20602,8 +20916,9 @@ void main(){
       }
       // the arch: two legs either side of the road and a banner across; a checkered line on the road beneath it
       const A = TP.arch, dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
-      const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz);
-      for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
+      const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz), UNIT = TRK.kind === 'uni';
+      if (UNIT) uniVenue(tg, dark);
+      if (!UNIT) for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
       const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : W.map === 'offroad' ? 'OFFROAD RACE · ' + TRK.B.name.toUpperCase() : 'WINDY MOWER TRACK';
       const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
       { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
@@ -20612,7 +20927,7 @@ void main(){
       const banT = new THREE.CanvasTexture(banC); banT.colorSpace = THREE.SRGBColorSpace;
       const banM = new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 });
       const banner = new THREE.Mesh(new THREE.BoxGeometry(A.w + 0.4, 0.8, 0.06), [dark, dark, dark, dark, banM, banM]);
-      banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; tg.add(banner);
+      banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; if (!UNIT) tg.add(banner);
       // (an offroad course: white marker stakes with an orange top down both edges; across the dunes, tall whip flags)
       if (TP.stakes && TP.stakes.length) {
         const dun = TRK.biome === 'dunes', m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
@@ -20631,7 +20946,7 @@ void main(){
       { const g = chkC.getContext('2d'); for (let k = 0; k < 32; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#141414' : '#ecebe6'; g.fillRect(k * 8, r * 8, 8, 8); } }
       const chkT = new THREE.CanvasTexture(chkC); chkT.colorSpace = THREE.SRGBColorSpace;
       const line = new THREE.Mesh(new THREE.PlaneGeometry(TRK.W + 0.2, 0.5), new THREE.MeshStandardMaterial({ map: chkT, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-      line.rotation.set(-Math.PI / 2, 0, rotA, 'YXZ'); line.position.set(A.x, ay + 0.03, A.z); line.receiveShadow = true; tg.add(line);
+      line.rotation.set(-Math.PI / 2, 0, rotA, 'YXZ'); line.position.set(A.x, ay + 0.03, A.z); line.receiveShadow = true; if (!UNIT) tg.add(line);
       if (TP.stands) {
         // bleachers back from the outside of the start straight, climbing away from it, a crowd on every row
         const ST = TP.stands, concrete = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.95 });
@@ -20908,7 +21223,7 @@ void main(){
       };
     }
 
-    return { group, terrainMat, update, drag, arena, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks };
+    return { group, terrainMat, update, drag, arena, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks, uniGate };
   }
 
   root.HCWorldRender = { create };
@@ -21586,6 +21901,19 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('hc_settings')) || {}); } catch (e) { S = Object.assign({}, DEFAULTS); }
   if (S.ver !== DEFAULTS.ver) { S.tcMode = DEFAULTS.tcMode; S.ver = DEFAULTS.ver; }
   const saveS = () => { try { localStorage.setItem('hc_settings', JSON.stringify(S)); } catch (e) { /* storage unavailable */ } };
+  // (the game modes' generated race tracks - Offroad Racing's courses and Unicycle Racing's BMX tracks: where their
+  // settings are kept, their course codes)
+  const GMODES = {
+    offroad: { key: 'offCfg', draft: 'offDraft', set: W.setOffroad, cfg: () => W.offroad, code: W.offCode, parse: W.offParse, norm: W.offNormalize, name: 'Offroad Race', what: 'offroad course' },
+    uni: { key: 'uniCfg', draft: 'uniDraft', set: W.setUni, cfg: () => W.uni, code: W.uniCode, parse: W.uniParse, norm: W.uniNormalize, name: 'Unicycle Racing', what: 'BMX track' },
+  };
+  // (Unicycle Racing: everyone on a unicycle - the version the race was set up with - your own vehicle kept for after;
+  // anywhere else, it comes back)
+  if (S.map === 'uni') {
+    // (a guest in a room has their own car kept already - netOwn - so it's only yours when you're not one)
+    if (S.car !== 'unicycle' && !S.netOwn && !S.carBeforeUni) S.carBeforeUni = { car: S.car, uniEng: S.uniEng, tcMode: S.tcMode };
+    S.car = 'unicycle'; S.uniEng = W.uniNormalize(S.uniCfg || null).ver;
+  } else if (S.carBeforeUni && !S.netOwn) { Object.assign(S, S.carBeforeUni); delete S.carBeforeUni; }
 
   // ------------------------------------------------------------------ renderer / scene
   const canvas = $('gl');
@@ -21601,8 +21929,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   }
   window.addEventListener('resize', resize); resize();
 
-  // (an offroad race: its course from the settings - the room's, online)
-  if (S.map === 'offroad') W.setOffroad(S.offCfg || null);
+  // (an offroad race, a unicycle race: its track from the settings - the room's, online)
+  if (GMODES[S.map]) GMODES[S.map].set(S[GMODES[S.map].key] || null);
   W.setMap(S.map);
   const world = WR.create(THREE, scene, W, { viewDist: S.viewDist, treeDensity: S.treeDensity, shadows: S.shadows });
   world.setTime(S.time, renderer);
@@ -22079,13 +22407,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const DRAGMAP = S.map === 'drag' || S.map === 'dirtdrag', DIRTSTRIP = S.map === 'dirtdrag', ARENAMAP = S.map === 'arena', MOWTRACK = S.map === 'mowtrack';
   const RAMPSMAP = S.map === 'ramps', FREESTYLE = ARENAMAP || RAMPSMAP;   // (All Ramps: tricks score there too)
   const DUNESMAP = S.map === 'dunes';
-  // (Offroad Racing: a generated course, raced in laps - against the clock, or the room)
-  const OFFMODE = S.map === 'offroad';
+  // (the game modes: a generated track - Offroad Racing's course, Unicycle Racing's BMX track - raced in laps, against the
+  // clock or the room)
+  const OFFMODE = !!GMODES[S.map], UNIMODE = S.map === 'uni', GM = GMODES[S.map] || null;
   // (the closed-loop tracks: the Rally Stage, the Windy Rally Stage and the Windy Mower Track)
   const TRKMAP = !!W.track, MOWCOURSE = MOWTRACK || S.map === 'mowwind';
   // (online, the two rally stages and the two mower tracks are race courses - points, walls, the 30 s reset: the course's
   // centre line, points every ~2 m - the track's own, or the Mower Track's oval)
-  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad'], COURSE = COURSE_MAPS.includes(S.map);
+  const COURSE_MAPS = ['rallywind', 'rally', 'mowwind', 'mowtrack', 'offroad', 'uni'], COURSE = COURSE_MAPS.includes(S.map);
   function ovalLine() {
     const M = W.MOWT, r = M.R, L = 4 * M.SL + 2 * Math.PI * r, n = Math.round(L / 2), x = new Float64Array(n), z = new Float64Array(n);
     for (let k = 0; k < n; k++) {
@@ -22114,8 +22443,13 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     o.x = T.x[i] + (T.x[j] - T.x[i]) * u; o.z = T.z[i] + (T.z[j] - T.z[i]) * u; o.tx = tx / tl; o.tz = tz / tl;
     return o;
   }
-  // a start-grid slot behind the line (k 0..7: two across, rows 10 m apart)
+  // a start-grid slot behind the line (k 0..7: two across, rows 10 m apart; on the BMX track's gate, eight across it)
   function gridSpot(k) {
+    if (UNIMODE) {
+      const p = coursePoint(-1.6 - 2.4 * Math.floor(k / 8), {}), lat = ((k % 8) - 3.5) * Math.min(0.85, (CRS_T.W - 1) / 8);
+      const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
+      return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
+    }
     const p = coursePoint(-10 - 10 * (k >> 1), {}), lat = (k & 1 ? 1 : -1) * Math.min(2, CRS_T.W / 2 - 1.3);
     const x = p.x - p.tz * lat, z = p.z + p.tx * lat;
     return { x, y: W.ground(x, z, {}).h, z, tx: p.tx, tz: p.tz };
@@ -22124,7 +22458,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const TRACK_HINT = { rally: 'Rally Stage: 4 km of fast gravel through the woods - long sweepers, crests you fly over flat out, chevron boards on the outside of the tighter corners. Laps are timed at the start / finish arch.',
     rallywind: 'Windy Rally Stage: 2.4 km of narrow, twisting gravel through dense forest - esses, kinks and four hairpins (SPACE is the handbrake). Laps are timed at the start / finish arch.',
     mowwind: 'Windy Mower Track: a twisting dirt road course cut into a mown field, straw bales both sides, turns every which way. Laps are timed at the start / finish arch.' };
-  if (OFFMODE) {
+  if (UNIMODE) {
+    const T = W.track, U = W.uni;
+    TRACK_HINT.uni = 'Unicycle Racing: a ' + Math.round(T.L) + ' m BMX track, ' + U.laps + (U.laps > 1 ? ' laps' : ' lap') + ' - down the start hill when the gate drops, over the rollers, doubles and tabletops, round the berms'
+      + (U.bank === 'flat' ? '' : ' (lean into them high up the bowl - the bank carries you round faster)') + '. The countdown starts by itself; Backspace puts you back on the track. Esc → Modes for a new track.';
+  } else if (OFFMODE) {
     const T = W.track, O = W.offroad, J = T.feats.filter((f) => f.kind === 'jump').length;
     TRACK_HINT.offroad = 'Offroad Race · ' + T.B.name + ': ' + (T.L / 1000).toFixed(1) + ' km, ' + O.laps + (O.laps > 1 ? ' laps' : ' lap') + ' - follow the marker stakes' + (O.biome === 'dunes' ? ' (the orange flags)' : '')
       + (J ? ', ' + J + ' jump' + (J > 1 ? 's' : '') + ' (a JUMP sign before each)' : '') + '. The countdown starts by itself; Backspace puts you back on the course. Esc → Modes for a new course.';
@@ -22421,7 +22759,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // ------------------------------------------------------------------ menu
   const TABS = ['Drive', 'Modes', 'Fun', 'Online', 'Controls', 'Graphics', 'Audio', 'Help'];
   const MAP_NAMES = { country: 'Countryside', tarmac: 'All Road', prepcountry: 'Prepped Countryside', preptarmac: 'Prepped All Road', straight: 'Straightaway', drag: 'Drag Strip',
-    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race' };
+    dirtdrag: 'Dirt Drag', arena: 'Monster Arena', ramps: 'All Ramps', mowtrack: 'Mower Track', mowwind: 'Windy Mower Track', rally: 'Rally Stage', rallywind: 'Windy Rally Stage', dunes: 'Sand Dunes', offroad: 'Offroad Race', uni: 'Unicycle Racing' };
   let curTab = 'Drive';
   function openMenu(v) {
     G.menu = v;
@@ -22484,6 +22822,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   const MORE_IDS = MORE_CARS.map((m) => m.id);
   function pickCar(id, opt) {
     if (carLocked()) { $('moreCars').classList.add('hidden'); return; }
+    if (S.map === 'uni' && id !== 'unicycle') { hud.toast('Unicycle Racing: everyone rides a unicycle - Esc → Modes to pick the version, or leave the race', 3.5); $('moreCars').classList.add('hidden'); return; }
     const m = MORE_CARS.find((x) => x.id === id);
     if (id === S.car && (!m || !opt || S[m.optKey] === opt)) { $('moreCars').classList.add('hidden'); return; }
     const o = m && opt && m.options ? m.options.find((x) => x[0] === opt) : null;
@@ -22506,7 +22845,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       const homeNew = homeOf(m, opt || (m && S[m.optKey])), homeOld = homeOf(from, from && S[from.optKey]);
       // (All Ramps is a monster truck's home too, the windy course a mower's, the windy stage a rally car's)
       const atHome = (h) => S.map === h || (h === 'arena' && S.map === 'ramps') || (h === 'mowtrack' && S.map === 'mowwind') || (h === 'rally' && S.map === 'rallywind');
-      if (inRoom() || S.map === 'offroad') { /* online: the host picks the map; racing offroad, you stay on the course */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
+      if (inRoom() || GMODES[S.map]) { /* online: the host picks the map; racing a game mode, you stay on its track */ } else if (homeNew && !atHome(homeNew)) { if (!homeOld || !atHome(homeOld)) S.mapPrev = S.map; S.map = homeNew; }
       else if (!homeNew && homeOld && atHome(homeOld) && S.mapPrev) S.map = S.mapPrev;
     }
     S.car = id;
@@ -23749,7 +24088,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     } else {
       if (m.map && m.map !== S.map) { S.map = m.map; why = 'the ' + (MAP_NAMES[m.map] || m.map); }
       // (an offroad race: the host's course, from its code)
-      if (m.map === 'offroad' && m.off && m.off !== (OFFMODE ? OFF_CODE : '')) { const c = W.offParse(m.off); if (c) { S.offCfg = c; if (!why) why = 'the host\'s offroad course'; } }
+      if (GMODES[m.map] && m.off && m.off !== (OFFMODE && W.map === m.map ? OFF_CODE : '')) { const c = GMODES[m.map].parse(m.off); if (c) { S[GMODES[m.map].key] = c; if (!why) why = 'the host\'s ' + GMODES[m.map].what; } }
       const cs = m.car;
       if (cs && cs.c && (VEH.CARS[cs.c] || MORE_IDS.includes(cs.c))) {
         ownCarKeep();
@@ -23829,7 +24168,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     ONLINE.busy = true; ONLINE.err = ''; renderOnlineIfOpen();
     try {
       const net = netCreate(), map = MAP_NAMES[ONLINE.hostMap] ? ONLINE.hostMap : S.map;
-      await net.hostRoom(map, netProfile(), map === 'offroad' ? W.offCode(offCfgNow()) : null);
+      await net.hostRoom(map, netProfile(), modeCode(map));
       ONLINE.lastProf = JSON.stringify(netProfile());
       S.netRoom = net.code; saveS();
       if (map !== S.map) {
@@ -24133,7 +24472,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (the walls: this far from the centre line - 10 m past the road's edge on the rally stages, well into the trees; 6 m
   // on the mower tracks, well behind the bales. Far enough out that going off costs you - the trees, the grass, a quarter
   // of the points - instead of being a guard rail to bounce along; still no way through to another bit of the course)
-  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : 6) : 0;
+  const RACE_WD = CRS_T ? CRS_T.W / 2 + (CRS_T.kind === 'rally' ? 10 : CRS_T.kind === 'offroad' ? 12 : CRS_T.kind === 'uni' ? 4 : 6) : 0;
   function raceTrack(x, z) {
     const T = CRS_T, n = T.n, X = T.x, Z = T.z;
     const d2 = (k) => (X[k] - x) * (X[k] - x) + (Z[k] - z) * (Z[k] - z);
@@ -24313,7 +24652,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (every frame of the hold: pinned where it stands - it can rev, in park / neutral, but not move; at GO, into drive)
   function raceHold() {
     if (raceHolding()) {
-      if (!RACE.hold) RACE.hold = { x: veh.px, z: veh.pz };
+      if (!RACE.hold) { RACE.hold = { x: veh.px, z: veh.pz }; if (UNIMODE) world.uniGate(false); }
       veh.px = RACE.hold.x; veh.pz = RACE.hold.z; veh.vx = 0; veh.vz = 0; veh.wy = 0;
       if (sp.jet) { if (veh.park || veh.gear < 1) veh.selectDrive(); }      // (a jet spools up in drive - its throttle does nothing in park)
       else if (veh.transType === 'auto') veh.park = true;
@@ -24321,7 +24660,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       RACE.prevS = null; RACE.i = -1;
       return true;
     }
-    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); }
+    if (RACE.hold) { RACE.hold = null; veh.selectDrive(); RACE.goT = 1.2; if (OFFMODE) offGo(); if (UNIMODE) world.uniGate(true); }
     else if (OFFMODE && RACE.go && ORACE.goAt !== RACE.go && !ORACE.fin) {
       // (an offroad race this car missed the start of - it joined late, or its tab was away: off the grid now, its clock
       // running since GO)
@@ -24357,7 +24696,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         big = inRoom() ? 'ON THE GRID' : '';
         sub = host ? 'Start the race when everyone\'s here (or Esc → Online) - you can rev meanwhile' : inRoom() ? 'Waiting for the host to start the race - you can rev meanwhile' : '';
         btn = host;
-      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
+      } else if (left > 3000) { big = 'GET READY'; sub = OFFMODE ? W.track.B.name + ' · ' + (UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km') + ' · ' + OFF_LAPS + (OFF_LAPS > 1 ? ' laps' : ' lap') : 'The race starts in a moment'; }
       else if (left > 0) big = String(Math.ceil(left / 1000));
       else if (RACE.goT > 0) big = 'GO!';
     }
@@ -24398,10 +24737,12 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // line - the one the walls follow - so going backwards (or round the walls) gains nothing: a lap counts once you've
   // covered the course's length again since the last. Alone it's you against the clock, a personal best per course and
   // car; in a room it's everyone in the host's car, placed by laps and ground covered, then by finishing time
-  const OFF_LAPS = OFFMODE ? W.offroad.laps : 0, OFF_CODE = OFFMODE ? W.offCode(W.offroad) : '';
+  const OFF_LAPS = OFFMODE ? GM.cfg().laps : 0, OFF_CODE = OFFMODE ? GM.code(GM.cfg()) : '';
   const ORACE = { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0, goAt: null };
   const offKey = () => OFF_CODE + '|' + TKEY;
-  const offCfgNow = () => (OFFMODE ? W.offroad : W.offNormalize(S.offCfg || null));
+  const offCfgNow = () => (S.map === 'offroad' ? W.offroad : W.offNormalize(S.offCfg || null));
+  // (a mode's track as it stands - the one loaded, or the settings it'll be generated from - and its code)
+  const modeCode = (map) => (GMODES[map] ? GMODES[map].code(map === S.map ? GMODES[map].cfg() : GMODES[map].norm(S[GMODES[map].key] || null)) : null);
   const offSeed = () => 1 + Math.floor(Math.random() * 2147483000);
   function offReset() {
     Object.assign(ORACE, { on: false, t0: 0, dist: 0, debt: 0, prevS: null, lap: 0, lapT0: 0, laps: [], fin: 0, finT: 0, wrongT: 0, place: 0 });
@@ -24453,10 +24794,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (racing alone, at the flag: the time, every lap, the personal best - and what next)
   function offResults(isPB, prev, best) {
     const d = prev ? ORACE.fin - prev.t : 0;
+    $('raceRes').querySelector('h2').innerHTML = UNIMODE ? 'UNICYCLE <span>RACE</span>' : 'OFFROAD <span>RACE</span>';
     $('rrBody').innerHTML = `<div class="rrTime">${lapFmt(ORACE.fin)}</div>
       <div class="rrSub ${isPB ? 'pb' : ''}">${isPB ? (prev ? 'New personal best · was ' + lapFmt(prev.t) : 'Your first time round this course') : 'Personal best ' + lapFmt(prev.t) + ' · ' + (d >= 0 ? '+' : '') + d.toFixed(2)}</div>
       <div class="rrLaps">${ORACE.laps.map((t, k) => `<div class="${t === best ? 'best' : ''}"><span>Lap ${k + 1}</span><span>${lapFmt(t)}</span></div>`).join('')}</div>
-      <div class="rrMeta">${esc(W.track.B.name)} · ${(W.track.L / 1000).toFixed(1)} km × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
+      <div class="rrMeta">${esc(W.track.B.name)} · ${UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km'} × ${OFF_LAPS} · ${esc(carLabel(S.car, optOf()))}<br>Course code <b>${OFF_CODE}</b> - share it to race the same course</div>
       <div class="rrBtns"><button class="btn small" data-a="again">Race again</button><button class="btn small" data-a="new">New course</button><button class="btn small ghost" data-a="set">Change settings</button><button class="btn small ghost" data-a="roam">Free roam</button></div>`;
     for (const b of $('rrBody').querySelectorAll('button')) b.addEventListener('click', () => offAction(b.dataset.a));
     $('raceRes').classList.remove('hidden');
@@ -24467,7 +24809,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     $('raceRes').classList.add('hidden');
     if (audio.ready) audio.master.gain.setTargetAtTime(1, audio.ctx.currentTime, 0.1);
     if (a === 'again') offRestart();
-    else if (a === 'new') offApply(Object.assign({}, W.offroad, { seed: offSeed() }));
+    else if (a === 'new') offApply(Object.assign({}, GM.cfg(), { seed: offSeed() }), S.map);
     else if (a === 'set') { curTab = 'Modes'; openMenu(true); }
     else if (a === 'roam') offLeave();
   }
@@ -24478,19 +24820,22 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     RACE.i = -1; RACE.prevS = null; RACE.hold = null; RACE.go = 0; RACE.resetT = -1e9;
     G.paused = G.menu || !G.started;
   }
-  // (a course to race: these settings - the room follows its host onto it)
-  function offApply(cfg) {
+  // (a track to race: these settings for that mode - the room follows its host onto it. A unicycle race puts everyone on
+  // a unicycle, the version it's set up with)
+  function offApply(cfg, mode) {
     if (mapLocked()) return;
-    cfg = W.offNormalize(cfg);
-    if (S.map !== 'offroad') S.mapPrev = S.map;
-    S.offCfg = cfg; S.offDraft = Object.assign({}, cfg); S.map = 'offroad'; S.reopenModes = false; saveS();
-    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap('offroad', W.offCode(cfg)); }
-    hud.toast('Generating the course - ' + W.offCode(cfg) + '…', 3);
+    mode = GMODES[mode] ? mode : 'offroad';
+    const M = GMODES[mode]; cfg = M.norm(cfg);
+    if (!GMODES[S.map]) S.mapPrev = S.map;
+    if (mode === 'uni') { if (S.map !== 'uni' && S.car !== 'unicycle' && !S.netOwn) S.carBeforeUni = { car: S.car, uniEng: S.uniEng, tcMode: S.tcMode }; S.car = 'unicycle'; S.uniEng = cfg.ver; }
+    S[M.key] = cfg; S[M.draft] = Object.assign({}, cfg); S.map = mode; S.reopenModes = false; saveS();
+    if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(mode, M.code(cfg)); }
+    hud.toast('Generating the ' + M.what + ' - ' + M.code(cfg) + '…', 3);
     setTimeout(() => location.reload(), 300);
   }
   function offLeave() {
     if (mapLocked()) return;
-    S.map = S.mapPrev && S.mapPrev !== 'offroad' ? S.mapPrev : 'country'; saveS();
+    S.map = S.mapPrev && !GMODES[S.mapPrev] ? S.mapPrev : 'country'; saveS();
     if (inRoom()) { ONLINE.reloading = true; ONLINE.net.setMap(S.map, null); }
     location.reload();
   }
@@ -24503,7 +24848,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     if (ORACE.on && !ORACE.fin && ORACE.wrongT > 1) { msg = 'Wrong way!'; cls = 'hay'; }
     else if (RACE.flashT > 0) { msg = RACE.flash; cls = 'hay'; }
     else if (multi) msg = lapFmt(t) + (last ? ' · last lap ' + lapFmt(last) : '');
-    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (L / 1000).toFixed(1) + ' km';
+    else msg = last ? 'Last ' + lapFmt(last) + ' · best ' + lapFmt(best) : pb ? 'Your best here ' + lapFmt(pb.t) : W.track.B.name + ' · ' + (UNIMODE ? Math.round(L) + ' m' : (L / 1000).toFixed(1) + ' km');
     st.textContent = msg; st.className = cls;
     $('nbList').innerHTML = multi
       ? list.map((e, k) => `<div class="${e.me ? 'me' : ''}"><span>${k + 1}. ${esc(e.n)}</span><span>${e.p < 0 ? lapFmt(-e.p / 100) : 'Lap ' + Math.min(OFF_LAPS, Math.floor(Math.max(0, e.p) / L) + 1)}</span></div>`).join('')
@@ -24514,7 +24859,10 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 
   // ---- Game modes: Offroad Racing's settings - the Modes tab, and the title's Game modes. Changes are a draft till you
   // generate a course from them
-  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null) };
+  const MODE_D = { d: W.offNormalize(S.offDraft || S.offCfg || null), mode: GMODES[S.map] ? S.map : S.modeTab === 'uni' ? 'uni' : 'offroad' };
+  const UNI_D = { d: W.uniNormalize(S.uniDraft || S.uniCfg || null) };
+  // (a course code typed in: either kind - it takes you to its mode)
+  const parseAnyCode = (t) => { const c = W.offParse(t); if (c) return [c, 'offroad']; const u = W.uniParse(t); return u ? [u, 'uni'] : null; };
   const BIOME_TXT = {
     dunes: 'Sand from horizon to horizon, the course flagged over the dunes - up the long faces and off the brinks. Paddles, big tyres and four-wheel drive',
     forest: 'A dirt trail through the woods over rolling hills, berms round the corners, mud holes in the dips',
@@ -24524,12 +24872,14 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   };
   const BIOME_CARS = { dunes: ['buggy', 'trophy', 'atv', 'monster'], forest: ['rally', 'trophy', 'atv', 'buggy'], desert: ['trophy', 'buggy', 'atv', 'ram'], mud: ['monster', 'tank', 'trophy', 'diesel'], mountain: ['rally', 'trophy', 'atv', 'ram'] };
   function renderModes(add) {
+    add(row('Game mode', '', seg([['offroad', 'Offroad Racing'], ['uni', 'Unicycle Racing']], MODE_D.mode, (v) => { MODE_D.mode = v; S.modeTab = v; renderModesOverlay(); })));
+    if (MODE_D.mode === 'uni') { renderUniModes(add); return; }
     const D = MODE_D.d, guest = inRoom() && !ONLINE.net.isHost;
     const set = (k) => (v) => { D[k] = v; S.offDraft = Object.assign({}, D); renderModesOverlay(); };
     const sg = (opts, k) => seg(opts, D[k], set(k));
     add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">OFFROAD RACING</b>', 'A new offroad course generated for every race, on the kind of land you pick, laid out the way you set it here. '
       + 'Race it in laps against the clock - or online, against the room: everyone in the host\'s car and tune.'
-      + (OFFMODE ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
+      + (S.map === 'offroad' ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS : ''), el('<span></span>')));
     if (guest) {
       add(row('Online', 'The host picks the course and the car - you\'re racing ' + (OFFMODE ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' in their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
       return;
@@ -24558,9 +24908,9 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
     add(el('<div class="sect">Race</div>'));
     const go = el('<button class="btn">Generate a new course &amp; race</button>');
-    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() })));
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() }), 'offroad'));
     add(row('New course', 'A fresh random course with these settings' + (inRoom() ? ' - everyone in the room comes with you' : ''), go));
-    if (OFFMODE) {
+    if (S.map === 'offroad') {
       const same = ['biome', 'len', 'twist', 'width', 'jumps', 'whoops'].every((k) => D[k] === W.offroad[k]);
       const again = el(`<button class="btn small">${same && D.laps === W.offroad.laps ? 'Restart this race' : 'Race this course with these laps'}</button>`);
       again.addEventListener('click', () => {
@@ -24575,11 +24925,61 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     }
     const code = el('<input type="text" maxlength="20" placeholder="FOR-M3MR11-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
     const load = el('<button class="btn small ghost">Race it</button>');
-    const doLoad = () => { const c = W.offParse(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C', 3); return; } offApply(c); };
+    const doLoad = () => { const c = parseAnyCode(code.value); if (!c) { hud.toast('That isn\'t a course code - they look like FOR-M3MR11-1A2B3C or UNI-PBM3M1B-1A2B3', 3); return; } offApply(c[0], c[1]); };
     load.addEventListener('click', doLoad);
     code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
     const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
     add(row('Course code', 'Every course has one (on the results and here): type a friend\'s in to race the very same course', cw));
+  }
+  // Unicycle Racing's settings: the unicycle everyone rides, the BMX track's size, length, laps, jumps, rhythm sections
+  // and berms
+  function renderUniModes(add) {
+    const D = UNI_D.d, guest = inRoom() && !ONLINE.net.isHost, here = UNIMODE;
+    const set = (k) => (v) => { D[k] = v; S.uniDraft = Object.assign({}, D); renderModesOverlay(); };
+    const sg = (opts, k) => seg(opts, D[k], set(k));
+    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">UNICYCLE RACING</b>', 'BMX on one wheel: a new BMX-style track generated for every race - the start hill and its gate, berms, rollers, rhythm sections, doubles, tabletops - and everyone on unicycles. '
+      + 'Race it in laps against the clock, or online against the room: the host picks the track and the unicycle.'
+      + (here ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + Math.round(W.track.L) + ' m × ' + OFF_LAPS : ''), el('<span></span>')));
+    if (guest) {
+      add(row('Online', 'The host picks the track and the unicycle - you\'re racing ' + (here ? '<b class="modecode">' + OFF_CODE + '</b>' : 'their map') + ' on their ' + esc(carLabel(S.car, optOf())), el('<span></span>')));
+      return;
+    }
+    add(el('<div class="sect">Unicycle</div>'));
+    add(row('Everyone rides', 'Pedal: legs only, ~14 mph · Improved: a geared hub and a sprinter, ~35 mph · Jet: a model turbojet behind the saddle, ~85 mph - give it the Supercross size',
+      seg([['pedal', 'Pedal'], ['improved', 'Improved pedal'], ['jet', 'Jet']], D.ver, (v) => { if (v === 'jet' && D.ver !== 'jet') D.size = 'super'; set('ver')(v); })));   // (the jet's too quick for a BMX-size track: onto Supercross - it can go back)
+    add(el('<div class="sect">Track</div>'));
+    add(row('Size', 'BMX: a tight track for pedal power · Supercross: everything ~1.8 × as big, for the faster unicycles', sg([['bmx', 'BMX'], ['super', 'Supercross']], 'size')));
+    add(row('Length', 'Short and medium: four straights and three berms · long: six and five', sg([['short', 'Short'], ['medium', 'Medium'], ['long', 'Long']], 'len')));
+    add(row('Laps', '', sg([[1, '1'], [2, '2'], [3, '3'], [5, '5']], 'laps')));
+    add(row('Jumps', 'How big the doubles, tabletops and step-ups are', sg([['small', 'Small'], ['medium', 'Medium'], ['big', 'Big']], 'jumps')));
+    add(row('Rhythm sections', 'Runs of little rollers one after another', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'rhythm')));
+    add(row('Berms', 'Flat turns, or banked bowls - ride up into them and they carry you round faster (Steep: more so)', sg([['flat', 'Flat'], ['banked', 'Banked'], ['steep', 'Steep']], 'bank')));
+    add(row('Air assist', 'Over the jumps: it keeps the unicycle level in the air for the landing - Off and you fly it yourself',
+      seg([[true, 'On'], [false, 'Off']], S.airAssist !== false, (v) => { S.airAssist = v; renderModesOverlay(); })));
+    add(el('<div class="sect">Race</div>'));
+    const go = el('<button class="btn">Generate a new track &amp; race</button>');
+    go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() }), 'uni'));
+    add(row('New track', 'A fresh random BMX track with these settings' + (inRoom() ? ' - everyone in the room comes with you, on that unicycle' : ''), go));
+    if (here) {
+      const U = W.uni, same = ['ver', 'size', 'len', 'jumps', 'rhythm', 'bank'].every((k) => D[k] === U[k]);
+      const again = el(`<button class="btn small">${same && D.laps === U.laps ? 'Restart this race' : 'Race this track with these laps'}</button>`);
+      again.addEventListener('click', () => {
+        if (D.laps !== U.laps) { offApply(Object.assign({}, U, { laps: D.laps }), 'uni'); return; }
+        offRestart(); $('modes').classList.add('hidden'); openMenu(false);
+      });
+      const leave = el('<button class="btn small ghost">Leave - free roam</button>');
+      leave.addEventListener('click', () => offLeave());
+      const w = el('<div style="display:flex;gap:8px"></div>'); w.appendChild(again); w.appendChild(leave);
+      const pb = S.offPB && S.offPB[offKey()];
+      add(row('This track', '<b class="modecode">' + OFF_CODE + '</b>' + (pb ? ' · your best ' + lapFmt(pb.t) + ' (lap ' + lapFmt(pb.lap) + ')' : '') + (same ? '' : ' · the settings above make a different track - generate one to race them'), w));
+    }
+    const code = el('<input type="text" maxlength="20" placeholder="UNI-PBM3M1B-XXXX" style="width:170px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:13px;border-radius:3px;text-transform:uppercase;letter-spacing:0.08em">');
+    const load = el('<button class="btn small ghost">Race it</button>');
+    const doLoad = () => { const c = parseAnyCode(code.value); if (!c) { hud.toast('That isn\'t a track code - they look like UNI-PBM3M1B-1A2B3', 3); return; } offApply(c[0], c[1]); };
+    load.addEventListener('click', doLoad);
+    code.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') doLoad(); });
+    const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
+    add(row('Track code', 'Every track has one (on the results and here): type a friend\'s in to race the very same track', cw));
   }
   function renderModesOverlay() {
     if ($('modes').classList.contains('hidden')) return;
@@ -24593,7 +24993,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   // (the title: what's loaded - and back to Game modes after a car was picked from it)
   if (OFFMODE) {
     const pb = S.offPB && S.offPB[offKey()];
-    $('modeTitle').textContent = 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
+    $('modeTitle').textContent = (UNIMODE ? 'Unicycle Racing · BMX track · ' + Math.round(W.track.L) + ' m' : 'Offroad Race · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km') + ' × ' + OFF_LAPS + ' · course ' + OFF_CODE + (pb ? ' · your best ' + lapFmt(pb.t) : '') + ' - Start engine to race';
   }
   if (S.reopenModes) { S.reopenModes = false; saveS(); if (!S.netRoom) setTimeout(openModes, 200); }
 
@@ -24612,8 +25012,8 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     add(row('Racing for points', 'On the race courses - the Windy Rally Stage, the Rally Stage, the Windy Mower Track and the Mower Track: points for ground covered along the course, on the road 1 a metre times a streak that builds the longer you stay on it (up to ×' + STREAK_MAX + '); '
       + 'off the road a quarter, and the streak\'s gone. Hitting a straw bale costs ' + HAY_PTS + '. Invisible walls well off the road stop shortcuts, '
       + 'and you can reset (Backspace) once every ' + RESET_WAIT + ' s. Everyone waits on the start grid till the host starts the race.', el('<span></span>')));
-    add(row('Offroad Racing', 'Host on the Offroad Race map and everyone races the course you set up in Game modes (Esc → Modes), in your car and tune: laps, places by ground covered, then by finishing time. '
-      + 'A reset back onto the course every 10 s.', el('<span></span>')));
+    add(row('Offroad Racing · Unicycle Racing', 'Host on the Offroad Race or Unicycle Racing map and everyone races the track you set up in Game modes (Esc → Modes) - offroad in your car and tune, BMX on the unicycle you picked: laps, places by ground covered, then by finishing time. '
+      + 'A reset back onto the track every 10 s.', el('<span></span>')));
     const inp = (ph, v, max, w) => el(`<input type="text" maxlength="${max}" placeholder="${ph}" value="${esc(v)}" style="width:${w}px;background:rgba(255,255,255,0.06);border:1px solid var(--line);color:var(--txt);padding:7px 10px;font-size:14px;border-radius:3px">`);
     const name = inp('Your name', S.netName, 16, 170);
     name.addEventListener('change', () => { const v = name.value.trim().slice(0, 16); if (v) { S.netName = v; saveS(); netProfileSync(); } });
@@ -24624,7 +25024,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
     else add(row('Car', 'Picked by the host, set up their way - everyone drives the same car. Leaving the room puts you back in your own', carNow));
     if (!on) {
       add(row('Map', 'For a room you host (the race courses score points; the Offroad Race is a race)', seg(maps, ONLINE.hostMap, (v) => { ONLINE.hostMap = v; })));
-      if (ONLINE.hostMap === 'offroad') { const b = el('<button class="btn small ghost">Set up the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', 'From your Game modes settings: <b class="modecode">' + W.offCode(offCfgNow()) + '</b>', b)); }
+      if (GMODES[ONLINE.hostMap]) { const b = el('<button class="btn small ghost">Set it up</button>'); b.addEventListener('click', () => { MODE_D.mode = ONLINE.hostMap; curTab = 'Modes'; renderMenu(); }); add(row(ONLINE.hostMap === 'uni' ? 'Track' : 'Course', 'From your Game modes settings: <b class="modecode">' + modeCode(ONLINE.hostMap) + '</b>', b)); }
       const hb = el('<button class="btn small">Host a game</button>');
       hb.addEventListener('click', () => onlineHost());
       add(row('Host', 'Opens a room on that map (loading it if you\'re not on it) and gives you its code to share', hb));
@@ -24639,7 +25039,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
         el(`<b style="font-size:28px;letter-spacing:0.2em;color:#fff">${esc(net.code)}</b>`)));
       if (net.isHost) {
         add(row('Map', 'Everyone follows you to it', seg(maps, S.map, (v) => { if (v !== S.map) { S.map = v; saveS(); location.reload(); } })));
-        if (OFFMODE) { const b = el('<button class="btn small ghost">Change the course</button>'); b.addEventListener('click', () => { curTab = 'Modes'; renderMenu(); }); add(row('Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (W.track.L / 1000).toFixed(1) + ' km × ' + OFF_LAPS, b)); }
+        if (OFFMODE) { const b = el('<button class="btn small ghost">Change it</button>'); b.addEventListener('click', () => { MODE_D.mode = S.map; curTab = 'Modes'; renderMenu(); }); add(row(UNIMODE ? 'Track' : 'Course', '<b class="modecode">' + OFF_CODE + '</b> · ' + W.track.B.name + ' · ' + (UNIMODE ? Math.round(W.track.L) + ' m' : (W.track.L / 1000).toFixed(1) + ' km') + ' × ' + OFF_LAPS, b)); }
         if (COURSE) {
           const rb = el('<button class="btn small">Start race</button>');
           rb.addEventListener('click', () => { net.startRace(); openMenu(false); });

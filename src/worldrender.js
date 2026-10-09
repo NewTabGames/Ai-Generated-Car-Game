@@ -61,7 +61,7 @@ float lampLight(float lat, float al){
     }
     const DUNEMAP = W.map === 'dunes';
     const terrUniforms = { uRNS: { value: rns }, uREW: { value: rew }, uWater: { value: TRK || DUNEMAP ? -1e4 : C.WATER_LEVEL },   // (no lakes by the tracks, none in the desert)
-      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
+      uMap: { value: DUNEMAP ? 8 : TRK ? (TRK.kind === 'uni' ? 10 : TRK.kind === 'offroad' ? 9 : TRK.kind === 'mow' ? 7 : 6) : W.map === 'drag' || W.map === 'dirtdrag' ? 2 : W.map === 'tarmac' ? 3 : W.map === 'arena' || W.map === 'ramps' ? 4 : W.map === 'mowtrack' ? 5 : 0 }, uLamp: { value: 0 }, uDirt: { value: W.map === 'dirtdrag' ? 1 : 0 }, uPrep: { value: W.prep ? 1 : 0 }, uRamps: { value: W.map === 'ramps' ? 1 : 0 },
       uTrk: { value: trkTex }, uTrkBox: { value: trkBox }, uTrkW: { value: TRK ? TRK.W / 2 : 0 },
       uBiome: { value: TRK && TRK.kind === 'offroad' ? ['dunes', 'forest', 'desert', 'mud', 'mountain'].indexOf(TRK.biome) : 0 } };
     const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
@@ -116,7 +116,21 @@ float lampLight(float lat, float al){
     float d = min(dNS, dEW), sdr = isNS ? sdNS : sdEW, dOther = isNS ? dEW : dNS;
     float along = isNS ? vWPos.z : vWPos.x;
     float aa = max(fwidth(d), 0.003);
-    if (uMap > 8.5) {
+    if (uMap > 9.5) {
+      // ---- the BMX track's venue: a mown field (light and dark stripes) round red clay mounds - the start hill's sides,
+      // the backs of the berms, the jumps' wings - the track itself its own mesh on top
+      vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
+      float td = tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0 ? texture2D(uTrk, tuv).r * 25.5 : 25.5;
+      float m1 = vnoise(P * 0.35), m2 = vnoise(P * 2.2), m3 = vnoise(P * 9.0);
+      float sf = fract(P.x / 8.0 + 0.25), stripe = smoothstep(0.47, 0.53, sf) * (1.0 - smoothstep(0.97, 1.0, sf)) + (1.0 - smoothstep(0.0, 0.03, sf));
+      vec3 g = mix(vec3(0.15, 0.26, 0.065), vec3(0.19, 0.31, 0.085), m1) * (0.9 + 0.1 * m2 + 0.08 * m3) * mix(0.92, 1.06, stripe);
+      g = mix(g, col, smoothstep(24.0, 25.4, td) * 0.35);
+      vec3 clay = mix(vec3(0.42, 0.15, 0.06), vec3(0.5, 0.21, 0.09), m1) * (0.88 + 0.1 * m2 + 0.06 * m3);
+      float mound = max(1.0 - smoothstep(uTrkW + 0.6, uTrkW + 1.6, td), smoothstep(0.06, 0.3, vWPos.y) * (1.0 - smoothstep(14.0, 18.0, td)));
+      float edge = (vnoise(P * 1.3) - 0.5) * 0.25;
+      col = mix(g, clay, clamp(mound + edge * mound, 0.0, 1.0));
+      rough = 0.97;
+    } else if (uMap > 8.5) {
       // ---- an offroad race: the terrain painted its own way, the course worn into it. td: metres from the centre line;
       // zone: the course's mud holes (forest, 1), sandy washes (desert, 2), firm dry stretches (the bog, 3)
       vec2 tuv = (P - uTrkBox.xy) * uTrkBox.zw;
@@ -1133,8 +1147,73 @@ void main(){
       return p;
     }
     const _tv = new THREE.Vector3();
+    // ---------------------------------------------------------------- the BMX track (Unicycle Racing): the track's own fine
+    // mesh - red clay, packed darker down the middle where everyone rides, tyre lines, white chalk down both edges - laid
+    // on worldgen's exact surface (what the tyre rolls on); the start gate on the hill (eight numbered lanes, a plate that
+    // drops at GO), START over it, flags round the hill's top
+    const gate = { mesh: null, a: 0, want: 0 };
+    function uniVenue(tg, dark) {
+      const T = W.track, hw = T.W / 2, ex = 1.4, half = hw + ex, nl = Math.max(12, Math.round(2 * half / 0.35)), ds = 0.5, ns = Math.ceil(T.L / ds);
+      const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');
+      g.fillStyle = '#a4502e'; g.fillRect(0, 0, 256, 512);
+      for (let i = 0; i < 2600; i++) { const v = Math.random(); g.fillStyle = v < 0.5 ? 'rgba(80,30,14,0.18)' : 'rgba(214,140,96,0.16)'; g.fillRect(Math.random() * 256, Math.random() * 512, 2 + Math.random() * 5, 2 + Math.random() * 5); }
+      const u0 = ex / (2 * half) * 256, u1 = 256 - u0;
+      // (packed darker down the middle; tyre lines wandering along it)
+      const grd = g.createLinearGradient(u0, 0, u1, 0); grd.addColorStop(0, 'rgba(60,20,8,0)'); grd.addColorStop(0.5, 'rgba(60,20,8,0.28)'); grd.addColorStop(1, 'rgba(60,20,8,0)');
+      g.fillStyle = grd; g.fillRect(u0, 0, u1 - u0, 512);
+      g.strokeStyle = 'rgba(55,18,8,0.35)'; g.lineWidth = 1.5;
+      for (let k = 0; k < 9; k++) { g.beginPath(); let x = u0 + 10 + Math.random() * (u1 - u0 - 20); g.moveTo(x, 0); for (let y = 0; y <= 512; y += 32) { x += (Math.random() - 0.5) * 3; g.lineTo(x, y); } g.stroke(); }
+      // (the mounds either side of the edges: drier, lighter clay)
+      g.fillStyle = 'rgba(200,120,80,0.22)'; g.fillRect(0, 0, u0, 512); g.fillRect(u1, 0, 256 - u1, 512);
+      // (white chalk down both edges, worn in places)
+      for (const u of [u0, u1]) for (let y = 0; y < 512; y += 4) { g.fillStyle = 'rgba(240,236,226,' + (0.55 + Math.random() * 0.4).toFixed(2) + ')'; g.fillRect(u - 1.6, y, 3.2, 4); }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+      const pos = new Float32Array((ns + 1) * (nl + 1) * 3), uv = new Float32Array((ns + 1) * (nl + 1) * 2), idx = [], p = {};
+      for (let i = 0; i <= ns; i++) {
+        W.trackPoint(Math.min(T.L, i * ds), p);
+        for (let j = 0; j <= nl; j++) {
+          const lat = -half + 2 * half * j / nl, x = p.x - p.tz * lat, z = p.z + p.tx * lat, k = i * (nl + 1) + j;
+          pos[k * 3] = x; pos[k * 3 + 1] = W.uniHeight(x, z) + 0.012; pos[k * 3 + 2] = z;
+          uv[k * 2] = j / nl; uv[k * 2 + 1] = i * ds / 8;
+        }
+      }
+      for (let i = 0; i < ns; i++) for (let j = 0; j < nl; j++) { const a = i * (nl + 1) + j, b = a + 1, cc = a + nl + 1, d = cc + 1; idx.push(a, cc, b, b, cc, d); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+      if (geo.attributes.normal.getY(Math.floor(nl / 2)) < 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; } geo.setIndex(idx); geo.computeVertexNormals(); }
+      const track = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 })); track.receiveShadow = true; tg.add(track);
+      // the start gate: two posts, the plate across the track hinged at its foot (eight lanes, numbered), START over it
+      W.trackPoint(0, p);
+      const gy = W.uniHeight(p.x, p.z), rot = Math.atan2(-p.tx, -p.tz), gg = new THREE.Group(); gg.position.set(p.x, gy, p.z); gg.rotation.y = rot; tg.add(gg);
+      const lc = document.createElement('canvas'); lc.width = 512; lc.height = 64; const lg = lc.getContext('2d');
+      const lcol = ['#d22', '#26c', '#eb2', '#2a2', '#e70', '#a3c', '#2bb', '#eee'];
+      for (let k = 0; k < 8; k++) { lg.fillStyle = lcol[k]; lg.fillRect(k * 64, 0, 64, 64); lg.fillStyle = k === 2 || k === 7 ? '#111' : '#fff'; lg.font = 'bold 44px Arial'; lg.textAlign = 'center'; lg.textBaseline = 'middle'; lg.fillText(String(k + 1), k * 64 + 32, 34); }
+      const lt = new THREE.CanvasTexture(lc); lt.colorSpace = THREE.SRGBColorSpace;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(T.W - 0.2, 0.6, 0.05).translate(0, 0.3, 0), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: lt, roughness: 0.6 }), new THREE.MeshStandardMaterial({ map: lt, roughness: 0.6 })]);
+      plate.rotation.order = 'YXZ'; plate.castShadow = true; gg.add(plate); gate.mesh = plate;
+      for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.6, 0.12), dark); post.position.set(sx * (hw + 0.35), 1.3, 0.2); post.castShadow = true; gg.add(post); }
+      const bc = document.createElement('canvas'); bc.width = 1024; bc.height = 96; const bg = bc.getContext('2d');
+      bg.fillStyle = '#c4161c'; bg.fillRect(0, 0, 1024, 96); bg.fillStyle = '#fff'; bg.font = 'italic 900 54px Impact, "Arial Black", Arial'; bg.textAlign = 'center'; bg.textBaseline = 'middle'; bg.fillText('START  ·  UNICYCLE RACING  ·  FINISH', 512, 50);
+      const bt = new THREE.CanvasTexture(bc); bt.colorSpace = THREE.SRGBColorSpace; const bm = new THREE.MeshStandardMaterial({ map: bt, roughness: 0.7 });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(T.W + 0.9, 0.7, 0.08), [dark, dark, dark, dark, bm, bm]); bar.position.set(0, 2.45, 0.2); bar.castShadow = true; gg.add(bar);
+      // (the start line, chalked across)
+      const sl = new THREE.Mesh(new THREE.PlaneGeometry(T.W, 0.14), new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+      sl.rotation.x = -Math.PI / 2; sl.position.set(0, 0.03, -0.12); gg.add(sl);
+      // (flags round the top of the hill)
+      const fm = [0xd22020, 0xf2c200, 0x2050c8, 0x20a040].map((cl) => new THREE.MeshStandardMaterial({ color: cl, roughness: 0.7, side: THREE.DoubleSide }));
+      for (let k = 0; k < 6; k++) {
+        W.trackPoint(-2 - k * 3.2, p);
+        for (const sx of [-1, 1]) {
+          const x = p.x - p.tz * sx * (hw + 1.0), z = p.z + p.tx * sx * (hw + 1.0), y = W.uniHeight(x, z);
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 4.2, 6), dark); pole.position.set(x, y + 2.1, z); tg.add(pole);
+          const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), fm[(k + (sx > 0 ? 1 : 0)) % 4]); fl.position.set(x + 0.46, y + 3.85, z); tg.add(fl);
+        }
+      }
+    }
+    // (the gate: 0 up, 1 down - it swings over in a third of a second)
+    function uniGate(open) { gate.want = open ? 1 : 0; if (!open) gate.a = 0; }
     function frame(dt, camera, focus) {
       skyUniforms.uTime.value += dt;
+      if (gate.mesh && gate.a !== gate.want) { gate.a = gate.want > gate.a ? Math.min(1, gate.a + dt * 3) : 0; gate.mesh.rotation.x = -gate.a * gate.a * 1.45; }
       sky.position.copy(camera.position);
       water.position.x = Math.round(camera.position.x / 50) * 50; water.position.z = Math.round(camera.position.z / 50) * 50;
       waterNormal.offset.x += dt * 0.01; waterNormal.offset.y += dt * 0.006;
@@ -1288,8 +1367,9 @@ void main(){
       }
       // the arch: two legs either side of the road and a banner across; a checkered line on the road beneath it
       const A = TP.arch, dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5, metalness: 0.5 });
-      const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz);
-      for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
+      const ay = gh(A.x, A.z), rotA = Math.atan2(-A.tx, -A.tz), UNIT = TRK.kind === 'uni';
+      if (UNIT) uniVenue(tg, dark);
+      if (!UNIT) for (const [lx, lz] of A.legs) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.4, 12), dark); leg.position.set(lx, gh(lx, lz) + 2.2, lz); leg.castShadow = true; tg.add(leg); }
       const name = W.map === 'rally' ? 'RALLY STAGE' : W.map === 'rallywind' ? 'WINDY RALLY STAGE' : W.map === 'offroad' ? 'OFFROAD RACE · ' + TRK.B.name.toUpperCase() : 'WINDY MOWER TRACK';
       const banC = document.createElement('canvas'); banC.width = 1024; banC.height = 96;
       { const g = banC.getContext('2d'); for (let k = 0; k < 64; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#111' : '#f4f4f0'; g.fillRect(k * 16, r * 16, 16, 16); g.fillRect(k * 16, 64 + r * 16, 16, 16); }
@@ -1298,7 +1378,7 @@ void main(){
       const banT = new THREE.CanvasTexture(banC); banT.colorSpace = THREE.SRGBColorSpace;
       const banM = new THREE.MeshStandardMaterial({ map: banT, roughness: 0.7 });
       const banner = new THREE.Mesh(new THREE.BoxGeometry(A.w + 0.4, 0.8, 0.06), [dark, dark, dark, dark, banM, banM]);
-      banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; tg.add(banner);
+      banner.position.set(A.x, ay + 4.5, A.z); banner.rotation.y = rotA; banner.castShadow = true; if (!UNIT) tg.add(banner);
       // (an offroad course: white marker stakes with an orange top down both edges; across the dunes, tall whip flags)
       if (TP.stakes && TP.stakes.length) {
         const dun = TRK.biome === 'dunes', m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
@@ -1317,7 +1397,7 @@ void main(){
       { const g = chkC.getContext('2d'); for (let k = 0; k < 32; k++) for (let r = 0; r < 2; r++) { g.fillStyle = (k + r) % 2 ? '#141414' : '#ecebe6'; g.fillRect(k * 8, r * 8, 8, 8); } }
       const chkT = new THREE.CanvasTexture(chkC); chkT.colorSpace = THREE.SRGBColorSpace;
       const line = new THREE.Mesh(new THREE.PlaneGeometry(TRK.W + 0.2, 0.5), new THREE.MeshStandardMaterial({ map: chkT, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-      line.rotation.set(-Math.PI / 2, 0, rotA, 'YXZ'); line.position.set(A.x, ay + 0.03, A.z); line.receiveShadow = true; tg.add(line);
+      line.rotation.set(-Math.PI / 2, 0, rotA, 'YXZ'); line.position.set(A.x, ay + 0.03, A.z); line.receiveShadow = true; if (!UNIT) tg.add(line);
       if (TP.stands) {
         // bleachers back from the outside of the start straight, climbing away from it, a crowd on every row
         const ST = TP.stands, concrete = new THREE.MeshStandardMaterial({ color: 0x8e8c87, roughness: 0.95 });
@@ -1594,7 +1674,7 @@ void main(){
       };
     }
 
-    return { group, terrainMat, update, drag, arena, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks };
+    return { group, terrainMat, update, drag, arena, processJobs, pending, readyAround, frame, setTime, setQuality, rebuildAll, sunDir, sun, hemi, sky, water, get preset() { return preset; }, chunks, uniGate };
   }
 
   root.HCWorldRender = { create };
