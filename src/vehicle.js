@@ -446,14 +446,17 @@
       muX: 1.0, muY: 0.92, loose: 1.3, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.16, relaxY: 0.32,
       B: 1.9, C: 1.35, E: -0.1, heatCap: 1600, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
-    buggyR: { name: '235/75R15 rear', short: 'Buggy tyres', width: 0.235, radius: 0.367,
+    // (in sand the fat rear sits up on it and holds sideways better than the narrow front bites - so the tail stays behind)
+    buggyR: { name: '235/75R15 rear', short: 'Buggy tyres', width: 0.235, radius: 0.367, sandKy: 1.2,
       muX: 1.05, muY: 0.98, loose: 1.4, kappaPeak: 0.12, alphaPeak: 0.13, relaxX: 0.18, relaxY: 0.36,
       B: 1.9, C: 1.35, E: -0.1, heatCap: 2400, cold: 0.96, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.1, 1.05, 1.05, 1.05, 1, 1.1] },
     // (its off-road package: sand paddles on the back, ribbed sand fronts - dune tyres)
     // (in sand they're at home: ~1.8 g of bite at ~30 % slip - so traction control lets them have that slip - and they
     // float, rolling easier than any tyre that digs in)
-    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.65, sandKy: 1.5, sandCrr: 0.6,
+    // (sideways the wide paddle carcass holds more than the rib fronts bite: the rear carries 62 % of the buggy, and if it
+    // lets go first the tail comes round - it used to, and only ESC kept it straight)
+    buggyPaddle: { name: '30x11-15 sand paddles', short: 'Sand paddles', width: 0.28, radius: 0.381, sandKx: 1.65, sandKy: 2.1, sandCrr: 0.6,
       muX: 0.75, muY: 0.6, loose: 3.2, looseY: 1.35, looseKx: [1, 1.0, 0.85, 1.15, 1.0, 1], kappaPeak: 0.3, alphaPeak: 0.15, relaxX: 0.3, relaxY: 0.45,
       B: 1.5, C: 1.4, E: -0.2, heatCap: 8000, cold: 1, coldT: 0, warmT: 1, hotT: 200, overheat: 0.001, prep: 1.0,
       crr: [1.5, 1.25, 1.2, 1.1, 1.0, 1.5], massAdd: 3, inertiaAdd: 0.15, finalK: 0.381 / 0.367, tcTargets: [0.26, 0.32, 0.4] },
@@ -480,7 +483,7 @@
       muX: 0.92, muY: 0.85, loose: 1.55, looseKx: [1, 1.08, 1.12, 1.15, 1.1, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.18, relaxY: 0.36,
       B: 1.8, C: 1.32, E: -0.1, heatCap: 2000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 3, inertiaAdd: 0.1 },
-    buggyKnobR: { name: '31x10.50R15 knobby rear', short: 'Knobbies', width: 0.267, radius: 0.39, sandKx: 1.1, sandKy: 1.05, sandCrr: 0.9,
+    buggyKnobR: { name: '31x10.50R15 knobby rear', short: 'Knobbies', width: 0.267, radius: 0.39, sandKx: 1.1, sandKy: 1.4, sandCrr: 0.9,
       muX: 0.95, muY: 0.88, loose: 1.65, looseKx: [1, 1.08, 1.15, 1.15, 1.15, 1], looseKy: [1, 1.05, 1.1, 1.1, 1.05, 1], kappaPeak: 0.14, alphaPeak: 0.15, relaxX: 0.2, relaxY: 0.4,
       B: 1.8, C: 1.32, E: -0.1, heatCap: 3000, cold: 0.97, coldT: 5, warmT: 30, hotT: 110, overheat: 0.003, prep: 1.0,
       crr: [1.3, 1.1, 1.1, 1.05, 1.0, 1.3], massAdd: 5, inertiaAdd: 0.2, finalK: 0.39 / 0.367, tcTargets: [0.15, 0.18, 0.22] },
@@ -570,6 +573,11 @@
     const bx = t.B * rho;
     return Math.sin(t.C * Math.atan(bx - t.E * (bx - Math.atan(bx))));
   }
+  // (where a tyre's curve peaks - worked out once per tyre)
+  function mfPeak(t) {
+    if (t._mfPk === undefined) { let b = 1, m = 0; for (let r = 0.2; r < 6; r += 0.01) { const v = MF(r, t); if (v > m) { m = v; b = r; } } t._mfPk = b; }
+    return t._mfPk;
+  }
   function brakeClamp(omega, T, I, h) {
     const d = T * h / I;
     if (omega > d) return omega - d;
@@ -639,6 +647,49 @@
       const th = Math.atan2(-tx, -tz);
       this.qx = 0; this.qy = Math.sin(th / 2); this.qz = 0; this.qw = Math.cos(th / 2);
       this.px = x; this.py = y + s.cgHeight - (s.cgDrop || 0) + 0.02; this.pz = z;
+      // on a slope it's put down tilted to the ground under its four wheels, at its ride height above it - put down level
+      // there, the uphill wheels started buried and the springs fired it up into the air. (Only when it's being put on
+      // the ground: let go from a height, it drops level as asked)
+      const G = this.world && this.world.ground, W4 = this.wheels;
+      if (G && W4.length === 4) {
+        const c = Math.cos(th), sn = Math.sin(th), g = {}, hs = W4.map((w) => G(x + w.mx * c + w.mz * sn, z - w.mx * sn + w.mz * c, g).h);
+        const gC = (hs[0] + hs[1] + hs[2] + hs[3]) / 4, wb = W4[2].mz - W4[0].mz, tr = (W4[1].mx - W4[0].mx + W4[3].mx - W4[2].mx) / 2;
+        // (the rise towards the front and towards the right, per metre)
+        const slF = (hs[0] + hs[1] - hs[2] - hs[3]) / 2 / wb, slR = (hs[1] + hs[3] - hs[0] - hs[2]) / 2 / tr;
+        // (the ground's plane under the CG - the wheels' middle isn't where the CG is on a long car)
+        const zc = (W4[0].mz + W4[1].mz + W4[2].mz + W4[3].mz) / 4, hCG = gC + slF * zc;
+        if (Math.abs(y - hCG) < 0.6 && (Math.abs(slF) > 1e-6 || Math.abs(slR) > 1e-6)) {
+          const Rv = [c, slR, -sn], F = [-sn, slF, -c];
+          let N = [Rv[1] * F[2] - Rv[2] * F[1], Rv[2] * F[0] - Rv[0] * F[2], Rv[0] * F[1] - Rv[1] * F[0]];
+          const nl = Math.hypot(N[0], N[1], N[2]); N = N.map((v) => v / nl);
+          const rn = Rv[0] * N[0] + Rv[1] * N[1] + Rv[2] * N[2];
+          let X = [Rv[0] - rn * N[0], Rv[1] - rn * N[1], Rv[2] - rn * N[2]];
+          const xl = Math.hypot(X[0], X[1], X[2]); X = X.map((v) => v / xl);
+          const Z = [X[1] * N[2] - X[2] * N[1], X[2] * N[0] - X[0] * N[2], X[0] * N[1] - X[1] * N[0]];
+          // (the body's axes - right, up, back - as the columns of its rotation, into the quaternion)
+          const m00 = X[0], m10 = X[1], m20 = X[2], m01 = N[0], m11 = N[1], m21 = N[2], m02 = Z[0], m12 = Z[1], m22 = Z[2], trc = m00 + m11 + m22;
+          if (trc > 0) { const S = Math.sqrt(trc + 1) * 2; this.qw = 0.25 * S; this.qx = (m21 - m12) / S; this.qy = (m02 - m20) / S; this.qz = (m10 - m01) / S; }
+          else if (m00 > m11 && m00 > m22) { const S = Math.sqrt(1 + m00 - m11 - m22) * 2; this.qw = (m21 - m12) / S; this.qx = 0.25 * S; this.qy = (m01 + m10) / S; this.qz = (m02 + m20) / S; }
+          else if (m11 > m22) { const S = Math.sqrt(1 + m11 - m00 - m22) * 2; this.qw = (m02 - m20) / S; this.qx = (m01 + m10) / S; this.qy = 0.25 * S; this.qz = (m12 + m21) / S; }
+          else { const S = Math.sqrt(1 + m22 - m00 - m11) * 2; this.qw = (m10 - m01) / S; this.qx = (m02 + m20) / S; this.qy = (m12 + m21) / S; this.qz = 0.25 * S; }
+          // (its CG that high above the ground's plane, along its normal - and lifted clear if the ground's not flat
+          // and a wheel would still be in it)
+          let lift = 0;
+          W4.forEach((w, i) => { lift = Math.max(lift, hs[i] - (hCG - slF * w.mz + slR * w.mx)); });
+          const hh = s.cgHeight - (s.cgDrop || 0) + 0.02;
+          this.px = x + N[0] * hh; this.py = hCG + lift + N[1] * hh; this.pz = z + N[2] * hh;
+          // (and clear of the ground with its body too - a long low nose facing up a steep slope, the end of a wheelie
+          // bar facing down one: it's let down onto them from just above)
+          const pts = this.bodyPoints().slice(), wbar = s.wheelieBar;
+          if (wbar) for (const w of [W4[2], W4[3]]) pts.push([Math.sign(w.mx) * wbar.halfW, w.my - w.s0 + wbar.clr - w.radius, w.mz + wbar.len]);
+          let bl = 0;
+          for (const p of pts) {
+            const wx = this.px + m00 * p[0] + m01 * p[1] + m02 * p[2], wy = this.py + m10 * p[0] + m11 * p[1] + m12 * p[2], wz = this.pz + m20 * p[0] + m21 * p[1] + m22 * p[2];
+            bl = Math.max(bl, G(wx, wz, g).h - wy + 0.02);
+          }
+          this.py += bl;
+        }
+      }
       this.vx = this.vy = this.vz = 0; this.wx = this.wy = this.wz = 0;
       for (const w of this.wheels) { w.omega = 0; w.kappa = 0; w.tanA = 0; w.abs = 1; w.s = w.s0; }
       this.steerAngle = 0; this.rearSteerAngle = 0; this.bodyContact = 0; this.flipping = false;
@@ -1299,7 +1350,16 @@
         let Fxt = 0, Fyt = 0;
         if (rho > 1e-7) {
           const f = mu * Fzn * MF(rho, ty) / rho;
-          Fxt = (loose ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * f * sx; Fyt = -(loose ? (ty.looseY || ty.loose || ty.muY) * (ty.looseKy ? ty.looseKy[w.surface] : 1) : ty.muY) * f * sy;
+          Fxt = (loose ? (ty.loose || ty.muY) * (ty.looseKx ? ty.looseKx[w.surface] : 1) : ty.muX) * f * sx;
+          const kY = loose ? (ty.looseY || ty.loose || ty.muY) * (ty.looseKy ? ty.looseKy[w.surface] : 1) : ty.muY;
+          if (w.surface === 6) {
+            // in sand a tyre spinning digs itself in and the sand banks up against its side: it keeps most of its sideways
+            // hold (only a quarter of the wheelspin counts against it, and past ~2.5 x its peak slip it's just digging deeper)
+            // - and sliding sideways it ploughs a furrow, the push back holding at its peak rather than falling away past it.
+            // (On firm ground the spinning tyre skates, as it should)
+            const sxy = 0.25 * clamp(sx, -2.5, 2.5), ry = Math.sqrt(sxy * sxy + sy * sy), pk = mfPeak(ty);
+            Fyt = ry > 1e-7 ? -kY * mu * Fzn * (ry >= pk ? 1 : MF(ry, ty)) / ry * sy : 0;
+          } else Fyt = -kY * f * sy;
         }
         w.fx = Fxt; w.fy = Fyt;
         const tfx = fx * Fxt + lx * Fyt, tfy = fy * Fxt + ly * Fyt, tfz = fz * Fxt + lz * Fyt;
@@ -2313,10 +2373,10 @@
     }
 
     // ------------------------------------------------------------------ body vs ground (penalty)
-    _bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, apply) {
-      const s = this.spec, g = this._g;
-      // (per car, and shifted up when a tune drops the CG inside the body)
-      const P = this._bodyPts || (this._bodyPts = (() => {
+    // the points of the body that bear on the ground (per car, and shifted up when a tune drops the CG inside the body)
+    bodyPoints() {
+      const s = this.spec;
+      return this._bodyPts || (this._bodyPts = (() => {
         const hw = s.bodyHalfW, f = s.bodyFront, r = s.bodyRear, d = s.cgDrop || 0, b = s.bodyBottom + d, t = s.bodyTop + d;
         // (bodyPts: a vehicle shaped nothing like a car lists its own - the monster truck's tyres, body shell and roof)
         if (s.bodyPts) return s.bodyPts.map((p) => [p[0], p[1] + d, p[2]]);
@@ -2324,6 +2384,9 @@
           [-0.72, t, -0.3], [0.72, t, -0.3], [-0.72, t, 0.9], [0.72, t, 0.9],
           [-hw, 0.35 + d, f + 0.2], [hw, 0.35 + d, f + 0.2], [-hw, 0.35 + d, r - 0.2], [hw, 0.35 + d, r - 0.2], [-hw, 0.2 + d, 0.3], [hw, 0.2 + d, 0.3]];
       })());
+    }
+    _bodyGround(m00, m01, m02, m10, m11, m12, m20, m21, m22, apply) {
+      const s = this.spec, g = this._g, P = this.bodyPoints();
       const bK = s.bodyK || 240000, bC = s.bodyC || 16000;
       let nC = 0;
       // (where the body is bearing on the ground and how hard - the arena's junk cars are crushed by it too)
@@ -4001,7 +4064,9 @@
   const bgPts = (cg, fw, wb) => ccPts(cg, fw, wb, [...ccBox(0.72, 0.28, 1.45, -1.85, 1.6), [-0.5, 1.62, -0.45], [0.5, 1.62, -0.45], [-0.55, 1.6, 0.35], [0.55, 1.6, 0.35], [0, 0.22, 0]]);
   CARS.buggy = { name: 'Dune Buggy', short: 'Dune Buggy', car: '1600 VW FLAT FOUR', hp: 60, tq: 82, cc: true, kbLat: 7, spec: {
     name: 'Dune Buggy',
-    mass: 560, Ipitch: 290, Iyaw: 330, Iroll: 120, cgHeight: 0.5, wheelbase: 2.3, frontWeight: 0.38,
+    // (yaw inertia: the engine hangs out behind the rear axle, ~1.9 m back from the CG, the beam front end and the wheels
+    // out at the corners - ~700 kg m^2; at 330 the tail whipped round at the least excuse)
+    mass: 560, Ipitch: 290, Iyaw: 700, Iroll: 120, cgHeight: 0.5, wheelbase: 2.3, frontWeight: 0.38,
     trackF: 1.42, trackR: 1.5, wheelRadius: 0.367, wheelRadiusF: 0.335, wheelRadiusR: 0.367, wheelInertiaF: 0.7, wheelInertiaR: 1.1,
     frontTire: 'buggyF', rearTire: 'buggyR', Fz0: 1500, loadSens: 0.1,
     springF: 5600, springR: 9800, dampBumpF: 650, dampRebF: 950, dampBumpR: 950, dampRebR: 1400, dampKnee: 0.4,
@@ -4023,14 +4088,14 @@
   } };
   ccEngines('buggy', {
     built: { label: 'Built 2276 VW', car: '2276 VW · DUAL WEBERS', hp: 150, tq: 150, spec: {
-      mass: 575, idleRpm: 950, limiterRpm: 6500, redlineRpm: 6300, shiftRpm: 6100, engineInertia: 0.085, fricA: 8, fricB: 5,
+      mass: 575, Iyaw: 710, idleRpm: 950, limiterRpm: 6500, redlineRpm: 6300, shiftRpm: 6100, engineInertia: 0.085, fricA: 8, fricB: 5,
       torqueCurve: [[0, 70], [1000, 95], [2000, 120], [3000, 138], [4200, 150], [5000, 145], [5800, 136], [6300, 118], [6800, 95]],
       autoFinal: 4.125, shiftTimeWOT: 0.3,
       dragClutch: { rpm0: 1300, rpm1: 2600, kc: 0, base: [[0, 280]], muSlip: 0.15, slipRef: 150, rev: 200 },
       lsdPreload: 60, brakeTorqueF: 800, brakeTorqueR: 600,
     } },
     ls: { label: 'LS3 V8 sand rail', car: '6.2 L LS3 V8', hp: 480, tq: 475, spec: {
-      mass: 790, Ipitch: 380, Iyaw: 430, Iroll: 150, cgHeight: 0.52, frontWeight: 0.36,
+      mass: 790, Ipitch: 380, Iyaw: 900, Iroll: 150, cgHeight: 0.52, frontWeight: 0.36,
       // (long-travel arms: ~19 in at the back)
       springF: 7200, springR: 14500, dampBumpF: 900, dampRebF: 1400, dampBumpR: 1500, dampRebR: 2200, travelUp: 0.26, travelDown: 0.22, suspS0: 0.34,
       idleRpm: 800, limiterRpm: 6600, redlineRpm: 6400, shiftRpm: 6300, engineInertia: 0.16, fricA: 20, fricB: 14, starterTorque: 180,

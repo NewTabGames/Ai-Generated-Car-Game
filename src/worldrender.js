@@ -1406,15 +1406,16 @@ void main(){
           for (let i = 0; i < 520; i++) { g.fillStyle = cols[i % cols.length]; g.fillRect(Math.random() * 256, 10 + Math.random() * 50, 3, 6); } }
         const crowdT = new THREE.CanvasTexture(crowdC); crowdT.colorSpace = THREE.SRGBColorSpace; crowdT.wrapS = THREE.RepeatWrapping; crowdT.repeat.set(5, 1);
         const crowdM = new THREE.MeshStandardMaterial({ map: crowdT, roughness: 0.95 });
-        const len = ST.z1 - ST.z0, n = 5, dx = ST.d / n;
+        // (side -1: the BMX track's stands on the left of its start straight - climbing away the other way)
+        const len = ST.z1 - ST.z0, n = 5, dx = ST.d / n, sd = ST.side || 1, ux = (u) => (sd > 0 ? ST.x + u : ST.x + ST.d - u);
         for (let k = 0; k < n; k++) {
           const h = 0.45 * (k + 1), step = new THREE.Mesh(new THREE.BoxGeometry(dx, h, len), concrete);
-          step.position.set(ST.x + dx * (k + 0.5), h / 2, (ST.z0 + ST.z1) / 2); step.castShadow = true; step.receiveShadow = true; tg.add(step);
+          step.position.set(ux(dx * (k + 0.5)), h / 2, (ST.z0 + ST.z1) / 2); step.castShadow = true; step.receiveShadow = true; tg.add(step);
           const people = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.55), crowdM);
-          people.rotation.y = -Math.PI / 2; people.position.set(ST.x + dx * (k + 0.5) - 0.05, h + 0.27, (ST.z0 + ST.z1) / 2); tg.add(people);
+          people.rotation.y = -sd * Math.PI / 2; people.position.set(ux(dx * (k + 0.5)) - 0.05 * sd, h + 0.27, (ST.z0 + ST.z1) / 2); tg.add(people);
         }
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ST.x - 0.2, 1.0, (ST.z0 + ST.z1) / 2); tg.add(rail);
-        for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ST.x - 0.2, 0.5, ST.z0 + k * len / 8); tg.add(post); }
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), dark); rail.position.set(ux(-0.2), 1.0, (ST.z0 + ST.z1) / 2); tg.add(rail);
+        for (let k = 0; k <= 8; k++) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), dark); post.position.set(ux(-0.2), 0.5, ST.z0 + k * len / 8); tg.add(post); }
       }
     }
 

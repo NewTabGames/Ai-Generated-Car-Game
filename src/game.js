@@ -3058,13 +3058,13 @@
     const cw = el('<div style="display:flex;gap:8px;align-items:center"></div>'); cw.appendChild(code); cw.appendChild(load);
     add(row('Course code', 'Every course has one (on the results and here): type a friend\'s in to race the very same course', cw));
   }
-  // Unicycle Racing's settings: the unicycle everyone rides, the BMX track's size, length, laps, jumps, rhythm sections
-  // and berms
+  // Unicycle Racing's settings: the unicycle everyone rides, the BMX track's size, length, laps, how it winds, jumps,
+  // rhythm sections and berms
   function renderUniModes(add) {
     const D = UNI_D.d, guest = inRoom() && !ONLINE.net.isHost, here = UNIMODE;
     const set = (k) => (v) => { D[k] = v; S.uniDraft = Object.assign({}, D); renderModesOverlay(); };
     const sg = (opts, k) => seg(opts, D[k], set(k));
-    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">UNICYCLE RACING</b>', 'BMX on one wheel: a new BMX-style track generated for every race - the start hill and its gate, berms, rollers, rhythm sections, doubles, tabletops - and everyone on unicycles. '
+    add(row('<b style="font-size:16px;letter-spacing:0.06em;font-style:italic">UNICYCLE RACING</b>', 'BMX on one wheel: a new BMX-style track generated for every race - its own winding layout every time, the start hill and its gate, berms, rollers, rhythm sections, doubles, tabletops - and everyone on unicycles. '
       + 'Race it in laps against the clock, or online against the room: the host picks the track and the unicycle.'
       + (here ? '<br>Racing now: <b class="modecode">' + OFF_CODE + '</b> · ' + Math.round(W.track.L) + ' m × ' + OFF_LAPS : ''), el('<span></span>')));
     if (guest) {
@@ -3076,8 +3076,9 @@
       seg([['pedal', 'Pedal'], ['improved', 'Improved pedal'], ['jet', 'Jet']], D.ver, (v) => { if (v === 'jet' && D.ver !== 'jet') D.size = 'super'; set('ver')(v); })));   // (the jet's too quick for a BMX-size track: onto Supercross - it can go back)
     add(el('<div class="sect">Track</div>'));
     add(row('Size', 'BMX: a tight track for pedal power · Supercross: everything ~1.8 × as big, for the faster unicycles', sg([['bmx', 'BMX'], ['super', 'Supercross']], 'size')));
-    add(row('Length', 'Short and medium: four straights and three berms · long: six and five', sg([['short', 'Short'], ['medium', 'Medium'], ['long', 'Long']], 'len')));
+    add(row('Length', 'A lap: short ~360 m · medium ~460 m · long ~650 m (Supercross ~1.8 × that)', sg([['short', 'Short'], ['medium', 'Medium'], ['long', 'Long']], 'len')));
     add(row('Laps', '', sg([[1, '1'], [2, '2'], [3, '3'], [5, '5']], 'laps')));
+    add(row('Turns', 'How it winds: Flowing - fewer, wider turns and longer straights (more jumps) · Windy - hairpins, S-bends and bends in the straights · Tight - one turn after another', sg([['flowing', 'Flowing'], ['windy', 'Windy'], ['tight', 'Tight']], 'turns')));
     add(row('Jumps', 'How big the doubles, tabletops and step-ups are', sg([['small', 'Small'], ['medium', 'Medium'], ['big', 'Big']], 'jumps')));
     add(row('Rhythm sections', 'Runs of little rollers one after another', sg([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']], 'rhythm')));
     add(row('Berms', 'Flat turns, or banked bowls - ride up into them and they carry you round faster (Steep: more so)', sg([['flat', 'Flat'], ['banked', 'Banked'], ['steep', 'Steep']], 'bank')));
@@ -3088,7 +3089,7 @@
     go.addEventListener('click', () => offApply(Object.assign({}, D, { seed: offSeed() }), 'uni'));
     add(row('New track', 'A fresh random BMX track with these settings' + (inRoom() ? ' - everyone in the room comes with you, on that unicycle' : ''), go));
     if (here) {
-      const U = W.uni, same = ['ver', 'size', 'len', 'jumps', 'rhythm', 'bank'].every((k) => D[k] === U[k]);
+      const U = W.uni, same = ['ver', 'size', 'len', 'turns', 'jumps', 'rhythm', 'bank'].every((k) => D[k] === U[k]);
       const again = el(`<button class="btn small">${same && D.laps === U.laps ? 'Restart this race' : 'Race this track with these laps'}</button>`);
       again.addEventListener('click', () => {
         if (D.laps !== U.laps) { offApply(Object.assign({}, U, { laps: D.laps }), 'uni'); return; }

@@ -323,7 +323,7 @@
     const arch = { x: p.x, z: p.z, tx: p.tx, tz: p.tz, legs: [[p.x - p.tz * aw, p.z + p.tx * aw], [p.x + p.tz * aw, p.z - p.tx * aw]], w: 2 * aw };
     // (the mower course's bleachers: back from the outside of the start straight)
     const stands = T.kind === 'mow' ? { x: 10, z0: -38, z1: 8, d: 9 }
-      : T.kind === 'uni' ? { x: hw + 3, z0: -Math.min(T.uE.Lr + 50, T.uTurns[0].s0 - 8), z1: -(T.uE.Lr + 4), d: 6 } : null;   // (the BMX track's: along its first straight - ending before the first berm, which comes sooner on a long track's shorter straights)
+      : T.kind === 'uni' ? (T.uStands ? { x: T.uStands.side > 0 ? hw + 3 : -(hw + 9), z0: T.uStands.z0, z1: T.uStands.z1, d: 6, side: T.uStands.side } : null) : null;   // (the BMX track's: along the start straight, on its clear side)
     // an offroad course: marker stakes down both edges every ~16 m (tall whip flags across the dunes, every ~20 m,
     // side to side), and a JUMP sign 45 m before each jump, on the right
     const stakes = [], signs = [];
@@ -680,8 +680,9 @@
     jumps: [['small', 'S'], ['medium', 'M'], ['big', 'B']],
     rhythm: [['none', '0'], ['some', '1'], ['lots', '2']],
     bank: [['flat', 'F'], ['banked', 'B'], ['steep', 'S']],
+    turns: [['flowing', 'F'], ['windy', 'W'], ['tight', 'T']],
   };
-  const UNI_DEFAULT = { ver: 'pedal', size: 'bmx', len: 'medium', laps: 3, jumps: 'medium', rhythm: 'some', bank: 'banked', seed: 31415 };
+  const UNI_DEFAULT = { ver: 'pedal', size: 'bmx', len: 'medium', laps: 3, jumps: 'medium', rhythm: 'some', bank: 'banked', turns: 'windy', seed: 31415 };
   function uniNormalize(c) {
     const o = Object.assign({}, UNI_DEFAULT);
     if (c) for (const k of Object.keys(UNI_OPTS)) if (UNI_OPTS[k].some((p) => p[0] === c[k])) o[k] = c[k];
@@ -691,95 +692,273 @@
   function uniCode(c) {
     c = uniNormalize(c);
     const L = (k) => UNI_OPTS[k].find((p) => p[0] === c[k])[1];
-    return 'UNI-' + L('ver') + L('size') + L('len') + L('laps') + L('jumps') + L('rhythm') + L('bank') + '-' + c.seed.toString(36).toUpperCase();
+    return 'UNI-' + L('ver') + L('size') + L('len') + L('laps') + L('jumps') + L('rhythm') + L('bank') + L('turns') + '-' + c.seed.toString(36).toUpperCase();
   }
   function uniParse(code) {
-    const m = /^UNI-([PIJ])([BS])([SML])([1235])([SMB])([012])([FBS])-([0-9A-Z]{1,7})$/.exec(String(code || '').trim().toUpperCase());
+    // (codes from before the Turns setting have no letter for it)
+    const m = /^UNI-([PIJ])([BS])([SML])([1235])([SMB])([012])([FBS])([FWT])?-([0-9A-Z]{1,7})$/.exec(String(code || '').trim().toUpperCase());
     if (!m) return null;
     const P = (k, v) => { const p = UNI_OPTS[k].find((q) => q[1] === v); return p ? p[0] : undefined; };
-    return uniNormalize({ ver: P('ver', m[1]), size: P('size', m[2]), len: P('len', m[3]), laps: P('laps', m[4]), jumps: P('jumps', m[5]), rhythm: P('rhythm', m[6]), bank: P('bank', m[7]), seed: parseInt(m[8], 36) });
+    return uniNormalize({ ver: P('ver', m[1]), size: P('size', m[2]), len: P('len', m[3]), laps: P('laps', m[4]), jumps: P('jumps', m[5]), rhythm: P('rhythm', m[6]), bank: P('bank', m[7]), turns: m[8] ? P('turns', m[8]) : 'windy', seed: parseInt(m[9], 36) });
   }
   let UNI = uniNormalize(null);
   function setUni(c) { UNI = uniNormalize(c); }
+  // how the layout winds (the Turns setting): the grid's cell (an arm's width - a hairpin's diameter), how much the shape
+  // grows out in arms (hairpins) rather than filling in, how far its corners are knocked off true, and how often the
+  // longer straights get a bend or an S put in them (and how big)
+  const UNI_TW = {
+    flowing: { cell: 1.3, snake: 1.2, jit: 0.1, wig: 0.3, amp: 0.13 },
+    windy: { cell: 1.12, snake: 3.5, jit: 0.15, wig: 0.5, amp: 0.17 },
+    tight: { cell: 1, snake: 8, jit: 0.16, wig: 0.7, amp: 0.2 },
+  };
+  const UNI_LEN = { short: 330, medium: 440, long: 620 };
+  // a BMX track's layout, laid out fresh from the seed: a random shape grown cell by cell on an uneven grid - out in arms
+  // more than filling in, never with a hole or two cells touching only at a corner - and the track run round its edge
+  // (so it can't cross itself, and the bits of it side by side are a cell apart). Its corners are knocked off true, the
+  // longer straights get bends and S's put in them, then every corner is rounded off into an arc - a hairpin where two
+  // come together - and the start straight (the shape's underside) kept long and dead straight for the start hill.
+  // Returns the centre line from the gate round to it (heading -z from (0, 0)), its arcs, or null if this try won't do
+  function uniLayout(rnd, cfg, K, Wd, Lneed, gateBack) {
+    const TW = UNI_TW[cfg.turns] || UNI_TW.windy, c0 = 17 * K * TW.cell, Ltar = UNI_LEN[cfg.len] * K, Rmin = 7 * K, sep = Wd + 7;
+    const GX = 8, GZ = 7, gx = [0], gz = [0];
+    for (let i = 0; i < GX; i++) gx.push(gx[i] + c0 * (0.95 + rnd() * 0.7));
+    for (let j = 0; j < GZ; j++) gz.push(gz[j] + c0 * (0.95 + rnd() * 0.7));
+    const C = new Uint8Array(GX * GZ), at = (i, j) => i >= 0 && j >= 0 && i < GX && j < GZ && C[j * GX + i] === 1;
+    // (the seed: four cells along the bottom - their underside is the start straight)
+    const a0 = Math.floor(rnd() * (GX - 3));
+    for (let i = a0; i < a0 + 4; i++) C[i] = 1;
+    const perim = () => {
+      let p = 0;
+      for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) if (at(i, j)) {
+        if (!at(i, j - 1)) p += gx[i + 1] - gx[i]; if (!at(i, j + 1)) p += gx[i + 1] - gx[i];
+        if (!at(i - 1, j)) p += gz[j + 1] - gz[j]; if (!at(i + 1, j)) p += gz[j + 1] - gz[j];
+      }
+      return p;
+    };
+    const pinch = (i, j) => {
+      for (let a = i - 1; a <= i; a++) for (let b = j - 1; b <= j; b++) {
+        const p = at(a, b), q = at(a + 1, b), r = at(a, b + 1), s = at(a + 1, b + 1);
+        if ((p && s && !q && !r) || (q && r && !p && !s)) return true;
+      }
+      return false;
+    };
+    // (a hole: an empty cell the outside can't reach)
+    const holes = () => {
+      const W2 = GX + 2, seen = new Uint8Array(W2 * (GZ + 2)), st = [0];
+      let n = 0, empty = 0;
+      seen[0] = 1;
+      while (st.length) {
+        const k = st.pop(), i = (k % W2) - 1, j = Math.floor(k / W2) - 1;
+        if (i >= 0 && j >= 0 && i < GX && j < GZ) n++;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ii = i + di, jj = j + dj, kk = (jj + 1) * W2 + ii + 1;
+          if (ii < -1 || jj < -1 || ii > GX || jj > GZ || at(ii, jj) || seen[kk]) continue;
+          seen[kk] = 1; st.push(kk);
+        }
+      }
+      for (let k = 0; k < GX * GZ; k++) if (!C[k]) empty++;
+      return n !== empty;
+    };
+    while (perim() < Ltar / 0.9) {
+      const cand = [], wt = [];
+      let tot = 0;
+      for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) {
+        if (at(i, j)) continue;
+        const nb = at(i - 1, j) + at(i + 1, j) + at(i, j - 1) + at(i, j + 1);
+        if (!nb) continue;
+        C[j * GX + i] = 1;
+        const bad = pinch(i, j) || holes();
+        C[j * GX + i] = 0;
+        if (bad) continue;
+        const w = nb === 1 ? TW.snake : nb === 2 ? 1 : 0.2;
+        cand.push(j * GX + i); wt.push(w); tot += w;
+      }
+      if (!cand.length) return null;
+      let r = rnd() * tot, k = 0;
+      while ((r -= wt[k]) > 0 && k < cand.length - 1) k++;
+      C[cand[k]] = 1;
+    }
+    // its edge, the shape on the left: every grid corner along it, then just the corners where it turns
+    const nxt = new Map(), key = (i, j) => i * 64 + j;
+    for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) {
+      if (!at(i, j)) continue;
+      if (!at(i, j - 1)) nxt.set(key(i, j), key(i + 1, j));
+      if (!at(i + 1, j)) nxt.set(key(i + 1, j), key(i + 1, j + 1));
+      if (!at(i, j + 1)) nxt.set(key(i + 1, j + 1), key(i, j + 1));
+      if (!at(i - 1, j)) nxt.set(key(i, j + 1), key(i, j));
+    }
+    const loop = [];
+    for (let v = key(a0, 0), g = 0; g < 4000; g++) { loop.push(v); v = nxt.get(v); if (v === key(a0, 0)) break; }
+    let V = [];
+    for (let k = 0; k < loop.length; k++) {
+      const p = loop[(k - 1 + loop.length) % loop.length], c = loop[k], n = loop[(k + 1) % loop.length];
+      const ci = Math.floor(c / 64), cj = c % 64, d1i = ci - Math.floor(p / 64), d1j = cj - (p % 64), d2i = Math.floor(n / 64) - ci, d2j = (n % 64) - cj;
+      if (d1i !== d2i || d1j !== d2j) V.push({ x: gx[ci], z: gz[cj], b: cj === 0 });
+    }
+    // (the start straight: the longest run along the bottom)
+    let k0 = -1, lb = 0;
+    for (let k = 0; k < V.length; k++) { const a = V[k], b = V[(k + 1) % V.length]; if (a.b && b.b && b.x - a.x > lb) { lb = b.x - a.x; k0 = k; } }
+    if (k0 < 0) return null;
+    V = V.slice(k0).concat(V.slice(0, k0));
+    // (the corners knocked off true - the start straight's two ends only along it)
+    for (let k = 0; k < V.length; k++) {
+      V[k].x += (rnd() - 0.5) * 2 * TW.jit * c0;
+      if (k > 1) V[k].z += (rnd() - 0.5) * 2 * TW.jit * c0;
+    }
+    // (either way round)
+    if (rnd() < 0.5) V = [V[1], V[0]].concat(V.slice(2).reverse());
+    // the bends and S's in the longer straights - each kept clear of the rest of the track
+    const segD = (px, pz, a, b) => {
+      const dx = b.x - a.x, dz = b.z - a.z, t = Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / (dx * dx + dz * dz || 1)));
+      return Math.hypot(px - a.x - dx * t, pz - a.z - dz * t);
+    };
+    const clear = (px, pz, ka, kb) => {
+      for (let k = 0; k < V.length; k++) { if (k === ka || k === kb || (k + 1) % V.length === ka) continue; if (segD(px, pz, V[k], V[(k + 1) % V.length]) < sep + 3) return false; }
+      return true;
+    };
+    for (let k = V.length - 1; k >= 1; k--) {
+      const a = V[k], b = V[(k + 1) % V.length], l = Math.hypot(b.x - a.x, b.z - a.z);
+      if (l < 2.4 * c0 || rnd() > TW.wig) continue;
+      const nq = l > 3.4 * c0 && rnd() < 0.5 ? 2 : 1, ux = (b.x - a.x) / l, uz = (b.z - a.z) / l, side = rnd() < 0.5 ? 1 : -1, add = [];
+      for (let q = 1; q <= nq; q++) {
+        const f = q / (nq + 1) + (rnd() - 0.5) * 0.14, off = (q % 2 ? side : -side) * TW.amp * l * (0.6 + 0.4 * rnd());
+        let px = a.x + ux * l * f - uz * off, pz = a.z + uz * l * f + ux * off;
+        if (!clear(px, pz, k, (k + 1) % V.length)) { px = a.x + ux * l * f + uz * off; pz = a.z + uz * l * f - ux * off; if (!clear(px, pz, k, (k + 1) % V.length)) { add.length = 0; break; } }
+        add.push({ x: px, z: pz });
+      }
+      if (add.length) V.splice(k + 1, 0, ...add);
+    }
+    // every corner rounded off: an arc tangent to both its sides - tighter turns ~9-13 m (x the size), the gentle bends
+    // far wider - shrunk to fit where corners come close (a hairpin: the two arcs meet), the start straight left long
+    const m = V.length, dir = [], len = [], th = [], sg = [], r = [];
+    for (let k = 0; k < m; k++) { const a = V[k], b = V[(k + 1) % m], l = Math.hypot(b.x - a.x, b.z - a.z) || 1e-6; len.push(l); dir.push([(b.x - a.x) / l, (b.z - a.z) / l]); }
+    for (let k = 0; k < m; k++) {
+      const d1 = dir[(k - 1 + m) % m], d2 = dir[k], cr = d1[0] * d2[1] - d1[1] * d2[0], t = Math.atan2(Math.abs(cr), d1[0] * d2[0] + d1[1] * d2[1]);
+      if (t > 2.6) return null;
+      const rb = 9 * K * (1 + 0.45 * rnd());
+      th.push(t); sg.push(cr >= 0 ? 1 : -1); r.push(t < 1.05 ? rb * (1.3 + 2.2 * (1.05 - t) / 1.05) : rb);
+    }
+    const tn = (k) => r[k] * Math.tan(th[k] / 2);
+    for (let it = 0; it < 8; it++) for (let k = 0; k < m; k++) {
+      // (and a few metres straight between turns that go opposite ways, for a berm's bank to swap sides)
+      const b = (k + 1) % m, avail = len[k] - (k === 0 ? Lneed : 0) - (sg[k] !== sg[b] && th[k] > 0.6 && th[b] > 0.6 ? 4 * K : 0), need = tn(k) + tn(b);
+      if (avail <= 0) return null;
+      if (need > avail) { const f = avail / need; r[k] *= f; r[b] *= f; }
+    }
+    for (let k = 0; k < m; k++) if (r[k] < Rmin && th[k] > 0.05) return null;
+    // the centre line, a point every metre: from the gate down the start straight, round every corner, back to the gate
+    const P = [], arcs = [];
+    let sAcc = 0;
+    const push = (x, z) => { if (P.length) { const q = P[P.length - 1]; sAcc += Math.hypot(x - q[0], z - q[1]); } P.push([x, z]); };
+    const line = (ax, az, bx, bz) => { const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az))); for (let q = 0; q < n; q++) push(ax + (bx - ax) * q / n, az + (bz - az) * q / n); };
+    const d0 = dir[0], A = [V[0].x + d0[0] * tn(0), V[0].z + d0[1] * tn(0)], Ls = len[0] - tn(0) - tn(1);
+    const gs = gateBack + 0.3 * (Ls - Lneed), G = [A[0] + d0[0] * gs, A[1] + d0[1] * gs];
+    let cur = G;
+    for (let q = 1; q <= m; q++) {
+      const k = q % m, d1 = dir[(k - 1 + m) % m], d2 = dir[k], t = tn(k), P1 = [V[k].x - d1[0] * t, V[k].z - d1[1] * t];
+      line(cur[0], cur[1], P1[0], P1[1]);
+      if (th[k] > 0.01) {
+        const s = sg[k], cx = P1[0] - d1[1] * r[k] * s, cz = P1[1] + d1[0] * r[k] * s, a0 = Math.atan2(P1[1] - cz, P1[0] - cx), sw = s * th[k], n = Math.max(2, Math.ceil(th[k] * r[k]));
+        const s0 = sAcc + Math.hypot(P1[0] - P[P.length - 1][0], P1[1] - P[P.length - 1][1]);
+        for (let i = 0; i < n; i++) { const a = a0 + sw * i / n; push(cx + r[k] * Math.cos(a), cz + r[k] * Math.sin(a)); }
+        arcs.push({ s0, s1: sAcc + r[k] * th[k] / n, th: th[k], r: r[k] });
+      }
+      cur = [V[k].x + d2[0] * t, V[k].z + d2[1] * t];
+    }
+    line(cur[0], cur[1], G[0], G[1]);
+    sAcc += Math.hypot(G[0] - P[P.length - 1][0], G[1] - P[P.length - 1][1]);
+    // (the bits side by side far enough apart)
+    if (loopTooClose(resampleLoop(P, 2), sep, 40 * K)) return null;
+    // (into the world: the gate at (0, 0), the start straight heading -z)
+    const ph = -Math.PI / 2 - Math.atan2(d0[1], d0[0]), co = Math.cos(ph), si = Math.sin(ph);
+    const pts = P.map(([x, z]) => [(x - G[0]) * co - (z - G[1]) * si, (x - G[0]) * si + (z - G[1]) * co]);
+    pts[0] = [0, 0];
+    return { pts, arcs, sAcc, first: arcs.length ? arcs[0].s0 : sAcc / 4, Ltar };
+  }
   function uniGenerate(cfg) {
     const rnd = mulberry32((cfg.seed ^ 0x1b873593) + 104729);
     const K = cfg.size === 'super' ? 1.8 : 1, J = { small: 0.7, medium: 1, big: 1.35 }[cfg.jumps] * (cfg.size === 'super' ? 1.4 : 1);
     const Wd = cfg.size === 'super' ? 9 : 7, hw = Wd / 2;
-    const N = cfg.len === 'long' ? 6 : 4, Lx = (cfg.len === 'short' ? 34 + rnd() * 10 : 50 + rnd() * 16) * K;
-    const Rb = (9 + rnd() * 1.5) * K, D = 2 * Rb, r2 = Rb + hw + 12 * K, Lg = 4;
-    // the centre line, a point every metre, from the start gate (Lg along the first straight) round to it again; the
-    // straights run along +x, side by side up +z
-    const P = [], marks = [];
-    let sAcc = 0;
-    const push = (x, z) => { if (P.length) { const a = P[P.length - 1]; sAcc += Math.hypot(x - a[0], z - a[1]); } P.push([x, z]); };
-    const line = (ax, az, bx, bz) => { const m = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az))); for (let k = 0; k < m; k++) push(ax + (bx - ax) * k / m, az + (bz - az) * k / m); };
-    const arc = (cx, cz, r, a0, a1) => { const m = Math.max(2, Math.ceil(Math.abs(a1 - a0) * r)); for (let k = 0; k < m; k++) { const a = a0 + (a1 - a0) * k / m; push(cx + r * Math.cos(a), cz + r * Math.sin(a)); } };
-    const turns = [], straights = [];
-    for (let i = 0; i < N; i++) {
-      const z0 = i * D, dir = i % 2 === 0 ? 1 : -1, s0 = sAcc;
-      if (dir > 0) line(i === 0 ? Lg : 0, z0, Lx, z0); else line(Lx, z0, 0, z0);
-      straights.push([s0, sAcc]);
-      if (i < N - 1) {
-        const t0 = sAcc;
-        if (dir > 0) arc(Lx, z0 + Rb, Rb, -Math.PI / 2, Math.PI / 2); else arc(0, z0 + Rb, Rb, -Math.PI / 2, -1.5 * Math.PI);
-        turns.push({ s0: t0, s1: sAcc, kind: 'berm' });
-      }
-    }
-    // (the way back: round the outside of the left-hand berms, up to the start hill, into the first straight)
-    const zN = (N - 1) * D, sBack = sAcc;
-    let t0 = sAcc; arc(0, zN - r2, r2, Math.PI / 2, Math.PI); turns.push({ s0: t0, s1: sAcc, kind: 'sweep' });
-    line(-r2, zN - r2, -r2, r2);
-    t0 = sAcc; arc(0, r2, r2, Math.PI, 1.5 * Math.PI); turns.push({ s0: t0, s1: sAcc, kind: 'sweep' });
-    line(0, 0, Lg, 0);
-    void marks;
-    // (into the world: the gate at (0, 0), the first straight heading -z)
-    const c = 0, sn = -1, pts = P.map(([x, z]) => [(x - Lg) * c - z * sn, (x - Lg) * sn + z * c]);
-    pts[0] = [0, 0];
-    const T = buildTrack({ W: Wd, kind: 'uni', steep: 0, pts, step: 1 });
-    T.biome = 'uni'; T.cfg = cfg; T.code = uniCode(cfg); T.B = { name: 'BMX Track', verge: 8 };
-    // (the same course measured two ways - my running total and the fitted line's - scaled into the line's)
-    const kS = T.L / sAcc;
-    // the ground along it: the start hill - the gate on a level top, its steep face down into the first straight - then
-    // the field, and the long gentle climb back up to the gate round the last two turns
-    const Hs = 3.6 * K, Lr = 16 * K, sClimb = sBack * kS, sTop = T.L - 12 * K;
-    T.uE = { Hs, Lr, sClimb, sTop, L: T.L };
-    // the berms: bowls - level on the inside, curving up ever steeper to the outside edge, ~2 m up (banked) or ~2.8 m
-    // (steep); the two sweeping turns home are left level, and so's the start hill's top
+    // the start hill: the gate on a level top (12 m back to the last turn's bank), its face down into the start straight
+    const Hs = 3.6 * K, Lr = 16 * K, top = 12 * K, ramp = 7 * K, gateBack = top + ramp + 2, Lneed = gateBack + Lr + ramp + 5 * K;
     const Hb = { flat: 0, banked: 2.0, steep: 2.8 }[cfg.bank] * (K > 1 ? 1.4 : 1);
-    T.uTurns = turns.filter((t) => t.kind === 'berm').map((t) => {
-      const s0 = t.s0 * kS, s1 = t.s1 * kS, iMid = Math.round((s0 + s1) / 2 / T.L * T.n) % T.n;
-      return { s0, s1, H: Hb, sg: Math.sign(T.R[iMid]) || 1, ramp: 7 * K };
-    });
-    // the features down the straights: rollers, rhythm sections, doubles, tabletops, step-ups - one after another with
-    // room between them, clear of the turns and the start hill's face
-    const feats = [], kinds = [['roller', 1], ['double', 1], ['table', 1.2], ['step', 0.8]];
-    if (cfg.rhythm !== 'none') kinds.push(['rhythm', cfg.rhythm === 'lots' ? 3 : 1.2]);
-    const wsum = kinds.reduce((a, k) => a + k[1], 0);
-    straights.forEach(([a, b], i) => {
-      let pos = (i === 0 ? Lr + 10 * K : a * kS + 10 * K);
-      const end = b * kS - 10 * K;
-      for (;;) {
-        let r = rnd() * wsum, kind = kinds[0][0];
-        for (const [k, w] of kinds) { if ((r -= w) <= 0) { kind = k; break; } }
+    let best = null;
+    for (let attempt = 0; attempt < 120 && !(best && best.uIntr < 0.04); attempt++) {
+      const lay = uniLayout(rnd, cfg, K, Wd, Lneed, gateBack);
+      if (!lay) continue;
+      const T = buildTrack({ W: Wd, kind: 'uni', steep: 0, pts: lay.pts, step: 1 });
+      if (T.L < lay.Ltar * 0.78 || T.L > lay.Ltar * 1.3) continue;
+      T.biome = 'uni'; T.cfg = cfg; T.code = uniCode(cfg); T.B = { name: 'BMX Track', verge: 8 };
+      // (the same course measured two ways - my running total and the fitted line's - scaled into the line's)
+      const kS = T.L / lay.sAcc;
+      // the ground along it: the start hill - the gate on its level top, its steep face - then the field, and a gentle
+      // climb back up to the gate over the last ~60 m
+      const sTop = T.L - top, sClimb = sTop - 60 * K;
+      T.uE = { Hs, Lr, sClimb, sTop, L: T.L };
+      // the berms: the tighter turns (50 deg and more - a hairpin's two arcs one turn), bowls up to the outside, the
+      // bigger the turn the higher (to ~2 m banked, ~2.8 m steep, x 1.4 Supercross); the gentle bends level
+      const turns = [];
+      for (const a of lay.arcs) {
+        const s0 = a.s0 * kS, s1 = a.s1 * kS, iMid = Math.round((s0 + s1) / 2 / T.L * T.n) % T.n, dir = Math.sign(T.R[iMid]) || 1, last = turns[turns.length - 1];
+        if (last && last.sg === dir && s0 - last.s1 < 3 * K) { last.s1 = s1; last.th += a.th; } else turns.push({ s0, s1, th: a.th, sg: dir });
+      }
+      // (eased in and out over 5.5 m for a right angle, 7 m for a hairpin - and no quicker than 2.5 m for every metre high)
+      T.uTurns = turns.filter((t) => t.th > 0.87).map((t) => {
+        const H = Hb * Math.min(1, 0.4 + 0.6 * (t.th - 0.87) / 1.4);
+        return { s0: t.s0, s1: t.s1, H, sg: t.sg, ramp: Math.max((4 + 3 * Math.min(1, t.th / Math.PI)) * K, 2.5 * H), th: t.th };
+      });
+      // the features: rollers, rhythm sections, doubles, tabletops, step-ups - the jumps only where it runs straight, the
+      // rollers on the gentlest bends too (one that pops you up mid-turn throws you wide); none in a berm, on the start
+      // hill or up the climb back to it (a roller's face on top of the climb stalls a pedal unicycle)
+      const feats = [], kinds = [['roller', 1], ['double', 1], ['table', 1.2], ['step', 0.8]];
+      if (cfg.rhythm !== 'none') kinds.push(['rhythm', cfg.rhythm === 'lots' ? 3 : 1.2]);
+      const wsum = kinds.reduce((a, k) => a + k[1], 0), zones = T.uTurns.map((b) => [b.s0 - b.ramp, b.s1 + b.ramp]);
+      const minR = (a, b) => { let mr = 1e9; for (let s = a; s <= b; s += 1) mr = Math.min(mr, Math.abs(T.R[Math.min(T.n - 1, Math.max(0, Math.round(s / T.L * T.n)))])); return mr; };
+      const end = sClimb - 8 * K;
+      for (let pos = Lr + 8 * K; pos < end;) {
+        let rr = rnd() * wsum, kind = kinds[0][0];
+        for (const [k, w] of kinds) { if ((rr -= w) <= 0) { kind = k; break; } }
         const f = { kind, s: pos, h: 0, parts: [] };
-        if (kind === 'roller') { f.parts.push([0, 4.6 * K, 0.5 * J]); }
+        if (kind === 'roller') f.parts.push([0, 4.6 * K, 0.5 * J]);
         else if (kind === 'rhythm') { const n = 4 + Math.floor(rnd() * 3); for (let k = 0; k < n; k++) f.parts.push([k * 3.8 * K, 3.8 * K, 0.42 * J]); }
         else if (kind === 'double') { const h = 0.9 * J; f.parts.push([0, 5 * K, h], [8 * K, 5 * K, h]); }
-        else if (kind === 'table') { f.table = { up: 4.5 * K, top: (3 + rnd() * 2) * K, down: 5 * K, h: 1.0 * J }; }
-        else { f.table = { up: 4.5 * K, top: 5 * K, down: 7 * K, h: 1.1 * J, step: true }; }
+        else if (kind === 'table') f.table = { up: 4.5 * K, top: (3 + rnd() * 2) * K, down: 5 * K, h: 1.0 * J };
+        else f.table = { up: 4.5 * K, top: 5 * K, down: 7 * K, h: 1.1 * J, step: true };
         f.len = f.table ? f.table.up + f.table.top + f.table.down : Math.max(...f.parts.map((p) => p[0] + p[1]));
-        if (pos + f.len > end) break;
-        feats.push(f);
-        pos += f.len + (5 + rnd() * 4) * K;
+        const jump = kind === 'double' || kind === 'table' || kind === 'step';
+        if (pos + f.len <= end && !zones.some(([z0, z1]) => pos + f.len + 1 > z0 && pos - 1 < z1) && minR(pos - 2 * K, pos + f.len + 2 * K) >= (jump ? 45 : 35) * K) {
+          feats.push(f); pos += f.len + (4 + rnd() * 5) * K;
+        } else pos += 1.5;
       }
-    });
-    T.uFeats = feats;
-    T.feats = feats.map((f) => ({ s: f.s, kind: f.kind === 'rhythm' ? 'whoops' : 'jump' }));
-    // (a ground profile for the parts of the game that read one: the course's height down its middle)
-    T.hc = new Float32Array(T.n); for (let k = 0; k < T.n; k++) T.hc[k] = uniElev(T, T.s[k]) + uniFeat(T, T.s[k]);
-    T.hb = T.hc; T.zone = new Uint8Array(T.n); T.dig = 0;
-    T.off = ['uni', 0, 0, T.cx, T.cz, 1e4, 1, 0];
-    return T;
+      T.uFeats = feats;
+      T.feats = feats.map((f) => ({ s: f.s, kind: f.kind === 'rhythm' ? 'whoops' : 'jump' }));
+      // (a ground profile for the parts of the game that read one: the course's height down its middle)
+      T.hc = new Float32Array(T.n); for (let k = 0; k < T.n; k++) T.hc[k] = uniElev(T, T.s[k]) + uniFeat(T, T.s[k]);
+      T.hb = T.hc; T.zone = new Uint8Array(T.n); T.dig = 0;
+      T.off = ['uni', 0, 0, T.cx, T.cz, 1e4, 1, 0];
+      T.uR = 0; for (let k = 0; k < T.n; k++) T.uR = Math.max(T.uR, Math.hypot(T.x[k] - T.cx, T.z[k] - T.cz));
+      // the grandstands: along the start straight past the foot of the hill, on whichever side's clear of the track
+      const z0 = -Math.min(Lr + 50, lay.first * kS - 8), z1 = -(Lr + 4);
+      T.uStands = null;
+      if (z1 - z0 > 12) for (const side of [1, -1]) {
+        const bx0 = side > 0 ? hw + 3 : -(hw + 9), bx1 = bx0 + 6;
+        let ok = true;
+        for (let k = 0; k < T.n && ok; k += 2) { const cx = Math.max(bx0, Math.min(bx1, T.x[k])), cz = Math.max(z0, Math.min(z1, T.z[k])); if (Math.hypot(T.x[k] - cx, T.z[k] - cz) < hw + 2) ok = false; }
+        if (ok) { T.uStands = { side, z0, z1 }; break; }
+      }
+      // (the mounds of the bits of track side by side mustn't reach up onto each other: how far any does)
+      const TR0 = TRK;
+      TRK = T;
+      let intr = 0;
+      for (let i = 0; i < T.n; i += 2) for (const f of [-1, -0.5, 0, 0.5, 1]) {
+        const lat = f * hw, x = T.x[i] - T.tz[i] * lat, z = T.z[i] + T.tx[i] * lat;
+        intr = Math.max(intr, uniHeight(x, z) - uniPart(T, T.s[i], lat, Math.abs(lat), uniField(x, z)));
+      }
+      TRK = TR0;
+      T.uIntr = intr;
+      if (!best || intr < best.uIntr) best = T;
+    }
+    return best;
   }
   const uniSm = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
   // the base: the start hill's face down from the gate, the field, the climb back up, the level top
@@ -808,22 +987,24 @@
     return 0;
   }
   // the berm at s: how high its outside edge stands (t) and which way it faces (+1: a left-hander, its outside on the
-  // right), eased in and out
+  // right), eased in and out - the left-handers' and right-handers' netted off, so where an S's two berms overlap it
+  // runs through level from one bank to the other, never a step
   function uniBank(T, s, out) {
-    out.t = 0; out.sg = 1;
+    let p = 0, q = 0;
     for (const b of T.uTurns) {
       if (s < b.s0 - b.ramp || s > b.s1 + b.ramp) continue;
-      const w = s < b.s0 ? uniSm((s - b.s0 + b.ramp) / b.ramp) : s > b.s1 ? uniSm((b.s1 + b.ramp - s) / b.ramp) : 1;
-      if (w * b.H > out.t) { out.t = w * b.H; out.sg = b.sg; }
+      const h = b.H * (s < b.s0 ? uniSm((s - b.s0 + b.ramp) / b.ramp) : s > b.s1 ? uniSm((b.s1 + b.ramp - s) / b.ramp) : 1);
+      if (b.sg > 0) p = Math.max(p, h); else q = Math.max(q, h);
     }
+    out.t = Math.abs(p - q); out.sg = p >= q ? 1 : -1;
     return out;
   }
-  // the field: dead level round the track, low rolling country well back from it
+  // the field: dead level round the track (60 m past its furthest), low rolling country well back from it
   function uniField(x, z) {
-    const T = TRK, d = Math.hypot(x - T.cx, (z - T.cz) * 0.9);
-    return d < 160 ? 0 : smooth(160, 520, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 18 + nDet(x * 0.02, z * 0.02) * 1.2);
+    const T = TRK, d = Math.hypot(x - T.cx, (z - T.cz) * 0.9), r0 = (T.uR || 100) + 60;
+    return d < r0 ? 0 : smooth(r0, r0 + 360, d) * ((nHill(x * 0.0022, z * 0.0022) + 0.6) * 18 + nDet(x * 0.02, z * 0.02) * 1.2);
   }
-  const _uq = { i: -1, d: 1e4, s: 0 }, _ub = { t: 0, sg: 1 }, UQN = 24, _ucD = new Float64Array(UQN), _ucS = new Float64Array(UQN), _ucL = new Float64Array(UQN), _ucUsed = new Float64Array(8);
+  const _uq = { i: -1, d: 1e4, s: 0 }, _ub = { t: 0, sg: 1 }, UQN = 24, _ucD = new Float64Array(UQN), _ucK = new Float64Array(UQN), _ucS = new Float64Array(UQN), _ucL = new Float64Array(UQN), _ucUsed = new Float64Array(8);
   // one bit of the track's solid at a point (d m off its line, lat across it, + right): on the track the surface - level
   // across the straights, the berms' bowls up to the outside - and past its edges the mound it stands on sloping down to
   // the field, its foot wider the taller it stands
@@ -831,7 +1012,7 @@
     const hw = T.W / 2, base = uniElev(T, s) + uniFeat(T, s), bk = uniBank(T, s, _ub), lat = sd * bk.sg;
     const top = (l) => { const u = (Math.max(-hw, Math.min(hw, l)) + hw) / T.W; return base + bk.t * u * u; };
     if (d <= hw) return top(lat);
-    const e = top(lat), V = 1 + 1.2 * Math.max(0, e - field);
+    const e = top(lat), V = 1 + 1.3 * Math.max(0, e - field);
     return e + (field - e) * smooth(hw, hw + V, d);
   }
   /** The BMX track's surface height at (x, z). Where two bits of the track come close - a berm's back and the way home -
@@ -846,16 +1027,26 @@
     let nc = 0;
     for (let k = 0; k < list.length; k++) {
       const i = list[k], j = i + 1 === T.n ? 0 : i + 1, ax = T.x[i], az = T.z[i], dx = T.x[j] - ax, dz = T.z[j] - az;
-      let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz); t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
+      // (projected along the line's direction eased from one end of the segment to the other, not square to the segment:
+      // the nearest point then slides smoothly round a bend instead of jumping ~0.5 m at each corner of the line on the
+      // inside of it - which on the climb, a roller or a jump's face was a step of a few cm)
+      const Ax = x - ax, Az = z - az, t0x = T.tx[i], t0z = T.tz[i], ex = T.tx[j] - t0x, ez = T.tz[j] - t0z;
+      const a2 = -(dx * ex + dz * ez), a1 = Ax * ex + Az * ez - (dx * t0x + dz * t0z), a0 = Ax * t0x + Az * t0z, disc = a1 * a1 - 4 * a2 * a0;
+      let t;
+      if (disc >= 0 && a1 !== 0) { const qq = -0.5 * (a1 + (a1 < 0 ? -1 : 1) * Math.sqrt(disc)); t = a0 / qq; } else t = (Ax * dx + Az * dz) / (dx * dx + dz * dz);
+      // (a segment the point's off the end of ranks behind the one it's beside, or its end - as near, measured straight -
+      // would take turns with it and the point would hop along the line)
+      const over = t < 0 ? -t : t > 1 ? t - 1 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz), kd = d + over;
       if (d > reach) continue;
       // (kept in order of distance, the nearest UQN)
       let m;
       if (nc < UQN) m = nc++;
-      else { if (d >= _ucD[UQN - 1]) continue; m = UQN - 1; }
-      while (m > 0 && _ucD[m - 1] > d) { _ucD[m] = _ucD[m - 1]; _ucS[m] = _ucS[m - 1]; _ucL[m] = _ucL[m - 1]; m--; }
-      const tl = Math.hypot(dx, dz) || 1;
-      _ucD[m] = d; _ucS[m] = T.s[i] + (T.s[i + 1] - T.s[i]) * t; _ucL[m] = ((x - px) * -dz + (z - pz) * dx) / tl;
+      else { if (kd >= _ucK[UQN - 1]) continue; m = UQN - 1; }
+      while (m > 0 && _ucK[m - 1] > kd) { _ucK[m] = _ucK[m - 1]; _ucD[m] = _ucD[m - 1]; _ucS[m] = _ucS[m - 1]; _ucL[m] = _ucL[m - 1]; m--; }
+      const tx = t0x + ex * t, tz = t0z + ez * t, tl = Math.hypot(tx, tz) || 1;
+      _ucK[m] = kd; _ucD[m] = d; _ucS[m] = T.s[i] + (T.s[i + 1] - T.s[i]) * t; _ucL[m] = ((x - px) * -tz + (z - pz) * tx) / tl;
     }
     if (!nc) return field;
     _uq.i = 1; _uq.d = _ucD[0]; _uq.s = _ucS[0]; _uq.sd = _ucL[0];
@@ -1605,7 +1796,7 @@
     if (TRK && TRK.kind === 'uni') {
       // (the BMX venue: mown grass round the track, trees about the field and woods beyond)
       const d = trackQuery(x, z, _ftq).d, f = nForest(x * 0.0016, z * 0.0016) * 0.75 + nForest2(x * 0.0062, z * 0.0062) * 0.35;
-      return (0.12 + 0.5 * smooth(-0.2, 0.4, f)) * smooth(TRK.W / 2 + 14, TRK.W / 2 + 34, d) * (0.3 + 0.7 * smooth(120, 260, Math.hypot(x - TRK.cx, z - TRK.cz)));
+      return (0.12 + 0.5 * smooth(-0.2, 0.4, f)) * smooth(TRK.W / 2 + 14, TRK.W / 2 + 34, d) * (0.3 + 0.7 * smooth(TRK.uR + 10, TRK.uR + 120, Math.hypot(x - TRK.cx, z - TRK.cz)));
     }
     if (TRK && TRK.kind === 'offroad') {
       // (woods right up to the course in the forest; pines up the mountain; a few trees about the bog; none in the sand)

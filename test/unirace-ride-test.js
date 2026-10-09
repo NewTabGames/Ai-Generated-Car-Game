@@ -3,14 +3,14 @@
 // a lap on the full physics and the track's exact surface (the start hill, rollers, doubles, tabletops, berms). Reports
 // the lap time and average speed, the longest time in the air, the worst lean and pitch, the fastest it took a berm, and
 // whether it fell (over 70 deg of lean or 55 of pitch), went off the track (8 m+ from the line) or got stuck.
-// Env: VERS (pedal,improved,jet), SIZE (bmx | super - default bmx, super for the jet, as the game sets it), LEN, BANK, JUMPS, SEED, AA=0, DEBUG
+// Env: VERS (pedal,improved,jet), TURNS (flowing | windy | tight), SIZE (bmx | super - default bmx, super for the jet, as the game sets it), LEN, BANK, JUMPS, SEED, AA=0, DEBUG
 const W = require('../src/worldgen.js');
 const { Vehicle, CARS } = require('../src/vehicle.js');
 const MPH = 2.23694, DT = 1 / 120;
 const rollOf = (v) => Math.asin(Math.max(-1, Math.min(1, 2 * (v.qx * v.qy + v.qz * v.qw))));
 const pitchOf = (v) => Math.asin(Math.max(-1, Math.min(1, 2 * (v.qw * v.qx - v.qy * v.qz))));
 function ride(ver, bank) {
-  W.setUni({ ver, size: process.env.SIZE || (ver === 'jet' ? 'super' : 'bmx'), len: process.env.LEN || 'medium', laps: 1, jumps: process.env.JUMPS || 'medium', rhythm: 'some', bank, seed: +(process.env.SEED || 777) });
+  W.setUni({ ver, size: process.env.SIZE || (ver === 'jet' ? 'super' : 'bmx'), len: process.env.LEN || 'medium', laps: 1, jumps: process.env.JUMPS || 'medium', rhythm: 'some', bank, turns: process.env.TURNS || 'windy', seed: +(process.env.SEED || 777) });
   W.setMap('uni');
   const T = W.track, def = CARS.unicycle.make(ver), sp = JSON.parse(JSON.stringify(def.spec));
   const v = new Vehicle({ C: W.C, ground: W.ground, collidersNear: W.collidersNear }, sp);
