@@ -42,6 +42,18 @@ for (const [surf, name] of [[0, 'tarmac'], [6, 'sand']]) {
     row.push(`${kmh}: circle ${(R / n).toFixed(1)} m at ${held.toFixed(1)} km/h, lean ${(Math.acos(Math.min(1, up)) * 57.3).toFixed(1)} deg`);
   }
   out.push('  full lock: ' + row.join(' · '));
+  // (left and right alike: steering left takes it left, round the same circle - the four-wheel geometry once took the
+  // turn's sign twice and steering left went right)
+  const side = [];
+  for (const st of [-1, 1]) {
+    const v = mk(plane(0, 6)); for (let i = 0; i < 120 * 40 && v.forwardSpeed * KMH < 10; i++) { v.input.throttle = 1; v.step(DT); }
+    const x0 = v.px; let R = 0, n = 0;
+    for (let t = 0; t < 12; t += DT) { const e = 10 / KMH - v.forwardSpeed; v.input.throttle = Math.max(0, Math.min(1, 0.3 + e)); v.input.steer = st; v.input.rearSteer = rearFor(v, st); v.step(DT); if (t > 6) { R += Math.hypot(v.vx, v.vz) / Math.max(1e-3, Math.abs(v.wy)); n++; } }
+    side.push({ st, went: Math.sign(v.px - x0), R: R / n });
+  }
+  const ok = side.every((q) => q.went === q.st) && Math.abs(side[0].R - side[1].R) < 0.1 * side[1].R;
+  if (!ok) bad++;
+  out.push('  steering: ' + side.map((q) => (q.st < 0 ? 'left' : 'right') + ' goes ' + (q.went < 0 ? 'left' : 'right') + ' round ' + q.R.toFixed(1) + ' m').join(' · ') + (ok ? '' : ' WRONG'));
 }
 { let best = 0;
   for (const deg of [5, 10, 12, 15, 18, 20]) { const v = mk(plane(deg, 6), 0, 30); let ok = false; for (let t = 0; t < 50; t += DT) { v.input.throttle = 1; v.step(DT); if (-v.pz > 40) { ok = true; break; } } if (ok) best = deg; else break; }

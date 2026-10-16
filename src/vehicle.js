@@ -1121,7 +1121,9 @@
         if (s.ackermann4 && Math.abs(tf - tr) > 1e-4) {
           const R = s.wheelbase / (tf - tr), xc = tf * R, ht = s.trackF / 2, sg = R > 0 ? 1 : -1, Ra = Math.abs(R);
           // (a wheel's angle round it: the centre's distance back from the front axle over its distance out from the wheel)
-          const ang = (x, side) => Math.atan((xc - x) * sg / Math.max(0.5, Ra - side * sg * ht)) * sg;
+          // (xc is ahead of or behind each axle the same way whichever way it turns: only the angle takes the turn's sign - it
+          // took it twice, and steering left pointed the wheels right)
+          const ang = (x, side) => Math.atan((xc - x) / Math.max(0.5, Ra - side * sg * ht)) * sg;
           W[0].steer = ang(0, -1); W[1].steer = ang(0, 1); W[2].steer = ang(s.wheelbase, -1); W[3].steer = ang(s.wheelbase, 1);
         }
       }
@@ -3852,7 +3854,9 @@
     arbF: 0, arbR: 0, travelUp: 0.45, travelDown: 0.5, suspS0: 0.45, bumpStopK: 8e8, fzMax: 4e7,
     brakeTorqueF: 1.1e6, brakeTorqueR: 1.3e6, handbrakeTorque: 1.5e6, noABS: true, noESC: true, noTC: true,
     maxSteer: 0.3, steerRate: 0.35, steerRatio: 30, ackermann: 0.5, rearSteerMax: 0.25, ackermann4: true,
-    idleRpm: 500, limiterRpm: 1950, redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
+    // (the governor holds it: the hard limiter well clear above - at 1,950 a free rev in park overshot onto it and the
+    // fuel was cut nine-tenths of the time, the engine near silent)
+    idleRpm: 500, limiterRpm: 2100, redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
     // (lb-ft: ~42,400 Nm, flat - 8 MW at 1,800)
     torqueCurve: [[0, 26000], [500, 31000], [1000, 31300], [1800, 31300], [1900, 26000], [2100, 18000]],
     boostMax: 0, popScale: 0,
