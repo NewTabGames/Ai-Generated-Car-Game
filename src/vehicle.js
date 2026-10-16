@@ -1843,6 +1843,15 @@
       const s = this.spec, inp = this.input, W = this.wheels;
       const pedal = clamp(inp.brake, 0, 1);
       let absAny = false;
+      // drive retarder (retarder: [torque per wheel, drive rpm it comes in at, rpm over that to full]): pushed past its
+      // governed speed downhill, the drive holds it back - the traction motors generating, the hydraulic retarder on a
+      // big automatic - instead of the engine being run up to wreckage on the overrun
+      let ret = 0;
+      if (s.retarder && this.running && this.gear !== 0 && !this.park) {
+        const dr = Math.abs(this.carrierOmega() * this.ratioOf(this.gear)) * RAD2RPM;
+        ret = s.retarder[0] * clamp((dr - s.retarder[1]) / s.retarder[2], 0, 1);
+      }
+      this.retardT = ret;
       for (let i = 0; i < 4; i++) {
         const w = W[i];
         const maxT = w.front ? s.brakeTorqueF : s.brakeTorqueR;
@@ -1862,6 +1871,7 @@
         }
         if (!w.front && !this.launchHold) T += s.handbrakeTorque * clamp(inp.handbrake, 0, 1);
         T += w.escBrake || 0;
+        T += ret;
         w.brakeT = T;
       }
       this.absActive = absAny;
@@ -3854,9 +3864,12 @@
     arbF: 0, arbR: 0, travelUp: 0.45, travelDown: 0.5, suspS0: 0.45, bumpStopK: 8e8, fzMax: 4e7,
     brakeTorqueF: 1.1e6, brakeTorqueR: 1.3e6, handbrakeTorque: 1.5e6, noABS: true, noESC: true, noTC: true,
     maxSteer: 0.3, steerRate: 0.35, steerRatio: 30, ackermann: 0.5, rearSteerMax: 0.25, ackermann4: true,
-    // (the governor holds it: the hard limiter well clear above - at 1,950 a free rev in park overshot onto it and the
-    // fuel was cut nine-tenths of the time, the engine near silent)
-    idleRpm: 500, limiterRpm: 2100, redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
+    // (the governor is its only fuel control, as on a governed diesel - no hard limiter over it: at 1,950 a free rev in park
+    // overshot onto one and the fuel was cut nine-tenths of the time, and at 2,100 running away down a dune face pushed
+    // it onto it for good - the engine went near silent, just the whine and the cut's faint pulses. Driven past the
+    // governor it's on overrun: no fuel, the engine braking, still running and sounding)
+    // (and pushed past it downhill its drive holds it back, from ~33 km/h - see retarder)
+    idleRpm: 500, limiterRpm: 2100, noLimiter: true, retarder: [1e6, 2000, 150], redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
     // (lb-ft: ~42,400 Nm, flat - 8 MW at 1,800)
     torqueCurve: [[0, 26000], [500, 31000], [1000, 31300], [1800, 31300], [1900, 26000], [2100, 18000]],
     boostMax: 0, popScale: 0,
@@ -4398,7 +4411,7 @@
     s.torqueScale = (b.torqueScale || 1) * t.power * pr;
     s.boostMax = EVb ? 0 : t.boost; s.rpmStretch = t.stretch;
     s.limiterRpm = t.limiter; s.redlineRpm = t.limiter - (b.limiterRpm - b.redlineRpm);
-    s.noLimiter = !!t.nolimit;          // (the slider value still sets the redline and the automatic's shift points)
+    s.noLimiter = !!t.nolimit || !!b.noLimiter;          // (the slider value still sets the redline and the automatic's shift points)
 
     if (b.shiftRpm) s.shiftRpm = t.limiter - (b.limiterRpm - b.shiftRpm);
     s.idleRpm = EVb ? b.idleRpm : t.idle; s.engineInertia = b.engineInertia * t.inertia;

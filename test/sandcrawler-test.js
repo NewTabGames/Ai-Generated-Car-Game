@@ -1,6 +1,7 @@
 // The Sandcrawler: 1,200 t on four steering track units - static loads; 0-30 km/h and its governed top speed on tarmac
 // and sand; braking; full-lock turns at 5 / 15 / 30 km/h (the turning circle, the speed it holds, how far it leans); from
-// a standstill at the foot of a sand slope, how steep it climbs; parked across a slope, how steep it stands; and across
+// a standstill at the foot of a sand slope, how steep it climbs; down long slopes, the speed its drive holds it to (and the
+// fuel never cut); parked across a slope, how steep it stands; and across
 // the real Sand Dunes from the spawn - straight, then turning - the ground it covers and whether it ever stops for good
 // (it used to stand on two corners on the twisted sand with the other two units spinning in the air)
 const W = require('../src/worldgen.js');
@@ -59,6 +60,19 @@ for (const [surf, name] of [[0, 'tarmac'], [6, 'sand']]) {
   for (const deg of [5, 10, 12, 15, 18, 20]) { const v = mk(plane(deg, 6), 0, 30); let ok = false; for (let t = 0; t < 50; t += DT) { v.input.throttle = 1; v.step(DT); if (-v.pz > 40) { ok = true; break; } } if (ok) best = deg; else break; }
   if (best < 15) bad++;
   out.push(`  sand slopes: climbs ${best} deg from a standstill (40 m up it)`);
+}
+// (down a long sand slope on full throttle: driven past the governor its drive holds it back, ~35 km/h, and the engine's on
+// overrun with the fuel never cut - it used to run away, 78 km/h and 4,800 rpm down 12 deg, onto a hard limiter over the
+// governor that cut the fuel for good: the engine went near silent, just the whine and faint pulses. Steeper than the
+// drive alone can hold, the brakes with it)
+{ const row = [];
+  for (const [deg, br] of [[8, 0], [12, 0], [20, 1]]) {
+    const v = mk(plane(deg, 6), 0, -400, 0, 1); let rpm = 0, cut = 0, vmax = 0;
+    for (let t = 0; t < 60 && v.pz < -10; t += DT) { v.input.throttle = br ? (v.forwardSpeed < 8 ? 1 : 0) : 1; v.input.brake = v.forwardSpeed > 8 ? br : 0; v.step(DT); rpm = Math.max(rpm, v.rpm()); vmax = Math.max(vmax, v.forwardSpeed * KMH); if (v.fuelCut) cut += DT; }
+    if (cut > 0 || !v.running || vmax > 38) bad++;
+    row.push(`${deg} deg${br ? ' braking' : ''}: ${vmax.toFixed(1)} km/h at most, ${rpm.toFixed(0)} rpm, fuel cut ${cut.toFixed(1)} s${v.running ? '' : ' STALLED'}`);
+  }
+  out.push('  down sand slopes: ' + row.join(' · '));
 }
 { let stands = 0;
   for (const deg of [15, 25, 30, 35]) { const v = mk(plane(deg, 6, true)); for (let t = 0; t < 4; t += DT) { v.input.brake = 1; v.step(DT); } if (upY(v) > Math.cos((deg + 10) * Math.PI / 180)) stands = deg; else break; }

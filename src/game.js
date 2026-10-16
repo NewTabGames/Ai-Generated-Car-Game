@@ -626,7 +626,20 @@
   S.tune = S.tune || {};
   const TKEY = PULLER ? 'puller_' + CARDEF.engine : DRAGSTER ? 'dragster_' + CARDEF.cls : KART ? 'kart_' + CARDEF.cls : MOWER ? 'mower_' + CARDEF.cls
     : CC && CARDEF.engine && CARDEF.engine !== 'ev' ? S.car + '_' + CARDEF.engine : S.car;
-  const tune = Object.assign(tuneDefaults(), S.tune[TKEY] || {});
+  // (settings left at the car's stock follow the stock when the car changes: a saved tune carries the stock it was made
+  // against, _stock, and only what differs from that is the owner's. One saved before that held every setting as it was
+  // the first time the car was driven - the stock of the day, so a later change to the car, its limiter, its gearing, its
+  // weight, never reached it: with every one of its sliders that isn't a stock figure still at its default, it's taken
+  // as never tuned)
+  const TUNE_NEUTRAL = ['power', 'stretch', 'nolimit', 'inertia', 'nos', 'whine', 'gov', 'grip', 'downforce', 'drag', 'brakes', 'stiff', 'steer', 'gravity', 'smoke'];
+  function loadTune(saved) {
+    const d = tuneDefaults(), t = Object.assign({}, d);
+    if (saved && saved._stock) { for (const k in saved) if (k !== '_stock' && saved[k] !== saved._stock[k]) t[k] = saved[k]; }
+    else if (saved && !TUNE_NEUTRAL.every((k) => saved[k] === undefined || saved[k] === d[k])) Object.assign(t, saved);
+    t._stock = d;
+    return t;
+  }
+  const tune = loadTune(S.tune[TKEY]);
   S.tune[TKEY] = tune;
   function applyTune() {
     VEH.tuneSpec(veh.spec, STOCK, tune);
