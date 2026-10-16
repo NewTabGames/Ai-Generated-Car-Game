@@ -2,7 +2,7 @@
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle, SANDC = window.HCSandcrawler;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -446,6 +446,11 @@
       info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty tan-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
       trans: 'Repulsorlift · turbine thrust', tyres: 'Repulsor field',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.5, rpmRef: 10000, open: 1, fmul: 1.6, deep: 0, loud: 0.3, race: 0 } },
+    sandcrawler: { btn: 'SANDCRAWLER', sub: 'The Jawas\' mobile fortress · 36.8 m long, 20 m tall, ~1,200 t on four track units that all steer · a reactor-fed 8 MW drive · 30 km/h · its own sand dunes', paint: 'Sandcrawler Rust', tc: 3, cam: [7.2, 8.5], noPkg: true, map: 'dunes',
+      hint: 'Sandcrawler: shift up (E) for DRIVE - 1,200 tonnes of rusting digger crawler, 36.8 m long and 20 m tall, on four track units that all swing to steer (a ~24 m turning circle at a crawl). The reactor-fed drive pulls it to 30 km/h (18.6 mph) in ~15 s in sand and governs there; it walks up the long windward faces of the dunes, not the steep slip faces - go round those. Trees and posts go down under it. The view button (C) puts you on the bridge, 18 m up.',
+      info: 'The Jawas\' sandcrawler, an old Corellia Mining Corporation digger crawler: the tall slab-sided hull leaning in a little towards the roof, the bridge\'s face with its row of small windows up front and the long bow sloping back under it to the tracks, the loading ramp let into it, the roof stepping down twice towards the sloped stern; a ledge round the lower hull with its ports, the dark hatch in the side, plates of every shade of rust riveted over each other, rust run down from the rivets, machinery, masts and a sensor dish on the roof, a crane over the stern, floodlights on the bow and lamps behind the windows at night · 36.8 m long (the Databank says 40 m), 20 m tall, ~15 m wide · ~1,200 t (no figure is given anywhere: NASA\'s crawler-transporter, near the same footprint but a third as tall, is 2,700 t) · four track units of 3.6 m steel shoes round 3.4 m sprockets, a short pair forward and a long pair aft, every one swinging to steer · a reactor feeding an ~8 MW (~10,700 hp) drive through a 4-speed drive transmission · 0-30 km/h in ~15 s in sand, governed at 30 km/h',
+      trans: 'Reactor drive · 4-speed · four-unit steering', tyres: 'Crawler tracks',
+      snd: { nEng: 2, cyl: 12, fmul: 0.35, deep: 1, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 0.3, rpmRef: 1900, race: 0.2, rough: 0.6, diesel: 0.4, treads: 0.75 } },
     firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in flotation tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
       hint: 'Jet fire truck: shift up (E) for DRIVE and open the throttle - the J34 in the box spools up in a couple of seconds and shoves; floor it and the afterburner lights, a long flame out of the tailpipe. Nothing drives the wheels: it rolls on them and brakes and steers with them - G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). 0-60 ~11 s, ~135 mph, so brake early: it\'s 13,000 lb. R backs it up on a hydraulic motor.',
       info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its ribbed hose-bed band, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack and a polished hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis on a 3.3 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66 in flotation tyres on plain grey steel wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
@@ -706,6 +711,7 @@
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
+    if (id === 'sandcrawler') return SANDC.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
     if (id === 'atv') return ATVM.build(THREE, Object.assign(o, { engine: def.engine || 'sport', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     if (id === 'unicycle') return UNIM.build(THREE, Object.assign(o, { engine: def.engine || 'pedal', wheelRadiusF: s.wheelRadiusF || s.wheelRadius }));
@@ -1818,7 +1824,7 @@
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
-      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0, road: HOVER ? 0.3 : 1,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0, road: HOVER ? 0.3 : 1, treads: ENG_SND.treads || 0,
     });
   }
   function processEvents() {

@@ -3235,6 +3235,13 @@
       muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
+    // the Sandcrawler's tracks: four units, each a 3.6 m wide belt of steel shoes round sprockets 3.4 m tall - each 'wheel'
+    // is one unit's ground contact. A huge footprint (~50 m^2 a unit): it floats on sand where a tyre would dig in, and
+    // bites in it
+    crawlerTrack: { name: 'Crawler track, 3.6 m steel shoes', short: 'Crawler tracks', width: 3.6, radius: 1.7, sandKx: 1.25, sandKy: 1.2, sandCrr: 0.3,
+      muX: 0.85, muY: 0.65, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.12, relaxX: 0.6, relaxY: 0.8,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e7, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16, sandKx: 1.05, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -3745,7 +3752,7 @@
       const h = this.h;
       // gather obstacles once per frame
       const sp = Math.hypot(this.vx, this.vz);
-      this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
+      this.world.collidersNear(this.px, this.pz, (this.spec.colReach || 8) + sp * 0.12, this._circles, this._boxes);
       if (this.input.airAssist || this.spec.airLevel) this._airAssist(Math.min(dt, 0.1));
       // (wheelie control reads the nose-up pitch against the road, not the horizon: the slope under it along its heading)
       if (this.spec.wheelieCtl) {
@@ -3843,6 +3850,16 @@
         const rt = clamp(inp.rearSteer || 0, -1, 1) * s.rearSteerMax, ra = this.rearSteerAngle || 0;
         this.rearSteerAngle = ra + clamp(rt - ra, -mr, mr);
         W[2].steer += this.rearSteerAngle; W[3].steer += this.rearSteerAngle;
+        // (ackermann4: every wheel pointed round the one turn centre the two axles' angles make - on a vehicle as wide as
+        // it's long (the Sandcrawler's units 10.6 m apart on a 13.5 m wheelbase) a front-only split left the inside and
+        // outside units ~3 deg apart from it, shoving against each other sideways with ~1.5 MN apiece)
+        const tf = Math.tan(d), tr = Math.tan(this.rearSteerAngle);
+        if (s.ackermann4 && Math.abs(tf - tr) > 1e-4) {
+          const R = s.wheelbase / (tf - tr), xc = tf * R, ht = s.trackF / 2, sg = R > 0 ? 1 : -1, Ra = Math.abs(R);
+          // (a wheel's angle round it: the centre's distance back from the front axle over its distance out from the wheel)
+          const ang = (x, side) => Math.atan((xc - x) * sg / Math.max(0.5, Ra - side * sg * ht)) * sg;
+          W[0].steer = ang(0, -1); W[1].steer = ang(0, 1); W[2].steer = ang(s.wheelbase, -1); W[3].steer = ang(s.wheelbase, 1);
+        }
       }
 
       // ---------------- tyre growth: a big low-pressure slick is flung outwards as it spins up (taller, narrower),
@@ -3870,6 +3887,7 @@
         const rho = s.bike ? Math.min(r * 0.5, w.tire.width / 2) : 0;
         const rEf = (nx, ny, nz) => { const na = nx * m00 + ny * m10 + nz * m20; return rho + (r - rho) * Math.sqrt(Math.max(0, 1 - na * na)); };
         if (s.tyreEnvelope) this._envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
+        else if (s.trackEnv) this._trackEnvelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
         else {
           world.ground(hx, hz, g);
           if (s.hover) this._onWater(g);
@@ -3905,7 +3923,7 @@
           const rx = hx - px, ry = hy - py, rz = hz - pz;
           const hvx = vx + (wy * rz - wz * ry), hvy = vy + (wz * rx - wx * rz), hvz = vz + (wx * ry - wy * rx);
           w.comp = -(nx * hvx + ny * hvy + nz * hvz) / ndd;
-          if (s.tyreEnvelope) w.comp = clamp(w.comp, -8, 8);    // (the carcass gives before the shocks see a spike)
+          if (s.tyreEnvelope || s.trackEnv) w.comp = clamp(w.comp, -8, 8);    // (the carcass gives before the shocks see a spike)
         } else {
           w.contact = false; w.s = w.sMax; w.comp = 0;
         }
@@ -3945,7 +3963,7 @@
         // apply along body up at the wheel centre
         let cx = w.hx + dirX * w.s, cy = w.hy + dirY * w.s, cz = w.hz + dirZ * w.s;
         let fx = upX * F, fy = upY * F, fz = upZ * F;
-        if (s.tyreEnvelope || s.bike) {
+        if (s.tyreEnvelope || s.bike || s.trackEnv) {
           // (a motorcycle too: leaned over, its forks and shock are tilted - the ground still pushes straight up at the
           // tyre, and a spring pushing along the tilted strut mustn't hand it a sideways shove the tyres never made)
           // the whole contact force at the contact point: the spring sets its part along the strut, the links carry the
@@ -3955,6 +3973,8 @@
           // (a leaned motorcycle wheel touches down on its tyre's shoulder, out from under the hub)
           if (s.bike) { cx += w.cox; cy += w.coy; cz += w.coz; }
           else { cx -= w.nx * w.radius; cy -= w.ny * w.radius; cz -= w.nz * w.radius; }
+          // (a track unit bears where along it touches - its front end walking up a rise, its middle on a crest)
+          if (s.trackEnv) { cx += w.tox; cy += w.toy; cz += w.toz; }
         }
         Fx += fx; Fy += fy; Fz += fz;
         const rx = cx - px, ry = cy - py, rz = cz - pz;
@@ -4046,7 +4066,8 @@
         const lx = fy * nz - fz * ny, ly = fz * nx - fx * nz, lz = fx * ny - fy * nx;
         // contact point
         // (a motorcycle's: on its leaned tyre's shoulder)
-        const cpx = w.hx + dirX * w.sRaw + (s.bike ? w.cox : -nx * r), cpy = w.hy + dirY * w.sRaw + (s.bike ? w.coy : -ny * r), cpz = w.hz + dirZ * w.sRaw + (s.bike ? w.coz : -nz * r);
+        let cpx = w.hx + dirX * w.sRaw + (s.bike ? w.cox : -nx * r), cpy = w.hy + dirY * w.sRaw + (s.bike ? w.coy : -ny * r), cpz = w.hz + dirZ * w.sRaw + (s.bike ? w.coz : -nz * r);
+        if (s.trackEnv) { cpx += w.tox; cpy += w.toy; cpz += w.toz; }
         w.cpx = cpx; w.cpy = cpy; w.cpz = cpz;
         const rx = cpx - px, ry = cpy - py, rz = cpz - pz;
         const cvx = vx + (wy * rz - wz * ry), cvy = vy + (wz * rx - wx * rz), cvz = vz + (wx * ry - wy * rx);
@@ -4416,6 +4437,44 @@
       w.ndd = Math.max(0.35, -(w.nx * dirX + w.ny * dirY + w.nz * dirZ));
     }
 
+    // ------------------------------------------------------------------ track units (trackEnv)
+    // A track unit (the Sandcrawler's) isn't a wheel: its belt lies flat on the ground the length of the unit and curls
+    // up round the sprockets at each end (trackEnv: the flat run's half-length, front units and rear). Points along the
+    // flat run and round both ends are tested against the ground and the deepest carries the corner - so a unit walks up
+    // a rise from its front end as it meets it, rides a crest on its middle and bridges a hollow on its ends, where the
+    // hub's single ray found a slope only once the unit's middle got to it (and its ends ploughed in). Gives the
+    // suspension length, the contact normal, the surface, and where along the unit it bears (w.tox / toy / toz from under
+    // the hub - the middle of the points that touch, so on the flat it bears under the hub as a wheel does)
+    _trackEnvelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g) {
+      const world = this.world, r = w.radius, hl = this.spec.trackEnv[w.front ? 0 : 1], T = Vehicle.TRK;
+      if (-dirY < 0.2) { w.sRaw = 1e9; w.nx = 0; w.ny = 1; w.nz = 0; w.ndd = 1; w.tox = w.toy = w.toz = 0; return; }   // upended: no contact
+      const S = this._trkS || (this._trkS = new Float64Array(T.n)), sn = Math.sin(w.steer), cs = Math.cos(w.steer);
+      const fX = m00 * sn - m02 * cs, fY = m10 * sn - m12 * cs, fZ = m20 * sn - m22 * cs;   // the unit's heading
+      const aX = m00 * cs + m02 * sn, aY = m10 * cs + m12 * sn, aZ = m20 * cs + m22 * sn;   // across it
+      const sE = w.sRaw < w.sMin ? w.sMin : w.sRaw > w.sMax ? w.sMax : w.sRaw;
+      const cx0 = hx + dirX * sE, cy0 = hy + dirY * sE, cz0 = hz + dirZ * sE;
+      let best = 1e9, bj = 0, bs = 0, gx = 0, gy = 1, gz = 0;
+      for (let j = 0; j < T.n; j++) {
+        const al = T.k[j] * hl + T.sin[j] * r, dn = T.cos[j] * r;
+        world.ground(cx0 + al * fX + dn * dirX, cz0 + al * fZ + dn * dirZ, g);
+        const nd = -(dirX * g.nx + dirY * g.ny + dirZ * g.nz);
+        const sl = S[j] = sE + (cy0 + al * fY + dn * dirY - g.h) * g.ny / (nd > 0.2 ? nd : 0.2);
+        if (sl < best) { best = sl; bj = j; bs = g.surface; gx = g.nx; gy = g.ny; gz = g.nz; }
+      }
+      // (where it bears: the points within a few cm of the deepest, weighted - all of the flat run on level ground)
+      let sw = 0, sa = 0;
+      for (let j = 0; j < T.n; j++) { const q = 1 - (S[j] - best) / 0.04; if (q > 0) { sw += q * q; sa += q * q * T.k[j] * hl; } }
+      const bA = sa / sw, th = T.th[bj], ps = Math.sin(th), pc = Math.cos(th);
+      let nx = -(ps * fX + pc * dirX), ny = -(ps * fY + pc * dirY), nz = -(ps * fZ + pc * dirZ);
+      const la = gx * aX + gy * aY + gz * aZ;            // + the ground's slope across the unit
+      nx += la * aX; ny += la * aY; nz += la * aZ;
+      const nl = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      w.nx = nx * nl; w.ny = ny * nl; w.nz = nz * nl;
+      w.sRaw = best; w.surface = bs;
+      w.ndd = Math.max(0.35, -(w.nx * dirX + w.ny * dirY + w.nz * dirZ));
+      w.tox = bA * fX; w.toy = bA * fY; w.toz = bA * fZ;
+    }
+
     // ------------------------------------------------------------------ driver aids: TC, ESC, line lock
     _aids(h, speed, vFwd, vRight, upX, upY, upZ) {
       const s = this.spec, inp = this.input, W = this.wheels;
@@ -4445,7 +4504,9 @@
       // (tcAxleMean - karts: a solid rear axle turns both wheels together, so in a turn the outside one always reads
       // fast. The axle's mean speed against the chassis' own speed is exact however hard it's turning or sliding)
       if (s.tcAxleMean && okL && okR) vRear = vRearMin = 0.5 * (vL + vR);
-      const tcOn = this.tcMode < 3 && !this.lineLockActive && this.gear !== 0;
+      // (noTC: none fitted - the Sandcrawler's outside tracks run half as fast again as its inside ones in a turn, and
+      // traction control read that as wheelspin and cut the drive to nothing)
+      const tcOn = this.tcMode < 3 && !this.lineLockActive && this.gear !== 0 && !s.noTC;
       if (tcOn && !okL && !okR) { /* both rears unloaded: hold */ }
       else if (tcOn) {
         const den = Math.max(Math.abs(vRef), 3.5);
@@ -4825,9 +4886,9 @@
             }
           }
         }
-        // torque-converter lockup clutch
+        // torque-converter lockup clutch (lockRpm: from 2nd up, the output speed it locks at - a slow-turning drive's own)
         const wantLock = !s.noLockup && !this.park && this.gear !== 0 && !this.revHoldActive && !this.launchHold &&
-          ((this.gear >= 2 && turbineRpm > 1150) ||
+          ((this.gear >= 2 && turbineRpm > (s.lockRpm || 1150)) ||
            // 1st: lock once past torque multiplication (speed ratio > 0.86) so the coupling phase doesn't bleed power
            (this.gear === 1 && turbineRpm > 2900 && (inp.throttle < 0.6 || turbineRpm > 0.86 * this.eOmega * RAD2RPM) && this.shiftTimer <= 0));
         const shP = this.shiftTimer > 0 ? 1 - this.shiftTimer / (this.shiftDur || 0.2) : 1;
@@ -5020,8 +5081,21 @@
       const Te = this.Te, lt = s.lsdRamp * Math.abs(this.lastTin);
       // (fwd: front-wheel drive through this driveline - all of it to the fronts, the rears on no diff at all)
       const lkR = s.fwd ? 0 : s.lsdPreload + lt, lkF = (s.lsdPreloadF || s.lsdPreload) + lt, lkC = s.fwd ? 0 : (s.centerPreload || 2 * s.lsdPreload) + 2 * lt;
-      const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
-      const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
+      // (eDiff: every wheel on its own motors, held to the turn the steering's making - each outside one faster by just as
+      // much as its path round the turn is longer - so the couplings lock against a unit spinning free, not against the
+      // turn; lsdScale: the speed difference, rad/s, they lock over - a track unit turns at a twentieth of a car wheel's)
+      let k0 = 1, k1 = 1, k2 = 1, k3 = 1;
+      if (s.eDiff) {
+        const tf = Math.tan(this.steerAngle), tr = Math.tan(this.rearSteerAngle || 0);
+        if (Math.abs(tf - tr) > 1e-4) {
+          const R = s.wheelbase / (tf - tr), xc = tf * R, ht = s.trackF / 2, rad = (x, side) => Math.hypot(xc - x, R - side * ht);
+          const r0 = rad(0, -1), r1 = rad(0, 1), r2 = rad(s.wheelbase, -1), r3 = rad(s.wheelbase, 1), rm = (r0 + r1 + r2 + r3) / 4;
+          k0 = r0 / rm; k1 = r1 / rm; k2 = r2 / rm; k3 = r3 / rm;
+        }
+      }
+      const sc = s.lsdScale || 2.5;
+      const tR = -lkR * Math.tanh((W[2].omega / k2 - W[3].omega / k3) / sc), tF = -lkF * Math.tanh((W[0].omega / k0 - W[1].omega / k1) / sc);
+      const tC = -lkC * Math.tanh((W[0].omega / k0 + W[1].omega / k1 - W[2].omega / k2 - W[3].omega / k3) / (2 * sc));
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
       // (awdFront: the front axle's share of the drive - a rear-biased road-car system sends most of it to the back
       // and lets the centre coupling pass more forward when the rears slip)
@@ -5250,8 +5324,8 @@
       // ground - taken as the full box, a truck pitched up against a wall read metres of overlap and was flung away)
       const zc = 0.5 * (s.bodyFront + s.bodyRear) * l, hl = Math.max(0.5 * (s.bodyRear - s.bodyFront) * l, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - l * l))), hw = Math.max(s.bodyHalfW * lr, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - lr * lr)));
       const cx = this.px + bX * zc, cz = this.pz + bZ * zc;
-      // skip when flying high over things
-      for (const c of this._circles) {
+      // skip when flying high over things (and trees, posts and rocks don't stop the Sandcrawler: it rolls them flat)
+      if (!s.flattens) for (const c of this._circles) {
         const dx = c.x - cx, dz = c.z - cz;
         const lx = dx * rX + dz * rZ, lz = dx * bX + dz * bZ;
         const qx = clamp(lx, -hw, hw), qz = clamp(lz, -hl, hl);
@@ -5306,6 +5380,14 @@
     }
   }
 
+  // track-envelope points: along the flat run (k from its back end, -1, to its front, +1), then round the front sprocket
+  // and round the back one (th: + ahead, from straight down)
+  Vehicle.TRK = (() => {
+    const k = [], th = [];
+    for (let j = 0; j <= 8; j++) { k.push(-1 + j / 4); th.push(0); }
+    for (const a of [20, 40, 60, 80]) { k.push(1); th.push(a * Math.PI / 180); k.push(-1); th.push(-a * Math.PI / 180); }
+    return { n: k.length, k, th, sin: th.map(Math.sin), cos: th.map(Math.cos) };
+  })();
   // tyre-envelope sample angles round the tread (-80 .. +80 deg from straight down along the strut, + = ahead)
   Vehicle.ENV = (() => {
     const n = 9, dth = 20 * Math.PI / 180, th = [], sin = [], cos = [];
@@ -6478,6 +6560,51 @@
     CdA: 6.4,
     bodyHalfW: 1.83, bodyFront: -3.95, bodyRear: 3.95, bodyBottom: -0.67, bodyTop: 1.25,
   } };
+  // The Sandcrawler: the Jawas' - an old Corellia Mining Corporation digger crawler, 36.8 m long and 20 m tall (the film's
+  // figures; the Databank gives 40 m), ~15 m wide. No mass is given anywhere: ~1,200 t here (NASA's crawler-transporter,
+  // near the same footprint but a third as tall, is 2,700 t). Four track units - a shorter pair forward, a long pair aft -
+  // on a 13.5 m wheelbase, 10.6 m apart, every one swinging to steer as the crawler-transporter's do (the back pair the
+  // other way at its crawl, halving the turn); a reactor feeding its drive, ~8 MW (~10,700 hp), through a 4-speed drive
+  // transmission with a torque converter; 30 km/h (18.6 mph) flat out. Model space (bodyPts): the CG 6.5 m up, 2.7 m
+  // behind the hull's middle
+  const scPts = (() => {
+    const P = [], y = (h) => h - 6.5, z = (zh) => zh - 2.675;
+    for (const sx of [-1, 1]) {
+      // (the hull: its belly, the bow's slope up to the bridge, the roof's steps, the sloped stern)
+      P.push([sx * 7.5, y(3.6), z(-9.2)], [sx * 7.5, y(3.6), z(4)], [sx * 7.5, y(3.6), z(17.4)], [sx * 7.3, y(9), z(-13)], [sx * 7.0, y(14.5), z(-17.6)],
+        [sx * 6.8, y(20), z(-18.4)], [sx * 6.9, y(18.3), z(-0.3)], [sx * 7.0, y(16), z(11)], [sx * 7.0, y(14.2), z(15.8)], [sx * 7.4, y(6), z(18.4)]);
+    }
+    P.push([0, y(3.6), z(4)], [0, y(20), z(-18.4)], [0, y(18.3), z(-0.3)], [0, y(16), z(11)]);
+    return P;
+  })();
+  CARS.sandcrawler = { name: 'Sandcrawler', short: 'Sandcrawler', car: 'REACTOR DRIVE · 8 MW', hp: 10700, tq: 31300, cc: true, kbLat: 1.5, spec: {
+    name: 'Sandcrawler',
+    mass: 1.2e6, Ipitch: 1.75e8, Iyaw: 1.6e8, Iroll: 6.3e7, cgHeight: 6.5, wheelbase: 13.5, frontWeight: 0.45,
+    trackF: 10.6, trackR: 10.6, wheelRadius: 1.7, wheelInertiaF: 1e5, wheelInertiaR: 1.5e5,
+    frontTire: 'crawlerTrack', rearTire: 'crawlerTrack', Fz0: 3e6, loadSens: 0.03,
+    // (each unit on equalising bogies: ~0.2 m of static sag, ~1.1 Hz, half a metre of travel either way - a 13.5 x 10.6 m
+    // footprint on dune sand twists; stiff and short, it stood on two corners with the others in the air)
+    springF: 1.32e7, springR: 1.62e7, dampBumpF: 1.1e6, dampRebF: 1.5e6, dampBumpR: 1.4e6, dampRebR: 1.8e6,
+    arbF: 0, arbR: 0, travelUp: 0.45, travelDown: 0.5, suspS0: 0.45, bumpStopK: 8e8, fzMax: 4e7,
+    brakeTorqueF: 1.1e6, brakeTorqueR: 1.3e6, handbrakeTorque: 1.5e6, noABS: true, noESC: true, noTC: true,
+    maxSteer: 0.3, steerRate: 0.35, steerRatio: 30, ackermann: 0.5, rearSteerMax: 0.25, ackermann4: true,
+    idleRpm: 500, limiterRpm: 1950, redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
+    // (lb-ft: ~42,400 Nm, flat - 8 MW at 1,800)
+    torqueCurve: [[0, 26000], [500, 31000], [1000, 31300], [1800, 31300], [1900, 26000], [2100, 18000]],
+    boostMax: 0, popScale: 0,
+    autoRatios: [3.4, 2.1, 1.4, 1.0], autoRev: 3.4, autoFinal: 39.5, tcK: 6, tcStall: 2.0, lockupTorque: 75000,
+    // (its own shift schedule: the drive turns 500-1,900 rpm, a car's points would hold it in first)
+    shiftTimeWOT: 1.0, shiftTimePart: 1.2, launchRpm: 900, engineTc: false, noCoastBlip: true, shiftDown: 600, shiftDownSpan: 250, shiftUpBase: 1100, shiftMinNext: 700, lockRpm: 700,
+    // (every unit driven on its own motors: strong couplings between them, each unit held to its own speed round the
+    // turn the steering's making - open, the drive escaped through whichever unit the dunes had lifted and spun it)
+    awd: true, awdFront: 0.45, lsdPreload: 1.2e6, lsdPreloadF: 1.2e6, centerPreload: 2.4e6, lsdRamp: 0, driveEff: 0.8, eDiff: true, lsdScale: 0.3,
+    CdA: 300,
+    bodyHalfW: 7.6, bodyFront: -21.1, bodyRear: 15.7, bodyBottom: -2.9, bodyTop: 13.5, bodyPts: scPts, bodyK: 3e8, bodyC: 3e7, bodyFricC: 3e7,
+    // (colReach: how far round it to look for things to hit - it's 37 m long; flattens: trees and posts go down under it)
+    colReach: 24, flattens: true,
+    // (the track units: the front pair's flat run 6 m long, the back pair's 12.6 m - the belt round 1.7 m sprockets beyond)
+    trackEnv: [3.0, 6.3],
+  } };
   // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
   // restarts to swap)
@@ -7105,7 +7232,8 @@ class CarSynth {
       turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
       diesel: 0,   // a diesel's injection knock, 0..1
       rc: 0,       // an RC car's motor and drivetrain (1 brushless, 2 brushed)
-      road: 1 };   // the tyres' roar on the road and the gravel's patter (a repulsor: a little air under it)
+      road: 1,     // the tyres' roar on the road and the gravel's patter (a repulsor: a little air under it)
+      treads: 0 }; // a tracked vehicle: its links' pitch, m (their clank comes round at the speed over that)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -7135,6 +7263,7 @@ class CarSynth {
     this.hpL = [0, 0]; this.hpR = [0, 0];
     this.pops = []; this.crack = 0; this.boom = 0; this.boomPh = 0;
     this.clunk = 0; this.clunkPh = 0; this.grind = 0; this.imp = 0; this.impLP = 0; this.impRing = 0;
+    this.trPh = 0; this.trPh2 = 0; this.trHit = 0; this.trThPh = 0;
     this.t = 0; this.cnt = 0; this.lastSet = 0; this.alive = 0; this.roarLP1 = 0; this.roarLP2 = 0; this.bodyLP = 0;
   }
   rnd() { let x = this.seed; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.seed = x >>> 0; return this.seed / 4294967296; }
@@ -7234,7 +7363,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc' || key === 'treads') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -7297,6 +7426,9 @@ class CarSynth {
     const sqAmp = Math.pow(Math.min(1, c.squeal), 1.25) * 0.55 * c.fxVol;
     const spin = Math.min(1, c.spin);
     const spd = c.speed;
+    // (treads: a tracked vehicle's link pitch, m - every link that comes round a sprocket knocks: a dull steel clank at the
+    // link rate, two tracks' worth a little out of step, louder the faster they run)
+    const trR = c.treads > 0 ? spd / c.treads : 0, trAmp = c.treads > 0 ? Math.min(1, spd / 3) * c.fxVol * (c.interior > 0.5 ? 0.6 : 1) : 0;
     const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1) * c.road;
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
@@ -7475,6 +7607,16 @@ class CarSynth {
       this.windLP += aWind * (w2 - this.windLP); this.windLP2 += aWind * (this.windLP - this.windLP2);
       const wd = this.windLP2 * windAmp * 3;
       oL += rd + wd; oR += rd + wd * 0.95;
+      if (trAmp > 1e-4) {
+        if (!this.trBP) { this.trBP = this.bp(480, 5); this.trBP2 = this.bp(1700, 8); }
+        this.trPh += trR / sr; this.trPh2 += trR * 1.07 / sr;
+        if (this.trPh >= 1) { this.trPh -= 1; this.trHit = Math.max(this.trHit, 0.7 + this.rnd() * 0.5); }
+        if (this.trPh2 >= 1) { this.trPh2 -= 1; this.trHit = Math.max(this.trHit, 0.5 + this.rnd() * 0.5); }
+        this.trThPh += 2 * Math.PI * 42 / sr; if (this.trThPh > 6.283185307) this.trThPh -= 6.283185307;
+        const k = (this.run(this.trBP, w1 * this.trHit) * 0.9 + this.run(this.trBP2, w2 * this.trHit) * 0.3 + Math.sin(this.trThPh) * this.trHit * 0.3) * trAmp;
+        this.trHit *= 0.9975;
+        oL += k; oR += k * 0.95;
+      }
       // horn (two-tone)
       if (c.horn > 0.5) {
         this.hornPh1 += 405 / sr; this.hornPh2 += 492 / sr;
@@ -8155,7 +8297,7 @@ registerProcessor('hellcat-synth', HellcatProcessor);
     'F8 Green': 0x2f3d25, 'White Knuckle': 0xe6e6e3, 'Destroyer Grey': 0x55595e, 'Octane Red': 0x5e0b14,
     'Sinamon Stick': 0x7a3317, 'Frostbite': 0x2753a6, 'Triple Nickel': 0x8b8e92, 'Hellraisin': 0x2c1227, 'Smoke Show': 0x474c52, 'Sublime': 0x6cbf2a,
     // (the Car Crushers 2 cars' colours)
-    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e, 'Landspeeder Brown': 0xa8754f, 'Fire Engine Red': 0xc4161c,
+    'Stainless': 0xaeb2b6, 'Sand': 0xbfa07e, 'Avenger Green': 0x6fd21e, 'Diamond Black': 0x0b0c0e, 'Saddle': 0x7b4a2b, 'Buttercup': 0xf2c21b, 'Bluebird': 0x2f6fd0, 'Bay Blue': 0x1f4fd1, 'Bronze Yellow': 0xc6cf2e, 'Potty Blue': 0x3d7cc9, 'Crimson': 0xb01020, 'Patriot Blue': 0x1b3a94, 'Magnetic Gray': 0x5f6266, 'Liquid Silver': 0xc8cbcf, 'Racing Silver': 0xc9cbc6, 'Vitamin C': 0xf0560c, 'Lime Light': 0x7cc423, 'Lemon Twist': 0xf2d21a, 'Petty Blue': 0x3f8fd8, 'Alpine White': 0xeceae2, 'Bus Yellow': 0xf0a21e, 'Landspeeder Brown': 0xa8754f, 'Sandcrawler Rust': 0x7d5539, 'Fire Engine Red': 0xc4161c,
   };
 
   // ------------------------------------------------------------------ builder
@@ -17892,6 +18034,318 @@ registerProcessor('hellcat-synth', HellcatProcessor);
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
+<script>/* src/sandcrawler.js */
+/* Hellcat Drive — procedural Sandcrawler: the Jawas' rusting mobile fortress, an old Corellia Mining digger crawler -
+   36.8 m long and 20 m tall. A tall slab-sided hull, its sides leaning in a little towards the roof: the bridge's near-
+   vertical face up front with its row of small windows, under it the long bow sloping back down to the tracks (the
+   loading ramp let into it), the roof stepping down twice towards the stern, the sloped stern; a ledge round the lower
+   hull with its ports, the dark hatch in the side, plates of every shade of rust riveted over each other, rust streaks,
+   machinery and masts on the roof, floodlights on the bow. Under it four track units, each a belt of steel shoes round
+   sprockets 3.4 m tall - a short pair forward, a long pair aft - each running at its own speed and swinging to steer.
+   Model space: origin on the ground under the wheelbase centre, +X right, +Y up, forward = -Z.
+   Returns the same interface as HCCarModel.build, plus afterWheels() (the tracks' belts and sprockets). */
+(function (root) {
+  'use strict';
+
+  function build(THREE, opts) {
+    opts = opts || {};
+    const cgH = opts.cgHeight || 6.5, zOff = opts.zOff || 0;
+    const cgToFront = opts.cgToFront || 7.4, cgToRear = opts.cgToRear || 6.1;
+    const trackX = (opts.trackF || 10.6) / 2, RW = opts.wheelRadius || 1.7;
+    const PAINTS = (root.HCCarModel && root.HCCarModel.PAINTS) || {};
+    const rootG = new THREE.Group(); rootG.name = 'sandcrawler';
+    const model = new THREE.Group(); model.position.set(0, -cgH, zOff); rootG.add(model);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const toRoot = (v) => v.clone().add(V3(0, -cgH, zOff));
+    const add = (parent, geo, mat, x, y, z, rx, ry, rz, cast) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = cast !== false; m.receiveShadow = true;
+      parent.add(m); return m;
+    };
+    const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+    const cylX = (r0, r1, len, seg) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg || 24); g.rotateZ(Math.PI / 2); return g; };
+    const tubeAB = (parent, a, b, r, mat, seg) => {
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = add(parent, new THREE.CylinderGeometry(r, r, len, seg || 8), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      return m;
+    };
+    // (a seeded random, so it's the same crawler every time)
+    let seed = 7349;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    // ---------------------------------------------------------------- materials
+    // the hull's skin: plates of every shade riveted over each other, seams, rust run down from the rivets, grime - a
+    // neutral patchwork the paint colour tints (rust brown as it comes), the rust streaks warmer still. One tile is 16 m
+    function rustTex() {
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 1024; const g = c.getContext('2d');
+      g.fillStyle = '#b4aaa0'; g.fillRect(0, 0, 1024, 1024);
+      for (let i = 0; i < 260; i++) {
+        const w = 48 + rnd() * 200, h = 40 + rnd() * 170, x = rnd() * 1024 - 40, y = rnd() * 1024 - 40, v = 165 + rnd() * 60, warm = rnd() * 0.08;
+        g.fillStyle = `rgba(${Math.round(v)},${Math.round(v * (0.9 - warm))},${Math.round(v * (0.82 - warm * 1.6))},0.92)`;
+        g.fillRect(x, y, w, h);
+        g.strokeStyle = 'rgba(28,18,12,0.45)'; g.lineWidth = 2; g.strokeRect(x, y, w, h);
+        // (rivets along its edges, now and then)
+        if (rnd() < 0.45) { g.fillStyle = 'rgba(40,26,18,0.6)'; for (let k = 6; k < w - 4; k += 14) { g.fillRect(x + k, y + 5, 3, 3); g.fillRect(x + k, y + h - 8, 3, 3); } }
+      }
+      // (rust run down from the seams and rivets)
+      for (let i = 0; i < 160; i++) {
+        const x = rnd() * 1024, y = rnd() * 1024, l = 40 + rnd() * 220, w = 2 + rnd() * 10;
+        const gr = g.createLinearGradient(0, y, 0, y + l); gr.addColorStop(0, 'rgba(170,92,48,0.26)'); gr.addColorStop(1, 'rgba(170,92,48,0)');
+        g.fillStyle = gr; g.fillRect(x, y, w, l);
+      }
+      // (grime and scorched patches)
+      for (let i = 0; i < 40; i++) {
+        const x = rnd() * 1024, y = rnd() * 1024, r = 40 + rnd() * 160, gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(30,22,16,0.32)'); gr.addColorStop(1, 'rgba(30,22,16,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      }
+      // (bright scrapes)
+      g.strokeStyle = 'rgba(235,225,210,0.25)'; g.lineWidth = 1.5;
+      for (let i = 0; i < 50; i++) { const x = rnd() * 1024, y = rnd() * 1024; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 80, y + (rnd() - 0.5) * 20); g.stroke(); }
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+      return t;
+    }
+    const base = PAINTS[opts.paint] !== undefined ? PAINTS[opts.paint] : 0x7d5539;
+    const M = {};
+    M.hull = new THREE.MeshStandardMaterial({ map: rustTex(), color: base, roughness: 0.88, metalness: 0.22 });
+    M.plate = new THREE.MeshStandardMaterial({ map: M.hull.map, color: base, roughness: 0.85, metalness: 0.25, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    M.paint = M.hull;
+    M.dark = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.9, metalness: 0.2 });
+    M.hole = new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    M.glass = new THREE.MeshStandardMaterial({ color: 0x0a0c0d, roughness: 0.15, metalness: 0.7, emissive: 0xffb860, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    M.steel = new THREE.MeshStandardMaterial({ color: 0x45403a, roughness: 0.6, metalness: 0.6 });
+    M.rusty = new THREE.MeshStandardMaterial({ map: M.hull.map, color: 0x5e402c, roughness: 0.9, metalness: 0.3 });
+    M.head = new THREE.MeshStandardMaterial({ color: 0x77736a, emissive: 0xfff2d8, emissiveIntensity: 0, roughness: 0.25, metalness: 0.4 });
+    M.tail = new THREE.MeshStandardMaterial({ color: 0x5a0808, emissive: 0xff1a10, emissiveIntensity: 0.3, roughness: 0.3 });
+
+    const body = new THREE.Group(); model.add(body);
+    const tips = [], spots = [], panes = [];
+
+    // ---------------------------------------------------------------- the hull
+    // its side profile (z from the bow's tip back, y up; the hull's own z - the wheelbase's middle is 2 m behind its
+    // middle): the bridge's top edge, the roof stepping down at the middle and again over the stern, the sloped stern, the
+    // belly over the tracks, the bow sloping up from the front tracks to the bridge's face
+    const ZH = 2.0, zm = (zh) => zh - ZH;
+    const PROF = [[-18.4, 20.0], [-0.3, 18.3], [-0.3, 17.8], [11.0, 16.0], [11.0, 15.0], [15.8, 14.2], [18.4, 6.0], [17.6, 3.6], [-9.5, 3.6], [-17.6, 14.5]];
+    // (its sides lean in a little towards the roof)
+    const hwAt = (y) => 7.55 - 0.045 * (y - 3.6);
+    let area = 0; for (let i = 0; i < PROF.length; i++) { const a = PROF[i], b = PROF[(i + 1) % PROF.length]; area += a[0] * b[1] - b[0] * a[1]; }
+    const ccw = area > 0;
+    const insideProf = (z, y) => { let c = false; for (let i = 0, j = PROF.length - 1; i < PROF.length; j = i++) { const [zi, yi] = PROF[i], [zj, yj] = PROF[j]; if ((yi > y) !== (yj > y) && z < (zj - zi) * (y - yi) / (yj - yi) + zi) c = !c; } return c; };
+    // a mesh from triangles, each turned to face `want`, UVs projected on the face's own plane (16 m a tile)
+    function triMesh(tris, mat, colors) {
+      const pos = [], uv = [], col = [];
+      for (const t of tris) {
+        let [a, b, c, want] = t;
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        if (nx * want[0] + ny * want[1] + nz * want[2] < 0) { const s = b; b = c; c = s; nx = -nx; ny = -ny; nz = -nz; }
+        const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz), o = t[4] || 0;
+        for (const p of [a, b, c]) {
+          pos.push(p[0], p[1], p[2]);
+          if (ax >= ay && ax >= az) uv.push(p[2] / 16 + o, p[1] / 16); else if (ay >= az) uv.push(p[0] / 16 + o, p[2] / 16); else uv.push(p[0] / 16 + o, p[1] / 16);
+          if (colors) col.push(t[5], t[5] * 0.98, t[5] * 0.95);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      if (colors) g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.computeVertexNormals();
+      return new THREE.Mesh(g, mat);
+    }
+    {
+      const tris = [], n = PROF.length;
+      const side = (sx, p) => [sx * hwAt(p[1]), p[1], zm(p[0])];
+      const idx = THREE.ShapeUtils.triangulateShape(PROF.map(([z, y]) => new THREE.Vector2(z, y)), []);
+      for (const sx of [-1, 1]) for (const [i, j, k] of idx) tris.push([side(sx, PROF[i]), side(sx, PROF[j]), side(sx, PROF[k]), [sx, 0, 0]]);
+      for (let i = 0; i < n; i++) {
+        const p = PROF[i], q = PROF[(i + 1) % n], dz = q[0] - p[0], dy = q[1] - p[1];
+        const want = ccw ? [0, -dz, dy] : [0, dz, -dy];
+        const a = side(-1, p), b = side(1, p), c = side(1, q), d = side(-1, q);
+        tris.push([a, b, c, want], [a, c, d, want]);
+      }
+      const hull = triMesh(tris, M.hull); hull.castShadow = true; hull.receiveShadow = true; body.add(hull);
+    }
+    // ---- plates riveted over the sides, every shade of rust (a few hundred, as one mesh a side)
+    {
+      const tris = [];
+      for (const sx of [-1, 1]) for (let i = 0; i < 150; i++) {
+        const w = 1.2 + rnd() * 4.5, h = 0.8 + rnd() * 3.2, z0 = -18 + rnd() * 36, y0 = 3.8 + rnd() * 15.5;
+        if (!insideProf(z0, y0) || !insideProf(z0 + w, y0) || !insideProf(z0, y0 + h) || !insideProf(z0 + w, y0 + h)) continue;
+        const P = (z, y) => [sx * (hwAt(y) + 0.05), y, zm(z)], shade = 0.84 + rnd() * 0.26, o = rnd();
+        tris.push([P(z0, y0), P(z0 + w, y0), P(z0 + w, y0 + h), [sx, 0, 0], o, shade], [P(z0, y0), P(z0 + w, y0 + h), P(z0, y0 + h), [sx, 0, 0], o, shade]);
+      }
+      body.add(triMesh(tris, M.plate, true));
+    }
+    // ---- the ledge round the lower hull and the one along the middle, the seams between the sections
+    const slopeZ = (y) => -9.5 - 8.1 * (y - 3.6) / 10.9;            // (the bow's face, z at height y)
+    for (const sx of [-1, 1]) {
+      const z0 = slopeZ(6.6) + 0.3, z1 = 18.1;
+      add(body, box(0.45, 0.32, z1 - z0), M.rusty, sx * (hwAt(6.6) + 0.18), 6.6, zm((z0 + z1) / 2));
+      add(body, box(0.3, 0.22, 18.2), M.rusty, sx * (hwAt(8.8) + 0.12), 8.8, zm(-0.3 + 9.1));
+      for (const [zh, y0, y1] of [[-2.7, 6.8, 18.6], [-0.3, 6.8, 17.9], [11.0, 6.8, 15.8]]) add(body, box(0.22, y1 - y0, 0.3), M.rusty, sx * (hwAt((y0 + y1) / 2) + 0.1), (y0 + y1) / 2, zm(zh));
+      // (the lower band's ports and grilles)
+      for (let zh = -7; zh < 17; zh += 2.4 + rnd() * 1.2) add(body, box(0.05, 0.5 + rnd() * 0.4, 0.6 + rnd() * 0.9), M.hole, sx * (hwAt(5) + 0.04), 4.7 + rnd() * 0.8, zm(zh));
+      // (the dark hatch in the side, its frame - and on the right a second, smaller one aft)
+      const hz = sx > 0 ? 6.6 : 5.4;
+      add(body, box(0.06, 2.1, 2.2), M.hole, sx * (hwAt(10.2) + 0.05), 10.2, zm(hz));
+      add(body, box(0.18, 0.2, 2.6), M.rusty, sx * (hwAt(11.3) + 0.1), 11.35, zm(hz));
+      if (sx > 0) add(body, box(0.06, 1.1, 0.9), M.hole, sx * (hwAt(11.5) + 0.05), 11.5, zm(13.3));
+      // (the small windows high up near the bow, and over the middle)
+      for (let k = 0; k < 4; k++) panes.push(add(body, box(0.06, 0.42, 0.62), M.glass, sx * (hwAt(19.1) + 0.04), 19.1, zm(-17.2 + k * 1.3)));
+      for (let k = 0; k < 3; k++) add(body, box(0.06, 0.32, 0.5), M.glass, sx * (hwAt(17.2) + 0.04), 17.2, zm(0.9 + k * 0.9));
+      // (vertical ribs and a ladder up the stern quarter)
+      for (const zh of [12.6, 14.1]) add(body, box(0.16, 7.2, 0.18), M.rusty, sx * (hwAt(10.5) + 0.08), 10.5, zm(zh));
+    }
+    // ---- the bridge's face: its row of small windows; the bow below it, the loading ramp let into it, the floodlights
+    {
+      const bz = (y) => -18.4 + 0.8 * (20 - y) / 5.5;              // (the bridge's face leans back a touch)
+      for (let k = 0; k < 9; k++) { const x = -5.2 + k * 1.3; panes.push(add(body, box(0.72, 0.5, 0.06), M.glass, x, 18.6, zm(bz(18.6)) - 0.03)); }
+      // the ramp: a plate the width of the bow, hinged at its foot, its ribs across it (its group's +y runs up the bow's
+      // face, -z out of it)
+      const rampG = new THREE.Group(); rampG.position.set(0, 3.6, zm(-9.5)); rampG.rotation.x = -Math.atan2(8.1, 10.9); body.add(rampG);
+      const L = 7.6;
+      add(rampG, box(8.6, L, 0.25), M.rusty, 0, L / 2, -0.15);
+      for (let k = 1; k < 7; k++) add(rampG, box(8.4, 0.14, 0.12), M.dark, 0, k * L / 7, -0.33);
+      for (const sx of [-1, 1]) add(rampG, box(0.3, L, 0.3), M.rusty, sx * 4.3, L / 2, -0.2);
+      // (floodlights across the bow, under the bridge)
+      for (const x of [-4.6, -1.6, 1.6, 4.6]) {
+        const y = 13.1, z = zm(slopeZ(y)) - 0.3;
+        add(body, box(0.85, 0.8, 0.6), M.dark, x, y, z);
+        add(body, new THREE.CircleGeometry(0.32, 16), M.head, x, y, z - 0.31, 0, Math.PI, 0);
+        if (Math.abs(x) > 3) {
+          const sl = new THREE.SpotLight(0xfff0d8, 0, 160, 0.55, 0.5, 1.2);
+          sl.position.copy(toRoot(V3(x, y, z - 0.4))); sl.target.position.copy(toRoot(V3(x * 1.4, 0, z - 60)));
+          rootG.add(sl); rootG.add(sl.target); sl.visible = false; spots.push(sl);
+        }
+      }
+      // (a red lamp each side of the stern)
+      for (const sx of [-1, 1]) add(body, box(0.1, 0.4, 0.4), M.tail, sx * (hwAt(7.5) + 0.06), 7.5, zm(17.9));
+    }
+    // ---- the roof: machinery housings, vents, the masts and a sensor dish up front, a crane boom over the stern
+    {
+      const roofY = (zh) => zh < -0.3 ? 20 - 1.7 * (zh + 18.4) / 18.1 : zh < 11 ? 17.8 - 1.8 * (zh + 0.3) / 11.3 : 15 - 0.8 * (zh - 11) / 4.8;
+      for (const [x, zh, w, h, d] of [[-3.2, -12, 3.5, 1.4, 4.5], [2.8, -8, 2.6, 1.0, 3.2], [-1.0, -3.5, 5, 1.2, 2.4], [3.0, 3, 2.4, 1.6, 4.2], [-3.4, 6, 2.2, 1.0, 2.8], [0.5, 13.2, 4.4, 1.1, 2.6]]) {
+        const y = roofY(zh);
+        add(body, box(w, h, d), M.rusty, x, y + h / 2 - 0.15, zm(zh));
+        add(body, box(w * 0.8, 0.05, d * 0.7), M.hole, x, y + h - 0.12, zm(zh));
+      }
+      tubeAB(body, V3(4.8, roofY(-15), zm(-15)), V3(4.8, roofY(-15) + 4.5, zm(-15)), 0.08, M.steel);
+      tubeAB(body, V3(-5.4, roofY(-9), zm(-9)), V3(-5.4, roofY(-9) + 3.2, zm(-9)), 0.06, M.steel);
+      add(body, cylX(0.04, 0.04, 1.6, 6), M.steel, 4.8, roofY(-15) + 3.6, zm(-15));
+      { const d = new THREE.Group(); d.position.set(-4.6, roofY(-16) + 0.9, zm(-16)); body.add(d);
+        add(d, cylX(0.25, 0.25, 0.9, 12), M.rusty, 0, -0.45, 0, 0, 0, Math.PI / 2);
+        const dish = add(d, new THREE.SphereGeometry(1.1, 18, 8, 0, Math.PI * 2, 0, 0.55), M.steel, 0, 0.2, 0, -1.2, 0, 0); dish.material = M.steel; }
+      // the crane over the stern
+      tubeAB(body, V3(5.0, roofY(15), zm(15)), V3(5.4, roofY(15) + 3.2, zm(9)), 0.22, M.rusty);
+      tubeAB(body, V3(5.4, roofY(15) + 3.2, zm(9)), V3(6.6, roofY(15) + 1.4, zm(6.5)), 0.12, M.rusty);
+      tubeAB(body, V3(6.6, roofY(15) + 1.4, zm(6.5)), V3(6.6, roofY(15) - 2.0, zm(6.5)), 0.03, M.dark, 4);
+    }
+
+    // ---------------------------------------------------------------- the track units
+    // each a belt of steel shoes round two sprockets 3.4 m tall, a side frame over the inside; in its corner of the
+    // physics (the game moves it with the suspension and swings it as it steers)
+    function shoeTex() {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
+      // (u runs along the belt - one shoe a tile - v across it)
+      g.fillStyle = '#3b3631'; g.fillRect(0, 0, 64, 128);
+      g.fillStyle = '#100d0b'; g.fillRect(0, 0, 5, 128);
+      g.fillStyle = '#5e564c'; g.fillRect(14, 4, 14, 120);
+      g.fillStyle = '#2a2622'; g.fillRect(30, 4, 6, 120);
+      g.fillStyle = 'rgba(160,110,70,0.35)'; for (let i = 0; i < 30; i++) g.fillRect(Math.random() * 64, Math.random() * 128, 4, 6);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+    }
+    const PITCH = 0.75, BW = 3.6, BT = 0.28;
+    function beltGeo(hl, r) {
+      const pts = [], n = Math.max(48, Math.round((4 * hl + 2 * Math.PI * r) / 0.25));
+      const per = 4 * hl + 2 * Math.PI * r;
+      for (let i = 0; i <= n; i++) {
+        let s = i / n * per, z, y, nz, ny;
+        // (from the bottom of the front sprocket back along the ground, round the back one, forward over the top, round the front)
+        if (s < 2 * hl) { z = -hl + s; y = -r; nz = 0; ny = -1; }
+        else if ((s -= 2 * hl) < Math.PI * r) { const a = -Math.PI / 2 + s / r; z = hl + Math.cos(a) * r; y = Math.sin(a) * r; nz = Math.cos(a); ny = Math.sin(a); }
+        else if ((s -= Math.PI * r) < 2 * hl) { z = hl - s; y = r; nz = 0; ny = 1; }
+        else { s -= 2 * hl; const a = Math.PI / 2 + s / r; z = -hl + Math.cos(a) * r; y = Math.sin(a) * r; nz = Math.cos(a); ny = Math.sin(a); }
+        pts.push([z, y, nz, ny, i / n * per]);
+      }
+      const pos = [], uv = [], idx = [], h = BW / 2;
+      const ring = (off) => { const s0 = pos.length / 3; for (const p of pts) for (const x of [-h, h]) { pos.push(x, p[1] - p[3] * off, p[0] - p[2] * off); uv.push(p[4] / PITCH, x < 0 ? 0 : 1); } return s0; };
+      const o = ring(0), ii = ring(BT);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = o + i * 2, b = a + 2, c = ii + i * 2, d = c + 2;
+        idx.push(a, a + 1, b, b, a + 1, b + 1);                              // the shoes (outside)
+        idx.push(c, d, c + 1, d, d + 1, c + 1);                              // the inside
+        idx.push(a, b, c, b, d, c); idx.push(a + 1, c + 1, b + 1, b + 1, c + 1, d + 1);   // the edges
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+    // a stadium (the frame's outline, the side plates), radius r round centres +-hl, as a flat plate t thick across x
+    function stadium(hl, r, t) {
+      const s = new THREE.Shape(); s.moveTo(-hl, -r); s.lineTo(hl, -r); s.absarc(hl, 0, r, -Math.PI / 2, Math.PI / 2, false); s.lineTo(-hl, r); s.absarc(-hl, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+      const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false, curveSegments: 16 }); g.rotateY(-Math.PI / 2); g.translate(t / 2, 0, 0); return g;
+    }
+    const units = [], wheels = [];
+    const HL = [3.0, 6.3];                 // (the flat runs' half-lengths: front pair, back pair - as the physics has them)
+    for (let i = 0; i < 4; i++) {
+      const front = i < 2, left = (i & 1) === 0, side = left ? -1 : 1, hl = HL[front ? 0 : 1];
+      const corner = new THREE.Group(); corner.position.set(side * trackX, RW - cgH, front ? -cgToFront : cgToRear); rootG.add(corner);
+      const flip = new THREE.Group(); corner.add(flip); const spin = new THREE.Group(); flip.add(spin);
+      const tex = shoeTex(), tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0.5, side: THREE.DoubleSide });
+      add(corner, beltGeo(hl, RW), tm, 0, 0, 0);
+      // (the frame inside the belt, its side plates, the sprockets' hubs and a run of rollers along the bottom)
+      add(corner, stadium(hl, RW - 0.36, BW - 0.3), M.dark, 0, 0, 0);
+      for (const sx of [-1, 1]) add(corner, stadium(hl + 0.2, RW - 0.5, 0.12), M.rusty, sx * (BW / 2 + 0.07), 0, 0);
+      const hubs = [];
+      for (const zz of [-hl, hl]) for (const sx of [-1, 1]) {
+        const hg = new THREE.Group(); hg.position.set(sx * (BW / 2 + 0.18), 0, zz); corner.add(hg); hubs.push(hg);
+        add(hg, cylX(0.75, 0.75, 0.16, 20), M.steel, 0, 0, 0);
+        for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; add(hg, cylX(0.09, 0.09, 0.22, 8), M.dark, 0, Math.cos(a) * 0.5, Math.sin(a) * 0.5); }
+      }
+      for (let zz = -hl + 1.4; zz < hl - 1.2; zz += 1.6) for (const sx of [-1, 1]) add(corner, cylX(0.32, 0.32, 0.1, 14), M.steel, sx * (BW / 2 + 0.15), -RW + 0.75, zz);
+      units.push({ tex, hubs, travel: 0, prev: null, i, left });
+      wheels.push({ corner, flip, spin, left, front, side, stock: [], pkg: [] });
+    }
+    const steerG = new THREE.Group(); body.add(steerG);
+
+    // the belts run and the sprockets turn with each unit's own spin (the physics turns it like a wheel of the
+    // sprocket's radius)
+    function afterWheels() {
+      for (const u of units) {
+        const w = wheels[u.i], a = u.left ? w.spin.rotation.x : -w.spin.rotation.x;
+        if (u.prev !== null) { let d = a - u.prev; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; u.travel += d * RW; }
+        u.prev = a;
+        u.tex.offset.x = -u.travel / PITCH;
+        for (const h of u.hubs) h.rotation.x = -u.travel / 0.75;
+      }
+    }
+    function setPaint(name) { const c = PAINTS[name]; if (c === undefined) return; M.hull.color.setHex(c); M.plate.color.setHex(c); }
+    function setLights(o) {
+      M.tail.emissiveIntensity = o.brake ? 3 : (o.headlights ? 1.2 : 0.3);
+      M.head.emissiveIntensity = o.headlights ? 3.5 : 0;
+      M.glass.emissiveIntensity = o.headlights ? 0.6 : 0;          // (the Jawas' lamps on behind the windows at night)
+      for (const s of spots) { s.visible = !!o.headlights; s.intensity = o.headlights ? 900 : 0; }
+    }
+    const noop = () => {};
+    afterWheels();
+    return {
+      root: rootG, model, exterior: model, interior: model, wheels, steerWheel: steerG,
+      // (the bridge: behind its windows, 18 m up)
+      eye: toRoot(V3(-1.3, 18.5, zm(-17.3))),
+      exhaustTips: tips, materials: M, headlights: spots, tailLens: [], mirrors: [],
+      // (on the bridge the windows' panes would fill the view, a hand's breadth from the eye: you look out past them)
+      setPaint, setLights, setInteriorVisible(v, cockpit) { for (const p of panes) p.visible = !cockpit; }, setTires: noop, setTransmission: noop, drawCluster: noop, drawScreen: noop, setChute: noop,
+      afterWheels, variant: 'sandcrawler', cls: 'sandcrawler',
+    };
+  }
+
+  root.HCSandcrawler = { build };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
 <script>/* src/bike.js */
 /* Hellcat Drive — procedural touring bagger, built like a Street Glide (no badges): the batwing fairing on the forks
    with its short smoked screen, the LED headlamp and the dash inside it, a long tank with its console, the stepped
@@ -22132,7 +22586,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
 (async function () {
   'use strict';
   const W = window.HCWorld, VEH = window.HCVehicle, AUD = window.HCAudio, INP = window.HCInput;
-  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle;
+  const CAR = window.HCCarModel, WR = window.HCWorldRender, FX = window.HCFx, HUDM = window.HCHud, PULL = window.HCPuller, DRAGM = window.HCDragster, MON = window.HCMonster, KRT = window.HCKart, MOW = window.HCMower, CRU = window.HCCrushers, TANKM = window.HCTank, BIKEM = window.HCBike, OFFR = window.HCOffroad, ATVM = window.HCAtv, UNIM = window.HCUnicycle, SANDC = window.HCSandcrawler;
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const MPH = 2.23694;
@@ -22576,6 +23030,11 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       info: 'The X-34 landspeeder, Luke\'s: a long low body with a blunt rounded nose and a flat deck, a long chrome grille down each flank in its recess, two vents behind it, a slot in the nose; a clear bubble far back over the two seats; three turbines on the back - two low on stalks off the corners (the left one\'s cowling long gone, its bare engine showing), one up on a swept pylon on the centre line - their intakes forward round red lips, the fans inside turning with the spool; the pilot on the right. Dusty tan-brown under a dark red stripe, sand-scoured to grey primer and to bare metal round the nose, a grille across the nose · repulsorlift: ~0.5 m off the ground, the same hold on any surface and over water · three turbines, ~2,600 N (585 lbf) between them · 2.95 m long (3.5 m over the turbines), 1.7 m wide · ~470 kg with the pilot · 0-60 ~6 s, ~155 mph',
       trans: 'Repulsorlift · turbine thrust', tyres: 'Repulsor field',
       snd: { jet: 1, nEng: 1, cyl: 8, ev: 0, whK: 0.3, whPure: 1, whine: 1.5, rpmRef: 10000, open: 1, fmul: 1.6, deep: 0, loud: 0.3, race: 0 } },
+    sandcrawler: { btn: 'SANDCRAWLER', sub: 'The Jawas\' mobile fortress · 36.8 m long, 20 m tall, ~1,200 t on four track units that all steer · a reactor-fed 8 MW drive · 30 km/h · its own sand dunes', paint: 'Sandcrawler Rust', tc: 3, cam: [7.2, 8.5], noPkg: true, map: 'dunes',
+      hint: 'Sandcrawler: shift up (E) for DRIVE - 1,200 tonnes of rusting digger crawler, 36.8 m long and 20 m tall, on four track units that all swing to steer (a ~24 m turning circle at a crawl). The reactor-fed drive pulls it to 30 km/h (18.6 mph) in ~15 s in sand and governs there; it walks up the long windward faces of the dunes, not the steep slip faces - go round those. Trees and posts go down under it. The view button (C) puts you on the bridge, 18 m up.',
+      info: 'The Jawas\' sandcrawler, an old Corellia Mining Corporation digger crawler: the tall slab-sided hull leaning in a little towards the roof, the bridge\'s face with its row of small windows up front and the long bow sloping back under it to the tracks, the loading ramp let into it, the roof stepping down twice towards the sloped stern; a ledge round the lower hull with its ports, the dark hatch in the side, plates of every shade of rust riveted over each other, rust run down from the rivets, machinery, masts and a sensor dish on the roof, a crane over the stern, floodlights on the bow and lamps behind the windows at night · 36.8 m long (the Databank says 40 m), 20 m tall, ~15 m wide · ~1,200 t (no figure is given anywhere: NASA\'s crawler-transporter, near the same footprint but a third as tall, is 2,700 t) · four track units of 3.6 m steel shoes round 3.4 m sprockets, a short pair forward and a long pair aft, every one swinging to steer · a reactor feeding an ~8 MW (~10,700 hp) drive through a 4-speed drive transmission · 0-30 km/h in ~15 s in sand, governed at 30 km/h',
+      trans: 'Reactor drive · 4-speed · four-unit steering', tyres: 'Crawler tracks',
+      snd: { nEng: 2, cyl: 12, fmul: 0.35, deep: 1, loud: 1, open: 1, whK: 0.19, whPure: 0, whine: 0.3, rpmRef: 1900, race: 0.2, rough: 0.6, diesel: 0.4, treads: 0.75 } },
     firetruck: { btn: 'JET FIRE TRUCK', sub: 'ABLAZE - ALL STAR FIRE DEPT\'s monster fire truck · a J34 turbojet in the box, ~4,900 lbf with the afterburner and a flame out of the back · 66 in flotation tyres, four-wheel steer · ~135 mph', paint: 'Fire Engine Red', tc: 3, cam: [1.5, 1.85], map: 'arena',
       hint: 'Jet fire truck: shift up (E) for DRIVE and open the throttle - the J34 in the box spools up in a couple of seconds and shoves; floor it and the afterburner lights, a long flame out of the tailpipe. Nothing drives the wheels: it rolls on them and brakes and steers with them - G cycles the rear steering (AUTO / CRAB / MANUAL with , and .). 0-60 ~11 s, ~135 mph, so brake early: it\'s 13,000 lb. R backs it up on a hydraulic motor.',
       info: 'ABLAZE, the All Star Monster Truck Tour\'s jet-powered, flame-throwing monster fire truck: a cab-forward fire engine\'s cab - the big two-pane windshield, ALLSTAR on the doors, a gold Maltese cross, the light bar - an open crew step, and the tall red box with its ribbed hose-bed band, the ABLAZE flame logo and ALL STAR FIRE DEPT. in gold leaf, a red ladder rack and a polished hood at the back; a Westinghouse J34 turbojet with an afterburner lies in the box, its grey tailpipe a metre out of the back · ~3,400 lbf dry, ~4,900 lbf lit · the monster truck\'s chassis on a 3.3 m wheelbase: 4-link, nitrogen shocks with yellow coils, planetary axles, four-wheel steer, 66 in flotation tyres on plain grey steel wheels · nothing drives the wheels forwards; a hydraulic motor backs it up · ~13,000 lb · 0-60 ~11 s, ~135 mph',
@@ -22836,6 +23295,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
   function buildModel(id, def, s, paint) {
     const o = { variant: id === 'dragpak' ? 'dragpak' : id === 'demon' ? 'demon' : 'hellcat', paint, cgHeight: s.cgHeight, zOff: (s.cgToRear - s.cgToFront) / 2, cgToFront: s.cgToFront, cgToRear: s.cgToRear, trackF: s.trackF, trackR: s.trackR };
     if (id === 'tank') return TANKM.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
+    if (id === 'sandcrawler') return SANDC.build(THREE, Object.assign(o, { wheelRadius: s.wheelRadius }));
     if (id === 'trophy' || id === 'buggy') return OFFR.build(THREE, Object.assign(o, { car: id, engine: def.engine, wheelRadiusF: s.wheelRadiusF || s.wheelRadius, wheelRadiusR: s.wheelRadiusR || s.wheelRadius }));
     if (id === 'atv') return ATVM.build(THREE, Object.assign(o, { engine: def.engine || 'sport', wheelRadiusF: s.wheelRadiusF, wheelRadiusR: s.wheelRadiusR }));
     if (id === 'unicycle') return UNIM.build(THREE, Object.assign(o, { engine: def.engine || 'pedal', wheelRadiusF: s.wheelRadiusF || s.wheelRadius }));
@@ -23948,7 +24408,7 @@ void main(){ vec4 t = texture2D(map, vUv); float a = t.a * vA;
       pipe: ENG_SND.pipe ? clamp((veh.rpm() - ENG_SND.pipe[0]) / (ENG_SND.pipe[1] - ENG_SND.pipe[0]), 0, 1) : 0,
       vt: ENG_SND.vt || 0, surge: ENG_SND.surge || 0, ev: ENG_SND.ev || 0,
       jet: ENG_SND.jet || 0, ab: veh.jetAB || 0, nos: veh.nosActive ? 1 : 0, jsz: JET ? jetSize() : 1,
-      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0, road: HOVER ? 0.3 : 1,
+      turbo: ENG_SND.turbo || 0, diesel: ENG_SND.diesel || 0, rc: ENG_SND.rc || 0, road: HOVER ? 0.3 : 1, treads: ENG_SND.treads || 0,
     });
   }
   function processEvents() {

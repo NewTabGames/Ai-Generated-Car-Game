@@ -45,7 +45,8 @@ class CarSynth {
       turbo: 0,    // 1: the whine is a turbo's (its pitch from the boost)
       diesel: 0,   // a diesel's injection knock, 0..1
       rc: 0,       // an RC car's motor and drivetrain (1 brushless, 2 brushed)
-      road: 1 };   // the tyres' roar on the road and the gravel's patter (a repulsor: a little air under it)
+      road: 1,     // the tyres' roar on the road and the gravel's patter (a repulsor: a little air under it)
+      treads: 0 }; // a tracked vehicle: its links' pitch, m (their clank comes round at the speed over that)
     this.cur = Object.assign({}, this.tgt);
     this.seed = 22222;
     this.ca = 0; this.fi = 0;
@@ -75,6 +76,7 @@ class CarSynth {
     this.hpL = [0, 0]; this.hpR = [0, 0];
     this.pops = []; this.crack = 0; this.boom = 0; this.boomPh = 0;
     this.clunk = 0; this.clunkPh = 0; this.grind = 0; this.imp = 0; this.impLP = 0; this.impRing = 0;
+    this.trPh = 0; this.trPh2 = 0; this.trHit = 0; this.trThPh = 0;
     this.t = 0; this.cnt = 0; this.lastSet = 0; this.alive = 0; this.roarLP1 = 0; this.roarLP2 = 0; this.bodyLP = 0;
   }
   rnd() { let x = this.seed; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.seed = x >>> 0; return this.seed / 4294967296; }
@@ -174,7 +176,7 @@ class CarSynth {
     // rpm glides (~55 ms) like a heavy crank + flywheel; load a touch quicker so throttle stabs still bark
     const kr = 1 - Math.exp(-n / (sr * 0.055)), kf = 1 - Math.exp(-n / (sr * 0.035)), ks = 1 - Math.exp(-n / (sr * 0.06));
     for (const key in t) {
-      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc') c[key] = t[key];
+      if (key === 'cut' || key === 'horn' || key === 'run' || key === 'crank' || key === 'nEng' || key === 'cyl' || key === 'fmul' || key === 'open' || key === 'whPure' || key === 'vt' || key === 'surge' || key === 'ev' || key === 'jet' || key === 'turbo' || key === 'rc' || key === 'treads') c[key] = t[key];
       else c[key] += (t[key] - c[key]) * (key === 'rpm' ? kr : key === 'load' ? kf : ks);
     }
     const nE = Math.max(1, Math.min(4, c.nEng | 0 || 1));
@@ -237,6 +239,9 @@ class CarSynth {
     const sqAmp = Math.pow(Math.min(1, c.squeal), 1.25) * 0.55 * c.fxVol;
     const spin = Math.min(1, c.spin);
     const spd = c.speed;
+    // (treads: a tracked vehicle's link pitch, m - every link that comes round a sprocket knocks: a dull steel clank at the
+    // link rate, two tracks' worth a little out of step, louder the faster they run)
+    const trR = c.treads > 0 ? spd / c.treads : 0, trAmp = c.treads > 0 ? Math.min(1, spd / 3) * c.fxVol * (c.interior > 0.5 ? 0.6 : 1) : 0;
     const roadAmp = Math.min(1.3, spd / 45) * (c.surf === 0 ? 0.10 : c.surf === 1 ? 0.24 : 0.2) * c.fxVol * (interior > 0.5 ? 1.25 : 0.8) * (rcM ? 0.3 : 1) * c.road;
     // all-terrain tread blocks slapping the pavement: a howl that rises with road speed (~64 mm block pitch),
     // wobbling once per wheel turn; mostly drowned out on dirt
@@ -415,6 +420,16 @@ class CarSynth {
       this.windLP += aWind * (w2 - this.windLP); this.windLP2 += aWind * (this.windLP - this.windLP2);
       const wd = this.windLP2 * windAmp * 3;
       oL += rd + wd; oR += rd + wd * 0.95;
+      if (trAmp > 1e-4) {
+        if (!this.trBP) { this.trBP = this.bp(480, 5); this.trBP2 = this.bp(1700, 8); }
+        this.trPh += trR / sr; this.trPh2 += trR * 1.07 / sr;
+        if (this.trPh >= 1) { this.trPh -= 1; this.trHit = Math.max(this.trHit, 0.7 + this.rnd() * 0.5); }
+        if (this.trPh2 >= 1) { this.trPh2 -= 1; this.trHit = Math.max(this.trHit, 0.5 + this.rnd() * 0.5); }
+        this.trThPh += 2 * Math.PI * 42 / sr; if (this.trThPh > 6.283185307) this.trThPh -= 6.283185307;
+        const k = (this.run(this.trBP, w1 * this.trHit) * 0.9 + this.run(this.trBP2, w2 * this.trHit) * 0.3 + Math.sin(this.trThPh) * this.trHit * 0.3) * trAmp;
+        this.trHit *= 0.9975;
+        oL += k; oR += k * 0.95;
+      }
       // horn (two-tone)
       if (c.horn > 0.5) {
         this.hornPh1 += 405 / sr; this.hornPh2 += 492 / sr;

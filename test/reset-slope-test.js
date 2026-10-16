@@ -9,7 +9,7 @@ const plane = (deg, dir) => {
   return { C: { WATER_LEVEL: -1e4 }, ground(x, z, o) { const n = 1 / Math.hypot(1, g); o.h = g * (x * ux + z * uz); o.nx = -g * ux * n; o.ny = n; o.nz = -g * uz * n; o.surface = 0; return o; }, collidersNear(x, z, r, c, b) { c.length = 0; b.length = 0; } };
 };
 let bad = 0;
-for (const c of (process.env.CARS || 'hellcat,buggy:vw,monster,tank:gov,bike:stock,unicycle:pedal,dragster:tf,kart:rental').split(',')) {
+for (const c of (process.env.CARS || 'hellcat,buggy:vw,monster,tank:gov,bike:stock,unicycle:pedal,dragster:tf,kart:rental,sandcrawler').split(',')) {
   const [id, key] = c.split(':'), def = CARS[id].make ? CARS[id].make(key) : CARS[id], rows = [];
   for (const deg of [10, 20, 30]) for (const [name, hd] of [['up', 0], ['across', Math.PI / 2], ['45', Math.PI / 4]]) {
     const W = plane(deg, 0), sp = JSON.parse(JSON.stringify(def.spec)), v = new Vehicle(W, sp);

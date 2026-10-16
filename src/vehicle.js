@@ -499,6 +499,13 @@
       muX: 0.62, muY: 0.45, loose: 1.55, looseKx: [1, 1.2, 1.25, 1.25, 1.35, 1], looseKy: [1, 1.15, 1.2, 1.2, 1.3, 1], kappaPeak: 0.12, alphaPeak: 0.1, relaxX: 0.25, relaxY: 0.3,
       B: 2.2, C: 1.4, E: 0, heatCap: 1e6, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
       crr: [3, 1.2, 1.0, 1.0, 0.45, 3] },
+    // the Sandcrawler's tracks: four units, each a 3.6 m wide belt of steel shoes round sprockets 3.4 m tall - each 'wheel'
+    // is one unit's ground contact. A huge footprint (~50 m^2 a unit): it floats on sand where a tyre would dig in, and
+    // bites in it
+    crawlerTrack: { name: 'Crawler track, 3.6 m steel shoes', short: 'Crawler tracks', width: 3.6, radius: 1.7, sandKx: 1.25, sandKy: 1.2, sandCrr: 0.3,
+      muX: 0.85, muY: 0.65, loose: 1.3, looseKx: [1, 1.15, 1.2, 1.2, 1.25, 1], looseKy: [1, 1.1, 1.15, 1.15, 1.2, 1], kappaPeak: 0.12, alphaPeak: 0.12, relaxX: 0.6, relaxY: 0.8,
+      B: 2.2, C: 1.4, E: 0, heatCap: 1e7, cold: 1, coldT: 0, warmT: 1, hotT: 1000, overheat: 0, prep: 1.0,
+      crr: [3, 1.2, 1.0, 1.0, 0.5, 3] },
     // their off-road package: knobbies in each car's own size, a touch of lift
     ccKnob: { name: 'Knobby off-road tyres', short: 'Knobbies', width: 0.16, sandKx: 1.05, sandKy: 1.0,
       muX: 1.0, muY: 0.88, loose: 1.45, looseKx: [1, 1.05, 1.1, 1.15, 0.9, 1], kappaPeak: 0.13, alphaPeak: 0.15, relaxX: 0.14, relaxY: 0.26,
@@ -1009,7 +1016,7 @@
       const h = this.h;
       // gather obstacles once per frame
       const sp = Math.hypot(this.vx, this.vz);
-      this.world.collidersNear(this.px, this.pz, 8 + sp * 0.12, this._circles, this._boxes);
+      this.world.collidersNear(this.px, this.pz, (this.spec.colReach || 8) + sp * 0.12, this._circles, this._boxes);
       if (this.input.airAssist || this.spec.airLevel) this._airAssist(Math.min(dt, 0.1));
       // (wheelie control reads the nose-up pitch against the road, not the horizon: the slope under it along its heading)
       if (this.spec.wheelieCtl) {
@@ -1107,6 +1114,16 @@
         const rt = clamp(inp.rearSteer || 0, -1, 1) * s.rearSteerMax, ra = this.rearSteerAngle || 0;
         this.rearSteerAngle = ra + clamp(rt - ra, -mr, mr);
         W[2].steer += this.rearSteerAngle; W[3].steer += this.rearSteerAngle;
+        // (ackermann4: every wheel pointed round the one turn centre the two axles' angles make - on a vehicle as wide as
+        // it's long (the Sandcrawler's units 10.6 m apart on a 13.5 m wheelbase) a front-only split left the inside and
+        // outside units ~3 deg apart from it, shoving against each other sideways with ~1.5 MN apiece)
+        const tf = Math.tan(d), tr = Math.tan(this.rearSteerAngle);
+        if (s.ackermann4 && Math.abs(tf - tr) > 1e-4) {
+          const R = s.wheelbase / (tf - tr), xc = tf * R, ht = s.trackF / 2, sg = R > 0 ? 1 : -1, Ra = Math.abs(R);
+          // (a wheel's angle round it: the centre's distance back from the front axle over its distance out from the wheel)
+          const ang = (x, side) => Math.atan((xc - x) * sg / Math.max(0.5, Ra - side * sg * ht)) * sg;
+          W[0].steer = ang(0, -1); W[1].steer = ang(0, 1); W[2].steer = ang(s.wheelbase, -1); W[3].steer = ang(s.wheelbase, 1);
+        }
       }
 
       // ---------------- tyre growth: a big low-pressure slick is flung outwards as it spins up (taller, narrower),
@@ -1134,6 +1151,7 @@
         const rho = s.bike ? Math.min(r * 0.5, w.tire.width / 2) : 0;
         const rEf = (nx, ny, nz) => { const na = nx * m00 + ny * m10 + nz * m20; return rho + (r - rho) * Math.sqrt(Math.max(0, 1 - na * na)); };
         if (s.tyreEnvelope) this._envelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
+        else if (s.trackEnv) this._trackEnvelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g);
         else {
           world.ground(hx, hz, g);
           if (s.hover) this._onWater(g);
@@ -1169,7 +1187,7 @@
           const rx = hx - px, ry = hy - py, rz = hz - pz;
           const hvx = vx + (wy * rz - wz * ry), hvy = vy + (wz * rx - wx * rz), hvz = vz + (wx * ry - wy * rx);
           w.comp = -(nx * hvx + ny * hvy + nz * hvz) / ndd;
-          if (s.tyreEnvelope) w.comp = clamp(w.comp, -8, 8);    // (the carcass gives before the shocks see a spike)
+          if (s.tyreEnvelope || s.trackEnv) w.comp = clamp(w.comp, -8, 8);    // (the carcass gives before the shocks see a spike)
         } else {
           w.contact = false; w.s = w.sMax; w.comp = 0;
         }
@@ -1209,7 +1227,7 @@
         // apply along body up at the wheel centre
         let cx = w.hx + dirX * w.s, cy = w.hy + dirY * w.s, cz = w.hz + dirZ * w.s;
         let fx = upX * F, fy = upY * F, fz = upZ * F;
-        if (s.tyreEnvelope || s.bike) {
+        if (s.tyreEnvelope || s.bike || s.trackEnv) {
           // (a motorcycle too: leaned over, its forks and shock are tilted - the ground still pushes straight up at the
           // tyre, and a spring pushing along the tilted strut mustn't hand it a sideways shove the tyres never made)
           // the whole contact force at the contact point: the spring sets its part along the strut, the links carry the
@@ -1219,6 +1237,8 @@
           // (a leaned motorcycle wheel touches down on its tyre's shoulder, out from under the hub)
           if (s.bike) { cx += w.cox; cy += w.coy; cz += w.coz; }
           else { cx -= w.nx * w.radius; cy -= w.ny * w.radius; cz -= w.nz * w.radius; }
+          // (a track unit bears where along it touches - its front end walking up a rise, its middle on a crest)
+          if (s.trackEnv) { cx += w.tox; cy += w.toy; cz += w.toz; }
         }
         Fx += fx; Fy += fy; Fz += fz;
         const rx = cx - px, ry = cy - py, rz = cz - pz;
@@ -1310,7 +1330,8 @@
         const lx = fy * nz - fz * ny, ly = fz * nx - fx * nz, lz = fx * ny - fy * nx;
         // contact point
         // (a motorcycle's: on its leaned tyre's shoulder)
-        const cpx = w.hx + dirX * w.sRaw + (s.bike ? w.cox : -nx * r), cpy = w.hy + dirY * w.sRaw + (s.bike ? w.coy : -ny * r), cpz = w.hz + dirZ * w.sRaw + (s.bike ? w.coz : -nz * r);
+        let cpx = w.hx + dirX * w.sRaw + (s.bike ? w.cox : -nx * r), cpy = w.hy + dirY * w.sRaw + (s.bike ? w.coy : -ny * r), cpz = w.hz + dirZ * w.sRaw + (s.bike ? w.coz : -nz * r);
+        if (s.trackEnv) { cpx += w.tox; cpy += w.toy; cpz += w.toz; }
         w.cpx = cpx; w.cpy = cpy; w.cpz = cpz;
         const rx = cpx - px, ry = cpy - py, rz = cpz - pz;
         const cvx = vx + (wy * rz - wz * ry), cvy = vy + (wz * rx - wx * rz), cvz = vz + (wx * ry - wy * rx);
@@ -1680,6 +1701,44 @@
       w.ndd = Math.max(0.35, -(w.nx * dirX + w.ny * dirY + w.nz * dirZ));
     }
 
+    // ------------------------------------------------------------------ track units (trackEnv)
+    // A track unit (the Sandcrawler's) isn't a wheel: its belt lies flat on the ground the length of the unit and curls
+    // up round the sprockets at each end (trackEnv: the flat run's half-length, front units and rear). Points along the
+    // flat run and round both ends are tested against the ground and the deepest carries the corner - so a unit walks up
+    // a rise from its front end as it meets it, rides a crest on its middle and bridges a hollow on its ends, where the
+    // hub's single ray found a slope only once the unit's middle got to it (and its ends ploughed in). Gives the
+    // suspension length, the contact normal, the surface, and where along the unit it bears (w.tox / toy / toz from under
+    // the hub - the middle of the points that touch, so on the flat it bears under the hub as a wheel does)
+    _trackEnvelope(w, hx, hy, hz, dirX, dirY, dirZ, m00, m10, m20, m02, m12, m22, g) {
+      const world = this.world, r = w.radius, hl = this.spec.trackEnv[w.front ? 0 : 1], T = Vehicle.TRK;
+      if (-dirY < 0.2) { w.sRaw = 1e9; w.nx = 0; w.ny = 1; w.nz = 0; w.ndd = 1; w.tox = w.toy = w.toz = 0; return; }   // upended: no contact
+      const S = this._trkS || (this._trkS = new Float64Array(T.n)), sn = Math.sin(w.steer), cs = Math.cos(w.steer);
+      const fX = m00 * sn - m02 * cs, fY = m10 * sn - m12 * cs, fZ = m20 * sn - m22 * cs;   // the unit's heading
+      const aX = m00 * cs + m02 * sn, aY = m10 * cs + m12 * sn, aZ = m20 * cs + m22 * sn;   // across it
+      const sE = w.sRaw < w.sMin ? w.sMin : w.sRaw > w.sMax ? w.sMax : w.sRaw;
+      const cx0 = hx + dirX * sE, cy0 = hy + dirY * sE, cz0 = hz + dirZ * sE;
+      let best = 1e9, bj = 0, bs = 0, gx = 0, gy = 1, gz = 0;
+      for (let j = 0; j < T.n; j++) {
+        const al = T.k[j] * hl + T.sin[j] * r, dn = T.cos[j] * r;
+        world.ground(cx0 + al * fX + dn * dirX, cz0 + al * fZ + dn * dirZ, g);
+        const nd = -(dirX * g.nx + dirY * g.ny + dirZ * g.nz);
+        const sl = S[j] = sE + (cy0 + al * fY + dn * dirY - g.h) * g.ny / (nd > 0.2 ? nd : 0.2);
+        if (sl < best) { best = sl; bj = j; bs = g.surface; gx = g.nx; gy = g.ny; gz = g.nz; }
+      }
+      // (where it bears: the points within a few cm of the deepest, weighted - all of the flat run on level ground)
+      let sw = 0, sa = 0;
+      for (let j = 0; j < T.n; j++) { const q = 1 - (S[j] - best) / 0.04; if (q > 0) { sw += q * q; sa += q * q * T.k[j] * hl; } }
+      const bA = sa / sw, th = T.th[bj], ps = Math.sin(th), pc = Math.cos(th);
+      let nx = -(ps * fX + pc * dirX), ny = -(ps * fY + pc * dirY), nz = -(ps * fZ + pc * dirZ);
+      const la = gx * aX + gy * aY + gz * aZ;            // + the ground's slope across the unit
+      nx += la * aX; ny += la * aY; nz += la * aZ;
+      const nl = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      w.nx = nx * nl; w.ny = ny * nl; w.nz = nz * nl;
+      w.sRaw = best; w.surface = bs;
+      w.ndd = Math.max(0.35, -(w.nx * dirX + w.ny * dirY + w.nz * dirZ));
+      w.tox = bA * fX; w.toy = bA * fY; w.toz = bA * fZ;
+    }
+
     // ------------------------------------------------------------------ driver aids: TC, ESC, line lock
     _aids(h, speed, vFwd, vRight, upX, upY, upZ) {
       const s = this.spec, inp = this.input, W = this.wheels;
@@ -1709,7 +1768,9 @@
       // (tcAxleMean - karts: a solid rear axle turns both wheels together, so in a turn the outside one always reads
       // fast. The axle's mean speed against the chassis' own speed is exact however hard it's turning or sliding)
       if (s.tcAxleMean && okL && okR) vRear = vRearMin = 0.5 * (vL + vR);
-      const tcOn = this.tcMode < 3 && !this.lineLockActive && this.gear !== 0;
+      // (noTC: none fitted - the Sandcrawler's outside tracks run half as fast again as its inside ones in a turn, and
+      // traction control read that as wheelspin and cut the drive to nothing)
+      const tcOn = this.tcMode < 3 && !this.lineLockActive && this.gear !== 0 && !s.noTC;
       if (tcOn && !okL && !okR) { /* both rears unloaded: hold */ }
       else if (tcOn) {
         const den = Math.max(Math.abs(vRef), 3.5);
@@ -2089,9 +2150,9 @@
             }
           }
         }
-        // torque-converter lockup clutch
+        // torque-converter lockup clutch (lockRpm: from 2nd up, the output speed it locks at - a slow-turning drive's own)
         const wantLock = !s.noLockup && !this.park && this.gear !== 0 && !this.revHoldActive && !this.launchHold &&
-          ((this.gear >= 2 && turbineRpm > 1150) ||
+          ((this.gear >= 2 && turbineRpm > (s.lockRpm || 1150)) ||
            // 1st: lock once past torque multiplication (speed ratio > 0.86) so the coupling phase doesn't bleed power
            (this.gear === 1 && turbineRpm > 2900 && (inp.throttle < 0.6 || turbineRpm > 0.86 * this.eOmega * RAD2RPM) && this.shiftTimer <= 0));
         const shP = this.shiftTimer > 0 ? 1 - this.shiftTimer / (this.shiftDur || 0.2) : 1;
@@ -2284,8 +2345,21 @@
       const Te = this.Te, lt = s.lsdRamp * Math.abs(this.lastTin);
       // (fwd: front-wheel drive through this driveline - all of it to the fronts, the rears on no diff at all)
       const lkR = s.fwd ? 0 : s.lsdPreload + lt, lkF = (s.lsdPreloadF || s.lsdPreload) + lt, lkC = s.fwd ? 0 : (s.centerPreload || 2 * s.lsdPreload) + 2 * lt;
-      const tR = -lkR * Math.tanh((W[2].omega - W[3].omega) / 2.5), tF = -lkF * Math.tanh((W[0].omega - W[1].omega) / 2.5);
-      const tC = -lkC * Math.tanh((W[0].omega + W[1].omega - W[2].omega - W[3].omega) / 5);
+      // (eDiff: every wheel on its own motors, held to the turn the steering's making - each outside one faster by just as
+      // much as its path round the turn is longer - so the couplings lock against a unit spinning free, not against the
+      // turn; lsdScale: the speed difference, rad/s, they lock over - a track unit turns at a twentieth of a car wheel's)
+      let k0 = 1, k1 = 1, k2 = 1, k3 = 1;
+      if (s.eDiff) {
+        const tf = Math.tan(this.steerAngle), tr = Math.tan(this.rearSteerAngle || 0);
+        if (Math.abs(tf - tr) > 1e-4) {
+          const R = s.wheelbase / (tf - tr), xc = tf * R, ht = s.trackF / 2, rad = (x, side) => Math.hypot(xc - x, R - side * ht);
+          const r0 = rad(0, -1), r1 = rad(0, 1), r2 = rad(s.wheelbase, -1), r3 = rad(s.wheelbase, 1), rm = (r0 + r1 + r2 + r3) / 4;
+          k0 = r0 / rm; k1 = r1 / rm; k2 = r2 / rm; k3 = r3 / rm;
+        }
+      }
+      const sc = s.lsdScale || 2.5;
+      const tR = -lkR * Math.tanh((W[2].omega / k2 - W[3].omega / k3) / sc), tF = -lkF * Math.tanh((W[0].omega / k0 - W[1].omega / k1) / sc);
+      const tC = -lkC * Math.tanh((W[0].omega / k0 + W[1].omega / k1 - W[2].omega / k2 - W[3].omega / k3) / (2 * sc));
       Ti[0] = tF + tC / 2; Ti[1] = -tF + tC / 2; Ti[2] = tR - tC / 2; Ti[3] = -tR - tC / 2;
       // (awdFront: the front axle's share of the drive - a rear-biased road-car system sends most of it to the back
       // and lets the centre coupling pass more forward when the rears slip)
@@ -2514,8 +2588,8 @@
       // ground - taken as the full box, a truck pitched up against a wall read metres of overlap and was flung away)
       const zc = 0.5 * (s.bodyFront + s.bodyRear) * l, hl = Math.max(0.5 * (s.bodyRear - s.bodyFront) * l, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - l * l))), hw = Math.max(s.bodyHalfW * lr, 0.5 * (s.bodyTop - s.bodyBottom) * Math.sqrt(Math.max(0, 1 - lr * lr)));
       const cx = this.px + bX * zc, cz = this.pz + bZ * zc;
-      // skip when flying high over things
-      for (const c of this._circles) {
+      // skip when flying high over things (and trees, posts and rocks don't stop the Sandcrawler: it rolls them flat)
+      if (!s.flattens) for (const c of this._circles) {
         const dx = c.x - cx, dz = c.z - cz;
         const lx = dx * rX + dz * rZ, lz = dx * bX + dz * bZ;
         const qx = clamp(lx, -hw, hw), qz = clamp(lz, -hl, hl);
@@ -2570,6 +2644,14 @@
     }
   }
 
+  // track-envelope points: along the flat run (k from its back end, -1, to its front, +1), then round the front sprocket
+  // and round the back one (th: + ahead, from straight down)
+  Vehicle.TRK = (() => {
+    const k = [], th = [];
+    for (let j = 0; j <= 8; j++) { k.push(-1 + j / 4); th.push(0); }
+    for (const a of [20, 40, 60, 80]) { k.push(1); th.push(a * Math.PI / 180); k.push(-1); th.push(-a * Math.PI / 180); }
+    return { n: k.length, k, th, sin: th.map(Math.sin), cos: th.map(Math.cos) };
+  })();
   // tyre-envelope sample angles round the tread (-80 .. +80 deg from straight down along the strut, + = ahead)
   Vehicle.ENV = (() => {
     const n = 9, dth = 20 * Math.PI / 180, th = [], sin = [], cos = [];
@@ -3741,6 +3823,51 @@
     lsdPreload: 0, lsdRamp: 0, driveEff: 0.75,
     CdA: 6.4,
     bodyHalfW: 1.83, bodyFront: -3.95, bodyRear: 3.95, bodyBottom: -0.67, bodyTop: 1.25,
+  } };
+  // The Sandcrawler: the Jawas' - an old Corellia Mining Corporation digger crawler, 36.8 m long and 20 m tall (the film's
+  // figures; the Databank gives 40 m), ~15 m wide. No mass is given anywhere: ~1,200 t here (NASA's crawler-transporter,
+  // near the same footprint but a third as tall, is 2,700 t). Four track units - a shorter pair forward, a long pair aft -
+  // on a 13.5 m wheelbase, 10.6 m apart, every one swinging to steer as the crawler-transporter's do (the back pair the
+  // other way at its crawl, halving the turn); a reactor feeding its drive, ~8 MW (~10,700 hp), through a 4-speed drive
+  // transmission with a torque converter; 30 km/h (18.6 mph) flat out. Model space (bodyPts): the CG 6.5 m up, 2.7 m
+  // behind the hull's middle
+  const scPts = (() => {
+    const P = [], y = (h) => h - 6.5, z = (zh) => zh - 2.675;
+    for (const sx of [-1, 1]) {
+      // (the hull: its belly, the bow's slope up to the bridge, the roof's steps, the sloped stern)
+      P.push([sx * 7.5, y(3.6), z(-9.2)], [sx * 7.5, y(3.6), z(4)], [sx * 7.5, y(3.6), z(17.4)], [sx * 7.3, y(9), z(-13)], [sx * 7.0, y(14.5), z(-17.6)],
+        [sx * 6.8, y(20), z(-18.4)], [sx * 6.9, y(18.3), z(-0.3)], [sx * 7.0, y(16), z(11)], [sx * 7.0, y(14.2), z(15.8)], [sx * 7.4, y(6), z(18.4)]);
+    }
+    P.push([0, y(3.6), z(4)], [0, y(20), z(-18.4)], [0, y(18.3), z(-0.3)], [0, y(16), z(11)]);
+    return P;
+  })();
+  CARS.sandcrawler = { name: 'Sandcrawler', short: 'Sandcrawler', car: 'REACTOR DRIVE · 8 MW', hp: 10700, tq: 31300, cc: true, kbLat: 1.5, spec: {
+    name: 'Sandcrawler',
+    mass: 1.2e6, Ipitch: 1.75e8, Iyaw: 1.6e8, Iroll: 6.3e7, cgHeight: 6.5, wheelbase: 13.5, frontWeight: 0.45,
+    trackF: 10.6, trackR: 10.6, wheelRadius: 1.7, wheelInertiaF: 1e5, wheelInertiaR: 1.5e5,
+    frontTire: 'crawlerTrack', rearTire: 'crawlerTrack', Fz0: 3e6, loadSens: 0.03,
+    // (each unit on equalising bogies: ~0.2 m of static sag, ~1.1 Hz, half a metre of travel either way - a 13.5 x 10.6 m
+    // footprint on dune sand twists; stiff and short, it stood on two corners with the others in the air)
+    springF: 1.32e7, springR: 1.62e7, dampBumpF: 1.1e6, dampRebF: 1.5e6, dampBumpR: 1.4e6, dampRebR: 1.8e6,
+    arbF: 0, arbR: 0, travelUp: 0.45, travelDown: 0.5, suspS0: 0.45, bumpStopK: 8e8, fzMax: 4e7,
+    brakeTorqueF: 1.1e6, brakeTorqueR: 1.3e6, handbrakeTorque: 1.5e6, noABS: true, noESC: true, noTC: true,
+    maxSteer: 0.3, steerRate: 0.35, steerRatio: 30, ackermann: 0.5, rearSteerMax: 0.25, ackermann4: true,
+    idleRpm: 500, limiterRpm: 1950, redlineRpm: 1850, shiftRpm: 1820, governorRpm: 1910, governorBand: 110, engineInertia: 60, fricA: 500, fricB: 330, starterTorque: 7000,
+    // (lb-ft: ~42,400 Nm, flat - 8 MW at 1,800)
+    torqueCurve: [[0, 26000], [500, 31000], [1000, 31300], [1800, 31300], [1900, 26000], [2100, 18000]],
+    boostMax: 0, popScale: 0,
+    autoRatios: [3.4, 2.1, 1.4, 1.0], autoRev: 3.4, autoFinal: 39.5, tcK: 6, tcStall: 2.0, lockupTorque: 75000,
+    // (its own shift schedule: the drive turns 500-1,900 rpm, a car's points would hold it in first)
+    shiftTimeWOT: 1.0, shiftTimePart: 1.2, launchRpm: 900, engineTc: false, noCoastBlip: true, shiftDown: 600, shiftDownSpan: 250, shiftUpBase: 1100, shiftMinNext: 700, lockRpm: 700,
+    // (every unit driven on its own motors: strong couplings between them, each unit held to its own speed round the
+    // turn the steering's making - open, the drive escaped through whichever unit the dunes had lifted and spun it)
+    awd: true, awdFront: 0.45, lsdPreload: 1.2e6, lsdPreloadF: 1.2e6, centerPreload: 2.4e6, lsdRamp: 0, driveEff: 0.8, eDiff: true, lsdScale: 0.3,
+    CdA: 300,
+    bodyHalfW: 7.6, bodyFront: -21.1, bodyRear: 15.7, bodyBottom: -2.9, bodyTop: 13.5, bodyPts: scPts, bodyK: 3e8, bodyC: 3e7, bodyFricC: 3e7,
+    // (colReach: how far round it to look for things to hit - it's 37 m long; flattens: trees and posts go down under it)
+    colReach: 24, flattens: true,
+    // (the track units: the front pair's flat run 6 m long, the back pair's 12.6 m - the belt round 1.7 m sprockets beyond)
+    trackEnv: [3.0, 6.3],
   } };
   // The electric cars' petrol alternatives. CARS[id].engines: { key: entry overrides + spec overrides }; the stock
   // (electric) car is 'ev'; label names it. CARS[id].make(key) -> a CARS-style entry with that engine in (the game
